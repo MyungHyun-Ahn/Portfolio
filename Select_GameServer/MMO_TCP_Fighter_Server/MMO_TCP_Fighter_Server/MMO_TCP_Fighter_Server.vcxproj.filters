@@ -1,0 +1,105 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="ServerLib">
+      <UniqueIdentifier>{4973d34e-4e9f-4736-90eb-72f7eea85c45}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Etc">
+      <UniqueIdentifier>{b46f19b9-086b-40d5-9aa1-1ae6cc183815}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Main">
+      <UniqueIdentifier>{4c5b1da3-1a47-415d-9c9e-7980c28e484e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GameServer">
+      <UniqueIdentifier>{eee2952b-dcd0-401b-8a3a-5c42ae2bdd88}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Tools">
+      <UniqueIdentifier>{90496b9f-9e9c-4085-9d46-70db39fca84a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DataStructure">
+      <UniqueIdentifier>{ef339a03-c9ce-4bb4-bb49-2a113e555767}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Config">
+      <UniqueIdentifier>{23d0a07d-1eb7-4fd3-bdd1-f8965ccb547e}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="CServerCore.cpp">
+      <Filter>ServerLib</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>Etc</Filter>
+    </ClCompile>
+    <ClCompile Include="CCrashDump.cpp">
+      <Filter>Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="CLogger.cpp">
+      <Filter>Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="CProfiler.cpp">
+      <Filter>Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="CSession.cpp">
+      <Filter>ServerLib</Filter>
+    </ClCompile>
+    <ClCompile Include="CObjectPool.cpp">
+      <Filter>DataStructure</Filter>
+    </ClCompile>
+    <ClCompile Include="CRingBuffer.cpp">
+      <Filter>DataStructure</Filter>
+    </ClCompile>
+    <ClCompile Include="CSerializableBuffer.cpp">
+      <Filter>DataStructure</Filter>
+    </ClCompile>
+    <ClCompile Include="Main.cpp">
+      <Filter>Main</Filter>
+    </ClCompile>
+    <ClCompile Include="CProcessPacket.cpp">
+      <Filter>ServerLib</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="CServerCore.h">
+      <Filter>ServerLib</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
+      <Filter>Etc</Filter>
+    </ClInclude>
+    <ClInclude Include="CCrashDump.h">
+      <Filter>Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="CLogger.h">
+      <Filter>Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="CProfiler.h">
+      <Filter>Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="Define.h">
+      <Filter>Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="GameDefine.h">
+      <Filter>GameServer</Filter>
+    </ClInclude>
+    <ClInclude Include="CSession.h">
+      <Filter>ServerLib</Filter>
+    </ClInclude>
+    <ClInclude Include="CObjectPool.h">
+      <Filter>DataStructure</Filter>
+    </ClInclude>
+    <ClInclude Include="CRingBuffer.h">
+      <Filter>DataStructure</Filter>
+    </ClInclude>
+    <ClInclude Include="CSerializableBuffer.h">
+      <Filter>DataStructure</Filter>
+    </ClInclude>
+    <ClInclude Include="CProcessPacket.h">
+      <Filter>ServerLib</Filter>
+    </ClInclude>
+    <ClInclude Include="Config.h">
+      <Filter>Config</Filter>
+    </ClInclude>
+    <ClInclude Include="DefinePacket.h">
+      <Filter>ServerLib</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
