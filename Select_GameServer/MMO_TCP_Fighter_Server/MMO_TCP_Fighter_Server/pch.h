@@ -31,6 +31,7 @@
 
 // 직접 정의한 라이브러리
 #include "Define.h"
+#include "GameDefine.h"
 #include "CObjectPool.h"
 #include "CRingBuffer.h"
 #include "CSerializableBuffer.h"

@@ -27,7 +27,8 @@ public:
 
 	inline int GetBufferSize() const { return m_MaxSize; }
 	inline int GetDataSize() const { return m_Rear - m_Front; }
-	inline int GetHeaderSize() { return  (int)DEFINE::HEADER_SIZE; }
+	inline int GetHeaderSize() const { return  (int)DEFINE::HEADER_SIZE; }
+	inline int GetFullSize() const { return GetDataSize() + GetHeaderSize(); }
 
 	// 외부에서 버퍼를 직접 조작하기 위한 용도
 	inline char *GetBufferPtr() { return m_Buffer; }

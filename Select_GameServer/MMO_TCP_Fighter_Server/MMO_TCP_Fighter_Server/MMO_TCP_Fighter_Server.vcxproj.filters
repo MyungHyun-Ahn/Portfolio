@@ -54,8 +54,17 @@
     <ClCompile Include="Main.cpp">
       <Filter>Main</Filter>
     </ClCompile>
+    <ClCompile Include="CGameServer.cpp">
+      <Filter>GameServer</Filter>
+    </ClCompile>
+    <ClCompile Include="CPlayer.cpp">
+      <Filter>GameServer</Filter>
+    </ClCompile>
+    <ClCompile Include="CGenPacket.cpp">
+      <Filter>GameServer</Filter>
+    </ClCompile>
     <ClCompile Include="CProcessPacket.cpp">
-      <Filter>ServerLib</Filter>
+      <Filter>GameServer</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -92,14 +101,23 @@
     <ClInclude Include="CSerializableBuffer.h">
       <Filter>DataStructure</Filter>
     </ClInclude>
-    <ClInclude Include="CProcessPacket.h">
-      <Filter>ServerLib</Filter>
-    </ClInclude>
     <ClInclude Include="Config.h">
       <Filter>Config</Filter>
     </ClInclude>
     <ClInclude Include="DefinePacket.h">
       <Filter>ServerLib</Filter>
+    </ClInclude>
+    <ClInclude Include="CGameServer.h">
+      <Filter>GameServer</Filter>
+    </ClInclude>
+    <ClInclude Include="CPlayer.h">
+      <Filter>GameServer</Filter>
+    </ClInclude>
+    <ClInclude Include="CGenPacket.h">
+      <Filter>GameServer</Filter>
+    </ClInclude>
+    <ClInclude Include="CProcessPacket.h">
+      <Filter>GameServer</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

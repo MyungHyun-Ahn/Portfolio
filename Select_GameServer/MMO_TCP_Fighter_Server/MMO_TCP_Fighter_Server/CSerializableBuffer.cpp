@@ -24,8 +24,11 @@ CSerializableBuffer::~CSerializableBuffer()
 
 bool CSerializableBuffer::EnqueueHeader(char *buffer, int size)
 {
+	// 이 상황은 이미 헤더를 삽입한 것
+	//	* CGameServer::SendSector에서 발생 가능
+	//  * 싱글 스레드에서는 문제가 발생할 여지가 없으므로 그냥 return true
 	if (m_HeaderFront + size > m_Front)
-		return false;
+		return true;
 
 	memcpy_s(m_Buffer + m_HeaderFront, m_Front - m_HeaderFront, buffer, size);
 

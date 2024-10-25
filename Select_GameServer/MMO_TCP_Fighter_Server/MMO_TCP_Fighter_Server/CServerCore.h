@@ -12,7 +12,7 @@ public:
 	VOID					Stop();
 
 	BOOL					Select();
-	BOOL					SendPacket(CONST UINT64 sessionId, char *packet, int size);
+	BOOL					SendPacket(CONST UINT64 sessionId, CSerializableBuffer *message);
 	VOID					TimeoutCheck();
 	BOOL					Disconnect();
 
@@ -20,6 +20,7 @@ private:
 	BOOL					Accept();
 	BOOL					Recv(CSession *pSession);
 	BOOL					Send(CSession *pSession);
+	BOOL					Process(CSession *pSession);
 
 public:
 	// 상속받는 쪽에서 호출할 콜백을 구현하여 등록해야함
@@ -28,11 +29,11 @@ public:
 	virtual bool			OnRecv(CONST UINT64 sessionId, CSerializableBuffer *message) = 0;
 
 private:
-	std::unordered_map<INT, CSession *>		m_mapSessions;
+	std::unordered_map<UINT64, CSession *>		m_mapSessions;
 
 	// Session 관련
 	UINT64									m_iCurSessionIDValue = 0; // 유저에게 부여할 ID 번호
-	int										m_iMaxSessionCount = 0;
+	UINT64									m_iMaxSessionCount = 0;
 
 	// DeleteQueue
 	std::deque<CSession *>					m_deqDeleteQueue;

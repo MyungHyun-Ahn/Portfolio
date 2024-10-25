@@ -146,8 +146,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="CCrashDump.h" />
+    <ClInclude Include="CGameServer.h" />
+    <ClInclude Include="CGenPacket.h" />
     <ClInclude Include="CLogger.h" />
     <ClInclude Include="CObjectPool.h" />
+    <ClInclude Include="CPlayer.h" />
     <ClInclude Include="CProcessPacket.h" />
     <ClInclude Include="CProfiler.h" />
     <ClInclude Include="CRingBuffer.h" />
@@ -162,8 +165,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CCrashDump.cpp" />
+    <ClCompile Include="CGameServer.cpp" />
+    <ClCompile Include="CGenPacket.cpp" />
     <ClCompile Include="CLogger.cpp" />
     <ClCompile Include="CObjectPool.cpp" />
+    <ClCompile Include="CPlayer.cpp" />
     <ClCompile Include="CProcessPacket.cpp" />
     <ClCompile Include="CProfiler.cpp" />
     <ClCompile Include="CRingBuffer.cpp" />

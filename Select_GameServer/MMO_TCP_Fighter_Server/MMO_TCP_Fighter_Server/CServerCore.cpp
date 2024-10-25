@@ -13,8 +13,6 @@
 */
 BOOL CServerCore::Start(const CHAR *openIp, const USHORT port, INT maxSessionCount)
 {
-	g_pProcessPacket->SetServer(this);
-
 	int retVal;
 	int errVal;
 	
@@ -218,10 +216,15 @@ BOOL CServerCore::Select()
 		* 컨텐츠 코드에서 sessionId를 통해 Send 할것을 Enqueue
 		* 실질적인 Send는 Select 함수에서 이뤄짐
 */
-BOOL CServerCore::SendPacket(CONST UINT64 sessionId, char *packet, int size)
+BOOL CServerCore::SendPacket(CONST UINT64 sessionId, CSerializableBuffer *message)
 {
+	// 헤더 세팅
+	PacketHeader header{ PACKET_IDENTIFIER, message->GetDataSize() - 1 };
+	message->EnqueueHeader((char *)&header, sizeof(PacketHeader));
+
+	// SendBuffer에 등록
 	CSession *pSession = m_mapSessions[sessionId];
-	int ret = pSession->m_SendBuffer.Enqueue(packet, size);
+	int ret = pSession->m_SendBuffer.Enqueue(message->GetBufferPtr(), message->GetFullSize());
 	if (ret == -1)
 		return FALSE;
 
@@ -334,7 +337,7 @@ BOOL CServerCore::Recv(CSession *pSession)
 	// 1. ProcessPacket 패킷 헤더 분석은 ServerCore에서 ProcessPacket의 Process 함수
 	// 2. ServerCore의 OnRecv 콜백을 Process 함수의 내부에서 호출
 
-	if (!g_pProcessPacket->Process(pSession))
+	if (!Process(pSession))
 	{
 		if (pSession->m_isVaild)
 		{
@@ -380,6 +383,32 @@ BOOL CServerCore::Send(CSession *pSession)
 	}
 	
 	// Send TPS 증가
+
+	return TRUE;
+}
+
+BOOL CServerCore::Process(CSession *pSession)
+{
+	int size = pSession->m_RecvBuffer.GetUseSize();
+
+	while (size > 0)
+	{
+		PacketHeader header;
+		int ret = pSession->m_RecvBuffer.Peek((char *)&header, sizeof(PacketHeader));
+		// PacketHeader + PacketType + size
+		if (pSession->m_RecvBuffer.GetUseSize() < sizeof(PacketHeader) + 1 + header.bySize)
+			break;
+
+		pSession->m_RecvBuffer.MoveFront(ret);
+
+		CSerializableBuffer *buffer = new CSerializableBuffer;
+		ret = pSession->m_RecvBuffer.Dequeue(buffer->GetContentBufferPtr(), header.bySize + 1);
+
+		if (OnRecv(pSession->m_iId, buffer))
+			return FALSE;
+
+		delete buffer;
+	}
 
 	return TRUE;
 }
