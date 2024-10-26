@@ -13,7 +13,7 @@
 		* sessionId가 0일시 자신도 포함
 			* sessionId는 1부터 부여하기 때문에 0이 들어올리가 없음
 */
-bool CGameServer::SendSector(const UINT64 sessionId, INT secY, INT secX, CSerializableBuffer *message)
+BOOL CGameServer::SendSector(const UINT64 sessionId, INT secY, INT secX, CSerializableBuffer *message)
 {
 	int startY = secY - SECTOR_VIEW_START;
 	int startX = secX - SECTOR_VIEW_START;
@@ -42,7 +42,7 @@ bool CGameServer::SendSector(const UINT64 sessionId, INT secY, INT secX, CSerial
 /*
 	섹터 범위 내의 플레이어를 대상으로 수행할 행동 지정
 */
-bool CGameServer::FuncSector(const UINT64 sessionId, INT secY, INT secX, SectorFunc func)
+BOOL CGameServer::FuncSector(const UINT64 sessionId, INT secY, INT secX, SectorFunc func)
 {
 	int startY = secY - SECTOR_VIEW_START;
 	int startX = secX - SECTOR_VIEW_START;
@@ -69,7 +69,7 @@ bool CGameServer::FuncSector(const UINT64 sessionId, INT secY, INT secX, SectorF
 }
 
 // 여기서 Player 생성 작업을 진행
-void CGameServer::OnAccept(const UINT64 sessionId)
+VOID CGameServer::OnAccept(const UINT64 sessionId)
 {
 	// 랜덤 좌표 생성
 	USHORT ranY = (rand() % (RANGE_MOVE_BOTTOM - RANGE_MOVE_TOP - 1)) + RANGE_MOVE_TOP + 1;
@@ -99,7 +99,7 @@ void CGameServer::OnAccept(const UINT64 sessionId)
 	m_mapPlayers.insert(std::make_pair(sessionId, newPlayer));
 }
 
-void CGameServer::OnClientLeave(const UINT64 sessionId)
+VOID CGameServer::OnClientLeave(const UINT64 sessionId)
 {
 	CPlayer *delPlayer = m_mapPlayers[sessionId];
 	// 섹터에서 지워주기
@@ -112,7 +112,7 @@ void CGameServer::OnClientLeave(const UINT64 sessionId)
 	delete delPlayer;
 }
 
-bool CGameServer::OnRecv(const UINT64 sessionId, CSerializableBuffer *message)
+BOOL CGameServer::OnRecv(const UINT64 sessionId, CSerializableBuffer *message)
 {
 	BYTE packetCode;
 	*message >> packetCode;
@@ -125,7 +125,7 @@ bool CGameServer::OnRecv(const UINT64 sessionId, CSerializableBuffer *message)
 // CGameServer 클래스 멤버로 만든 이유
 //		* CPlayer 객체의 멤버의 접근이 필요
 //		* friend 클래스로 CGameServer 객체 내의 함수라면 접근을 허용
-void CGameServer::NewPlayerGetOtherPlayerInfo(UINT64 newPlayerId, CPlayer *otherPlayer)
+VOID CGameServer::NewPlayerGetOtherPlayerInfo(UINT64 newPlayerId, CPlayer *otherPlayer)
 {
 	CSerializableBuffer *createOtherCharPacket = CGenPacket::makePacketSCCreateOtherCharacter(otherPlayer->m_iId, otherPlayer->m_bDirection, otherPlayer->m_sX, otherPlayer->m_sY, (CHAR)otherPlayer->m_sHp);
 	SendPacket(newPlayerId, createOtherCharPacket);

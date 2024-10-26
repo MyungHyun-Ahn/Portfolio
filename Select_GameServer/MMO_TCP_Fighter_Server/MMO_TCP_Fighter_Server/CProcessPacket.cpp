@@ -10,30 +10,30 @@ CProcessPacketInterface *g_pProcessPacket = &g_ProcessPacket;
 
 bool CProcessPacket::PacketProcCSMoveStart(UINT64 sessionId, CSerializableBuffer *message)
 {
-	return false;
+	return true;
 }
 
 bool CProcessPacket::PacketProcCSMoveStop(UINT64 sessionId, CSerializableBuffer *message)
 {
-	return false;
+	return true;
 }
 
 bool CProcessPacket::PacketProcCSAttack1(UINT64 sessionId, CSerializableBuffer *message)
 {
-	return false;
+	return true;
 }
 
 bool CProcessPacket::PacketProcCSAttack2(UINT64 sessionId, CSerializableBuffer *message)
 {
-	return false;
+	return true;
 }
 
 bool CProcessPacket::PacketProcCSAttack3(UINT64 sessionId, CSerializableBuffer *message)
 {
-	return false;
+	return true;
 }
 
 bool CProcessPacket::PacketProcCSEcho(UINT64 sessionId, CSerializableBuffer *message)
 {
-	return false;
+	return true;
 }

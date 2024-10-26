@@ -11,7 +11,7 @@
 		* listen과 소켓 옵션까지 설정
 		* maxClientCount까지 받으면 서버에서 연결을 거부하고 끊을 것
 */
-BOOL CServerCore::Start(const CHAR *openIp, const USHORT port, INT maxSessionCount)
+BOOL CServerCore::Start(CONST CHAR *openIp, CONST USHORT port, INT maxSessionCount)
 {
 	int retVal;
 	int errVal;
@@ -24,7 +24,7 @@ BOOL CServerCore::Start(const CHAR *openIp, const USHORT port, INT maxSessionCou
 		g_Logger->WriteLog(L"NetworkCore", LOG_LEVEL::ERR, L"WSAStartup Error");
 
 		// 여기서 예외를 던지면 UnhandledExceptionFilter에 걸려서 크래시 덤프가 남을 것
-		throw 1;
+		throw FALSE;
 	}
 
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"WSAStartup success");
@@ -35,7 +35,7 @@ BOOL CServerCore::Start(const CHAR *openIp, const USHORT port, INT maxSessionCou
 	{
 		errVal = WSAGetLastError();
 		g_Logger->WriteLog(L"NetworkCore", LOG_LEVEL::ERR, L"socket() Error : %d", errVal);
-		return FALSE;
+		throw FALSE;
 	}
 
 	// bind
@@ -49,7 +49,7 @@ BOOL CServerCore::Start(const CHAR *openIp, const USHORT port, INT maxSessionCou
 	{
 		errVal = WSAGetLastError();
 		g_Logger->WriteLog(L"NetworkCore", LOG_LEVEL::ERR, L"bind() Error : %d", errVal);
-		return false;
+		throw FALSE;
 	}
 
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Bind OK # Port : %d", port);
@@ -60,7 +60,7 @@ BOOL CServerCore::Start(const CHAR *openIp, const USHORT port, INT maxSessionCou
 	{
 		errVal = WSAGetLastError();
 		g_Logger->WriteLog(L"NetworkCore", LOG_LEVEL::ERR, L"listen() Error : %d", errVal);
-		return false;
+		throw FALSE;
 	}
 
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Listen OK #");
@@ -68,18 +68,24 @@ BOOL CServerCore::Start(const CHAR *openIp, const USHORT port, INT maxSessionCou
 	// 논 블로킹 소켓으로 전환
 	u_long on = 1;
 	retVal = ioctlsocket(m_listenSocket, FIONBIO, &on);
-	if (retVal == SOCKET_ERROR)
+	if (retVal == SOCKET_ERROR) // 실패 시 SOCKET_ERROR 반환
 	{
 		errVal = WSAGetLastError();
 		g_Logger->WriteLog(L"NetworkCore", LOG_LEVEL::ERR, L"ioctlsocket() Error : %d", errVal);
-		return false;
+		throw FALSE;
 	}
 
 	// 링거 옵션 설정
 	LINGER ling;
 	ling.l_linger = 0;
 	ling.l_onoff = 1;
-	setsockopt(m_listenSocket, SOL_SOCKET, SO_LINGER, (char *)&ling, sizeof(ling));
+	retVal = setsockopt(m_listenSocket, SOL_SOCKET, SO_LINGER, (char *)&ling, sizeof(ling));
+	if (retVal == SOCKET_ERROR)
+	{
+		errVal = WSAGetLastError();
+		g_Logger->WriteLog(L"NetworkCore", LOG_LEVEL::ERR, L"setsockopt() Error : %d", errVal);
+		throw FALSE;
+	}
 
 	return TRUE;
 }
@@ -100,13 +106,13 @@ VOID CServerCore::Stop()
 	CServerCore::Select
 		* Select 함수를 통한 논블로킹 소켓 제어
 		* 63개 씩 소켓을 끊어 호출
+		* writeSet, readSet에 논블락킹 소켓이 Pending을 반환하지 않고 할 작업이 있는 경우에
+		* FD_ISSET으로 소켓을 확인하여 작업 진행
 */
 BOOL CServerCore::Select()
 {
 	int errVal;
 	int retVal;
-
-	int loopCount = 0;
 
 	auto startIt = m_mapSessions.begin();
 	auto prevStartIt = startIt;
@@ -131,11 +137,8 @@ BOOL CServerCore::Select()
 		startIt = prevStartIt;
 
 		// 루프를 돌며 set에 session 등록
-		int sesCount = 0;
-		for (; startIt != m_mapSessions.end(); ++startIt)
+		for (; startIt != endIt; ++startIt)
 		{
-			++sesCount;
-
 			CSession *ses = startIt->second;
 
 			if (time - ses->m_iPrevRecvTime > NETWORK_PACKET_RECV_TIMEOUT && ses->m_isVaild)
@@ -146,10 +149,6 @@ BOOL CServerCore::Select()
 			}
 
 			FD_SET(ses->m_ClientSocket, &m_readSet);
-
-			// 63개 까지 등록했다면 루프 종료
-			if (sesCount == 63)
-				break;
 		}
 
 		// select()
@@ -193,6 +192,7 @@ BOOL CServerCore::Select()
 			}
 		}
 
+		// iterator를 63번 밀어줌
 		for (size_t i = 0; i < 63; i++)
 		{
 			++prevStartIt;
@@ -201,32 +201,10 @@ BOOL CServerCore::Select()
 				break;
 		}
 
+		// startIt이 끝에 도달하였다면 끝
 		if (startIt == m_mapSessions.end())
 			break;
-
-		loopCount++;
 	}
-
-	return TRUE;
-}
-
-
-/*
-	CServerCore::SendPacket
-		* 컨텐츠 코드에서 sessionId를 통해 Send 할것을 Enqueue
-		* 실질적인 Send는 Select 함수에서 이뤄짐
-*/
-BOOL CServerCore::SendPacket(CONST UINT64 sessionId, CSerializableBuffer *message)
-{
-	// 헤더 세팅
-	PacketHeader header{ PACKET_IDENTIFIER, message->GetDataSize() - 1 };
-	message->EnqueueHeader((char *)&header, sizeof(PacketHeader));
-
-	// SendBuffer에 등록
-	CSession *pSession = m_mapSessions[sessionId];
-	int ret = pSession->m_SendBuffer.Enqueue(message->GetBufferPtr(), message->GetFullSize());
-	if (ret == -1)
-		return FALSE;
 
 	return TRUE;
 }
@@ -262,6 +240,26 @@ BOOL CServerCore::Disconnect()
 	}
 
 	m_deqDeleteQueue.clear();
+	return TRUE;
+}
+
+/*
+	CServerCore::SendPacket
+		* 컨텐츠 코드에서 sessionId를 통해 Send 할것을 Enqueue
+		* 실질적인 Send는 Select 함수에서 이뤄짐
+*/
+BOOL CServerCore::SendPacket(CONST UINT64 sessionId, CSerializableBuffer *message)
+{
+	// 헤더 세팅
+	PacketHeader header{ PACKET_IDENTIFIER, message->GetDataSize() - 1 };
+	message->EnqueueHeader((char *)&header, sizeof(PacketHeader));
+
+	// SendBuffer에 등록
+	CSession *pSession = m_mapSessions[sessionId];
+	int ret = pSession->m_SendBuffer.Enqueue(message->GetBufferPtr(), message->GetFullSize());
+	if (ret == -1)
+		return FALSE;
+
 	return TRUE;
 }
 
@@ -307,6 +305,8 @@ BOOL CServerCore::Recv(CSession *pSession)
 		errVal = WSAGetLastError();
 		if (errVal != WSAEWOULDBLOCK)
 		{
+			g_Logger->WriteLog(L"NetworkCore", LOG_LEVEL::ERR, L"recv() Error : %d, SessionID : %d", errVal, pSession->m_iId);
+
 			// WOULDBLOCK이 아닌 에러는 deleteQueue에 Enqueue
 			if (pSession->m_isVaild)
 			{
@@ -332,10 +332,6 @@ BOOL CServerCore::Recv(CSession *pSession)
 
 	pSession->m_iPrevRecvTime = timeGetTime();
 	pSession->m_RecvBuffer.MoveRear(retVal);
-
-	// 받은 패킷을 어떻게 처리할 것인지는 고민이 필요
-	// 1. ProcessPacket 패킷 헤더 분석은 ServerCore에서 ProcessPacket의 Process 함수
-	// 2. ServerCore의 OnRecv 콜백을 Process 함수의 내부에서 호출
 
 	if (!Process(pSession))
 	{
@@ -363,6 +359,8 @@ BOOL CServerCore::Send(CSession *pSession)
 		errVal = WSAGetLastError();
 		if (errVal != WSAEWOULDBLOCK)
 		{
+			g_Logger->WriteLog(L"NetworkCore", LOG_LEVEL::ERR, L"send() Error : %d, SessionID : %d", errVal, pSession->m_iId);
+
 			if (pSession->m_isVaild)
 			{
 				m_deqDeleteQueue.push_back(pSession);

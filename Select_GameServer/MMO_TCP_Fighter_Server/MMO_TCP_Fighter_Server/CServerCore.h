@@ -8,13 +8,14 @@ class CServerCore
 public:
 	friend class CProcessPacket;
 
-	BOOL					Start(const CHAR *openIp, const USHORT port, INT maxSessionCount);
+	BOOL					Start(CONST CHAR *openIp, CONST USHORT port, INT maxSessionCount);
 	VOID					Stop();
 
 	BOOL					Select();
-	BOOL					SendPacket(CONST UINT64 sessionId, CSerializableBuffer *message);
 	VOID					TimeoutCheck();
 	BOOL					Disconnect();
+
+	BOOL					SendPacket(CONST UINT64 sessionId, CSerializableBuffer *message);
 
 private:
 	BOOL					Accept();
@@ -24,9 +25,9 @@ private:
 
 public:
 	// 상속받는 쪽에서 호출할 콜백을 구현하여 등록해야함
-	virtual void			OnAccept(CONST UINT64 sessionId) = 0;
-	virtual void			OnClientLeave(CONST UINT64 sessionId) = 0;
-	virtual bool			OnRecv(CONST UINT64 sessionId, CSerializableBuffer *message) = 0;
+	virtual VOID			OnAccept(CONST UINT64 sessionId) = 0;
+	virtual VOID			OnClientLeave(CONST UINT64 sessionId) = 0;
+	virtual BOOL			OnRecv(CONST UINT64 sessionId, CSerializableBuffer *message) = 0;
 
 private:
 	std::unordered_map<UINT64, CSession *>		m_mapSessions;
