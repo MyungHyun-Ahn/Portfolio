@@ -76,9 +76,7 @@ BOOL CServerCore::Start(CONST CHAR *openIp, CONST USHORT port, INT maxSessionCou
 	}
 
 	// 링거 옵션 설정
-	LINGER ling;
-	ling.l_linger = 0;
-	ling.l_onoff = 1;
+	LINGER ling{ 1, 0 };
 	retVal = setsockopt(m_listenSocket, SOL_SOCKET, SO_LINGER, (char *)&ling, sizeof(ling));
 	if (retVal == SOCKET_ERROR)
 	{
@@ -253,7 +251,7 @@ BOOL CServerCore::Disconnect()
 BOOL CServerCore::SendPacket(CONST UINT64 sessionId, CSerializableBuffer *message)
 {
 	// 헤더 세팅
-	PacketHeader header{ PACKET_IDENTIFIER, message->GetDataSize() - 1 };
+	PacketHeader header{ PACKET_IDENTIFIER, (BYTE)(message->GetDataSize() - 1) };
 	message->EnqueueHeader((char *)&header, sizeof(PacketHeader));
 
 	// SendBuffer에 등록

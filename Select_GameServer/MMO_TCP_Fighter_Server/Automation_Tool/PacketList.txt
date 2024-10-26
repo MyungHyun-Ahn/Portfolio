@@ -1,0 +1,91 @@
+# Server to Client
+
+CreateMyCharacter 0
+- id : INT
+- direction : CHAR
+- x : USHORT
+- y : USHORT
+- hp : BYTE
+
+CreateOtherCharacter 1
+- id : INT
+- direction : CHAR
+- x : USHORT
+- y : USHORT
+- hp : BYTE
+
+DeleteCharacter 2
+- id : INT
+
+MoveStart 11
+- id : INT
+- direction : CHAR
+- x : USHORT
+- y : USHORT
+
+MoveStop 13
+- id : INT
+- direction : CHAR
+- x : USHORT
+- y : USHORT
+
+Attack1 21
+- id : INT
+- direction : CHAR
+- x : USHORT
+- y : USHORT
+
+Attack2 23
+- id : INT
+- direction : CHAR
+- x : USHORT
+- y : USHORT
+
+Attack3 25
+- id : INT
+- direction : CHAR
+- x : USHORT
+- y : USHORT
+
+Damage 30
+- attackId : INT
+- damageId : INT
+- damageHp : CHAR
+
+Sync 251
+- id : INT
+- x : USHORT
+- y : USHORT
+
+Echo 253
+- time : DWORD
+
+# Client to Server
+
+MoveStart 10
+- direction : CHAR
+- x : USHORT
+- y : USHORT
+
+MoveStop 12
+- direction : CHAR
+- x : USHORT
+- y : USHORT
+
+Attack1 20
+- direction : CHAR
+- x : USHORT
+- y : USHORT
+
+Attack2 22
+- direction : CHAR
+- x : USHORT
+- y : USHORT
+
+Attack3 24
+- direction : CHAR
+- x : USHORT
+- y : USHORT
+
+Echo 252
+- time : DWORD

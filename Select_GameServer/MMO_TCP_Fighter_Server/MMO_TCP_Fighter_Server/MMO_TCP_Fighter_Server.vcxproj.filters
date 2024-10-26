@@ -104,9 +104,6 @@
     <ClInclude Include="Config.h">
       <Filter>Config</Filter>
     </ClInclude>
-    <ClInclude Include="DefinePacket.h">
-      <Filter>ServerLib</Filter>
-    </ClInclude>
     <ClInclude Include="CGameServer.h">
       <Filter>GameServer</Filter>
     </ClInclude>
@@ -117,6 +114,9 @@
       <Filter>GameServer</Filter>
     </ClInclude>
     <ClInclude Include="CProcessPacket.h">
+      <Filter>GameServer</Filter>
+    </ClInclude>
+    <ClInclude Include="DefinePacket.h">
       <Filter>GameServer</Filter>
     </ClInclude>
   </ItemGroup>

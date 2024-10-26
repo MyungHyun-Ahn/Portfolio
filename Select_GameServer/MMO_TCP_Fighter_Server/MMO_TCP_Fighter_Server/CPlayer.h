@@ -26,7 +26,7 @@ public:
 	}
 
 	bool				Move(SHORT x, SHORT y);
-	inline bool			GetDamage(INT damage) { m_sHp - damage; }
+	inline bool			GetDamage(INT damage) { m_sHp -= damage; return true; }
 
 
 	// 섹터 처리 함수

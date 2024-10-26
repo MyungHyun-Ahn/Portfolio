@@ -40,5 +40,6 @@
 #include "CCrashDump.h"
 
 // warning disable
-#pragma warning(disable : 26495)
-#pragma warning(disable : 4244)
+#pragma warning(disable : 26495) // 멤버 변수 초기화
+#pragma warning(disable : 4244) // 축소 변환 경고
+#pragma warning(disable : 6001) // 초기화되지 않은 메모리

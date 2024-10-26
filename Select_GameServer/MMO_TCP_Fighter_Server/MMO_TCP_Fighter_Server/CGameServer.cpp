@@ -37,7 +37,7 @@ BOOL CGameServer::SendSector(const UINT64 sessionId, INT secY, INT secX, CSerial
 			if (startY + y < 0 || startY + y >= SECTOR_MAX_Y || startX + x < 0 || startX + x >= SECTOR_MAX_X)
 				continue;
 
-			for (auto player : CPlayer::s_Sectors[startY + y][startX + x])
+			for (auto &player : CPlayer::s_Sectors[startY + y][startX + x])
 			{
 				CPlayer *otherPlayer = player.second;
 				if (otherPlayer->m_iId == sessionId)
@@ -66,7 +66,7 @@ BOOL CGameServer::FuncSector(const UINT64 sessionId, INT secY, INT secX, SectorF
 			if (startY + y < 0 || startY + y >= SECTOR_MAX_Y || startX + x < 0 || startX + x >= SECTOR_MAX_X)
 				continue;
 
-			for (auto player : CPlayer::s_Sectors[startY + y][startX + x])
+			for (auto &player : CPlayer::s_Sectors[startY + y][startX + x])
 			{
 				CPlayer *otherPlayer = player.second;
 				if (otherPlayer->m_iId == sessionId)
