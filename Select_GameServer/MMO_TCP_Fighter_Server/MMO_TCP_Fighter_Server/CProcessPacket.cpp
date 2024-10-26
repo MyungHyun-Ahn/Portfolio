@@ -3,37 +3,36 @@
 #include "CSession.h"
 #include "DefinePacket.h"
 #include "CServerCore.h"
+#include "CPlayer.h"
+#include "CGameServer.h"
 #include "CProcessPacket.h"
 
-CProcessPacket g_ProcessPacket;
-CProcessPacketInterface *g_pProcessPacket = &g_ProcessPacket;
-
-bool CProcessPacket::PacketProcCSMoveStart(UINT64 sessionId, CSerializableBuffer *message)
+bool CGameProcessPacket::PacketProcCSMoveStart(UINT64 sessionId, CSerializableBuffer *message)
 {
 	return true;
 }
 
-bool CProcessPacket::PacketProcCSMoveStop(UINT64 sessionId, CSerializableBuffer *message)
+bool CGameProcessPacket::PacketProcCSMoveStop(UINT64 sessionId, CSerializableBuffer *message)
 {
 	return true;
 }
 
-bool CProcessPacket::PacketProcCSAttack1(UINT64 sessionId, CSerializableBuffer *message)
+bool CGameProcessPacket::PacketProcCSAttack1(UINT64 sessionId, CSerializableBuffer *message)
 {
 	return true;
 }
 
-bool CProcessPacket::PacketProcCSAttack2(UINT64 sessionId, CSerializableBuffer *message)
+bool CGameProcessPacket::PacketProcCSAttack2(UINT64 sessionId, CSerializableBuffer *message)
 {
 	return true;
 }
 
-bool CProcessPacket::PacketProcCSAttack3(UINT64 sessionId, CSerializableBuffer *message)
+bool CGameProcessPacket::PacketProcCSAttack3(UINT64 sessionId, CSerializableBuffer *message)
 {
 	return true;
 }
 
-bool CProcessPacket::PacketProcCSEcho(UINT64 sessionId, CSerializableBuffer *message)
+bool CGameProcessPacket::PacketProcCSEcho(UINT64 sessionId, CSerializableBuffer *message)
 {
 	return true;
 }

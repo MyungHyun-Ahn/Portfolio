@@ -1,4 +1,7 @@
 #pragma once
+
+class CProcessPacketInterface;
+
 /*
 네트워크 코어 엔진
 	* 게임 서버 등의 콘텐츠 서버는 이를 상속받아 구현할 것
@@ -43,5 +46,9 @@ private:
 	SOCKET									m_listenSocket;
 	fd_set									m_readSet;
 	fd_set									m_writeSet;
+
+protected:
+	// 패킷 처리기
+	CProcessPacketInterface					*m_pProcessPacket;
 };
 

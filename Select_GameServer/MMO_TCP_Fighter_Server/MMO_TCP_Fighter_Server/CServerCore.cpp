@@ -149,6 +149,8 @@ BOOL CServerCore::Select()
 			}
 
 			FD_SET(ses->m_ClientSocket, &m_readSet);
+			if (ses->m_SendBuffer.GetUseSize() > 0)
+				FD_SET(ses->m_ClientSocket, &m_writeSet);
 		}
 
 		// select()
@@ -401,8 +403,10 @@ BOOL CServerCore::Process(CSession *pSession)
 
 		CSerializableBuffer *buffer = new CSerializableBuffer;
 		ret = pSession->m_RecvBuffer.Dequeue(buffer->GetContentBufferPtr(), header.bySize + 1);
+		buffer->MoveWritePos(ret);
 
-		if (OnRecv(pSession->m_iId, buffer))
+
+		if (!OnRecv(pSession->m_iId, buffer))
 			return FALSE;
 
 		delete buffer;

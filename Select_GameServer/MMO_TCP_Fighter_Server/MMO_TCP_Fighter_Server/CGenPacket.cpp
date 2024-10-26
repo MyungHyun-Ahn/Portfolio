@@ -12,12 +12,18 @@ CSerializableBuffer *CGenPacket::makePacketSCCreateMyCharacter(INT id, CHAR dire
 
 CSerializableBuffer *CGenPacket::makePacketSCCreateOtherCharacter(INT id, CHAR direction, USHORT x, USHORT y, BYTE hp)
 {
-	return nullptr;
+	CSerializableBuffer *pSBuffer = new CSerializableBuffer;
+	BYTE type = (BYTE)PACKET_CODE::SCCreateOtherCharacter;
+	*pSBuffer << type << id << direction << x << y << hp;
+	return pSBuffer;
 }
 
 CSerializableBuffer *CGenPacket::makePacketSCDeleteCharacter(INT id)
 {
-	return nullptr;
+	CSerializableBuffer *pSBuffer = new CSerializableBuffer;
+	BYTE type = (BYTE)PACKET_CODE::SCDeleteCharacter;
+	*pSBuffer << type << id;
+	return pSBuffer;
 }
 
 CSerializableBuffer *CGenPacket::makePacketSCMoveStart(INT id, CHAR direction, USHORT x, USHORT y)

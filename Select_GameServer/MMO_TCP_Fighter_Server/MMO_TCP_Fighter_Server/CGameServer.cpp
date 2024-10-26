@@ -7,6 +7,18 @@
 #include "CGameServer.h"
 #include "CProcessPacket.h"
 #include "CGenPacket.h"
+
+CGameServer::CGameServer()
+{
+	m_pProcessPacket = new CGameProcessPacket;
+	m_pProcessPacket->SetServer(this);
+}
+
+CGameServer::~CGameServer()
+{
+	delete m_pProcessPacket;
+}
+
 /*
 	적절한 섹터 범위의 모든 플레이어에게 전송
 		* sessionId의 플레이어는 제외
@@ -31,7 +43,7 @@ BOOL CGameServer::SendSector(const UINT64 sessionId, INT secY, INT secX, CSerial
 				if (otherPlayer->m_iId == sessionId)
 					continue;
 
-				SendPacket(sessionId, message);
+				SendPacket(otherPlayer->m_iId, message);
 			}
 		}
 	}
@@ -75,6 +87,9 @@ VOID CGameServer::OnAccept(const UINT64 sessionId)
 	USHORT ranY = (rand() % (RANGE_MOVE_BOTTOM - RANGE_MOVE_TOP - 1)) + RANGE_MOVE_TOP + 1;
 	USHORT ranX = (rand() % (RANGE_MOVE_RIGHT - RANGE_MOVE_LEFT - 1)) + RANGE_MOVE_LEFT + 1;
 
+	ranY = 1000;
+	ranX = 1000;
+
 	// Player 객체 생성
 	CPlayer *newPlayer = new CPlayer;
 	newPlayer->Init(sessionId, ranY, ranX);
@@ -88,10 +103,11 @@ VOID CGameServer::OnAccept(const UINT64 sessionId)
 	int startY = newPlayer->m_sSecY - SECTOR_VIEW_START;
 	int startX = newPlayer->m_sSecX - SECTOR_VIEW_START;
 
-	// 섹터 내의 모든 다른 캐릭터에게 내 생성 정보를 보내라
+	// 섹터 내의 모든 다른 캐릭터의 정보를 보냄
 	SectorFunc func = &CGameServer::NewPlayerGetOtherPlayerInfo;
 	FuncSector(sessionId, newPlayer->m_sSecY, newPlayer->m_sSecX, func);
 
+	// 섹터 내의 모든 다른 캐릭터에게 내 생성 정보를 보내라
 	CSerializableBuffer *createOtherCharPacketMy = CGenPacket::makePacketSCCreateOtherCharacter(sessionId, newPlayer->m_bDirection, newPlayer->m_sX, newPlayer->m_sY, (BYTE)newPlayer->m_sHp);
 	SendSector(sessionId, newPlayer->m_sSecY, newPlayer->m_sSecX, createOtherCharPacketMy);
 
@@ -107,7 +123,7 @@ VOID CGameServer::OnClientLeave(const UINT64 sessionId)
 	m_mapPlayers.erase(sessionId);
 
 	CSerializableBuffer *deleteCharPacket = CGenPacket::makePacketSCDeleteCharacter(sessionId);
-	SendPacket(sessionId, deleteCharPacket);
+	SendSector(sessionId, delPlayer->m_sSecY, delPlayer->m_sSecX, deleteCharPacket);
 
 	delete delPlayer;
 }
@@ -116,7 +132,7 @@ BOOL CGameServer::OnRecv(const UINT64 sessionId, CSerializableBuffer *message)
 {
 	BYTE packetCode;
 	*message >> packetCode;
-	if (!g_pProcessPacket->ConsumePacket((PACKET_CODE)packetCode, sessionId, message))
+	if (!m_pProcessPacket->ConsumePacket((PACKET_CODE)packetCode, sessionId, message))
 		return false;
 
 	return true;
@@ -135,5 +151,4 @@ VOID CGameServer::NewPlayerGetOtherPlayerInfo(UINT64 newPlayerId, CPlayer *other
 		CSerializableBuffer *moveStartPacket = CGenPacket::makePacketSCMoveStart(otherPlayer->m_iId, otherPlayer->m_dwAction, otherPlayer->m_sX, otherPlayer->m_sY);
 		SendPacket(newPlayerId, moveStartPacket);
 	}
-
 }

@@ -6,6 +6,11 @@ typedef void (CGameServer::*SectorFunc)(UINT64, CPlayer *);
 class CGameServer : public CServerCore
 {
 public:
+	friend class CGameProcessPacket;
+
+	CGameServer();
+	~CGameServer();
+
 	// Sector 단위 진행
 	BOOL SendSector(const UINT64 sessionId, INT secY, INT secX, CSerializableBuffer *message);
 	BOOL FuncSector(const UINT64 sessionId, INT secY, INT secX, SectorFunc func);

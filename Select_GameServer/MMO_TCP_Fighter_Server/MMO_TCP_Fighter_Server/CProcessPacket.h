@@ -2,16 +2,21 @@
 class CProcessPacketInterface
 {
 public:
-	virtual bool ConsumePacket(PACKET_CODE code, UINT64 sessionId, CSerializableBuffer *message) = 0;
-	virtual bool PacketProcCSMoveStart(UINT64 sessionId, CSerializableBuffer *message) = 0;
-	virtual bool PacketProcCSMoveStop(UINT64 sessionId, CSerializableBuffer *message) = 0;
-	virtual bool PacketProcCSAttack1(UINT64 sessionId, CSerializableBuffer *message) = 0;
-	virtual bool PacketProcCSAttack2(UINT64 sessionId, CSerializableBuffer *message) = 0;
-	virtual bool PacketProcCSAttack3(UINT64 sessionId, CSerializableBuffer *message) = 0;
-	virtual bool PacketProcCSEcho(UINT64 sessionId, CSerializableBuffer *message) = 0;
+	virtual bool	ConsumePacket(PACKET_CODE code, UINT64 sessionId, CSerializableBuffer *message) = 0;
+	virtual bool	PacketProcCSMoveStart(UINT64 sessionId, CSerializableBuffer *message) = 0;
+	virtual bool	PacketProcCSMoveStop(UINT64 sessionId, CSerializableBuffer *message) = 0;
+	virtual bool	PacketProcCSAttack1(UINT64 sessionId, CSerializableBuffer *message) = 0;
+	virtual bool	PacketProcCSAttack2(UINT64 sessionId, CSerializableBuffer *message) = 0;
+	virtual bool	PacketProcCSAttack3(UINT64 sessionId, CSerializableBuffer *message) = 0;
+	virtual bool	PacketProcCSEcho(UINT64 sessionId, CSerializableBuffer *message) = 0;
+	inline void		SetServer(CServerCore *server) { m_pServerCore = server; }
+
+protected:
+	CServerCore *m_pServerCore;
+
 };
 
-class CProcessPacket : public CProcessPacketInterface
+class CGameProcessPacket : public CProcessPacketInterface
 {
 public:
 	bool ConsumePacket(PACKET_CODE code, UINT64 sessionId, CSerializableBuffer *message)
@@ -44,5 +49,5 @@ public:
 	bool PacketProcCSEcho(UINT64 sessionId, CSerializableBuffer *message);
 };
 
-extern CProcessPacket g_ProcessPacket;
+extern CGameProcessPacket g_ProcessPacket;
 extern CProcessPacketInterface *g_pProcessPacket;
