@@ -5,7 +5,7 @@ from jinja2 import Environment, FileSystemLoader
 CSList = list()
 SCList = list()
 
-class Function:
+class Message:
     def __init__(self, Name, Code):
         self.name = Name
         self.code = Code
@@ -46,12 +46,12 @@ def PacketListFileParse():
             p = line.split(' ')
             packetName = PacketDir + p[0]
             packetCode = int(p[1])
-            Function(packetName, packetCode)
+            Message(packetName, packetCode)
             if PacketDir == "SC":
-                SCList.append(Function(packetName, packetCode))
+                SCList.append(Message(packetName, packetCode))
                 index = len(SCList) - 1
             elif PacketDir == "CS":
-                CSList.append(Function(packetName, packetCode))
+                CSList.append(Message(packetName, packetCode))
                 index = len(CSList) - 1
 
         else: # argList
