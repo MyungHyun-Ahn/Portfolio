@@ -16,9 +16,12 @@ public:
 
 	BOOL					Select();
 	VOID					TimeoutCheck();
-	BOOL					Disconnect();
+	BOOL					ReleaseSession();
+	VOID					Disconnect(UINT64 sessionId);
 
 	BOOL					SendPacket(CONST UINT64 sessionId, CSerializableBuffer *message);
+
+	INT						GetSessionCount() { return m_mapSessions.size(); }
 
 private:
 	BOOL					Accept();

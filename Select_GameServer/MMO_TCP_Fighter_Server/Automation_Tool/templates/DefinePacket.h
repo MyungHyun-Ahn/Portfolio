@@ -5,7 +5,6 @@ struct PacketHeader
 {
 	BYTE		byCode;
 	BYTE		bySize;
-	BYTE		byType;
 };
 #pragma pack(pop)
 

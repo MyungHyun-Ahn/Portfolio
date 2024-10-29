@@ -3,16 +3,41 @@
 #include "DefinePacket.h"
 #include "CSession.h"
 #include "CServerCore.h"
+#include "CSector.h"
 #include "CPlayer.h"
 #include "CGameServer.h"
+
+BOOL monitorThreadRunning = TRUE;
+CGameServer *g_pServer;
+
+unsigned int MonitoringThreadFunc(LPVOID lpParam)
+{
+	DWORD mTime = timeGetTime();
+	while (monitorThreadRunning)
+	{
+		DWORD dTime = timeGetTime() - mTime;
+		if (dTime < 1000)
+			continue;
+
+		g_monitor.Update(g_pServer->GetSessionCount(), g_pServer->GetPlayerCount());
+
+		mTime += 1000;
+	}
+
+	return 0;
+}
 
 // InitializeSingleton
 void InitializeSingleton()
 {
 	CCrashDump initCrashDump;
 	g_Logger = CLogger::GetInstance();
+	g_Logger->SetDirectory(L"LogFile");
+	g_Logger->SetLogLevel(LOG_LEVEL::DEBUG);
 	g_Profiler = CProfileManager::GetInstance();
 }
+
+
 
 int main()
 {
@@ -20,17 +45,26 @@ int main()
 	srand((unsigned int)time(nullptr));
 	InitializeSingleton();
 
-	CServerCore *pServer = new CGameServer;
-	pServer->Start(SERVER_IP, SERVER_PORT, 10000);
+	g_pServer = new CGameServer;
+	g_pServer->Start(SERVER_IP, SERVER_PORT, 10000);
 
+	_beginthreadex(nullptr, NULL, MonitoringThreadFunc, nullptr, 0, nullptr);
+
+	int prevTick = timeGetTime();
 	while (true)
 	{
-		pServer->Select();
+		InterlockedIncrement(&g_monitor.m_lLoopCount);
+		g_pServer->Select();
 
-		// 게임 프레임 체크가 들어갈 것
+		// 게임 프레임 체크
+		if (int time = timeGetTime(); time - prevTick >= TICK_PER_FRAME)
+		{
+			g_pServer->Update();
+			prevTick += TICK_PER_FRAME;
+			InterlockedIncrement(&g_monitor.m_lFPS);
+		}
 
-		pServer->TimeoutCheck();
-		pServer->Disconnect();
+		g_pServer->ReleaseSession();
 	}
 
 

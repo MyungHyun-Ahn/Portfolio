@@ -17,6 +17,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
+#include <process.h>
 
 // 컨테이너 자료구조
 // 추후 직접 만든 컨테이너로 변경할 생각
@@ -38,6 +39,7 @@
 #include "CLogger.h"
 #include "CProfiler.h"
 #include "CCrashDump.h"
+#include "CMonitor.h"
 
 // warning disable
 #pragma warning(disable : 26495) // 멤버 변수 초기화

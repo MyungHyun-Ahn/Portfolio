@@ -3,6 +3,8 @@ class CPlayer
 {
 public:
 	friend class CGameServer;
+	friend class CGameProcessPacket;
+	friend class CSector;
 
 	CPlayer() = default;
 	CPlayer(UINT id, USHORT y, USHORT x) 
@@ -18,21 +20,21 @@ public:
 		m_sY = y;
 		m_sX = x;
 
-		m_sSecY = CPlayer::CalSectorY(m_sY);
-		m_sSecX = CPlayer::CalSectorX(m_sX);
+		m_sSecY = CSector::CalSectorY(m_sY);
+		m_sSecX = CSector::CalSectorX(m_sX);
 
 		m_dwAction = (DWORD)MOVE_DIR::MOVE_DIR_STOP;
 		m_bDirection = (BYTE)MOVE_DIR::MOVE_DIR_RR;
 	}
 
 	bool				Move(SHORT x, SHORT y);
-	inline bool			GetDamage(INT damage) { m_sHp -= damage; return true; }
-
-
-	// 섹터 처리 함수
-	inline static int	CalSectorY(int y) { return (y - RANGE_MOVE_LEFT) / SECTOR_SIZE; }
-	inline static int	CalSectorX(int x) { return (x - RANGE_MOVE_TOP) / SECTOR_SIZE; }
-	void				MoveSector(int prevY, int prevX, int nowY, int nowX);
+	inline bool			GetDamage(INT damage) 
+	{ 
+		m_sHp -= damage; 
+		if (m_sHp <= 0) // 캐릭터가 죽은 상황
+			return false;
+		return true; 
+	}
 
 private:
 	// Player Id - Session ID와 같음
@@ -50,8 +52,5 @@ private:
 	// Player 속한 Sector
 	USHORT		m_sSecY;
 	USHORT		m_sSecX;
-
-	// Sector 배열 - 이게 근데 여기에 있는게 맞을까? 고민이 필요함
-	inline static std::unordered_map<UINT64, CPlayer *> s_Sectors[SECTOR_MAX_Y][SECTOR_MAX_X];
 };
 

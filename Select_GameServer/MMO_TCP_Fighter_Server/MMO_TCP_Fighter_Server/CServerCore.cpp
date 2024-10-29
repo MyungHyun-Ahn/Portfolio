@@ -165,7 +165,6 @@ BOOL CServerCore::Select()
 		if (FD_ISSET(m_listenSocket, &m_readSet))
 		{
 			Accept();
-			// AcceptTPS 증가
 		}
 
 		startIt = prevStartIt;
@@ -180,15 +179,13 @@ BOOL CServerCore::Select()
 			if (FD_ISSET(ses->m_ClientSocket, &m_readSet))
 			{
 				// recv
-				if (!Recv(ses))
-					continue;
+				Recv(ses);
 			}
 
 			if (FD_ISSET(ses->m_ClientSocket, &m_writeSet))
 			{
 				// send
-				if (!Send(ses))
-					continue;
+				Send(ses);
 			}
 		}
 
@@ -226,10 +223,10 @@ VOID CServerCore::TimeoutCheck()
 }
 
 /*
-	CServerCore::Disconnect
+	CServerCore::ReleaseSession
 		* disconnectQueue에 있는 것을 삭제
 */
-BOOL CServerCore::Disconnect()
+BOOL CServerCore::ReleaseSession()
 {
 	for (CSession *pSession : m_deqDeleteQueue)
 	{
@@ -242,6 +239,20 @@ BOOL CServerCore::Disconnect()
 	m_deqDeleteQueue.clear();
 	return TRUE;
 }
+/*
+	CServerCore::Disconnect
+		* 컨텐츠 코드에서 연결 끊기를 요청하기 위해 존재
+*/
+
+VOID CServerCore::Disconnect(UINT64 sessionId)
+{
+	CSession *pSession = m_mapSessions[sessionId];
+	if (pSession->m_isVaild)
+	{
+		m_deqDeleteQueue.push_back(pSession);
+		pSession->m_isVaild = FALSE;
+	}
+}
 
 /*
 	CServerCore::SendPacket
@@ -251,12 +262,14 @@ BOOL CServerCore::Disconnect()
 BOOL CServerCore::SendPacket(CONST UINT64 sessionId, CSerializableBuffer *message)
 {
 	// 헤더 세팅
-	PacketHeader header{ PACKET_IDENTIFIER, (BYTE)(message->GetDataSize() - 1) };
+	BYTE headerSize = (BYTE)(message->GetDataSize() - 1);
+	PacketHeader header{ PACKET_IDENTIFIER, headerSize };
 	message->EnqueueHeader((char *)&header, sizeof(PacketHeader));
 
 	// SendBuffer에 등록
 	CSession *pSession = m_mapSessions[sessionId];
-	int ret = pSession->m_SendBuffer.Enqueue(message->GetBufferPtr(), message->GetFullSize());
+	int fullSize = message->GetFullSize();
+	int ret = pSession->m_SendBuffer.Enqueue(message->GetBufferPtr(), fullSize);
 	if (ret == -1)
 		return FALSE;
 
@@ -291,6 +304,8 @@ BOOL CServerCore::Accept()
 
 	OnAccept(id);
 
+	InterlockedIncrement(&g_monitor.m_lAcceptTPS);
+
 	return 0;
 }
 
@@ -305,7 +320,8 @@ BOOL CServerCore::Recv(CSession *pSession)
 		errVal = WSAGetLastError();
 		if (errVal != WSAEWOULDBLOCK)
 		{
-			g_Logger->WriteLog(L"NetworkCore", LOG_LEVEL::ERR, L"recv() Error : %d, SessionID : %d", errVal, pSession->m_iId);
+			if (errVal != WSAECONNRESET)
+				g_Logger->WriteLog(L"NetworkCore", LOG_LEVEL::ERR, L"recv() Error : %d, SessionID : %d", errVal, pSession->m_iId);
 
 			// WOULDBLOCK이 아닌 에러는 deleteQueue에 Enqueue
 			if (pSession->m_isVaild)
@@ -337,13 +353,13 @@ BOOL CServerCore::Recv(CSession *pSession)
 	{
 		if (pSession->m_isVaild)
 		{
-			// wprintf(L"Player %d disconnected!\n", s->m_Id);
 			m_deqDeleteQueue.push_back(pSession);
 			pSession->m_isVaild = FALSE;
 		}
 	}
 
 	// recv TPS 증가
+	InterlockedIncrement(&g_monitor.m_lRecvTPS);
 
 	return TRUE;
 }
@@ -359,7 +375,8 @@ BOOL CServerCore::Send(CSession *pSession)
 		errVal = WSAGetLastError();
 		if (errVal != WSAEWOULDBLOCK)
 		{
-			g_Logger->WriteLog(L"NetworkCore", LOG_LEVEL::ERR, L"send() Error : %d, SessionID : %d", errVal, pSession->m_iId);
+			if (errVal != WSAECONNRESET)
+				g_Logger->WriteLog(L"NetworkCore", LOG_LEVEL::ERR, L"send() Error : %d, SessionID : %d", errVal, pSession->m_iId);
 
 			if (pSession->m_isVaild)
 			{
@@ -381,6 +398,7 @@ BOOL CServerCore::Send(CSession *pSession)
 	}
 	
 	// Send TPS 증가
+	InterlockedIncrement(&g_monitor.m_lSendTPS);
 
 	return TRUE;
 }

@@ -161,11 +161,13 @@
     <ClInclude Include="CGameServer.h" />
     <ClInclude Include="CGenPacket.h" />
     <ClInclude Include="CLogger.h" />
+    <ClInclude Include="CMonitor.h" />
     <ClInclude Include="CObjectPool.h" />
     <ClInclude Include="CPlayer.h" />
     <ClInclude Include="CProcessPacket.h" />
     <ClInclude Include="CProfiler.h" />
     <ClInclude Include="CRingBuffer.h" />
+    <ClInclude Include="CSector.h" />
     <ClInclude Include="CSerializableBuffer.h" />
     <ClInclude Include="CServerCore.h" />
     <ClInclude Include="CSession.h" />
@@ -180,11 +182,13 @@
     <ClCompile Include="CGameServer.cpp" />
     <ClCompile Include="CGenPacket.cpp" />
     <ClCompile Include="CLogger.cpp" />
+    <ClCompile Include="CMonitor.cpp" />
     <ClCompile Include="CObjectPool.cpp" />
     <ClCompile Include="CPlayer.cpp" />
     <ClCompile Include="CProcessPacket.cpp" />
     <ClCompile Include="CProfiler.cpp" />
     <ClCompile Include="CRingBuffer.cpp" />
+    <ClCompile Include="CSector.cpp" />
     <ClCompile Include="CSerializableBuffer.cpp" />
     <ClCompile Include="CServerCore.cpp" />
     <ClCompile Include="CSession.cpp" />

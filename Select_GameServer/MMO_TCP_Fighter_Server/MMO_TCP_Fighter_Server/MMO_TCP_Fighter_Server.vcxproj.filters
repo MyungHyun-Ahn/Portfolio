@@ -66,6 +66,12 @@
     <ClCompile Include="CProcessPacket.cpp">
       <Filter>GameServer</Filter>
     </ClCompile>
+    <ClCompile Include="CSector.cpp">
+      <Filter>GameServer</Filter>
+    </ClCompile>
+    <ClCompile Include="CMonitor.cpp">
+      <Filter>Tools</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CServerCore.h">
@@ -118,6 +124,12 @@
     </ClInclude>
     <ClInclude Include="DefinePacket.h">
       <Filter>GameServer</Filter>
+    </ClInclude>
+    <ClInclude Include="CSector.h">
+      <Filter>GameServer</Filter>
+    </ClInclude>
+    <ClInclude Include="CMonitor.h">
+      <Filter>Tools</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
