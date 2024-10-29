@@ -63,6 +63,10 @@ public:
 			CloseHandle(hDumpFile);
 			g_Logger->WriteLogConsole(LOG_LEVEL::ERR, L"CrashDump saved completed");
 		}
+		else
+		{
+			g_Logger->WriteLogConsole(LOG_LEVEL::ERR, L"CrashDump failed");
+		}
 
 		return EXCEPTION_EXECUTE_HANDLER;
 	}

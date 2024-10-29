@@ -35,6 +35,13 @@ void CMonitor::Update(INT sessionCount, INT playerCount)
 	if (m_lFPS != FRAME_PER_SECOND)
 		g_Logger->WriteLog(L"ServerFPS", LOG_LEVEL::SYSTEM, L"FPS %d", m_lFPS);
 
+	// FPS가 5으로 떨어지면 Crash 유도
+	if (m_lFPS < 5)
+	{
+		MonitoringFile(sessionCount, playerCount);
+		CCrashDump::Crash();
+	}
+
 	// 모니터링 콘솔
 	MonitoringConsole(sessionCount, playerCount);
 
@@ -148,4 +155,32 @@ void CMonitor::MonitoringConsole(INT sessionCount, INT playerCount)
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRecv\t : %d", m_lRecvTPS);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSend\t : %d", m_lSendTPS);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"----------------------------------------");
+}
+
+void CMonitor::MonitoringFile(INT sessionCount, INT playerCount)
+{
+	// Cpu Usage
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"----------------------------------------");
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"             Cpu Usage");
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"Processor usage");
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tTotal \t: %f", m_fProcessorTotal);
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tUser \t: %f", m_fProcessorUser);
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tKernel \t: %f\n", m_fProcessorKernel);
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"Process Usage");
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tTotal \t: %f", m_fProcessTotal);
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tUser \t: %f", m_fProcessUser);
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tKernel \t: %f", m_fProcessKernel);
+					  
+	// Server Monitor 
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\n\n\n        Server monitoring info");
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"Info");
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tSession count \t: %d", sessionCount);
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tPlayer count  \t: %d\n", playerCount);
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"Frame");
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tFPS \t : %d\n\tLoop\t : %d\n", m_lFPS, m_lLoopCount);
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"TPS");
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tAccept\t : %d", m_lAcceptTPS);
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tRecv\t : %d", m_lRecvTPS);
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tSend\t : %d", m_lSendTPS);
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"----------------------------------------");
 }
