@@ -102,13 +102,21 @@ VOID CGameServer::OnAccept(const UINT64 sessionId)
 	// ranX = 1000;
 
 	// Player 객체 생성
+#ifdef USE_OBJECT_POOL
+	CPlayer *newPlayer = CPlayer::Alloc();
+#else
 	CPlayer *newPlayer = new CPlayer;
+#endif
 	newPlayer->Init(sessionId, ranY, ranX);
 
 	CSerializableBuffer *createMyCharPacket = CGenPacket::makePacketSCCreateMyCharacter(sessionId, newPlayer->m_bDirection, newPlayer->m_sX, newPlayer->m_sY, (BYTE)newPlayer->m_sHp);
 	if (!SendPacket(sessionId, createMyCharPacket))
 		g_Logger->WriteLog(L"GameContent", LOG_LEVEL::ERR, L"OnAccept SendPacket Err SessionID : %d", sessionId);
+#ifdef USE_OBJECT_POOL
+	CSerializableBuffer::Free(createMyCharPacket);
+#else
 	delete createMyCharPacket;
+#endif
 
 	// 다른 플레이어에게 자신의 캐릭터 생성 정보를 전달
 	// 섹터 계산
@@ -122,7 +130,11 @@ VOID CGameServer::OnAccept(const UINT64 sessionId)
 	// 섹터 내의 모든 다른 캐릭터에게 내 생성 정보를 보내라
 	CSerializableBuffer *createOtherCharPacketMy = CGenPacket::makePacketSCCreateOtherCharacter(sessionId, newPlayer->m_bDirection, newPlayer->m_sX, newPlayer->m_sY, (BYTE)newPlayer->m_sHp);
 	SendSector(sessionId, newPlayer->m_sSecY, newPlayer->m_sSecX, createOtherCharPacketMy);
+#ifdef USE_OBJECT_POOL
+	CSerializableBuffer::Free(createOtherCharPacketMy);
+#else
 	delete createOtherCharPacketMy;
+#endif
 
 	CSector::s_Sectors[newPlayer->m_sSecY][newPlayer->m_sSecX].insert(std::make_pair(sessionId, newPlayer));
 	m_mapPlayers.insert(std::make_pair(sessionId, newPlayer));
@@ -138,9 +150,13 @@ VOID CGameServer::OnClientLeave(const UINT64 sessionId)
 
 	CSerializableBuffer *deleteCharPacket = CGenPacket::makePacketSCDeleteCharacter(sessionId);
 	SendSector(sessionId, delPlayer->m_sSecY, delPlayer->m_sSecX, deleteCharPacket);
+#ifdef USE_OBJECT_POOL
+	CSerializableBuffer::Free(deleteCharPacket);
+	CPlayer::Free(delPlayer);
+#else
 	delete deleteCharPacket;
-
 	delete delPlayer;
+#endif
 }
 
 BOOL CGameServer::OnRecv(const UINT64 sessionId, CSerializableBuffer *message)
@@ -160,13 +176,21 @@ VOID CGameServer::NewPlayerGetOtherPlayerInfo(UINT64 newPlayerId, CPlayer *other
 {
 	CSerializableBuffer *createOtherCharPacket = CGenPacket::makePacketSCCreateOtherCharacter(otherPlayer->m_iId, otherPlayer->m_bDirection, otherPlayer->m_sX, otherPlayer->m_sY, (CHAR)otherPlayer->m_sHp);
 	SendPacket(newPlayerId, createOtherCharPacket);
+#ifdef USE_OBJECT_POOL
+	CSerializableBuffer::Free(createOtherCharPacket);
+#else
 	delete createOtherCharPacket;
+#endif
 
 	if (otherPlayer->m_dwAction != (CHAR)MOVE_DIR::MOVE_DIR_STOP)
 	{
 		CSerializableBuffer *moveStartPacket = CGenPacket::makePacketSCMoveStart(otherPlayer->m_iId, otherPlayer->m_dwAction, otherPlayer->m_sX, otherPlayer->m_sY);
 		SendPacket(newPlayerId, moveStartPacket);
+#ifdef USE_OBJECT_POOL
+		CSerializableBuffer::Free(moveStartPacket);
+#else
 		delete moveStartPacket;
+#endif
 	}
 }
 

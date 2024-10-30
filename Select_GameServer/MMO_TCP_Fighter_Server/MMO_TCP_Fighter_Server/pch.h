@@ -1,5 +1,8 @@
 #pragma once
 
+// 오브젝트 풀 사용 여부
+#define USE_OBJECT_POOL
+
 #pragma comment(lib, "ws2_32")
 #pragma comment(lib, "winmm")
 #pragma comment(lib, "DbgHelp.Lib")

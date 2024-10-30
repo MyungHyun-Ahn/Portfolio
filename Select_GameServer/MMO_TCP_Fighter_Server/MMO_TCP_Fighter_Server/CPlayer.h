@@ -36,6 +36,18 @@ public:
 		return true; 
 	}
 
+	inline static CPlayer *Alloc()
+	{
+		CPlayer *pPlayer = s_PlayerPool.Alloc();
+		pPlayer->m_sHp = MAX_PLAYER_HP;
+		return pPlayer;
+	}
+
+	inline static void Free(CPlayer *delPlayer)
+	{
+		s_PlayerPool.Free(delPlayer);
+	}
+
 private:
 	// Player Id - Session ID와 같음
 	UINT64		m_iId;
@@ -52,5 +64,9 @@ private:
 	// Player 속한 Sector
 	USHORT		m_sSecY;
 	USHORT		m_sSecX;
+
+#ifdef USE_OBJECT_POOL
+	inline static CObjectPool<CPlayer> s_PlayerPool = CObjectPool<CPlayer>(7500, false);
+#endif
 };
 

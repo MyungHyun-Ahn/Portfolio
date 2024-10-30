@@ -233,7 +233,12 @@ BOOL CServerCore::ReleaseSession()
 		OnClientLeave(pSession->m_iId);
 		m_mapSessions.erase(pSession->m_iId);
 		closesocket(pSession->m_ClientSocket);
+
+#ifdef USE_OBJECT_POOL
+		CSession::Free(pSession);
+#else
 		delete pSession;
+#endif
 	}
 
 	m_deqDeleteQueue.clear();
@@ -294,7 +299,11 @@ BOOL CServerCore::Accept()
 	++m_iCurSessionIDValue;
 	UINT64 id = m_iCurSessionIDValue;
 
+#ifdef USE_OBJECT_POOL
+	CSession *newSession = CSession::Alloc();
+#else
 	CSession *newSession = new CSession;
+#endif
 	newSession->m_iId = id;
 	newSession->m_ClientSocket = clientSock;
 	newSession->m_iPrevRecvTime = timeGetTime();
@@ -417,7 +426,11 @@ BOOL CServerCore::Process(CSession *pSession)
 
 		pSession->m_RecvBuffer.MoveFront(ret);
 
+#ifdef USE_OBJECT_POOL
+		CSerializableBuffer *buffer = CSerializableBuffer::Alloc();
+#else
 		CSerializableBuffer *buffer = new CSerializableBuffer;
+#endif
 		ret = pSession->m_RecvBuffer.Dequeue(buffer->GetContentBufferPtr(), header.bySize + 1);
 		buffer->MoveWritePos(ret);
 
@@ -425,7 +438,11 @@ BOOL CServerCore::Process(CSession *pSession)
 		if (!OnRecv(pSession->m_iId, buffer))
 			return FALSE;
 
+#ifdef USE_OBJECT_POOL
+		CSerializableBuffer::Free(buffer);
+#else
 		delete buffer;
+#endif
 	}
 
 	return TRUE;

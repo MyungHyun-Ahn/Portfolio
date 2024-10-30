@@ -35,7 +35,11 @@ bool CGameProcessPacket::PacketProcCSMoveStart(UINT64 sessionId, CSerializableBu
 		// 대상 플레이어 좌표로 sync 메시지
 		CSerializableBuffer *syncMessage = CGenPacket::makePacketSCSync(player->m_iId, player->m_sX, player->m_sY);
 		pGameServer->SendPacket(sessionId, syncMessage);
+#ifdef USE_OBJECT_POOL
+		CSerializableBuffer::Free(syncMessage);
+#else
 		delete syncMessage;
+#endif
 		g_Logger->WriteLog(L"Sync", LOG_LEVEL::SYSTEM, L"[START] PlayerId : %d, Server X : %d, Y : %d | Client X : %d, Y : %d", sessionId, player->m_sX, player->m_sY, x, y);
 
 		// 서버 좌표로 맞춰줌
@@ -81,7 +85,11 @@ bool CGameProcessPacket::PacketProcCSMoveStart(UINT64 sessionId, CSerializableBu
 	// 해당하는 섹터에 MoveStart 메시지 전달
 	CSerializableBuffer *moveStartPacket = CGenPacket::makePacketSCMoveStart(sessionId, (CHAR)player->m_dwAction, player->m_sX, player->m_sY);
 	pGameServer->SendSector(sessionId, nowSecY, nowSecX, moveStartPacket);
+#ifdef USE_OBJECT_POOL
+	CSerializableBuffer::Free(moveStartPacket);
+#else
 	delete moveStartPacket;
+#endif
 
 	return true;
 }
@@ -105,7 +113,11 @@ bool CGameProcessPacket::PacketProcCSMoveStop(UINT64 sessionId, CSerializableBuf
 		// 대상 플레이어 좌표로 sync 메시지
 		CSerializableBuffer *syncMessage = CGenPacket::makePacketSCSync(player->m_iId, player->m_sX, player->m_sY);
 		pGameServer->SendPacket(sessionId, syncMessage);
+#ifdef USE_OBJECT_POOL
+		CSerializableBuffer::Free(syncMessage);
+#else
 		delete syncMessage;
+#endif
 		g_Logger->WriteLog(L"Sync", LOG_LEVEL::SYSTEM, L"[STOP] PlayerId : %d, Server X : %d, Y : %d | Client X : %d, Y : %d", sessionId, player->m_sX, player->m_sY, x, y);
 
 		// 서버 좌표로 맞춰줌
@@ -148,7 +160,11 @@ bool CGameProcessPacket::PacketProcCSMoveStop(UINT64 sessionId, CSerializableBuf
 	// 해당하는 섹터에 MoveStart 메시지 전달
 	CSerializableBuffer *moveStopPacket = CGenPacket::makePacketSCMoveStop(sessionId, (CHAR)player->m_dwAction, player->m_sX, player->m_sY);
 	pGameServer->SendSector(sessionId, nowSecY, nowSecX, moveStopPacket);
+#ifdef USE_OBJECT_POOL
+	CSerializableBuffer::Free(moveStopPacket);
+#else
 	delete moveStopPacket;
+#endif
 
 	return true;
 }
@@ -182,12 +198,20 @@ bool CGameProcessPacket::PacketProcCSAttack1(UINT64 sessionId, CSerializableBuff
 
 		CSerializableBuffer *damagePacket = CGenPacket::makePacketSCDamage(sessionId, targetPlayer->m_iId, targetPlayer->m_sHp);
 		pGameServer->SendSector(NULL, player->m_sSecY, player->m_sSecX, damagePacket);
+#ifdef USE_OBJECT_POOL
+		CSerializableBuffer::Free(damagePacket);
+#else
 		delete damagePacket;
+#endif
 	}
 
 	CSerializableBuffer *attackPacket = CGenPacket::makePacketSCAttack1(sessionId, direction, playerX, playerY);
 	pGameServer->SendSector(NULL, player->m_sSecY, player->m_sSecX, attackPacket);
+#ifdef USE_OBJECT_POOL
+	CSerializableBuffer::Free(attackPacket);
+#else
 	delete attackPacket;
+#endif
 
 	return true;
 }
@@ -221,12 +245,20 @@ bool CGameProcessPacket::PacketProcCSAttack2(UINT64 sessionId, CSerializableBuff
 
 		CSerializableBuffer *damagePacket = CGenPacket::makePacketSCDamage(sessionId, targetPlayer->m_iId, targetPlayer->m_sHp);
 		pGameServer->SendSector(NULL, player->m_sSecY, player->m_sSecX, damagePacket);
+#ifdef USE_OBJECT_POOL
+		CSerializableBuffer::Free(damagePacket);
+#else
 		delete damagePacket;
+#endif
 	}
 	
 	CSerializableBuffer *attackPacket = CGenPacket::makePacketSCAttack2(sessionId, direction, playerX, playerY);
 	pGameServer->SendSector(NULL, player->m_sSecY, player->m_sSecX, attackPacket);
+#ifdef USE_OBJECT_POOL
+	CSerializableBuffer::Free(attackPacket);
+#else
 	delete attackPacket;
+#endif
 
 
 	return true;
@@ -261,12 +293,20 @@ bool CGameProcessPacket::PacketProcCSAttack3(UINT64 sessionId, CSerializableBuff
 
 		CSerializableBuffer *damagePacket = CGenPacket::makePacketSCDamage(sessionId, targetPlayer->m_iId, targetPlayer->m_sHp);
 		pGameServer->SendSector(NULL, player->m_sSecY, player->m_sSecX, damagePacket);
+#ifdef USE_OBJECT_POOL
+		CSerializableBuffer::Free(damagePacket);
+#else
 		delete damagePacket;
+#endif
 	}
 	
 	CSerializableBuffer *attackPacket = CGenPacket::makePacketSCAttack3(sessionId, direction, playerX, playerY);
 	pGameServer->SendSector(NULL, player->m_sSecY, player->m_sSecX, attackPacket);
+#ifdef USE_OBJECT_POOL
+	CSerializableBuffer::Free(attackPacket);
+#else
 	delete attackPacket;
+#endif
 
 	return true;
 }
@@ -280,7 +320,11 @@ bool CGameProcessPacket::PacketProcCSEcho(UINT64 sessionId, CSerializableBuffer 
 
 	CSerializableBuffer *echoPacket = CGenPacket::makePacketSCEcho(time);
 	pGameServer->SendPacket(sessionId, echoPacket);
+#ifdef USE_OBJECT_POOL
+	CSerializableBuffer::Free(echoPacket);
+#else
 	delete echoPacket;
+#endif
 
 	return true;
 }

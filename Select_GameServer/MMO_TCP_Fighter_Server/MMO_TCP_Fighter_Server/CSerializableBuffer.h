@@ -316,6 +316,19 @@ public:
 		return *this;
 	}
 
+public:
+	inline static CSerializableBuffer *Alloc()
+	{
+		// 할당하고 초기화해서 반환
+		CSerializableBuffer *pSBuffer = s_sbufferPool.Alloc();
+		pSBuffer->Clear();
+		return pSBuffer;
+	}
+
+	inline static void Free(CSerializableBuffer *delSBuffer)
+	{
+		s_sbufferPool.Free(delSBuffer);
+	}
 
 private:
 	char *m_Buffer;
@@ -323,4 +336,8 @@ private:
 	int m_Front = 0;
 	int m_Rear = 0;
 	int m_MaxSize = (int)DEFINE::DEFAULT_SIZE;
+
+#ifdef USE_OBJECT_POOL
+	inline static CObjectPool<CSerializableBuffer> s_sbufferPool = CObjectPool<CSerializableBuffer>(5000, false);
+#endif
 };

@@ -1,5 +1,8 @@
 #pragma once
 
+// 링 버퍼는 오브젝트 풀이 필요 없음
+// * 왜냐 - Session에 물려 있다!
+
 class CRingBuffer
 {
 public:
