@@ -24,6 +24,6 @@ private:
 	CRingBuffer m_RecvBuffer;
 	CRingBuffer m_SendBuffer;
 
-	inline static CObjectPool<CSession> m_SessionPool = CObjectPool<CSession>(7500, true);
+	// inline static CObjectPool<CSession> m_SessionPool = CObjectPool<CSession>(7500, true);
 };
 

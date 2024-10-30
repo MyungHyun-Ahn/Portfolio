@@ -15,9 +15,10 @@ unsigned int MonitoringThreadFunc(LPVOID lpParam)
 	DWORD mTime = timeGetTime();
 	while (monitorThreadRunning)
 	{
+		// 처음 실행 때문에 1초 늦게 시작
 		DWORD dTime = timeGetTime() - mTime;
 		if (dTime < 1000)
-			continue;
+			Sleep(1000 - dTime);
 
 		g_monitor.Update(g_pServer->GetSessionCount(), g_pServer->GetPlayerCount());
 

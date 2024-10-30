@@ -431,6 +431,9 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 
+# crash dump file
+*.dmp
+
 ### VisualStudio Patch ###
 # Additional files built by Visual Studio
 

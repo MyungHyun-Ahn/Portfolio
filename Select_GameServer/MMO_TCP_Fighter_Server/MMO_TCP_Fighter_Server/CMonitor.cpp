@@ -31,6 +31,7 @@ CMonitor::CMonitor(HANDLE hProcess)
 void CMonitor::Update(INT sessionCount, INT playerCount)
 {
 	UpdateCpuTime();
+	UpdateMemory();
 
 	if (m_lFPS != FRAME_PER_SECOND)
 		g_Logger->WriteLog(L"ServerFPS", LOG_LEVEL::SYSTEM, L"FPS %d", m_lFPS);
@@ -129,22 +130,29 @@ void CMonitor::UpdateServer()
 	InterlockedExchange(&m_lSendTPS, 0);
 }
 
+void CMonitor::UpdateMemory()
+{
+	GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS *)&m_stPmc, sizeof(m_stPmc));
+}
+
 void CMonitor::MonitoringConsole(INT sessionCount, INT playerCount)
 {
 	// Cpu Usage
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"----------------------------------------");
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"             Cpu Usage");
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Processor usage");
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"              System info");
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Memory usage");
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tMemory \t: %u MB\n", m_stPmc.PrivateUsage / (1024 * 1024));
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Processor CPU usage");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tTotal \t: %f", m_fProcessorTotal);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tUser \t: %f", m_fProcessorUser);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tKernel \t: %f\n", m_fProcessorKernel);
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Process Usage");
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Process CPU usage");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tTotal \t: %f", m_fProcessTotal);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tUser \t: %f", m_fProcessUser);
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tKernel \t: %f", m_fProcessKernel);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tKernel \t: %f\n", m_fProcessKernel);
 
 	// Server Monitor
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\n\n\n        Server monitoring info");
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"        Server monitoring info");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Info");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSession count \t: %d", sessionCount);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tPlayer count  \t: %d\n", playerCount);

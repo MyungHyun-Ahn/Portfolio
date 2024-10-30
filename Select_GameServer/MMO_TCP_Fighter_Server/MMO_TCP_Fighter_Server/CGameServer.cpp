@@ -99,6 +99,7 @@ VOID CGameServer::OnAccept(const UINT64 sessionId)
 	CSerializableBuffer *createMyCharPacket = CGenPacket::makePacketSCCreateMyCharacter(sessionId, newPlayer->m_bDirection, newPlayer->m_sX, newPlayer->m_sY, (BYTE)newPlayer->m_sHp);
 	if (!SendPacket(sessionId, createMyCharPacket))
 		g_Logger->WriteLog(L"GameContent", LOG_LEVEL::ERR, L"OnAccept SendPacket Err SessionID : %d", sessionId);
+	delete createMyCharPacket;
 
 	// 다른 플레이어에게 자신의 캐릭터 생성 정보를 전달
 	// 섹터 계산
@@ -112,6 +113,7 @@ VOID CGameServer::OnAccept(const UINT64 sessionId)
 	// 섹터 내의 모든 다른 캐릭터에게 내 생성 정보를 보내라
 	CSerializableBuffer *createOtherCharPacketMy = CGenPacket::makePacketSCCreateOtherCharacter(sessionId, newPlayer->m_bDirection, newPlayer->m_sX, newPlayer->m_sY, (BYTE)newPlayer->m_sHp);
 	SendSector(sessionId, newPlayer->m_sSecY, newPlayer->m_sSecX, createOtherCharPacketMy);
+	delete createOtherCharPacketMy;
 
 	CSector::s_Sectors[newPlayer->m_sSecY][newPlayer->m_sSecX].insert(std::make_pair(sessionId, newPlayer));
 	m_mapPlayers.insert(std::make_pair(sessionId, newPlayer));
@@ -127,6 +129,7 @@ VOID CGameServer::OnClientLeave(const UINT64 sessionId)
 
 	CSerializableBuffer *deleteCharPacket = CGenPacket::makePacketSCDeleteCharacter(sessionId);
 	SendSector(sessionId, delPlayer->m_sSecY, delPlayer->m_sSecX, deleteCharPacket);
+	delete deleteCharPacket;
 
 	delete delPlayer;
 }
@@ -148,11 +151,13 @@ VOID CGameServer::NewPlayerGetOtherPlayerInfo(UINT64 newPlayerId, CPlayer *other
 {
 	CSerializableBuffer *createOtherCharPacket = CGenPacket::makePacketSCCreateOtherCharacter(otherPlayer->m_iId, otherPlayer->m_bDirection, otherPlayer->m_sX, otherPlayer->m_sY, (CHAR)otherPlayer->m_sHp);
 	SendPacket(newPlayerId, createOtherCharPacket);
+	delete createOtherCharPacket;
 
 	if (otherPlayer->m_dwAction != (CHAR)MOVE_DIR::MOVE_DIR_STOP)
 	{
 		CSerializableBuffer *moveStartPacket = CGenPacket::makePacketSCMoveStart(otherPlayer->m_iId, otherPlayer->m_dwAction, otherPlayer->m_sX, otherPlayer->m_sY);
 		SendPacket(newPlayerId, moveStartPacket);
+		delete moveStartPacket;
 	}
 }
 

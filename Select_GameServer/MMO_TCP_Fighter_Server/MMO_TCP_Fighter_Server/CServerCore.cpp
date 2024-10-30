@@ -3,7 +3,6 @@
 #include "DefinePacket.h"
 #include "CSession.h"
 #include "CServerCore.h"
-#include "CProcessPacket.h"
 
 /*
 	CServerCore::Start

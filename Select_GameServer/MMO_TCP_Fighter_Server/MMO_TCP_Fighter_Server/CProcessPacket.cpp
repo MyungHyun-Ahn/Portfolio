@@ -35,6 +35,7 @@ bool CGameProcessPacket::PacketProcCSMoveStart(UINT64 sessionId, CSerializableBu
 		// 대상 플레이어 좌표로 sync 메시지
 		CSerializableBuffer *syncMessage = CGenPacket::makePacketSCSync(player->m_iId, player->m_sX, player->m_sY);
 		pGameServer->SendPacket(sessionId, syncMessage);
+		delete syncMessage;
 		g_Logger->WriteLog(L"Sync", LOG_LEVEL::SYSTEM, L"[START] PlayerId : %d, Server X : %d, Y : %d | Client X : %d, Y : %d", sessionId, player->m_sX, player->m_sY, x, y);
 
 		// 서버 좌표로 맞춰줌
@@ -104,6 +105,7 @@ bool CGameProcessPacket::PacketProcCSMoveStop(UINT64 sessionId, CSerializableBuf
 		// 대상 플레이어 좌표로 sync 메시지
 		CSerializableBuffer *syncMessage = CGenPacket::makePacketSCSync(player->m_iId, player->m_sX, player->m_sY);
 		pGameServer->SendPacket(sessionId, syncMessage);
+		delete syncMessage;
 		g_Logger->WriteLog(L"Sync", LOG_LEVEL::SYSTEM, L"[STOP] PlayerId : %d, Server X : %d, Y : %d | Client X : %d, Y : %d", sessionId, player->m_sX, player->m_sY, x, y);
 
 		// 서버 좌표로 맞춰줌

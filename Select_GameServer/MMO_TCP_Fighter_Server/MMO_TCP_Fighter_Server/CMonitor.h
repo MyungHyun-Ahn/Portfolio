@@ -7,6 +7,7 @@ public:
 	void Update(INT sessionCount, INT playerCount);
 	void UpdateCpuTime();
 	void UpdateServer();
+	void UpdateMemory();
 
 	void MonitoringConsole(INT sessionCount, INT playerCount);
 	void MonitoringFile(INT sessionCount, INT playerCount);
@@ -30,6 +31,9 @@ public:
 	ULARGE_INTEGER m_ftProcess_LastKernel;
 	ULARGE_INTEGER m_ftProcess_LastUser;
 	ULARGE_INTEGER m_ftProcess_LastTime;
+
+	// 메모리 사용량 모니터링 정보
+	PROCESS_MEMORY_COUNTERS_EX m_stPmc;
 
 	// Server 모니터링 정보
 	DWORD m_dwTime = 0;

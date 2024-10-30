@@ -74,6 +74,7 @@ void CLogger::WriteLog(const WCHAR *type, LOG_LEVEL logLevel, const WCHAR *fmt, 
 	if (m_pFile == nullptr)
 	{
 		wprintf(L"file open fail, errorCode = %d\n", GetLastError());
+		fclose(m_pFile);
 		FileUnLock();
 		return;
 	}
