@@ -14,6 +14,15 @@ CGameServer::CGameServer()
 	m_pProcessPacket = new CGameProcessPacket;
 	m_pProcessPacket->SetServer(this);
 	CSector::s_pGameServer = this;
+	m_mapPlayers.reserve(7500);
+
+	for (int y = 0; y < SECTOR_MAX_Y; y++)
+	{
+		for (int x = 0; x < SECTOR_MAX_X; x++)
+		{
+			CSector::s_Sectors[y][x].reserve(1000);
+		}
+	}
 }
 
 CGameServer::~CGameServer()

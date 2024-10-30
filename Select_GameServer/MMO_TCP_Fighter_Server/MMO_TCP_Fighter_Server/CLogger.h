@@ -19,23 +19,23 @@ public:
 	inline void SetLogLevel(LOG_LEVEL logLevel) { m_LogLevel = logLevel; }
 
 private:
-	inline void FileLock()
+	void Lock()
 	{
-		AcquireSRWLockExclusive(&m_srwFileLock);
+		EnterCriticalSection(&m_lock);
 	}
 
-	inline void FileUnLock()
+	void UnLock()
 	{
-		ReleaseSRWLockExclusive(&m_srwFileLock);
+		LeaveCriticalSection(&m_lock);
 	}
 
 private:
-	SRWLOCK m_srwFileLock;
+	CRITICAL_SECTION m_lock;
 
 	INT64 m_LogCount = 0;
 	LOG_LEVEL m_LogLevel = LOG_LEVEL::DEBUG;
 	const WCHAR *m_directoryName = nullptr;
-	FILE *m_pFile = nullptr;
+	DWORD threadId;
 };
 
 extern CLogger *g_Logger;

@@ -11,6 +11,12 @@ CMonitor::CMonitor(HANDLE hProcess)
 		m_hProcess = GetCurrentProcess();
 	}
 
+	// 콘솔 출력에 맞는 크기로 변경
+	HWND console = GetConsoleWindow();
+	RECT r;
+	GetWindowRect(console, &r);
+	MoveWindow(console, r.left, r.top, 380, 600, TRUE);
+
 	// 프로세서 개수 확인
 	//  * 프로세스 실행률 계산시 cpu 개수로 나누어 실제 사용률을 구함
 	SYSTEM_INFO sysInfo;

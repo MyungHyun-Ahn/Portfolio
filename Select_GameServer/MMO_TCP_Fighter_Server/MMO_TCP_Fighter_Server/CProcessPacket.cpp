@@ -74,7 +74,7 @@ bool CGameProcessPacket::PacketProcCSMoveStart(UINT64 sessionId, CSerializableBu
 	if (nowSecY != player->m_sSecY || nowSecX != player->m_sSecX)
 	{
 		// 섹터가 이동된 경우
-		g_Logger->WriteLog(L"MoveSector", LOG_LEVEL::SYSTEM, L"[PacketProcCSMoveStart] %d %d %d %d", player->m_sSecY, player->m_sSecX, nowSecY, nowSecX);
+		// g_Logger->WriteLog(L"MoveSector", LOG_LEVEL::SYSTEM, L"[PacketProcCSMoveStart] %d %d %d %d", player->m_sSecY, player->m_sSecX, nowSecY, nowSecX);
 		CSector::MoveSector(sessionId, player->m_sSecY, player->m_sSecX, nowSecY, nowSecX);
 	}
 
@@ -141,9 +141,7 @@ bool CGameProcessPacket::PacketProcCSMoveStop(UINT64 sessionId, CSerializableBuf
 	if (nowSecY != player->m_sSecY || nowSecX != player->m_sSecX)
 	{
 		// 섹터가 이동된 경우
-		// 언제 이런 상황이 발생할까?
-		// - Sync 발생 시
-		g_Logger->WriteLog(L"MoveSector", LOG_LEVEL::SYSTEM, L"[PacketProcCSMoveStop] %d %d %d %d", player->m_sSecY, player->m_sSecX, nowSecY, nowSecX);
+		// g_Logger->WriteLog(L"MoveSector", LOG_LEVEL::SYSTEM, L"[PacketProcCSMoveStop] %d %d %d %d", player->m_sSecY, player->m_sSecX, nowSecY, nowSecX);
 		CSector::MoveSector(sessionId, player->m_sSecY, player->m_sSecX, nowSecY, nowSecX);
 	}
 

@@ -5,12 +5,12 @@ CLogger *g_Logger;
 
 CLogger::CLogger()
 {
-	InitializeSRWLock(&m_srwFileLock);
+	InitializeCriticalSection(&m_lock);
 }
 
 CLogger::~CLogger()
 {
-
+	DeleteCriticalSection(&m_lock);
 }
 
 void CLogger::WriteLog(const WCHAR *type, LOG_LEVEL logLevel, const WCHAR *fmt, ...)
@@ -68,22 +68,23 @@ void CLogger::WriteLog(const WCHAR *type, LOG_LEVEL logLevel, const WCHAR *fmt, 
 		WriteLog(L"ERROR", LOG_LEVEL::ERR, L"로그 버퍼 크기 부족");
 	}
 
-	FileLock();
+	Lock();
 
-	m_pFile = _wfsopen(fileName, L"a, ccs = UTF-16LE", _SH_DENYWR);
-	if (m_pFile == nullptr)
+	FILE *pFile = _wfsopen(fileName, L"a, ccs = UTF-16LE", _SH_DENYWR);
+
+	threadId = GetCurrentThreadId();
+
+	if (pFile == nullptr)
 	{
 		wprintf(L"file open fail, errorCode = %d\n", GetLastError());
-		fclose(m_pFile);
-		FileUnLock();
+		fclose(pFile);
+		UnLock();
 		return;
 	}
-	fwrite(totalBuf, 1, wcslen(totalBuf) * sizeof(WCHAR), m_pFile);
+	fwrite(totalBuf, 1, wcslen(totalBuf) * sizeof(WCHAR), pFile);
 
-	fclose(m_pFile);
-	m_pFile = nullptr;
-
-	FileUnLock();
+	fclose(pFile);
+	UnLock();
 }
 
 WCHAR g_MessageBuf[10000] = { 0, };
@@ -121,5 +122,7 @@ void CLogger::WriteLogConsole(LOG_LEVEL logLevel, const WCHAR *fmt, ...)
 	}
 	va_end(va);
 
+	// Lock();
 	wprintf(L"%s\n", logBuffer);
+	// UnLock();
 }

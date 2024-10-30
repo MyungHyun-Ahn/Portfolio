@@ -16,6 +16,7 @@ BOOL CServerCore::Start(CONST CHAR *openIp, CONST USHORT port, INT maxSessionCou
 	int errVal;
 	
 	m_iMaxSessionCount = maxSessionCount;
+	m_mapSessions.reserve(7500);
 
 	WSADATA wsa;
 	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
