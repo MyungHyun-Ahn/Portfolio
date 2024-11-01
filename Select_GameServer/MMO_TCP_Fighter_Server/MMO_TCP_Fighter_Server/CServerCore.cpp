@@ -55,7 +55,7 @@ BOOL CServerCore::Start(CONST CHAR *openIp, CONST USHORT port, INT maxSessionCou
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Bind OK # Port : %d", port);
 
 	// listen()
-	retVal = listen(m_listenSocket, SOMAXCONN);
+	retVal = listen(m_listenSocket, SOMAXCONN_HINT(65535));
 	if (retVal == SOCKET_ERROR)
 	{
 		errVal = WSAGetLastError();

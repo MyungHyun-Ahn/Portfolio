@@ -52,6 +52,7 @@ public:
 			{
 				top->data.~DATA();
 			}
+
 			Node *delNode = top;
 			top = top->link;
 			free(delNode);
