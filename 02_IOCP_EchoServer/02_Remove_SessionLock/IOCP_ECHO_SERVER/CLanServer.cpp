@@ -140,10 +140,6 @@ void CLanServer::SendPacket(const UINT64 sessionID, CSerializableBuffer *sBuffer
 {
 	EnterCriticalSection(&g_SessionMapLock);
 	CSession *pSession = g_mapSessions[sessionID];
-
-#ifdef SESSION_LOCK
-	EnterCriticalSection(&pSession->m_Lock);
-#endif
 	LeaveCriticalSection(&g_SessionMapLock);
 
 	USHORT header = sBuffer->GetDataSize();
@@ -153,9 +149,6 @@ void CLanServer::SendPacket(const UINT64 sessionID, CSerializableBuffer *sBuffer
 	pSession->SendPacket(sBuffer);
 	if (!pSession->PostSend(1))
 		ReleaseSession(pSession);
-#ifdef SESSION_LOCK
-	LeaveCriticalSection(&pSession->m_Lock);
-#endif
 }
 
 BOOL CLanServer::Disconnect(CSession *pSession)
@@ -169,17 +162,11 @@ BOOL CLanServer::ReleaseSession(CSession *pSession)
 	EnterCriticalSection(&g_SessionMapLock);
 	g_mapSessions.erase(pSession->m_uiSessionID);
 
-#ifdef SESSION_LOCK
-	EnterCriticalSection(&pSession->m_Lock);
-#endif
 	LeaveCriticalSection(&g_SessionMapLock);
 	if (pSession->m_bIsValid)
 		Disconnect(pSession);
 
 	closesocket(pSession->m_sSessionSocket);
-#ifdef SESSION_LOCK
-	LeaveCriticalSection(&pSession->m_Lock);
-#endif
 	delete pSession;
 
 	InterlockedIncrement(&deleteCount);
@@ -236,20 +223,17 @@ int CLanServer::WorkerThread()
 				// 	__debugbreak();
 				// }
 
-				pSession->PostSend(2);
+				// 여기에서 SendFlag가 FALSE인 경우
+				if (!pSession->m_iSendFlag)
+					__debugbreak();
+
 				pSession->PostRecv();
 			}
 			else if (lpOverlapped->m_Operation == IOOperation::SEND)
 			{
-#ifdef SESSION_LOCK
-				EnterCriticalSection(&pSession->m_Lock);
-#endif
 				pSession->SendCompleted(dwTransferred);
 				pSession->PostSend(0);
 
-#ifdef SESSION_LOCK
-				LeaveCriticalSection(&pSession->m_Lock);
-#endif
 			}
 		}
 
