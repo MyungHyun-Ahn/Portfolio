@@ -1,0 +1,85 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Network">
+      <UniqueIdentifier>{bab55af7-1566-43ab-97b1-412747273556}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Content">
+      <UniqueIdentifier>{6e494647-b9e7-4dfd-b609-eb53a9117045}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Define">
+      <UniqueIdentifier>{daa4e531-6548-40e9-ae92-048eca81c220}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Tools">
+      <UniqueIdentifier>{0db06b59-5535-474b-9865-09dce295457b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DataStructures">
+      <UniqueIdentifier>{00d64862-3f29-474d-a3e1-61b77ae173ee}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pch.h">
+      <Filter>Define</Filter>
+    </ClInclude>
+    <ClInclude Include="CLanServer.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="CSession.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="CRingBuffer.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
+    <ClInclude Include="CSerializableBuffer.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
+    <ClInclude Include="CObjectPool.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
+    <ClInclude Include="DefineSingleton.h">
+      <Filter>Define</Filter>
+    </ClInclude>
+    <ClInclude Include="CLogger.h">
+      <Filter>Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="DefineServer.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="ServerConfig.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="CEchoServer.h">
+      <Filter>Content</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="pch.cpp">
+      <Filter>Define</Filter>
+    </ClCompile>
+    <ClCompile Include="CLanServer.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="CSession.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="CRingBuffer.cpp">
+      <Filter>DataStructures</Filter>
+    </ClCompile>
+    <ClCompile Include="CSerializableBuffer.cpp">
+      <Filter>DataStructures</Filter>
+    </ClCompile>
+    <ClCompile Include="CObjectPool.cpp">
+      <Filter>DataStructures</Filter>
+    </ClCompile>
+    <ClCompile Include="CLogger.cpp">
+      <Filter>Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="CEchoServer.cpp">
+      <Filter>Content</Filter>
+    </ClCompile>
+    <ClCompile Include="Main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="MemoryDebug.txt" />
+  </ItemGroup>
+</Project>

@@ -23,9 +23,16 @@ unsigned int WorkerThreadFunc(LPVOID lpParam)
 BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorkerThreadCount, USHORT maxWorkerThreadCount, INT maxSessionCount)
 {
 	InitializeCriticalSection(&g_SessionMapLock);
+	InitializeSRWLock(&m_disconnectStackLock);
 	int retVal;
 	int errVal;
 	WSAData wsaData;
+
+	// 디스커넥트 스택 채우기
+	for (int i = 65534; i >= 0; i--)
+	{
+		m_stackDisconnectIndex.push_back(i);
+	}
 
 	retVal = WSAStartup(MAKEWORD(2, 2), &wsaData);
 	if (retVal != 0)
@@ -154,8 +161,8 @@ BOOL CLanServer::ReleaseSession(CSession *pSession)
 {
 	EnterCriticalSection(&g_SessionMapLock);
 	g_mapSessions.erase(pSession->m_uiSessionID);
-	LeaveCriticalSection(&g_SessionMapLock);
 
+	LeaveCriticalSection(&g_SessionMapLock);
 	if (pSession->m_bIsValid)
 		Disconnect(pSession);
 
@@ -270,6 +277,12 @@ int CLanServer::AccepterThread()
 		// IOCP에 세션 소켓 등록
 		CreateIoCompletionPort((HANDLE)clientSocket, m_hIOCPHandle, (ULONG_PTR)pSession, 0);
 		// g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"[SYSTEM] ip : %s , port : %d, sessionID : %lld\n", clientAddrBuf, ntohs(clientAddr.sin_port), pSession->m_uiSessionID);
+
+		// AcquireSRWLockExclusive(&m_disconnectStackLock);
+		// USHORT index = m_stackDisconnectIndex.back();
+		// m_stackDisconnectIndex.pop_back();
+		// ReleaseSRWLockExclusive(&m_disconnectStackLock);
+		// m_arrPSessions[index] = pSession;
 
 		EnterCriticalSection(&g_SessionMapLock);
 		g_mapSessions.insert(std::make_pair(pSession->m_uiSessionID, pSession));

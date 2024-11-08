@@ -21,9 +21,10 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{e562e0c1-1b04-4613-89ae-de7c0e3d5e5c}</ProjectGuid>
-    <RootNamespace>LockFreeStack</RootNamespace>
+    <ProjectGuid>{fb05af3b-4227-4b8f-996d-91a26222df5f}</ProjectGuid>
+    <RootNamespace>IOCPECHOLOCK</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>IOCP_ECHO_SERVER</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -77,6 +78,9 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -93,6 +97,9 @@
       <ConformanceMode>true</ConformanceMode>
       <Optimization>Disabled</Optimization>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -108,6 +115,9 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -124,6 +134,9 @@
       <ConformanceMode>true</ConformanceMode>
       <Optimization>Disabled</Optimization>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -133,14 +146,36 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="CLFStack.h" />
+    <ClInclude Include="CEchoServer.h" />
+    <ClInclude Include="CLanServer.h" />
+    <ClInclude Include="CLogger.h" />
+    <ClInclude Include="CObjectPool.h" />
+    <ClInclude Include="CRingBuffer.h" />
+    <ClInclude Include="CSerializableBuffer.h" />
+    <ClInclude Include="CSession.h" />
+    <ClInclude Include="DefineServer.h" />
+    <ClInclude Include="DefineSingleton.h" />
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="ServerConfig.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CLFStack.cpp" />
+    <ClCompile Include="CEchoServer.cpp" />
+    <ClCompile Include="CLanServer.cpp" />
+    <ClCompile Include="CLogger.cpp" />
+    <ClCompile Include="CObjectPool.cpp" />
+    <ClCompile Include="CRingBuffer.cpp" />
+    <ClCompile Include="CSerializableBuffer.cpp" />
+    <ClCompile Include="CSession.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="pch.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="StackDebugging01.txt" />
+    <Text Include="MemoryDebug.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

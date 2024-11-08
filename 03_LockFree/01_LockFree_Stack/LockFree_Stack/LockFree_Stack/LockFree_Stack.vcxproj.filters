@@ -7,4 +7,7 @@
     <ClCompile Include="CLFStack.cpp" />
     <ClCompile Include="Main.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="StackDebugging01.txt" />
+  </ItemGroup>
 </Project>

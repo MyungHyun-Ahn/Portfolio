@@ -3,6 +3,7 @@
 #include <process.h>
 #include "CLFStack.h"
 
+// 스레드 2개로 해야 분석이 편함
 #define THREAD_COUNT 2
 
 CLFStack<UINT64> lockfreeStack;

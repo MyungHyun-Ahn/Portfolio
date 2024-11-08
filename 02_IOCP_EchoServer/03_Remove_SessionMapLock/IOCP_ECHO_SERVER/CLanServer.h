@@ -31,6 +31,9 @@ private:
 	INT						m_iCurrentID = 0;
 
 	USHORT					m_usMaxSessionCount = 65535;
+	CSession				*m_arrPSessions[65535];
+	std::vector<USHORT>		m_stackDisconnectIndex;
+	SRWLOCK					m_disconnectStackLock;
 
 	// Worker
 	SOCKET					m_sListenSocket = INVALID_SOCKET;
