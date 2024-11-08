@@ -1,0 +1,82 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="Main.cpp" />
+    <ClCompile Include="CEchoServer.cpp">
+      <Filter>Content</Filter>
+    </ClCompile>
+    <ClCompile Include="CRingBuffer.cpp">
+      <Filter>DataStructures</Filter>
+    </ClCompile>
+    <ClCompile Include="CSerializableBuffer.cpp">
+      <Filter>DataStructures</Filter>
+    </ClCompile>
+    <ClCompile Include="CObjectPool.cpp">
+      <Filter>DataStructures</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>Define</Filter>
+    </ClCompile>
+    <ClCompile Include="CLanServer.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="CSession.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="CLogger.cpp">
+      <Filter>Tools</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="CEchoServer.h">
+      <Filter>Content</Filter>
+    </ClInclude>
+    <ClInclude Include="CSerializableBuffer.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
+    <ClInclude Include="CRingBuffer.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
+    <ClInclude Include="CObjectPool.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
+    <ClInclude Include="DefineSingleton.h">
+      <Filter>Define</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
+      <Filter>Define</Filter>
+    </ClInclude>
+    <ClInclude Include="CLanServer.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="CSession.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="DefineServer.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="ServerConfig.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="CLogger.h">
+      <Filter>Tools</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Content">
+      <UniqueIdentifier>{900d0326-bdd9-44d6-9aa6-08da5f5f33b9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DataStructures">
+      <UniqueIdentifier>{9e35bb42-e3ce-4416-a1a8-cdf7584459b9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Define">
+      <UniqueIdentifier>{fce5c033-3fae-49b0-a4c8-0a5d373a630d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Network">
+      <UniqueIdentifier>{cca92df0-a222-43c0-b835-f2ec13b2ab66}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Tools">
+      <UniqueIdentifier>{baa65f0f-14ab-4837-8344-71a328c6b480}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
