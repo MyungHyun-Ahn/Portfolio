@@ -5,7 +5,6 @@ class CLanServer
 {
 public:
 	BOOL Start(const CHAR *openIP, const USHORT port, USHORT createWorkerThreadCount, USHORT maxWorkerThreadCount, INT maxSessionCount);
-	// void Stop();
 
 	inline INT GetSessionCount() { return m_iSessionCount; }
 
@@ -13,13 +12,32 @@ public:
 	BOOL Disconnect(CSession *pSession);
 	BOOL ReleaseSession(CSession *pSession);
 
-	// void Monitor();
-
 	virtual bool OnConnectionRequest(const WCHAR *ip, USHORT port) = 0;
 	virtual void OnAccept(const UINT64 sessionID) = 0;
 	virtual void OnClientLeave(const UINT64 sessionID) = 0;
 	virtual void OnRecv(const UINT64 sessionID, CSerializableBuffer *message) = 0;
 	virtual void OnError(int errorcode, WCHAR *errMsg) = 0;
+
+private:
+	inline USHORT GetIndex(UINT64 sessionId)
+	{
+		UINT64 mask64 = sessionId & SESSION_INDEX_MASK;
+		mask64 = mask64 >> 48;
+		return (USHORT)mask64;
+	}
+
+	inline UINT64 GetId(UINT64 sessionId)
+	{
+		UINT64 mask64 = sessionId & SESSION_ID_MASK;
+		return mask64;
+	}
+
+	inline UINT64 CombineIndex(USHORT index, UINT64 id)
+	{
+		UINT64 index64 = index;
+		index64 = index64 << 48;
+		return index64 | id;
+	}
 
 public:
 	int WorkerThread();
@@ -27,7 +45,7 @@ public:
 
 private:
 	// Session
-	INT						m_iSessionCount = 0;
+	LONG					m_iSessionCount = 0;
 	INT						m_iCurrentID = 0;
 
 	USHORT					m_usMaxSessionCount = 65535;
