@@ -109,6 +109,14 @@ BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 		return FALSE;
 	}
 
+	retVal = WSAIoctl(m_sListenSocket, SIO_GET_EXTENSION_FUNCTION_POINTER, &m_guidGetAcceptExSockaddrs, sizeof(m_guidGetAcceptExSockaddrs), &m_lpfnGetAcceptExSockaddrs, sizeof(m_lpfnGetAcceptExSockaddrs), &dwBytes, NULL, NULL);
+	if (retVal == SOCKET_ERROR)
+	{
+		errVal = WSAGetLastError();
+		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"WSAIoctl(lpfnGetAcceptExSockaddrs) 실패 : %d", errVal);
+		return FALSE;
+	}
+
 	// 500개 AcceptEx 예약
 	FristPostAcceptEx();
 
@@ -186,10 +194,96 @@ void CLanServer::FristPostAcceptEx()
 	// 처음에 AcceptEx를 걸어두고 시작
 	for (int i = 0; i < ACCEPTEX_COUNT; i++)
 	{
-		CSession *pSession = CSession::Alloc();
-		pSession->PostAcceptEx(i);
-		m_AcceptExSessions[i] = pSession;
+		PostAcceptEx(i);
 	}
+}
+
+BOOL CLanServer::PostAcceptEx(INT index)
+{
+	int retVal;
+	int errVal;
+
+	CSession *newAcceptEx = CSession::Alloc();
+	m_AcceptExSessions[index] = newAcceptEx;
+
+	newAcceptEx->m_sSessionSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (newAcceptEx->m_sSessionSocket == INVALID_SOCKET)
+	{
+		errVal = WSAGetLastError();
+		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"PostAcceptEx socket() 실패 : %d", errVal);
+		return FALSE;
+	}
+
+	InterlockedIncrement(&newAcceptEx->m_iIOCount);
+	ZeroMemory(&newAcceptEx->m_AcceptExOverlapped, sizeof(OVERLAPPED));
+	newAcceptEx->m_AcceptExOverlapped.m_Index = index;
+
+	retVal = m_lpfnAcceptEx(m_sListenSocket, newAcceptEx->m_sSessionSocket
+		, newAcceptEx->m_AcceptBuffer, 0, sizeof(SOCKADDR_IN) + 16, sizeof(SOCKADDR_IN) + 16, NULL, (LPWSAOVERLAPPED)&newAcceptEx->m_AcceptExOverlapped);
+	if (retVal == FALSE)
+	{
+		errVal = WSAGetLastError();
+		if (errVal != WSA_IO_PENDING)
+		{
+			if (errVal != WSAECONNABORTED && errVal != WSAECONNRESET)
+				g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"AcceptEx() Error : %d", errVal);
+
+			// 사실 여기선 0이 될 일이 없음
+			// 반환값을 사용안해도 됨
+			if (InterlockedDecrement(&newAcceptEx->m_iIOCount) == 0)
+			{
+				return FALSE;
+			}
+		}
+	}
+
+	return TRUE;
+}
+
+BOOL CLanServer::AcceptExCompleted(CSession *pSession)
+{
+	int retVal;
+	int errVal;
+	retVal = setsockopt(pSession->m_sSessionSocket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
+		(char *)&m_sListenSocket, sizeof(SOCKET));
+	if (retVal == SOCKET_ERROR)
+	{
+		errVal = WSAGetLastError();
+		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"setsockopt(SO_UPDATE_ACCEPT_CONTEXT) 실패 : %d", errVal);
+		return FALSE;
+	}
+
+	// 성공한 소켓에 대해 IOCP 등록
+	CreateIoCompletionPort((HANDLE)pSession->m_sSessionSocket, m_hIOCPHandle, (ULONG_PTR)pSession, 0);
+
+	SOCKADDR_IN *localAddr = nullptr;
+	INT localAddrLen;
+
+	SOCKADDR_IN *remoteAddr = nullptr;
+	INT remoteAddrLen;
+	m_lpfnGetAcceptExSockaddrs(pSession->m_AcceptBuffer, 0, sizeof(SOCKADDR_IN) + 16, sizeof(SOCKADDR_IN) + 16, (SOCKADDR **)&localAddr, &localAddrLen, (SOCKADDR **)&remoteAddr, &remoteAddrLen);
+	
+	InetNtop(AF_INET, &remoteAddr->sin_addr, pSession->m_ClientAddrBuffer, 16);
+
+	pSession->m_ClientPort = remoteAddr->sin_port;
+
+	// TODO - 끊어줄 방법 고민
+	if (!OnConnectionRequest(pSession->m_ClientAddrBuffer, pSession->m_ClientPort))
+		return FALSE;
+
+	AcquireSRWLockExclusive(&m_disconnectStackLock);
+	USHORT index = m_arrDisconnectIndex[m_disconnectArrTop--];
+	ReleaseSRWLockExclusive(&m_disconnectStackLock);
+
+	UINT64 combineId = CLanServer::CombineIndex(index, ++m_iCurrentID);
+
+	pSession->Init(combineId);
+
+	InterlockedIncrement(&m_iSessionCount);
+	InterlockedIncrement(&g_monitor.m_lAcceptTPS);
+	m_arrPSessions[index] = pSession;
+
+	return TRUE;
 }
 
 int CLanServer::WorkerThread()
@@ -228,28 +322,48 @@ int CLanServer::WorkerThread()
 		}
 		else
 		{
-			if (lpOverlapped->m_Operation == IOOperation::ACCEPTEX)
+			switch (lpOverlapped->m_Operation)
 			{
+			case IOOperation::ACCEPTEX:
+			{
+				// Accept가 성공한 세션 포인터를 얻어옴
 				INT index = lpOverlapped->m_Index;
 				pSession = m_AcceptExSessions[index];
-				pSession->AcceptExCompleted();
+
+				// 이거 실패하면 연결 끊음
+				// * 실패 가능한 상황 - setsockopt, OnConnectionRequest
+				// * ioCount 무조건 1일 것임
+				// * 바로 끊어도 괜춘
+				// * 다른 I/O 요청을 안걸고 끝내기 때문에 아래의 ioCount 0이 됨으로 연결 끊김을 유도
+				if (!AcceptExCompleted(pSession))
+				{
+					// 실패한 인덱스에 대한 예약은 다시 걸어줌
+					PostAcceptEx(index);
+					break;
+				}
+
+				// OnAccept 처리는 여기서
 				OnAccept(pSession->m_uiSessionID);
+
+				// 해당 세션에 대해 Recv 예약
 				pSession->PostRecv();
 
 				// 해제된 인덱스에 다시 AcceptEx를 검
-				CSession *newAcceptEx = CSession::Alloc();
-				m_AcceptExSessions[index] = newAcceptEx;
-				newAcceptEx->PostAcceptEx(index);
+				PostAcceptEx(index);
 			}
-			else if (lpOverlapped->m_Operation == IOOperation::RECV)
+				break;
+			case IOOperation::RECV:
 			{
 				pSession->RecvCompleted(dwTransferred);
 				pSession->PostRecv();
 			}
-			else if (lpOverlapped->m_Operation == IOOperation::SEND)
+				break;
+			case IOOperation::SEND:
 			{
 				pSession->SendCompleted(dwTransferred);
 				pSession->PostSend(0);
+			}
+				break;
 			}
 		}
 

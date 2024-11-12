@@ -6,4 +6,4 @@ constexpr USHORT SERVER_PORT = 6000;
 constexpr USHORT PACKET_HEADER_SIZE = 2;
 constexpr UINT64 LOGIN_PACKET = 0x7fffffffffffffff;
 constexpr INT WSASEND_MAX_BUFFER_COUNT = 64;
-constexpr INT ACCEPTEX_COUNT = 500;
+constexpr INT ACCEPTEX_COUNT = 1;

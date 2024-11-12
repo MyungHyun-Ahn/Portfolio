@@ -70,14 +70,11 @@ public:
 		m_SendBuffer.Clear();
 	}
 
-	bool AcceptExCompleted();
-
 	void RecvCompleted(int size);
 
 	bool SendPacket(CSerializableBuffer *message);
 	void SendCompleted(int size);
 
-	bool PostAcceptEx(int index);
 	bool PostRecv();
 	bool PostSend(USHORT wher = 0);
 
@@ -101,10 +98,16 @@ public:
 private:
 	LONG m_bIsValid;
 
+	LONG m_iIOCount = 0;
+	LONG m_iSendFlag = FALSE;
+	LONG m_iSendCount = 0;
+
 	SOCKET m_sSessionSocket;
 	UINT64 m_uiSessionID;
 
 	char	    m_AcceptBuffer[64];
+	WCHAR		m_ClientAddrBuffer[16];
+	USHORT		m_ClientPort;
 	CRingBuffer m_RecvBuffer;
 	CRingBuffer m_SendBuffer;
 
@@ -112,9 +115,6 @@ private:
 	OverlappedEx m_RecvOverlapped;
 	OverlappedEx m_SendOverlapped;
 
-	LONG m_iIOCount = 0;
-	LONG m_iSendFlag = FALSE;
-	LONG m_iSendCount = 0;
 	inline static CObjectPool<CSession> s_sSessionPool = CObjectPool<CSession>(1000, false);
 
 #ifdef POSTSEND_LOST_DEBUG

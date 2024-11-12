@@ -32,7 +32,7 @@ int main()
 		
 	CCrashDump crashDump;
 	g_Server = new CEchoServer;
-	g_Server->Start(SERVER_IP, SERVER_PORT, 4, 4, 100);
+	g_Server->Start(SERVER_IP, SERVER_PORT, 16, 4, 100);
 
 	MonitorThreadFunc(nullptr);
 

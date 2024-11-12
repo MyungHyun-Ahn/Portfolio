@@ -3,43 +3,6 @@
 #include "CSession.h"
 #include "CLanServer.h"
 
-bool CSession::AcceptExCompleted()
-{
-    int retVal;
-    int errVal;
-
-	retVal = setsockopt(m_sSessionSocket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
-		(char *)&g_Server->m_sListenSocket, sizeof(SOCKET));
-	if (retVal == SOCKET_ERROR)
-	{
-		errVal = WSAGetLastError();
-		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"setsockopt(SO_UPDATE_ACCEPT_CONTEXT) 실패 : %d", errVal);
-		return FALSE;
-	}
-
-    CreateIoCompletionPort((HANDLE)m_sSessionSocket, g_Server->m_hIOCPHandle, (ULONG_PTR)this, 0);
-
-    SOCKADDR_IN *clientAddr = (SOCKADDR_IN *)m_AcceptBuffer;
-	WCHAR clientAddrBuf[16] = { 0, };
-	InetNtop(AF_INET, &clientAddr->sin_addr, clientAddrBuf, 16);
-
-    if (!g_Server->OnConnectionRequest(clientAddrBuf, ntohs(clientAddr->sin_port)))
-        return FALSE;
-
-	AcquireSRWLockExclusive(&g_Server->m_disconnectStackLock);
-	USHORT index = g_Server->m_arrDisconnectIndex[g_Server->m_disconnectArrTop--];
-	ReleaseSRWLockExclusive(&g_Server->m_disconnectStackLock);
-
-    UINT64 combineId = CLanServer::CombineIndex(index, ++g_Server->m_iCurrentID);
-    
-    // 소켓은 이미 할당되어서 반환됨
-    Init(combineId);
-
-    InterlockedIncrement(&g_Server->m_iSessionCount);
-    InterlockedIncrement(&g_monitor.m_lAcceptTPS);
-    g_Server->m_arrPSessions[index] = this;
-}
-
 void CSession::RecvCompleted(int size)
 {
     m_RecvBuffer.MoveRear(size);
@@ -110,43 +73,6 @@ void CSession::SendCompleted(int size)
 	sendDebug[index % 65535] = { index, (USHORT)GetCurrentThreadId(), 0xff, TRUE, 0 };
 #endif
     InterlockedExchange(&m_iSendFlag, FALSE);
-}
-
-bool CSession::PostAcceptEx(int index)
-{
-    int retVal;
-    int errVal;
-    m_sSessionSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (m_sSessionSocket == INVALID_SOCKET)
-    {
-        errVal = WSAGetLastError();
-        g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"PostAcceptEx socket() 실패 : %d", errVal);
-        return FALSE;
-    }
-
-    InterlockedIncrement(&m_iIOCount);
-    ZeroMemory(&m_AcceptExOverlapped, sizeof(OVERLAPPED));
-    m_AcceptExOverlapped.m_Index = index;
-    retVal = g_Server->m_lpfnAcceptEx(g_Server->m_sListenSocket, m_sSessionSocket
-                        , m_AcceptBuffer, 0, sizeof(SOCKADDR_IN) + 16, sizeof(SOCKADDR_IN) + 16, NULL, (LPWSAOVERLAPPED)&m_AcceptExOverlapped);
-    if (retVal == FALSE)
-    {
-		errVal = WSAGetLastError();
-		if (errVal != WSA_IO_PENDING)
-		{
-			if (errVal != WSAECONNABORTED && errVal != WSAECONNRESET)
-				g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"AcceptEx() Error : %d", errVal);
-
-			// 사실 여기선 0이 될 일이 없음
-			// 반환값을 사용안해도 됨
-			if (InterlockedDecrement(&m_iIOCount) == 0)
-			{
-				return FALSE;
-			}
-		}
-    }
-
-    return TRUE;
 }
 
 bool CSession::PostRecv()

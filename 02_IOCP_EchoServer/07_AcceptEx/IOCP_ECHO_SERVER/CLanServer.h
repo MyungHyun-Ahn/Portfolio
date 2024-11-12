@@ -4,8 +4,6 @@ class CSession;
 class CLanServer
 {
 public:
-	friend class CSession;
-
 	BOOL Start(const CHAR *openIP, const USHORT port, USHORT createWorkerThreadCount, USHORT maxWorkerThreadCount, INT maxSessionCount);
 	// void Stop();
 
@@ -22,6 +20,8 @@ public:
 	virtual void OnError(int errorcode, WCHAR *errMsg) = 0;
 
 	void FristPostAcceptEx();
+	BOOL PostAcceptEx(INT index);
+	BOOL AcceptExCompleted(CSession *pSession);
 
 private:
 	inline static USHORT GetIndex(UINT64 sessionId)
@@ -67,6 +67,10 @@ private:
 	// Accepter
 	LPFN_ACCEPTEX		m_lpfnAcceptEx = NULL;
 	GUID				m_guidAcceptEx = WSAID_ACCEPTEX;
+
+	LPFN_GETACCEPTEXSOCKADDRS		m_lpfnGetAcceptExSockaddrs = NULL;
+	GUID							m_guidGetAcceptExSockaddrs = WSAID_GETACCEPTEXSOCKADDRS;
+
 	CSession			*m_AcceptExSessions[ACCEPTEX_COUNT];
 
 	// IOCP วฺต้
