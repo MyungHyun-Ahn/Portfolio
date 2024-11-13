@@ -34,7 +34,7 @@ CMonitor::CMonitor(HANDLE hProcess)
 	PdhOpenQuery(NULL, NULL, &m_SystemNPMemoryQuery);
 	PdhOpenQuery(NULL, NULL, &m_SystemAvailableMemoryQuery);
 
-	PdhAddCounter(m_ProcessNPMemoryQuery, L"\\Process(IOCP_ECHO_LOCK)\\Pool Nonpaged Bytes", NULL, &m_ProcessNPMemoryCounter);
+	PdhAddCounter(m_ProcessNPMemoryQuery, L"\\Process(IOCP_ECHO_SERVER)\\Pool Nonpaged Bytes", NULL, &m_ProcessNPMemoryCounter);
 	PdhAddCounter(m_SystemNPMemoryQuery, L"\\Memory\\Pool Nonpaged Bytes", NULL, &m_SystemNPMemoryCounter);
 	PdhAddCounter(m_SystemAvailableMemoryQuery, L"\\Memory\\Available MBytes", NULL, &m_SystemAvailableMemoryCounter);
 	
