@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="CLFStack.h" />
+    <ClInclude Include="LFDefine.h" />
+    <ClInclude Include="CLFMemoryPool.h" />
+    <ClInclude Include="CLFQueue.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="CLFStack.cpp" />
+    <ClCompile Include="Main.cpp" />
+    <ClCompile Include="CLFMemoryPool.cpp" />
+    <ClCompile Include="CLFQueue.cpp" />
+  </ItemGroup>
+</Project>
