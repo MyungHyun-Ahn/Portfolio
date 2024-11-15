@@ -43,7 +43,7 @@ public:
 		LONG64 backIndex = InterlockedIncrement64(&logIndex);
 		logging[backIndex % LOG_MAX] = { backIndex, GetCurrentThreadId(), PUSH, (USHORT)data, (LPVOID)t, (LPVOID)newTop };
 		// Push 성공
-		// InterlockedIncrement(&m_iUseCount);
+		InterlockedIncrement(&m_iUseCount);
 	}
 
 	void Pop(T *data)
@@ -54,6 +54,7 @@ public:
 		do
 		{
 			t = m_pTop;
+			Sleep(0);
 			newTop = t->next;
 		} while (InterlockedCompareExchangePointer((volatile LPVOID *)&m_pTop, (LPVOID)newTop, (LPVOID)t) != t);
 
@@ -61,7 +62,7 @@ public:
 		logging[backIndex % LOG_MAX] = { backIndex, GetCurrentThreadId(), POP, (USHORT)t->data, (LPVOID)t, (LPVOID)newTop };
 
 		// Pop 성공
-		// InterlockedDecrement(&m_iUseCount);
+		InterlockedDecrement(&m_iUseCount);
 
 		*data = t->data;
 		delete t;
