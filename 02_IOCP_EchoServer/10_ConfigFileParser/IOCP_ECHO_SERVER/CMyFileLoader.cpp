@@ -127,3 +127,88 @@ VOID CMyFileLoader::Parse(const WCHAR *fileName)
 
 	return;
 }
+
+BOOL CMyFileLoader::Load(const WCHAR *classStr, const WCHAR *keyStr, USHORT *outValue)
+{
+	auto classIt = m_parsedDatas.find(classStr);
+	if (classIt == m_parsedDatas.end())
+	{
+		// class 없음
+		return FALSE;
+	}
+
+	auto keyIt = classIt->second.find(keyStr);
+	if (keyIt == classIt->second.end())
+	{
+		// value 없음
+		return FALSE;
+	}
+
+	INT out = _wtoi(keyIt->second.c_str());
+	*outValue = (USHORT)out;
+	return TRUE;
+}
+
+BOOL CMyFileLoader::Load(const WCHAR *classStr, const WCHAR *keyStr, INT *outValue)
+{
+	auto classIt = m_parsedDatas.find(classStr);
+	if (classIt == m_parsedDatas.end())
+	{
+		// class 없음
+		return FALSE;
+	}
+
+	auto keyIt = classIt->second.find(keyStr);
+	if (keyIt == classIt->second.end())
+	{
+		// value 없음
+		return FALSE;
+	}
+
+	INT out = _wtoi(keyIt->second.c_str());
+	*outValue = out;
+	return TRUE;
+}
+
+BOOL CMyFileLoader::Load(const WCHAR *classStr, const WCHAR *keyStr, std::string *str)
+{
+	auto classIt = m_parsedDatas.find(classStr);
+	if (classIt == m_parsedDatas.end())
+	{
+		// class 없음
+		return FALSE;
+	}
+
+	auto keyIt = classIt->second.find(keyStr);
+	if (keyIt == classIt->second.end())
+	{
+		// value 없음
+		return FALSE;
+	}
+
+	str->assign(keyIt->second.begin(), keyIt->second.end());
+	return TRUE;
+}
+
+BOOL CMyFileLoader::Load(const WCHAR *classStr, const WCHAR *keyStr, std::wstring *wstr)
+{
+	auto classIt = m_parsedDatas.find(classStr);
+	if (classIt == m_parsedDatas.end())
+	{
+		// class 없음
+		return FALSE;
+	}
+
+	auto keyIt = classIt->second.find(keyStr);
+	if (keyIt == classIt->second.end())
+	{
+		// value 없음
+		return FALSE;
+	}
+	wstr->assign(keyIt->second.begin(), keyIt->second.end());
+	return TRUE;
+}
+
+
+
+
