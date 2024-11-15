@@ -112,7 +112,7 @@ public:
 			} while (InterlockedCompareExchange(&m_pTop, newTop, readTop) != readTop);
 
 			// 반환될 노드가 결정된 이후 진행
-			if (m_bPlacementNewFlag)
+			if (m_bPlacementNewFlag && readTop != NULL)
 			{
 				node = new (node) Node;
 			}

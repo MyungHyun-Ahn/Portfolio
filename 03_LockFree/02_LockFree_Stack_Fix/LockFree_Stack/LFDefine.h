@@ -1,6 +1,5 @@
 #pragma once
 
-// Identifier
 constexpr ULONG_PTR ADDR_MASK = 0x00007FFFFFFFFFFF;
 constexpr ULONG_PTR IDENTIFIER_MASK = ~ADDR_MASK;
 constexpr INT ZERO_BIT = 17;
