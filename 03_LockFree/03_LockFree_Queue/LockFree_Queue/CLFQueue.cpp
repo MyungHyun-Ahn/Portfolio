@@ -5,3 +5,7 @@
 #include "LFDefine.h"
 #include "CLFMemoryPool.h"
 #include "CLFQueue.h"
+
+
+QueueDebug logging[200000];
+LONG64 logIndex = 0;

@@ -22,12 +22,12 @@ template<typename DATA>
 class CLFMemoryPool
 {
 	using Node = MemoryPoolNode<DATA>;
-	
+
 public:
 	// 이 부분은 싱글 스레드에서 진행
 	// - 다른 스레드가 생성되고는 절대 초기화를 진행하면 안됨
 	__forceinline CLFMemoryPool(int initCount, bool placementNewFlag)
-		: m_iCapacity(0), m_bPlacementNewFlag(placementNewFlag)
+		: m_iSize(0), m_bPlacementNewFlag(placementNewFlag)
 	{
 		// initCount 만큼 FreeList 할당
 		for (int i = 0; i < initCount; i++)
@@ -90,7 +90,7 @@ public:
 			ULONG_PTR readTop;
 			ULONG_PTR newTop;
 
-			do 
+			do
 			{
 				readTop = m_pTop;
 				if (readTop == NULL)
@@ -112,11 +112,6 @@ public:
 			} while (InterlockedCompareExchange(&m_pTop, newTop, readTop) != readTop);
 
 			// 반환될 노드가 결정된 이후 진행
-			if (readTop != NULL)
-			{
-				InterlockedDecrement(&m_iFreeCount);
-			}
-			
 			if (m_bPlacementNewFlag)
 			{
 				node = new (node) Node;
@@ -154,7 +149,7 @@ public:
 		ULONG_PTR readTop;
 		ULONG_PTR combinedNewTop = CombineIdentAndAddr(ident, (ULONG_PTR)newTop);
 
-		do 
+		do
 		{
 			readTop = m_pTop;
 			newTop->next = readTop;
@@ -162,7 +157,6 @@ public:
 		} while (InterlockedCompareExchange(&m_pTop, combinedNewTop, readTop) != readTop);
 
 		// Push 성공
-		InterlockedIncrement(&m_iFreeCount);
 	}
 
 private:
@@ -173,7 +167,7 @@ private:
 #ifdef SAFE_MODE
 		newNode->poolPtr = this;
 #endif
-		InterlockedIncrement(&m_iCapacity);
+		InterlockedIncrement(&m_iSize);
 		return newNode;
 	}
 
@@ -183,14 +177,13 @@ private:
 #ifdef SAFE_MODE
 		newNode->poolPtr = this;
 #endif
-		InterlockedIncrement(&m_iCapacity);
+		InterlockedIncrement(&m_iSize);
 		return newNode;
 	}
 
 private:
 	bool		m_bPlacementNewFlag;
-	LONG		m_iCapacity = 0;
-	LONG		m_iFreeCount = 0;
+	LONG		m_iSize = 0;
 	ULONG_PTR	m_ullCurrentIdentifier = 0;
 	ULONG_PTR	m_pTop = 0;
 };

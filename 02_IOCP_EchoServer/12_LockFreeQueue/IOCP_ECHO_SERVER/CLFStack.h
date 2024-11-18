@@ -1,5 +1,23 @@
 #pragma once
 
+struct DebugInfo
+{
+	LONG64		index;
+	DWORD		threadId;
+	USHORT		pushOrPop;		// push : 0							
+								// pop : 1
+	USHORT		data;			// 데이터
+	void *tPtr;			// 읽어온 Top
+	void *newTPtr;		// 새로 Top 되어야할 것
+};
+
+#define LOG_MAX 200000
+#define PUSH 0
+#define POP 1
+
+extern DebugInfo logging[LOG_MAX];
+extern LONG64 logIndex;
+
 template<typename Data>
 struct StackNode
 {
@@ -33,7 +51,7 @@ public:
 		InterlockedIncrement(&m_iUseCount);
 	}
 
-	void Pop(T *data)
+	bool Pop(T *data)
 	{
 		ULONG_PTR readTop;
 		ULONG_PTR newTop;
@@ -43,21 +61,29 @@ public:
 		{
 			readTop = m_pTop;
 			readTopAddr = (Node *)GetAddress(readTop);
+			if (readTop == NULL)
+			{
+				break;
+			}
 			newTop = readTopAddr->next;
 		} while (InterlockedCompareExchange(&m_pTop, newTop, readTop) != readTop);
+
+		if (readTopAddr == NULL)
+			return false;
 
 		// Pop 성공
 		InterlockedDecrement(&m_iUseCount);
 
 		*data = readTopAddr->data;
 		m_StackNodePool.Free(readTopAddr);
+		return true;
 	}
 
 public:
-	ULONG_PTR		m_pTop = NULL;
-	ULONG_PTR		m_ullCurrentIdentifier = 0; // ABA 문제를 해결하기 위한 식별자
-	CLFMemoryPool<Node> m_StackNodePool = CLFMemoryPool<Node>(1000, false);
+	ULONG_PTR				m_pTop = NULL;
+	ULONG_PTR				m_ullCurrentIdentifier = 0; // ABA 문제를 해결하기 위한 식별자
+	CLFMemoryPool<Node>		m_StackNodePool = CLFMemoryPool<Node>(1000, false);
 
-	LONG			m_iUseCount = 0;
+	LONG					m_iUseCount = 0;
 };
 

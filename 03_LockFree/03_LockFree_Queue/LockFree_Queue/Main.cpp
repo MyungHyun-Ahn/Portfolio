@@ -5,11 +5,12 @@
 #include "LFDefine.h"
 #include "CLFMemoryPool.h"
 #include "CLFStack.h"
+#include "CLFQueue.h"
 
 // 스레드 2개로 해야 분석이 편함
 #define THREAD_COUNT 2
 
-CLFStack<UINT64> lockfreeStack;
+CLFQueue<UINT64> lockfreeQueue;
 
 unsigned int ThreadFunc(LPVOID lpParam)
 {
@@ -17,17 +18,16 @@ unsigned int ThreadFunc(LPVOID lpParam)
 	{
 		int thId = GetCurrentThreadId();
 
-		for (UINT64 i = 0; i < 1000; i++)
+		for (UINT64 i = 0; i < 3; i++)
 		{
-			lockfreeStack.Push(i);
+			lockfreeQueue.Enqueue(i);
 
 		}
 
-		for (int i = 0; i < 1000; i++)
+		for (UINT64 i = 0; i < 3; i++)
 		{
 			UINT64 data;
-			lockfreeStack.Pop(&data);
-			// printf("Pop ThreadId = %d, Data = %d\n", thId, data);
+			lockfreeQueue.Dequeue(&data);
 		}
 	}
 }
@@ -50,7 +50,4 @@ int main()
 	WaitForMultipleObjects(THREAD_COUNT, arrTh, true, INFINITE);
 
 	printf("정상종료\n");
-
-	if (lockfreeStack.m_pTop != NULL)
-		__debugbreak();
 }
