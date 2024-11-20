@@ -3,7 +3,7 @@
 
 VOID CMyFileLoader::Parse(const WCHAR *fileName)
 {
-	int retVal;
+	size_t retVal;
 
 	FILE *pFile = _wfsopen(fileName, L"r, ccs = UTF-16LE", _SH_DENYWR);
 	if (pFile == nullptr)
@@ -44,7 +44,7 @@ VOID CMyFileLoader::Parse(const WCHAR *fileName)
 		while (xPos != std::wstring::npos)
 		{
 			// nPos บฮลอ
-			int yPos;
+			size_t yPos;
 			for (yPos = xPos; yPos < wStr.size(); yPos++)
 			{
 				if (wStr[yPos] == L'\n')

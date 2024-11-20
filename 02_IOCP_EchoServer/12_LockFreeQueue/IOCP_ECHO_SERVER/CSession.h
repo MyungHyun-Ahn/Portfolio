@@ -67,7 +67,6 @@ public:
 		m_iIOCount = 0;
 		m_iSendCount = 0;
 		m_RecvBuffer.Clear();
-		m_SendBuffer.Clear();
 	}
 
 	void RecvCompleted(int size);
@@ -96,7 +95,6 @@ private:
 
 	LONG m_iIOCount = 0;
 	LONG m_iSendFlag = FALSE;
-	LONG m_iSendCount = 0;
 
 	SOCKET m_sSessionSocket;
 	UINT64 m_uiSessionID;
@@ -105,7 +103,10 @@ private:
 	WCHAR		m_ClientAddrBuffer[16];
 	USHORT		m_ClientPort;
 	CRingBuffer m_RecvBuffer;
-	CRingBuffer m_SendBuffer;
+
+	CLFQueue<CSerializableBuffer *> m_lfQueue;
+	CSerializableBuffer				*m_arrPSendBufs[WSASEND_MAX_BUFFER_COUNT];
+	LONG							m_iSendCount = 0;
 
 	OverlappedEx m_AcceptExOverlapped;
 	OverlappedEx m_RecvOverlapped;

@@ -118,6 +118,17 @@ BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 		return FALSE;
 	}
 
+	// CreatePostAcceptExThread
+	m_hPostAcceptExThread = (HANDLE)_beginthreadex(nullptr, 0, PostAcceptThreadFunc, nullptr, 0, nullptr);
+	if (m_hPostAcceptExThread == 0)
+	{
+		errVal = GetLastError();
+		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"PostAcceptExThread running fail.. : %d", errVal);
+		return FALSE;
+	}
+
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"[SYSTEM] PostAcceptExThread running..");
+
 	// 500개 AcceptEx 예약
 	FristPostAcceptEx();
 
@@ -135,17 +146,6 @@ BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 		m_arrWorkerThreads.push_back(hWorkerThread);
 		g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"[SYSTEM] WorkerThread[%d] running..", i);
 	}
-
-	// CreatePostAcceptExThread
-	m_hPostAcceptExThread = (HANDLE)_beginthreadex(nullptr, 0, PostAcceptThreadFunc, nullptr, 0, nullptr);
-	if (m_hPostAcceptExThread == 0)
-	{
-		errVal = GetLastError();
-		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"PostAcceptExThread running fail.. : %d", errVal);
-		return FALSE;
-	}
-
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"[SYSTEM] PostAcceptExThread running..");
 
 	return TRUE;
 }
@@ -178,14 +178,17 @@ BOOL CLanServer::ReleaseSession(CSession *pSession)
 	// ReleaseSession 당시에 남아있는 send 링버퍼를 확인
 	// * 남아있는 경우가 확인됨
 	// * 남은 직렬화 버퍼를 할당 해제하고 세션 삭제
-	int useCount = (pSession->m_SendBuffer.GetUseSize() / sizeof(VOID *));
-	for (int i = 0; i < useCount; i++)
+	while (true)
 	{
+
+
 		CSerializableBuffer *delBuffer;
-		pSession->m_SendBuffer.Peek((char *)&delBuffer, sizeof(VOID *), sizeof(VOID *) * i);
+		// 못꺼낼때까지
+		if (!pSession->m_lfQueue.Dequeue(&delBuffer))
+			break;
+
 		CSerializableBuffer::Free(delBuffer);
 	}
-	pSession->m_SendBuffer.MoveFront(useCount * sizeof(VOID *));
 
 	USHORT index = GetIndex(pSession->m_uiSessionID);
 	m_arrPSessions[index] = nullptr;
@@ -285,7 +288,10 @@ BOOL CLanServer::AcceptExCompleted(CSession *pSession)
 	USHORT index;
 	// 연결 실패 : FALSE
 	if (!m_stackDisconnectIndex.Pop(&index))
+	{
+		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"m_stackDisconnectIndex.Pop(&index) failed");
 		return FALSE;
+	}
 
 	UINT64 combineId = CLanServer::CombineIndex(index, ++m_iCurrentID);
 

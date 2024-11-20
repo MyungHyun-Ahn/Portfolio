@@ -1,6 +1,6 @@
 #pragma once
 
-struct DebugInfo
+struct StackDebug
 {
 	LONG64		index;
 	DWORD		threadId;
@@ -11,12 +11,14 @@ struct DebugInfo
 	void *newTPtr;		// 새로 Top 되어야할 것
 };
 
+#define USE_LFSTACK_DEBUG
+
 #define LOG_MAX 200000
 #define PUSH 0
 #define POP 1
 
-extern DebugInfo logging[LOG_MAX];
-extern LONG64 logIndex;
+extern StackDebug StackLogging[LOG_MAX];
+extern LONG64 StackLogIndex;
 
 template<typename Data>
 struct StackNode

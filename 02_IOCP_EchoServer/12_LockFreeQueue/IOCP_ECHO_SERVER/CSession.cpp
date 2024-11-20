@@ -43,9 +43,7 @@ void CSession::RecvCompleted(int size)
 // * 나중에 Send 링버퍼는 락프리 큐로 교체될 것
 bool CSession::SendPacket(CSerializableBuffer *message)
 {
-    m_SendBuffer.Enqueue((char *)&message, sizeof(VOID *));
-    InterlockedIncrement(&g_monitor.m_lSendTPS);
-    // PostSend();
+    m_lfQueue.Enqueue(message);
     return TRUE;
 }
 
@@ -58,19 +56,17 @@ void CSession::SendCompleted(int size)
     // * 비동기 I/O는 무조건 전부 보내고 완료 통지가 도착함
     for (int count = 0; count < m_iSendCount; count++)
     {
-		int offset = count * sizeof(VOID *);
-		CSerializableBuffer *buffer;
-		m_SendBuffer.Peek((char *)&buffer, sizeof(VOID *), offset);
         // 보낸 거 삭제
-        CSerializableBuffer::Free(buffer);
+        CSerializableBuffer::Free(m_arrPSendBufs[count]);
     }
 
-    m_SendBuffer.MoveFront(m_iSendCount * sizeof(VOID *));
+    m_iSendCount = 0;
 
 #ifdef POSTSEND_LOST_DEBUG
 	UINT64 index = InterlockedIncrement(&sendIndex);
 	sendDebug[index % 65535] = { index, (USHORT)GetCurrentThreadId(), 0xff, TRUE, 0 };
 #endif
+    InterlockedIncrement(&g_monitor.m_lSendTPS);
     InterlockedExchange(&m_iSendFlag, FALSE);
 }
 
@@ -116,12 +112,9 @@ bool CSession::PostSend(USHORT wher)
     int errVal;
     int retVal;
 
-	int sendBufferUseSize = m_SendBuffer.GetUseSize();
-    // 이젠 포인터의 크기보다 작으면 send를 수행하지 않음
-	if (sendBufferUseSize < sizeof(VOID *))
+	int sendUseSize = m_lfQueue.GetUseSize();
+	if (sendUseSize <= 0)
 	{
-		// if (sendBufferUseSize != m_SendBuffer.GetUseSize())
-		//     __debugbreak();
 		return TRUE;
 	}
 
@@ -134,39 +127,27 @@ bool CSession::PostSend(USHORT wher)
         return TRUE;
     }
 
-    // 최대 등록할 수 있는 개수
-	WSABUF wsaBuf[WSASEND_MAX_BUFFER_COUNT];
-	int useSize = m_SendBuffer.GetUseSize();
+	sendUseSize = m_lfQueue.GetUseSize();
+	if (sendUseSize <= 0)
+	{
+		return TRUE;
+	}
+	
+    WSABUF wsaBuf[WSASEND_MAX_BUFFER_COUNT];
 
-    if (useSize < sizeof(VOID *))
+    int count;
+    for (count = 0; count < WSASEND_MAX_BUFFER_COUNT; count++)
     {
-#ifdef POSTSEND_LOST_DEBUG
-		UINT64 index = InterlockedIncrement(&sendIndex);
-		sendDebug[index % 65535] = { index, (USHORT)GetCurrentThreadId(), wher, FALSE, 1 };
-#endif
-        InterlockedExchange(&m_iSendFlag, FALSE);
-        return TRUE;
-    }
+        CSerializableBuffer *pBuffer;
+        // 못꺼낸 것
+        if (!m_lfQueue.Dequeue(&pBuffer))
+            break;
+        
+        wsaBuf[count].buf = pBuffer->GetBufferPtr();
+        wsaBuf[count].len = pBuffer->GetFullSize();
 
-#ifdef POSTSEND_LOST_DEBUG
-    // 여기부턴 성공할 것임
-	UINT64 index = InterlockedIncrement(&sendIndex);
-	sendDebug[index % 65535] = { index, (USHORT)GetCurrentThreadId(), wher, TRUE, 0 };
-#endif
-
-    // 반복을 돌며 WSABUF에 등록 작업 수행
-    m_iSendCount = min(useSize / sizeof(VOID *), WSASEND_MAX_BUFFER_COUNT);
-    
-    int count = 0;
-    for (count = 0; count < m_iSendCount; count++)
-    {
-        // 여긴 꺼낼게 있는 상황
-
-        int offset = count * sizeof(VOID *);
-        CSerializableBuffer *buffer;
-        m_SendBuffer.Peek((char *)&buffer, sizeof(VOID *), offset);
-        wsaBuf[count].buf = buffer->GetBufferPtr();
-        wsaBuf[count].len = buffer->GetFullSize();
+        m_arrPSendBufs[count] = pBuffer;
+        m_iSendCount++;
     }
 
     ZeroMemory(&m_SendOverlapped, sizeof(OVERLAPPED));

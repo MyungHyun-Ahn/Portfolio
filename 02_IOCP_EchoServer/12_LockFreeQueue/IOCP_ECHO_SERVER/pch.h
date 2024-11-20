@@ -46,6 +46,7 @@
 #include "LFDefine.h"
 #include "CLFMemoryPool.h"
 #include "CLFStack.h"
+#include "CLFQueue.h"
 
 // 직접 정의한 라이브러리
 #include "DefineSingleton.h"

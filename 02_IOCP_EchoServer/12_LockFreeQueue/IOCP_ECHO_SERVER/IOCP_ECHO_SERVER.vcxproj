@@ -150,6 +150,7 @@
     <ClInclude Include="CEchoServer.h" />
     <ClInclude Include="CLanServer.h" />
     <ClInclude Include="CLFMemoryPool.h" />
+    <ClInclude Include="CLFQueue.h" />
     <ClInclude Include="CLFStack.h" />
     <ClInclude Include="CLogger.h" />
     <ClInclude Include="CMonitor.h" />
@@ -167,6 +168,7 @@
     <ClCompile Include="CEchoServer.cpp" />
     <ClCompile Include="CLanServer.cpp" />
     <ClCompile Include="CLFMemoryPool.cpp" />
+    <ClCompile Include="CLFQueue.cpp" />
     <ClCompile Include="CLFStack.cpp" />
     <ClCompile Include="CLogger.cpp" />
     <ClCompile Include="CMonitor.cpp" />

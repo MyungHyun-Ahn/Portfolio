@@ -63,6 +63,9 @@
     <ClInclude Include="CLFMemoryPool.h">
       <Filter>DataStructures</Filter>
     </ClInclude>
+    <ClInclude Include="CLFQueue.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -100,6 +103,9 @@
       <Filter>DataStructures</Filter>
     </ClCompile>
     <ClCompile Include="CLFStack.cpp">
+      <Filter>DataStructures</Filter>
+    </ClCompile>
+    <ClCompile Include="CLFQueue.cpp">
       <Filter>DataStructures</Filter>
     </ClCompile>
   </ItemGroup>
