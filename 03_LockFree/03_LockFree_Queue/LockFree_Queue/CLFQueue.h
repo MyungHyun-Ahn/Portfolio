@@ -75,10 +75,6 @@ public:
 					UINT64 index = InterlockedIncrement64(&logIndex);
 					logging[index % LOG_MAX] = { index, GetCurrentThreadId(), ENQUEUE_CAS2, 2, readTail, m_pTail, combinedNode, next };
 
-					// CAS 02 실패
-					// __debugbreak();
-					break;
-
 				}
 				else
 				{
@@ -86,7 +82,25 @@ public:
 					// Tail을 바꿨음
 					UINT64 index = InterlockedIncrement64(&logIndex);
 					logging[index % LOG_MAX] = { index, GetCurrentThreadId(), ENQUEUE_CAS2, 0, readTail, m_pTail, combinedNode, next };
-					break;
+				}
+
+				readTail = m_pTail; // 다시 읽기
+				readTailAddr = (Node *)GetAddress(readTail);
+				next = readTailAddr->next;
+
+				// 해결법 1번
+				// - Enqueue를 완료하고 m_pTail의 next 가 NULL이 아니라면 m_pTail의 next 로 tail을 설정
+				// while (next != NULL)
+				// {
+				// 	InterlockedCompareExchange(&m_pTail, next, readTail);
+				// 	readTail = m_pTail; // 다시 읽기
+				// 	readTailAddr = (Node *)GetAddress(readTail);
+				// 	next = readTailAddr->next;
+				// }
+
+				if (next != NULL)
+				{
+					InterlockedCompareExchange(&m_pTail, next, readTail);
 				}
 
 				break; // 여기까지 했다면 break;

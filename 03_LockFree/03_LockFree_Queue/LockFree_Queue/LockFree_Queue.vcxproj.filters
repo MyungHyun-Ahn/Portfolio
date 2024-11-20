@@ -16,6 +16,8 @@
     <Text Include="CAS02_DEBUG01.txt" />
     <Text Include="Dequeue_DEBUG01.txt" />
     <Text Include="CAS02_DEBUG02.txt" />
-    <Text Include="CAS03_DEBUG03.txt" />
+    <Text Include="CAS02_DEBUG03.txt" />
+    <Text Include="CAS02_DEBUG04.txt" />
+    <Text Include="CAS02_FIX_DEBUG01.txt" />
   </ItemGroup>
 </Project>
