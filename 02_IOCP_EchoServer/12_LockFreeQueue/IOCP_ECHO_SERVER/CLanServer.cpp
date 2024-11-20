@@ -178,16 +178,31 @@ BOOL CLanServer::ReleaseSession(CSession *pSession)
 	// ReleaseSession 당시에 남아있는 send 링버퍼를 확인
 	// * 남아있는 경우가 확인됨
 	// * 남은 직렬화 버퍼를 할당 해제하고 세션 삭제
-	while (true)
+	for (int count = 0; count < pSession->m_iSendCount; count++)
 	{
+		CSerializableBuffer::Free(pSession->m_arrPSendBufs[count]);
+	}
 
 
-		CSerializableBuffer *delBuffer;
-		// 못꺼낼때까지
-		if (!pSession->m_lfQueue.Dequeue(&delBuffer))
-			break;
+	LONG useBufferSize = pSession->m_lfQueue.GetUseSize();
+	for (int i = 0; i < useBufferSize; i++)
+	{
+		CSerializableBuffer *pBuffer;
+		// 못꺼낸 것
+		if (!pSession->m_lfQueue.Dequeue(&pBuffer))
+		{
+			g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"LFQueue::Dequeue() Error");
+			// 말도 안되는 상황
+			CCrashDump::Crash();
+		}
 
-		CSerializableBuffer::Free(delBuffer);
+		CSerializableBuffer::Free(pBuffer);
+	}
+
+	useBufferSize = pSession->m_lfQueue.GetUseSize();
+	if (useBufferSize != 0)
+	{
+		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"LFQueue is not empty Error");
 	}
 
 	USHORT index = GetIndex(pSession->m_uiSessionID);

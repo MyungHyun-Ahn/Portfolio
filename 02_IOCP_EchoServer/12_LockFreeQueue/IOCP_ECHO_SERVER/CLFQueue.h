@@ -160,9 +160,8 @@ public:
 					UINT64 index = InterlockedIncrement64(&QueueLogIndex);
 					QueueLogging[index % LOG_MAX] = { index, GetCurrentThreadId(), DEQUEUE, 0, readHead, next, m_pTail, ((Node *)GetAddress(m_pTail))->next };
 #endif
-					// 여기서 문제가 생길것 같은데?
-					*t = nextAddr->data;
 
+					*t = nextAddr->data;
 					Node *readHeadAddr = (Node *)GetAddress(readHead);
 					m_QueueNodePool.Free(readHeadAddr);
 					break;
@@ -179,6 +178,6 @@ private:
 	ULONG_PTR			m_pHead = NULL;
 	ULONG_PTR			m_pTail = NULL;
 	ULONG_PTR			m_ullCurrentIdentifier = 0; // ABA 문제를 해결하기 위한 식별자
-	CLFMemoryPool<Node> m_QueueNodePool = CLFMemoryPool<Node>(1000, false);
+	CLFMemoryPool<Node> m_QueueNodePool = CLFMemoryPool<Node>(0, false);
 	LONG				m_iSize = 0;
 };

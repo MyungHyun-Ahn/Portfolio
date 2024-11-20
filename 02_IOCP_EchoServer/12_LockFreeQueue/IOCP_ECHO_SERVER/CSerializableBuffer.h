@@ -358,6 +358,9 @@ public:
 		s_sbufferPool.Free(delSBuffer);
 	}
 
+	inline static LONG GetPoolCapacity() { return s_sbufferPool.GetCapacity(); }
+	inline static LONG GetPoolUsage() { return s_sbufferPool.GetUseCount(); }
+
 private:
 	char *m_Buffer;
 	int m_HeaderFront = 0;

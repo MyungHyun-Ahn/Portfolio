@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "CMonitor.h"
+#include "CSession.h"
 
 CMonitor g_monitor;
 
@@ -14,7 +15,7 @@ CMonitor::CMonitor(HANDLE hProcess)
 	HWND console = GetConsoleWindow();
 	RECT r;
 	GetWindowRect(console, &r);
-	MoveWindow(console, r.left, r.top, 380, 600, TRUE);
+	MoveWindow(console, r.left, r.top, 500, 600, TRUE);
 
 	// 프로세서 개수 확인
 	//  * 프로세스 실행률 계산시 cpu 개수로 나누어 실제 사용률을 구함
@@ -179,6 +180,9 @@ void CMonitor::MonitoringConsole(INT sessionCount, INT playerCount)
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Info");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tAccept total \t: %lld", m_lAcceptTotal);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSession count \t: %d", sessionCount);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Pool capacity");
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSession pool capacity \t: %d, usage \t: %d", CSession::GetPoolCapacity(), CSession::GetPoolUsage());
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tBuffer pool capacity \t: %d, usage \t: %d", CSerializableBuffer::GetPoolCapacity(), CSerializableBuffer::GetPoolUsage());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"TPS");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tAccept\t : %d", m_lAcceptTPS);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRecv\t : %d", m_lRecvTPS);
@@ -212,6 +216,9 @@ void CMonitor::MonitoringFile(INT sessionCount, INT playerCount)
 	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"Info");
 	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tAccept total \t: %lld", m_lAcceptTotal);
 	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tSession count \t: %d", sessionCount);
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"Pool capacity");
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tSession pool capacity \t: %d", CSession::GetPoolCapacity());
+	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tBuffer pool capacity \t: %d", CSerializableBuffer::GetPoolCapacity());
 	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"TPS");
 	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tAccept\t : %d", m_lAcceptTPS);
 	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tRecv\t : %d", m_lRecvTPS);

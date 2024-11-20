@@ -84,7 +84,7 @@ public:
 public:
 	ULONG_PTR				m_pTop = NULL;
 	ULONG_PTR				m_ullCurrentIdentifier = 0; // ABA 문제를 해결하기 위한 식별자
-	CLFMemoryPool<Node>		m_StackNodePool = CLFMemoryPool<Node>(1000, false);
+	CLFMemoryPool<Node>		m_StackNodePool = CLFMemoryPool<Node>(0, false);
 
 	LONG					m_iUseCount = 0;
 };

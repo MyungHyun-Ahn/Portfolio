@@ -27,7 +27,7 @@ public:
 	// 이 부분은 싱글 스레드에서 진행
 	// - 다른 스레드가 생성되고는 절대 초기화를 진행하면 안됨
 	__forceinline CLFMemoryPool(int initCount, bool placementNewFlag)
-		: m_iSize(0), m_bPlacementNewFlag(placementNewFlag)
+		: m_iCapacity(0), m_bPlacementNewFlag(placementNewFlag)
 	{
 		// initCount 만큼 FreeList 할당
 		for (int i = 0; i < initCount; i++)
@@ -68,7 +68,7 @@ public:
 	}
 
 	// Pop 행동
-	__forceinline DATA *Alloc()
+	DATA *Alloc()
 	{
 		Node *node;
 
@@ -118,12 +118,14 @@ public:
 			}
 		}
 
+		InterlockedIncrement(&m_iUseCount);
+
 		// data의 주소를 반환
 		return &node->data;
 	}
 
 	// 스택으로 치면 Push 행동
-	__forceinline void Free(DATA *ptr)
+	void Free(DATA *ptr)
 	{
 #ifdef SAFE_MODE
 		unsigned __int64 intPtr = (__int64)ptr;
@@ -157,6 +159,7 @@ public:
 		} while (InterlockedCompareExchange(&m_pTop, combinedNewTop, readTop) != readTop);
 
 		// Push 성공
+		InterlockedDecrement(&m_iUseCount);
 	}
 
 private:
@@ -167,7 +170,7 @@ private:
 #ifdef SAFE_MODE
 		newNode->poolPtr = this;
 #endif
-		InterlockedIncrement(&m_iSize);
+		InterlockedIncrement(&m_iCapacity);
 		return newNode;
 	}
 
@@ -177,13 +180,18 @@ private:
 #ifdef SAFE_MODE
 		newNode->poolPtr = this;
 #endif
-		InterlockedIncrement(&m_iSize);
+		InterlockedIncrement(&m_iCapacity);
 		return newNode;
 	}
 
+public:
+	inline LONG GetCapacity() { return m_iCapacity; }
+	inline LONG GetUseCount() { return m_iUseCount; }
+
 private:
 	bool		m_bPlacementNewFlag;
-	LONG		m_iSize = 0;
+	LONG		m_iUseCount = 0;
+	LONG		m_iCapacity = 0;
 	ULONG_PTR	m_ullCurrentIdentifier = 0;
 	ULONG_PTR	m_pTop = 0;
 };

@@ -90,6 +90,9 @@ public:
 		s_sSessionPool.Free(delSession);
 	}
 
+	inline static LONG GetPoolCapacity() { return s_sSessionPool.GetCapacity(); }
+	inline static LONG GetPoolUsage() { return s_sSessionPool.GetUseCount(); }
+
 private:
 	LONG m_bIsValid;
 

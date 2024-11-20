@@ -54,11 +54,17 @@ void CSession::SendCompleted(int size)
     // m_iSendCount를 믿고 할당 해제를 진행
     // * 논블락킹 I/O일 때만 Send를 요청한 데이터보다 덜 보내는 상황이 발생 가능
     // * 비동기 I/O는 무조건 전부 보내고 완료 통지가 도착함
-    for (int count = 0; count < m_iSendCount; count++)
+    int count;
+    for (count = 0; count < m_iSendCount; count++)
     {
         // 보낸 거 삭제
         CSerializableBuffer::Free(m_arrPSendBufs[count]);
     }
+
+	if (count != m_iSendCount)
+	{
+		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"CSession::SendCompleted %d != %d", count + 1, m_iSendCount);
+	}
 
     m_iSendCount = 0;
 
@@ -127,6 +133,7 @@ bool CSession::PostSend(USHORT wher)
         return TRUE;
     }
 
+    // 여기서 얻은 만큼 쓸 것
 	sendUseSize = m_lfQueue.GetUseSize();
 	if (sendUseSize <= 0)
 	{
@@ -135,19 +142,29 @@ bool CSession::PostSend(USHORT wher)
 	
     WSABUF wsaBuf[WSASEND_MAX_BUFFER_COUNT];
 
+    m_iSendCount = min(sendUseSize, WSASEND_MAX_BUFFER_COUNT);
+
     int count;
-    for (count = 0; count < WSASEND_MAX_BUFFER_COUNT; count++)
+    for (count = 0; count < m_iSendCount; count++)
     {
         CSerializableBuffer *pBuffer;
         // 못꺼낸 것
         if (!m_lfQueue.Dequeue(&pBuffer))
-            break;
+        {
+            g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"LFQueue::Dequeue() Error");
+            // 말도 안되는 상황
+            CCrashDump::Crash();
+        }
         
         wsaBuf[count].buf = pBuffer->GetBufferPtr();
         wsaBuf[count].len = pBuffer->GetFullSize();
 
         m_arrPSendBufs[count] = pBuffer;
-        m_iSendCount++;
+    }
+
+    if (count != m_iSendCount)
+    {
+        g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"CSession::PostSend %d != %d", count + 1, m_iSendCount);
     }
 
     ZeroMemory(&m_SendOverlapped, sizeof(OVERLAPPED));
