@@ -116,6 +116,7 @@ public:
 			ULONG_PTR readHead = m_pHead;
 			Node *readHeadAddr = (Node *)GetAddress(readHead);
 			ULONG_PTR next = readHeadAddr->next;
+			Node *nextAddr = (Node *)GetAddress(next);
 
 			ULONG_PTR readTail = m_pTail;
 			Node *readTailAddr = (Node *)GetAddress(readTail);
@@ -157,7 +158,7 @@ public:
 					UINT64 index = InterlockedIncrement64(&logIndex);
 					logging[index % LOG_MAX] = { index, GetCurrentThreadId(), DEQUEUE, 0, readHead, next, m_pTail, ((Node *)GetAddress(m_pTail))->next };
 
-					Node *nextAddr = (Node *)GetAddress(next);
+					// 여기서 문제가 생길것 같은데?
 					*t = nextAddr->data;
 
 					Node *readHeadAddr = (Node *)GetAddress(readHead);
