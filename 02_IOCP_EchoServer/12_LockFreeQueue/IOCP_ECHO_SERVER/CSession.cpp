@@ -73,7 +73,11 @@ void CSession::SendCompleted(int size)
 	sendDebug[index % 65535] = { index, (USHORT)GetCurrentThreadId(), 0xff, TRUE, 0 };
 #endif
     InterlockedIncrement(&g_monitor.m_lSendTPS);
-    InterlockedExchange(&m_iSendFlag, FALSE);
+
+    if (!PostSend(TRUE))
+    {
+		InterlockedExchange(&m_iSendFlag, FALSE);
+    }
 }
 
 bool CSession::PostRecv()
@@ -113,7 +117,7 @@ bool CSession::PostRecv()
     return TRUE;
 }
 
-bool CSession::PostSend(USHORT wher)
+bool CSession::PostSend(BOOL isCompleted)
 {
     int errVal;
     int retVal;
@@ -121,23 +125,26 @@ bool CSession::PostSend(USHORT wher)
 	int sendUseSize = m_lfQueue.GetUseSize();
 	if (sendUseSize <= 0)
 	{
-		return TRUE;
+		return FALSE;
 	}
 
-    if (InterlockedExchange(&m_iSendFlag, TRUE) == TRUE)
+    if (!isCompleted)
     {
+		if (InterlockedExchange(&m_iSendFlag, TRUE) == TRUE)
+		{
 #ifdef POSTSEND_LOST_DEBUG
-        UINT64 index = InterlockedIncrement(&sendIndex);
-        sendDebug[index % 65535] = { index, (USHORT)GetCurrentThreadId(), wher, FALSE, 2 };
+			UINT64 index = InterlockedIncrement(&sendIndex);
+			sendDebug[index % 65535] = { index, (USHORT)GetCurrentThreadId(), wher, FALSE, 2 };
 #endif
-        return TRUE;
+			return TRUE;
+		}
     }
 
     // 여기서 얻은 만큼 쓸 것
 	sendUseSize = m_lfQueue.GetUseSize();
 	if (sendUseSize <= 0)
 	{
-		return TRUE;
+		return FALSE;
 	}
 	
     WSABUF wsaBuf[WSASEND_MAX_BUFFER_COUNT];

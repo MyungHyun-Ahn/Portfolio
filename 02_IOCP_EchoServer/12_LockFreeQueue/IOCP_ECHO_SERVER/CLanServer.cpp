@@ -161,7 +161,7 @@ void CLanServer::SendPacket(const UINT64 sessionID, CSerializableBuffer *sBuffer
 		__debugbreak();
 	sBuffer->EnqueueHeader((char *)&header, sizeof(USHORT));
 	pSession->SendPacket(sBuffer);
-	pSession->PostSend(1);
+	pSession->PostSend(0);
 }
 
 BOOL CLanServer::Disconnect(CSession *pSession)
@@ -395,7 +395,7 @@ int CLanServer::WorkerThread()
 			case IOOperation::SEND:
 			{
 				pSession->SendCompleted(dwTransferred);
-				pSession->PostSend(0);
+				pSession->PostSend();
 			}
 				break;
 			}

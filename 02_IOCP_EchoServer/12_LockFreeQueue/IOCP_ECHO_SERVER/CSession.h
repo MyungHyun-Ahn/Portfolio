@@ -75,7 +75,7 @@ public:
 	void SendCompleted(int size);
 
 	bool PostRecv();
-	bool PostSend(USHORT wher = 0);
+	bool PostSend(BOOL isCompleted = FALSE);
 
 public:
 	inline static CSession *Alloc()
