@@ -144,6 +144,7 @@ bool CSession::PostSend(BOOL isCompleted)
 	sendUseSize = m_lfQueue.GetUseSize();
 	if (sendUseSize <= 0)
 	{
+        InterlockedExchange(&m_iSendFlag, FALSE);
 		return FALSE;
 	}
 	
