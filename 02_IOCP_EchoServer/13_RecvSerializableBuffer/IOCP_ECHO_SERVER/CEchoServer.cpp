@@ -24,8 +24,6 @@ void CEchoServer::OnRecv(const UINT64 sessionID, CSerializableBufferView *messag
 {
     __int64 num;
     *message >> num;
-
-    // 사용을 마쳤으면 View의 해제를 해야함
     CSerializableBufferView::Free(message);
 
     // g_Logger->WriteLogConsole(LOG_LEVEL::DEBUG, L"%d", num);

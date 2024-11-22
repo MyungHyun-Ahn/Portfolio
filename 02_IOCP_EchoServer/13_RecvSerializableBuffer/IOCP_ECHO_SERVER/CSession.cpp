@@ -6,71 +6,71 @@ void CSession::RecvCompleted(int size)
 {
     m_pRecvBuffer->MoveRear(size);
     InterlockedIncrement(&g_monitor.m_lRecvTPS);
-    DWORD currentUseSize = m_pRecvBuffer->GetUseSize();
 
     std::vector<CSerializableBufferView *> viewList;
 
     bool delayFlag = false;
 
+	// 이전에서 딜레이 된게 있는 경우
+	if (m_pDelayedBuffer != nullptr)
+	{
+		// 딜레이 된걸 처리해야함
+		USHORT delayedHeaderSize = m_pDelayedBuffer->isReadHeaderSize();
+		// 헤더 사이즈 부족
+		if (delayedHeaderSize < (int)DEFINE::HEADER_SIZE)
+		{
+			// 헤더가 딜레이 됐나?
+			// 딜레이 됐다면 여기에 모자른 만큼써줌
+			int requireHeaderSize = (int)DEFINE::HEADER_SIZE - delayedHeaderSize;
+			// 헤더가 2번씩 밀릴일은 없을 것임
+			// 짤린 헤더를 써주고
+			m_pDelayedBuffer->WriteDelayedHeader(m_pRecvBuffer->GetFrontPtr(), requireHeaderSize);
+			m_pRecvBuffer->MoveFront(requireHeaderSize);
+			// 네트워크 헤더 파악
+			// - 지금은 USHORT 나중에 헤더로 정의하면 여기를 변경
+			USHORT header;
+			m_pDelayedBuffer->GetDelayedHeader((char *)&header, sizeof(USHORT));
+
+			// 여기서 버퍼를 할당
+			// - 헤더 사이즈 포함
+			m_pDelayedBuffer->InitAndAlloc(header + sizeof(USHORT));
+			m_pDelayedBuffer->Copy((char *)&header, 0, sizeof(USHORT));
+		}
+        else
+        {
+            if (m_pDelayedBuffer->isInit == 0)
+                __debugbreak();
+        }
+
+		USHORT header;
+		m_pDelayedBuffer->GetHeader((char *)&header, sizeof(USHORT));
+
+		int requireSize = header - m_pDelayedBuffer->GetDataSize();
+		// 데이터 모자름
+		int recvBufferUseSize = m_pRecvBuffer->GetUseSize();
+		if (recvBufferUseSize < requireSize)
+		{
+			delayFlag = true;
+			m_pDelayedBuffer->Copy(m_pRecvBuffer->GetPQueuePtr(), recvBufferUseSize);
+			m_pRecvBuffer->MoveFront(recvBufferUseSize);
+		}
+        else
+        {
+            // 필요한만큼 쓸 수 있으면
+            m_pDelayedBuffer->Copy(m_pRecvBuffer->GetFrontPtr(), requireSize);
+            m_pRecvBuffer->MoveFront(requireSize);
+            viewList.push_back(m_pDelayedBuffer);
+            m_pDelayedBuffer = nullptr;
+        }
+	}
+
+    DWORD currentUseSize = m_pRecvBuffer->GetUseSize();
     while (currentUseSize > 0)
     {
         USHORT packetHeader;
         CSerializableBufferView *view = CSerializableBufferView::Alloc();
 
-        // 이전에서 딜레이 된게 있는 경우
-        if (m_pDelayedBuffer != nullptr)
-        {
-            // 딜레이 된걸 처리해야함
-            USHORT delayedHeaderSize = m_pDelayedBuffer->isReadHeaderSize();
-            // 헤더 사이즈 부족
-            if (delayedHeaderSize < (int)DEFINE::HEADER_SIZE)
-            {
-                // 헤더가 딜레이 됐나?
-                // 딜레이 됐다면 여기에 모자른 만큼써줌
-                int requireHeaderSize = (int)DEFINE::HEADER_SIZE - delayedHeaderSize;
-                // 헤더가 2번씩 밀릴일은 없을 것임
-                // 짤린 헤더를 써주고
-                m_pDelayedBuffer->WriteDelayedHeader(m_pRecvBuffer->GetFrontPtr(), requireHeaderSize);
-                m_pRecvBuffer->MoveFront(requireHeaderSize);
-                // 네트워크 헤더 파악
-                // - 지금은 USHORT 나중에 헤더로 정의하면 여기를 변경
-                USHORT header;
-                m_pDelayedBuffer->GetDelayedHeader((char *)&header, sizeof(USHORT));
-                
-                // 여기서 버퍼를 할당
-                // - 헤더 사이즈 포함
-                m_pDelayedBuffer->InitAndAlloc(header + sizeof(USHORT));
-                m_pDelayedBuffer->Copy((char *)&header, 0, sizeof(USHORT));
-                // 헤더 쓰고
-                continue;
-            }
-            else
-            {
-                USHORT header;
-                m_pDelayedBuffer->GetHeader((char *)&header, sizeof(header));
-
-                int requireSize = header - m_pDelayedBuffer->GetDataSize();
-                // 데이터 모자름
-                int recvBufferUseSize = m_pRecvBuffer->GetUseSize();
-                if (recvBufferUseSize < requireSize)
-                {
-                    m_pDelayedBuffer->Copy(m_pRecvBuffer->GetPQueuePtr(), recvBufferUseSize);
-                    CSerializableBufferView::Free(view);
-                    break;
-                }
-                
-                // 필요한만큼 쓸 수 있으면
-                m_pDelayedBuffer->Copy(m_pRecvBuffer->GetPQueuePtr(), requireSize);
-                m_pRecvBuffer->MoveFront(requireSize);
-
-                viewList.push_back(m_pDelayedBuffer);
-                m_pDelayedBuffer = nullptr;
-                continue;
-            }
-        }
-
-
-        if (m_pRecvBuffer->Peek((char *)&packetHeader, PACKET_HEADER_SIZE) == -1)
+        if (currentUseSize < PACKET_HEADER_SIZE)
         {
             // Peek 실패 delayedBuffer로
             delayFlag = true;
@@ -78,20 +78,27 @@ void CSession::RecvCompleted(int size)
             int remainSize = m_pRecvBuffer->GetUseSize();
             // 남은 사이즈 만큼 씀
             view->WriteDelayedHeader(m_pRecvBuffer->GetFrontPtr(), remainSize);
-
+            m_pRecvBuffer->MoveFront(remainSize);
             m_pDelayedBuffer = view;
+
+            // g_Logger->WriteLog(L"RecvBuffer", LOG_LEVEL::DEBUG, L"HeaderDelay");
             break;
         }
 
-        if (m_pRecvBuffer->GetUseSize() < PACKET_HEADER_SIZE + packetHeader)
+        int useSize = m_pRecvBuffer->GetUseSize();
+        m_pRecvBuffer->Peek((char *)&packetHeader, PACKET_HEADER_SIZE);
+        if (useSize < PACKET_HEADER_SIZE + packetHeader)
         {
             // 직접 할당해서 뒤로 밀기 Delayed
             delayFlag = true;
             // 헤더는 읽은 것임
             // front 부터 끝까지 복사
             view->InitAndAlloc(packetHeader + sizeof(USHORT));
-            view->Copy(m_pRecvBuffer->GetFrontPtr(), 0, m_pRecvBuffer->GetUseSize());
+            view->Copy(m_pRecvBuffer->GetFrontPtr(), 0, useSize);
+            m_pRecvBuffer->MoveFront(useSize);
             m_pDelayedBuffer = view;
+
+            // g_Logger->WriteLog(L"RecvBuffer", LOG_LEVEL::DEBUG, L"PacketDelay");
             break;
         }
 
@@ -103,22 +110,24 @@ void CSession::RecvCompleted(int size)
         // 이 view를 그냥 써도 됨
         // Init 에서 RecvBuffer의 Ref가 증가
         view->Init(m_pRecvBuffer, offsetStart, offsetEnd);
-        viewList.push_back(view);
-
 
         m_pRecvBuffer->MoveFront(PACKET_HEADER_SIZE + packetHeader);
+
+        viewList.push_back(view);
+
         currentUseSize = m_pRecvBuffer->GetUseSize();
     }
 
     if (!delayFlag)
     {
-		for (int i = 0; i < viewList.size(); i++)
-		{
-			g_Server->OnRecv(m_uiSessionID, viewList[i]);
-		}
-
         m_pDelayedBuffer = nullptr;
     }
+
+    for (int i = 0; i < viewList.size(); i++)
+    {
+        g_Server->OnRecv(m_uiSessionID, viewList[i]);
+    }
+
     // Ref 감소
     if (m_pRecvBuffer->DecreaseRef() == 0)
         CRecvBuffer::Free(m_pRecvBuffer);

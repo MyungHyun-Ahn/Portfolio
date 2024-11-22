@@ -8,16 +8,10 @@ public:
 	CSerializableBufferView() = default;
 	virtual ~CSerializableBufferView() = default;
 
-	inline void Clear()
-	{
-		m_HeaderFront = 0;
-		m_Front = (int)DEFINE::HEADER_SIZE;
-		m_Rear = (int)DEFINE::HEADER_SIZE;
-	}
-
 	// 오프셋 시작과 끝을 받음
 	inline void Init(CRecvBuffer *pRecvBuffer, int offsetStart, int offsetEnd)
 	{
+		isInit = 1;
 		m_pRecvBuffer = pRecvBuffer;
 		m_pRecvBuffer->IncreaseRef();
 		m_pBuffer = m_pRecvBuffer->GetOffsetPtr(offsetStart);
@@ -25,18 +19,26 @@ public:
 		m_Front = (int)DEFINE::HEADER_SIZE;
 		// Rear는 end - start
 		m_Rear = offsetEnd - offsetStart;
+		m_iReadHeaderSize = 0;
 	}
 
 	// 이거 하고서는 Copy를 꼭 해줘야함
 	inline void InitAndAlloc(int size)
 	{
+		isInit = 1;
 		m_pRecvBuffer = nullptr;
 		m_pBuffer = new char[size];
+		m_iBufferSize = size;
 		m_HeaderFront = 0;
 		m_Front = (int)DEFINE::HEADER_SIZE;
-		m_Rear = (int)DEFINE::HEADER_SIZE;
+		m_Rear = 0;
+		m_iReadHeaderSize = 0;
 	}
 
+	inline void Clear()
+	{
+		m_iReadHeaderSize = 0;
+	}
 	// 이걸 보고 헤더가 딜레이 된 것이라면 지연처리 작업
 	inline USHORT isReadHeaderSize()
 	{
@@ -70,8 +72,8 @@ public:
 
 	inline static CSerializableBufferView *Alloc()
 	{
-		// 할당하고 초기화해서 반환
 		CSerializableBufferView *pSBuffer = s_sbufferPool.Alloc();
+		pSBuffer->isInit = 0;
 		pSBuffer->Clear();
 		return pSBuffer;
 	}
@@ -92,6 +94,7 @@ public:
 			delete[] delSBuffer->m_pBuffer;
 		}
 
+		delSBuffer->isInit = 0;
 		s_sbufferPool.Free(delSBuffer);
 	}
 
@@ -205,7 +208,8 @@ public:
 
 	inline CSerializableBufferView &operator>>(__int64 &iData)
 	{
-		if (GetDataSize() < sizeof(__int64))
+		int size = GetDataSize();
+		if (size < sizeof(__int64))
 		{
 			throw;
 		}
@@ -245,12 +249,13 @@ public:
 	inline static LONG GetPoolCapacity() { return s_sbufferPool.GetCapacity(); }
 	inline static LONG GetPoolUsage() { return s_sbufferPool.GetUseCount(); }
 
-private:
+public:
 	char *m_pBuffer;
 	int m_iBufferSize = 0;
 	int m_HeaderFront = 0;
 	int m_Front = 0;
 	int m_Rear = 0;
+	int isInit = 0;
 	CRecvBuffer *m_pRecvBuffer = nullptr;
 
 	// 사이즈 헤더 조차도 밀림을 방지하기 위한 버퍼

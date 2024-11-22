@@ -75,7 +75,7 @@ public:
 private:
 	char			*m_PQueue = nullptr;
 
-	int				m_iCapacity = 10000;
+	int				m_iCapacity = 1021;
 
 	int				m_iFront = 0;
 	int				m_iRear = 0;
