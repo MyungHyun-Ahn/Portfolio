@@ -110,9 +110,8 @@ public:
 		// -1 했는데 0은 있는 거
 		if (InterlockedDecrement(&m_iSize) < 0)
 		{
-			// 올렸는데도 0보다 작으면 
-			if (InterlockedIncrement(&m_iSize) <= 0)
-				return false; // 큐가 비었음
+			InterlockedIncrement(&m_iSize);
+			return false;
 		}
 
 		// 여기까지 온 경우는 큐가 비었을 상황은 없음
