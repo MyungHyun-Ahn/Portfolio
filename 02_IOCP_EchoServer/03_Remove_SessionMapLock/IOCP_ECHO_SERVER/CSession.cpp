@@ -124,6 +124,8 @@ bool CSession::PostSend(USHORT wher)
 		UINT64 index = InterlockedIncrement(&sendIndex);
 		sendDebug[index % 65535] = { index, (USHORT)GetCurrentThreadId(), wher, FALSE, 1 };
 #endif
+        Sleep(0);
+
         InterlockedExchange(&m_iSendFlag, FALSE);
         return TRUE;
     }

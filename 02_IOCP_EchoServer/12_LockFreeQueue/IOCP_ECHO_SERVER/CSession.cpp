@@ -128,6 +128,8 @@ bool CSession::PostSend(BOOL isCompleted)
 		return FALSE;
 	}
 
+    // Sleep(0);
+
     if (!isCompleted)
     {
 		if (InterlockedExchange(&m_iSendFlag, TRUE) == TRUE)
@@ -144,6 +146,7 @@ bool CSession::PostSend(BOOL isCompleted)
 	sendUseSize = m_lfQueue.GetUseSize();
 	if (sendUseSize <= 0)
 	{
+        // Sleep(0);
         InterlockedExchange(&m_iSendFlag, FALSE);
 		return FALSE;
 	}
