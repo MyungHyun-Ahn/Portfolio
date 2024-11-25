@@ -7,8 +7,6 @@ void CSession::RecvCompleted(int size)
     m_pRecvBuffer->MoveRear(size);
     InterlockedIncrement(&g_monitor.m_lRecvTPS);
 
-    std::vector<CSerializableBufferView *> viewList;
-
     bool delayFlag = false;
 
 	// 이전에서 딜레이 된게 있는 경우
@@ -36,11 +34,6 @@ void CSession::RecvCompleted(int size)
 			m_pDelayedBuffer->InitAndAlloc(header + sizeof(USHORT));
 			m_pDelayedBuffer->Copy((char *)&header, 0, sizeof(USHORT));
 		}
-        else
-        {
-            if (m_pDelayedBuffer->isInit == 0)
-                __debugbreak();
-        }
 
 		USHORT header;
 		m_pDelayedBuffer->GetHeader((char *)&header, sizeof(USHORT));
@@ -59,7 +52,7 @@ void CSession::RecvCompleted(int size)
             // 필요한만큼 쓸 수 있으면
             m_pDelayedBuffer->Copy(m_pRecvBuffer->GetFrontPtr(), requireSize);
             m_pRecvBuffer->MoveFront(requireSize);
-            viewList.push_back(m_pDelayedBuffer);
+            g_Server->OnRecv(m_uiSessionID, m_pDelayedBuffer);
             m_pDelayedBuffer = nullptr;
         }
 	}
@@ -112,8 +105,7 @@ void CSession::RecvCompleted(int size)
         view->Init(m_pRecvBuffer, offsetStart, offsetEnd);
 
         m_pRecvBuffer->MoveFront(PACKET_HEADER_SIZE + packetHeader);
-
-        viewList.push_back(view);
+        g_Server->OnRecv(m_uiSessionID, view);
 
         currentUseSize = m_pRecvBuffer->GetUseSize();
     }
@@ -121,11 +113,6 @@ void CSession::RecvCompleted(int size)
     if (!delayFlag)
     {
         m_pDelayedBuffer = nullptr;
-    }
-
-    for (int i = 0; i < viewList.size(); i++)
-    {
-        g_Server->OnRecv(m_uiSessionID, viewList[i]);
     }
 
     // Ref 감소

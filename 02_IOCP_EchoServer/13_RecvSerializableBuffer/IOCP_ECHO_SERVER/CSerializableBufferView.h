@@ -8,6 +8,10 @@ public:
 	CSerializableBufferView() = default;
 	virtual ~CSerializableBufferView() = default;
 
+
+private:
+	friend class CSession;
+
 	// 오프셋 시작과 끝을 받음
 	inline void Init(CRecvBuffer *pRecvBuffer, int offsetStart, int offsetEnd)
 	{
@@ -52,8 +56,6 @@ public:
 	// 뒤로 이어서 쓰는 용도
 	bool Copy(char *buffer, int size);
 
-	bool Dequeue(char *buffer, int size);
-
 	bool GetHeader(char *buffer, int size);
 
 	inline int GetDataSize() const { return m_Rear - m_Front; }
@@ -78,6 +80,7 @@ public:
 		return pSBuffer;
 	}
 
+public:
 	inline static void Free(CSerializableBufferView *delSBuffer)
 	{
 		// 직접 할당 받은 버퍼가 아니라면 recv 버퍼는 nullptr이 아님
@@ -100,6 +103,7 @@ public:
 
 	// operator
 public:
+	bool Dequeue(char *buffer, int size);
 
 	// 데이터 넣는 건 필요 없음
 	inline CSerializableBufferView &operator>>(char &chData)
@@ -249,7 +253,7 @@ public:
 	inline static LONG GetPoolCapacity() { return s_sbufferPool.GetCapacity(); }
 	inline static LONG GetPoolUsage() { return s_sbufferPool.GetUseCount(); }
 
-public:
+private:
 	char *m_pBuffer;
 	int m_iBufferSize = 0;
 	int m_HeaderFront = 0;
