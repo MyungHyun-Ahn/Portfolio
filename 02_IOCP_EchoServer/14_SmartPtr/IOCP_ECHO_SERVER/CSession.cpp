@@ -121,13 +121,12 @@ void CSession::RecvCompleted(int size)
 }
 
 // 인큐할 때 직렬화 버퍼의 포인터를 인큐
-// * 나중에 Send 링버퍼는 락프리 큐로 교체될 것
 bool CSession::SendPacket(CSerializableBuffer *message)
 {
     // 여기서 올라간 RefCount는 SendCompleted에서 내려감
     // 혹은 ReleaseSession
     message->IncreaseRef();
-    m_lfQueue.Enqueue(message);
+    m_lfSendBufferQueue.Enqueue(message);
     return TRUE;
 }
 
@@ -211,7 +210,7 @@ bool CSession::PostSend(BOOL isCompleted)
     int errVal;
     int retVal;
 
-	int sendUseSize = m_lfQueue.GetUseSize();
+	int sendUseSize = m_lfSendBufferQueue.GetUseSize();
 	if (sendUseSize <= 0)
 	{
 		return FALSE;
@@ -230,7 +229,7 @@ bool CSession::PostSend(BOOL isCompleted)
     }
 
     // 여기서 얻은 만큼 쓸 것
-	sendUseSize = m_lfQueue.GetUseSize();
+	sendUseSize = m_lfSendBufferQueue.GetUseSize();
 	if (sendUseSize <= 0)
 	{
         InterlockedExchange(&m_iSendFlag, FALSE);
@@ -246,7 +245,7 @@ bool CSession::PostSend(BOOL isCompleted)
     {
         CSerializableBuffer *pBuffer;
         // 못꺼낸 것
-        if (!m_lfQueue.Dequeue(&pBuffer))
+        if (!m_lfSendBufferQueue.Dequeue(&pBuffer))
         {
             g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"LFQueue::Dequeue() Error");
             // 말도 안되는 상황

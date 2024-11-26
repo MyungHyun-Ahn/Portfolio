@@ -1,0 +1,126 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="Main.cpp" />
+    <ClCompile Include="CCrashDump.cpp">
+      <Filter>Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="CSmartPtr.cpp">
+      <Filter>Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="CMonitor.cpp">
+      <Filter>Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="CMyFileLoader.cpp">
+      <Filter>Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="CLFMemoryPool.cpp">
+      <Filter>DataStuctures</Filter>
+    </ClCompile>
+    <ClCompile Include="CLFQueue.cpp">
+      <Filter>DataStuctures</Filter>
+    </ClCompile>
+    <ClCompile Include="CLFStack.cpp">
+      <Filter>DataStuctures</Filter>
+    </ClCompile>
+    <ClCompile Include="CLogger.cpp">
+      <Filter>Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="CRecvBuffer.cpp">
+      <Filter>DataStuctures</Filter>
+    </ClCompile>
+    <ClCompile Include="CRingBuffer.cpp">
+      <Filter>DataStuctures</Filter>
+    </ClCompile>
+    <ClCompile Include="CSerializableBuffer.cpp">
+      <Filter>DataStuctures</Filter>
+    </ClCompile>
+    <ClCompile Include="CSerializableBufferView.cpp">
+      <Filter>DataStuctures</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>Define</Filter>
+    </ClCompile>
+    <ClCompile Include="CSession.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="CLanClients.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="CEchoClients.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="CCrashDump.h">
+      <Filter>Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="CSmartPtr.h">
+      <Filter>Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="CMonitor.h">
+      <Filter>Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="CMyFileLoader.h">
+      <Filter>Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="CLFStack.h">
+      <Filter>DataStuctures</Filter>
+    </ClInclude>
+    <ClInclude Include="CLFMemoryPool.h">
+      <Filter>DataStuctures</Filter>
+    </ClInclude>
+    <ClInclude Include="CLFQueue.h">
+      <Filter>DataStuctures</Filter>
+    </ClInclude>
+    <ClInclude Include="CLogger.h">
+      <Filter>Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="CRingBuffer.h">
+      <Filter>DataStuctures</Filter>
+    </ClInclude>
+    <ClInclude Include="CRecvBuffer.h">
+      <Filter>DataStuctures</Filter>
+    </ClInclude>
+    <ClInclude Include="CSerializableBuffer.h">
+      <Filter>DataStuctures</Filter>
+    </ClInclude>
+    <ClInclude Include="CSerializableBufferView.h">
+      <Filter>DataStuctures</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
+      <Filter>Define</Filter>
+    </ClInclude>
+    <ClInclude Include="DefineSingleton.h">
+      <Filter>Define</Filter>
+    </ClInclude>
+    <ClInclude Include="LFDefine.h">
+      <Filter>DataStuctures</Filter>
+    </ClInclude>
+    <ClInclude Include="DefineNetwork.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="CSession.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="CLanClients.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="CEchoClients.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Tools">
+      <UniqueIdentifier>{c4664c95-8285-491d-b46e-4a36efe2be0e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DataStuctures">
+      <UniqueIdentifier>{cc497de3-2397-4e76-8522-5c34af14eb28}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Define">
+      <UniqueIdentifier>{c92c4fcc-4498-4270-80d0-fabe6ac7b82b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Network">
+      <UniqueIdentifier>{b0e4ca16-b78d-4496-a94e-b590971f1146}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Config.conf" />
+  </ItemGroup>
+</Project>

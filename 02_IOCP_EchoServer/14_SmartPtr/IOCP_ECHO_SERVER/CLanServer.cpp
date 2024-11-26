@@ -225,8 +225,6 @@ BOOL CLanServer::PostAcceptEx(INT index)
 			if (errVal != WSAECONNABORTED && errVal != WSAECONNRESET)
 				g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"AcceptEx() Error : %d", errVal);
 
-			// 사실 여기선 0이 될 일이 없음
-			// 반환값을 사용안해도 됨
 			if (InterlockedDecrement(&newAcceptEx->m_iIOCount) == 0)
 			{
 				return FALSE;

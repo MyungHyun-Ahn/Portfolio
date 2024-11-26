@@ -7,14 +7,14 @@
     <Filter Include="Content">
       <UniqueIdentifier>{6e494647-b9e7-4dfd-b609-eb53a9117045}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Define">
-      <UniqueIdentifier>{daa4e531-6548-40e9-ae92-048eca81c220}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Tools">
       <UniqueIdentifier>{0db06b59-5535-474b-9865-09dce295457b}</UniqueIdentifier>
     </Filter>
     <Filter Include="DataStructures">
       <UniqueIdentifier>{00d64862-3f29-474d-a3e1-61b77ae173ee}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Define">
+      <UniqueIdentifier>{daa4e531-6548-40e9-ae92-048eca81c220}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

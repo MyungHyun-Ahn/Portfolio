@@ -1,28 +1,13 @@
 #pragma once
-
-struct SendDebug
-{
-	UINT64 m_Index;
-	USHORT m_ThreadId;
-	USHORT m_Where;		// 0 - SendCompleted
-						// 1 - SendPacket
-						// 2 - RecvCompleted
-						// ff - sendCompleted
-	USHORT m_IsSuccess;
-	USHORT m_Why;		// 실패시 이유
-						// 1 - UseSize
-						// 2 - SendFlag
-};
-
 class CSession
 {
 public:
-	friend class CLanServer;
+	friend class CLanClients;
 
 	CSession()
 		: m_sSessionSocket(INVALID_SOCKET)
 		, m_uiSessionID(0)
-		, m_AcceptExOverlapped(IOOperation::ACCEPTEX)
+		, m_ConnectExOverlapped(IOOperation::CONNECTEX)
 		, m_RecvOverlapped(IOOperation::RECV)
 		, m_SendOverlapped(IOOperation::SEND)
 		, m_bIsValid(FALSE)
@@ -33,7 +18,7 @@ public:
 	CSession(SOCKET socket, UINT64 sessionID)
 		: m_sSessionSocket(socket)
 		, m_uiSessionID(sessionID)
-		, m_AcceptExOverlapped(IOOperation::ACCEPTEX)
+		, m_ConnectExOverlapped(IOOperation::CONNECTEX)
 		, m_RecvOverlapped(IOOperation::RECV)
 		, m_SendOverlapped(IOOperation::SEND)
 		, m_bIsValid(TRUE)
@@ -50,6 +35,7 @@ public:
 		m_uiSessionID = sessionID;
 		m_iSendFlag = FALSE;
 		m_bIsValid = TRUE;
+		m_bIsConnected = FALSE;
 	}
 
 	void Init(SOCKET socket, UINT64 sessionID)
@@ -58,6 +44,7 @@ public:
 		m_uiSessionID = sessionID;
 		m_iSendFlag = FALSE;
 		m_bIsValid = TRUE;
+		m_bIsConnected = FALSE;
 	}
 
 	void Clear()
@@ -107,6 +94,7 @@ public:
 		}
 
 		m_sSessionSocket = INVALID_SOCKET;
+		m_bIsConnected = FALSE;
 		m_uiSessionID = 0;
 		m_iIOCount = 0;
 		m_iSendCount = 0;
@@ -137,36 +125,30 @@ public:
 	inline static LONG GetPoolCapacity() { return s_sSessionPool.GetCapacity(); }
 	inline static LONG GetPoolUsage() { return s_sSessionPool.GetUseCount(); }
 
+
 private:
-	LONG m_bIsValid;
+	LONG m_bIsValid = FALSE;
+	LONG m_bIsConnected = FALSE;
 
 	LONG m_iIOCount = 0;
 	LONG m_iSendFlag = FALSE;
 
 	SOCKET m_sSessionSocket;
 	UINT64 m_uiSessionID;
+	
+	SOCKADDR_IN m_SockAddr;
 
-	char	    m_AcceptBuffer[64];
-	WCHAR		m_ClientAddrBuffer[16];
-	USHORT		m_ClientPort;
-	// CRingBuffer m_RecvBuffer;
 	CRecvBuffer *m_pRecvBuffer = nullptr;
-	// 최대 무조건 1개 -> 있거나 없거나
 	CSerializableBufferView *m_pDelayedBuffer = nullptr;
 
 	CLFQueue<CSerializableBuffer *> m_lfSendBufferQueue;
 	CSerializableBuffer				*m_arrPSendBufs[WSASEND_MAX_BUFFER_COUNT];
 	LONG							m_iSendCount = 0;
 
-	OverlappedEx m_AcceptExOverlapped;
+	OverlappedEx m_ConnectExOverlapped;
 	OverlappedEx m_RecvOverlapped;
 	OverlappedEx m_SendOverlapped;
 
 	inline static CLFMemoryPool<CSession> s_sSessionPool = CLFMemoryPool<CSession>(1000, false);
-
-#ifdef POSTSEND_LOST_DEBUG
-	UINT64 sendIndex = 0;
-	SendDebug sendDebug[65535];
-#endif
 };
 
