@@ -5,14 +5,14 @@ CLogger *g_Logger;
 
 CLogger::CLogger()
 {
-	InitializeSRWLock(&m_lock);
+	InitializeSRWLock(&m_Filelock);
 }
 
 CLogger::~CLogger()
 {
 }
 
-void CLogger::WriteLog(const WCHAR *type, LOG_LEVEL logLevel, const WCHAR *fmt, ...)
+void CLogger::WriteLog(const WCHAR *directory, const WCHAR *type, LOG_LEVEL logLevel, const WCHAR *fmt, ...)
 {
 	if (m_LogLevel > logLevel)
 		return;
@@ -21,11 +21,41 @@ void CLogger::WriteLog(const WCHAR *type, LOG_LEVEL logLevel, const WCHAR *fmt, 
 	time_t nowTime = time(nullptr);
 	localtime_s(&tmTime, &nowTime);
 
-	CreateDirectory(m_directoryName, NULL);
+	WCHAR directoryName[256];
+	HRESULT ret;
+	if (directory != nullptr)
+	{
+		ret = StringCchPrintf(directoryName, 256, L".\\%s\\%s", m_mainLogDirectoryName, directory);
+		if (ret != S_OK)
+		{
+			if (ret == STRSAFE_E_INSUFFICIENT_BUFFER)
+			{
+				WriteLog(L"SYSTEM", L"Logging", LOG_LEVEL::ERR, L"로그 버퍼 크기 부족");
+			}
+		}
+	}
+	else
+	{
+		ret = StringCchPrintf(directoryName, 256, L".\\%s", m_mainLogDirectoryName);
+		if (ret != S_OK)
+		{
+			if (ret == STRSAFE_E_INSUFFICIENT_BUFFER)
+			{
+				WriteLog(L"SYSTEM", L"Logging", LOG_LEVEL::ERR, L"로그 버퍼 크기 부족");
+			}
+		}
+	}
 
 	WCHAR fileName[256];
 
-	StringCchPrintf(fileName, 256, L".\\%s\\%d%02d_%s.txt", m_directoryName, tmTime.tm_year + 1900, tmTime.tm_mon + 1, type);
+	ret = StringCchPrintf(fileName, 256, L"%s\\%d%02d_%s.txt", directoryName, tmTime.tm_year + 1900, tmTime.tm_mon + 1, type);
+	if (ret != S_OK)
+	{
+		if (ret == STRSAFE_E_INSUFFICIENT_BUFFER)
+		{
+			WriteLog(L"SYSTEM", L"Logging", LOG_LEVEL::ERR, L"로그 버퍼 크기 부족");
+		}
+	}
 
 	INT64 logCount = InterlockedIncrement64(&m_LogCount);
 
@@ -46,56 +76,75 @@ void CLogger::WriteLog(const WCHAR *type, LOG_LEVEL logLevel, const WCHAR *fmt, 
 		break;
 	}
 
+	// lockMap 탐색
+	auto it = m_lockMap.find(fileName);
+	if (it != m_lockMap.end())
+	{
+		// 없다면 디렉터리 생성하고 SRWLOCK 객체 생성
+		CreateDirectory(directoryName, NULL);
+		SRWLOCK newSRWLock;
+		InitializeSRWLock(&newSRWLock);
+		m_lockMap.insert(std::make_pair(fileName, newSRWLock));
+	}
+
+	// 여기 코드부터는 map에 없는 경우는 없음
+	SRWLOCK srwLock = m_lockMap[fileName];
+
 	WCHAR messageBuf[256];
 
 	va_list va;
 	va_start(va, fmt);
-	HRESULT hResult = StringCchVPrintf(messageBuf, 256, fmt, va);
-	if (hResult != S_OK)
+	ret = StringCchVPrintf(messageBuf, 256, fmt, va);
+	if (ret != S_OK)
 	{
-		WriteLog(L"ERROR", LOG_LEVEL::ERR, L"로그 버퍼 크기 부족");
+		if (ret == STRSAFE_E_INSUFFICIENT_BUFFER)
+		{
+			WriteLog(L"SYSTEM", L"Logging", LOG_LEVEL::ERR, L"로그 버퍼 크기 부족");
+		}
 	}
 	va_end(va);
 
 	WCHAR totalBuf[1024];
 	//토탈 버퍼에 넣고 파일 쓰기
-	hResult = StringCchPrintf(totalBuf, 1024, L"[%s] [%d-%02d-%02d %02d:%02d:%02d / %s / %09lld] %s\n",
+	ret = StringCchPrintf(totalBuf, 1024, L"[%s] [%d-%02d-%02d %02d:%02d:%02d / %s / %09lld] %s\n",
 		type, tmTime.tm_year + 1900, tmTime.tm_mon + 1, tmTime.tm_mday,
 		tmTime.tm_hour, tmTime.tm_min, tmTime.tm_sec, logLevelStr, logCount, messageBuf);
-
-	if (hResult != S_OK)
+	if (ret != S_OK)
 	{
-		WriteLog(L"ERROR", LOG_LEVEL::ERR, L"로그 버퍼 크기 부족");
+		if (ret == STRSAFE_E_INSUFFICIENT_BUFFER)
+		{
+			WriteLog(L"SYSTEM", L"Logging", LOG_LEVEL::ERR, L"로그 버퍼 크기 부족");
+		}
 	}
 
-	Lock();
+	AcquireSRWLockExclusive(&srwLock);
 
 	FILE *pFile = _wfsopen(fileName, L"a, ccs = UTF-16LE", _SH_DENYWR);
 	if (pFile == nullptr)
 	{
 		wprintf(L"file open fail, errorCode = %d\n", GetLastError());
-		UnLock();
+		ReleaseSRWLockExclusive(&srwLock);
 		return;
 	}
 	fwrite(totalBuf, 1, wcslen(totalBuf) * sizeof(WCHAR), pFile);
 
 	fclose(pFile);
-	UnLock();
+	ReleaseSRWLockExclusive(&srwLock);
 }
 
-void CLogger::WriteLogHex(const WCHAR *type, LOG_LEVEL logLevel, const WCHAR *log, BYTE *pByte, int byteLen)
+void CLogger::WriteLogHex(const WCHAR *directory, const WCHAR *type, LOG_LEVEL logLevel, const WCHAR *logName, BYTE *pBytes, int byteLen)
 {
 	int offset = 0;
 	WCHAR *messageBuf = new WCHAR[10000];
 
-	offset += swprintf(messageBuf + offset, 10000 - offset, L"%s: ", log);
+	offset += swprintf(messageBuf + offset, 10000 - offset, L"%s: ", logName);
 
 	for (int i = 0; i < byteLen; i++)
 	{
-		offset += swprintf(messageBuf + offset, 10000 - offset, L"%02X ", pByte[i]);
+		offset += swprintf(messageBuf + offset, 10000 - offset, L"%02X ", pBytes[i]);
 	}
 
-	WriteLog(type, logLevel, messageBuf);
+	WriteLog(directory, type, logLevel, messageBuf);
 
 	delete[] messageBuf;
 }
@@ -112,14 +161,17 @@ void CLogger::WriteLogConsole(LOG_LEVEL logLevel, const WCHAR *fmt, ...)
 	va_list va;
 
 	va_start(va, fmt);
-	HRESULT hResult = StringCchVPrintf(logBuffer, 1024, fmt, va);
-	if (hResult != S_OK)
+	HRESULT ret = StringCchVPrintf(logBuffer, 1024, fmt, va);
+	if (ret != S_OK)
 	{
-		WriteLogConsole(LOG_LEVEL::ERR, L"로그 버퍼 크기 부족");
+		if (ret == STRSAFE_E_INSUFFICIENT_BUFFER)
+		{
+			WriteLog(L"SYSTEM", L"Logging", LOG_LEVEL::ERR, L"로그 버퍼 크기 부족");
+		}
 	}
 	va_end(va);
 
-	Lock();
+	ConsoleLock();
 	wprintf(L"%s\n", logBuffer);
-	UnLock();
+	ConsoleUnLock();
 }

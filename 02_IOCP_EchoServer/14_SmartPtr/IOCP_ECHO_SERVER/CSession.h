@@ -82,7 +82,7 @@ public:
 			// 못꺼낸 것
 			if (!m_lfSendBufferQueue.Dequeue(&pBuffer))
 			{
-				g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"LFQueue::Dequeue() Error");
+				g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"LFQueue::Dequeue() Error");
 				// 말도 안되는 상황
 				CCrashDump::Crash();
 			}
@@ -97,7 +97,7 @@ public:
 		useBufferSize = m_lfSendBufferQueue.GetUseSize();
 		if (useBufferSize != 0)
 		{
-			g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"LFQueue is not empty Error");
+			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"LFQueue is not empty Error");
 		}
 
 		if (m_pRecvBuffer != nullptr)

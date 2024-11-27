@@ -11,7 +11,6 @@ public:
 	void UpdatePDH();
 
 	void MonitoringConsole(INT sessionCount, INT playerCount);
-	void MonitoringFile(INT sessionCount, INT playerCount);
 
 public:
 	// CPU 모니터링 정보

@@ -189,39 +189,3 @@ void CMonitor::MonitoringConsole(INT sessionCount, INT playerCount)
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSend\t : %d", m_lSendTPS);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"----------------------------------------");
 }
-
-void CMonitor::MonitoringFile(INT sessionCount, INT playerCount)
-{
-	// Cpu Usage
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"----------------------------------------");
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"              System info");
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"Process memory usage");
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\ttotal \t: %u MB", m_stPmc.PrivateUsage / (1024 * 1024));
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tnon-paged pool \t: %u KB\n", m_ProcessNPMemoryVal.largeValue / (1024));
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"System memory usage");
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tavailable \t: %u MB", m_SystemAvailableMemoryVal.largeValue);
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tnon-paged pool \t: %u MB\n", m_SystemNPMemoryVal.largeValue / (1024 * 1024));
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"             Cpu Usage");
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"Processor usage");
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tTotal \t: %f", m_fProcessorTotal);
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tUser \t: %f", m_fProcessorUser);
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tKernel \t: %f\n", m_fProcessorKernel);
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"Process Usage");
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tTotal \t: %f", m_fProcessTotal);
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tUser \t: %f", m_fProcessUser);
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tKernel \t: %f", m_fProcessKernel);
-
-	// Server Monitor 
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\n\n\n        Server monitoring info");
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"Info");
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tAccept total \t: %lld", m_lAcceptTotal);
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tSession count \t: %d", sessionCount);
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"Pool capacity");
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tSession pool capacity \t: %d", CSession::GetPoolCapacity());
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tBuffer pool capacity \t: %d", CSerializableBuffer::GetPoolCapacity());
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"TPS");
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tAccept\t : %d", m_lAcceptTPS);
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tRecv\t : %d", m_lRecvTPS);
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"\tSend\t : %d", m_lSendTPS);
-	g_Logger->WriteLog(L"LowerFPS", LOG_LEVEL::SYSTEM, L"----------------------------------------");
-}

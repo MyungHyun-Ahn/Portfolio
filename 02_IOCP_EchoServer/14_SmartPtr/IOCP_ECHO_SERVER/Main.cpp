@@ -37,8 +37,15 @@ int main()
 	}
 
 	g_Logger = CLogger::GetInstance();
-	g_Logger->SetDirectory(L"LogFile");
+	g_Logger->SetMainDirectory(L"LogFile");
 	g_Logger->SetLogLevel(LOG_LEVEL::DEBUG);
+
+	g_Logger->WriteLog(L"Test01", L"TestFile01", LOG_LEVEL::SYSTEM, L"TestTestTestTest");
+	g_Logger->WriteLog(L"Test01", L"TestFile02", LOG_LEVEL::SYSTEM, L"TestTestTestTest");
+	g_Logger->WriteLog(L"Test01", L"TestFile03", LOG_LEVEL::SYSTEM, L"TestTestTestTest");
+	g_Logger->WriteLog(L"Test02", L"TestFile02", LOG_LEVEL::SYSTEM, L"TestTestTestTest");
+	g_Logger->WriteLog(L"Test03", L"TestFile03", LOG_LEVEL::SYSTEM, L"TestTestTestTest");
+	g_Logger->WriteLog(L"Test04", L"TestFile04", LOG_LEVEL::SYSTEM, L"TestTestTestTest");
 
 	CCrashDump crashDump;
 	g_Server = new CEchoServer;

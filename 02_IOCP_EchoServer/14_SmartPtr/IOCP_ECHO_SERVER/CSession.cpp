@@ -149,7 +149,7 @@ void CSession::SendCompleted(int size)
 
 	if (count != m_iSendCount)
 	{
-		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"CSession::SendCompleted %d != %d", count + 1, m_iSendCount);
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"CSession::SendCompleted %d != %d", count + 1, m_iSendCount);
 	}
 
     m_iSendCount = 0;
@@ -191,7 +191,7 @@ bool CSession::PostRecv()
         if (errVal != WSA_IO_PENDING)
         {
             if (errVal != WSAECONNABORTED && errVal != WSAECONNRESET)
-                g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"WSARecv() Error : %d", errVal);
+                g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"WSARecv() Error : %d", errVal);
 
 			// 사실 여기선 0이 될 일이 없음
 			// 반환값을 사용안해도 됨
@@ -247,7 +247,7 @@ bool CSession::PostSend(BOOL isCompleted)
         // 못꺼낸 것
         if (!m_lfSendBufferQueue.Dequeue(&pBuffer))
         {
-            g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"LFQueue::Dequeue() Error");
+            g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"LFQueue::Dequeue() Error");
             // 말도 안되는 상황
             CCrashDump::Crash();
         }
@@ -260,7 +260,7 @@ bool CSession::PostSend(BOOL isCompleted)
 
     if (count != m_iSendCount)
     {
-        g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"CSession::PostSend %d != %d", count + 1, m_iSendCount);
+        g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"CSession::PostSend %d != %d", count + 1, m_iSendCount);
     }
 
     ZeroMemory(&m_SendOverlapped, sizeof(OVERLAPPED));
@@ -274,7 +274,7 @@ bool CSession::PostSend(BOOL isCompleted)
 		if (errVal != WSA_IO_PENDING)
 		{
             if (errVal != WSAECONNABORTED && errVal != WSAECONNRESET)
-			    g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"WSASend() Error : %d", errVal);
+			    g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"WSASend() Error : %d", errVal);
 
             // 사실 여기선 0이 될 일이 없음
             // 반환값을 사용안해도 됨

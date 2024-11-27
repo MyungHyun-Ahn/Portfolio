@@ -31,7 +31,7 @@ BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	if (retVal != 0)
 	{
 		errVal = WSAGetLastError();
-		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"WSAStartup() 실패 : %d", errVal);
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"WSAStartup() 실패 : %d", errVal);
 		return FALSE;
 	}
 
@@ -39,7 +39,7 @@ BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	if (m_sListenSocket == INVALID_SOCKET)
 	{
 		errVal = WSAGetLastError();
-		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"WSASocket() 실패 : %d", errVal);
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"WSASocket() 실패 : %d", errVal);
 		return FALSE;
 	}
 
@@ -55,7 +55,7 @@ BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	if (retVal == SOCKET_ERROR)
 	{
 		errVal = WSAGetLastError();
-		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"bind() 실패 : %d", errVal);
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"bind() 실패 : %d", errVal);
 		return FALSE;
 	}
 
@@ -65,7 +65,7 @@ BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	if (retVal == SOCKET_ERROR)
 	{
 		errVal = WSAGetLastError();
-		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"setsockopt(SO_SNDBUF) 실패 : %d", errVal);
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"setsockopt(SO_SNDBUF) 실패 : %d", errVal);
 		return FALSE;
 	}
 
@@ -77,7 +77,7 @@ BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	if (retVal == SOCKET_ERROR)
 	{
 		errVal = WSAGetLastError();
-		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"setsockopt(SO_LINGER) 실패 : %d", errVal);
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"setsockopt(SO_LINGER) 실패 : %d", errVal);
 		return FALSE;
 	}
 
@@ -86,7 +86,7 @@ BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	if (retVal == SOCKET_ERROR)
 	{
 		errVal = WSAGetLastError();
-		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"listen() 실패 : %d", errVal);
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"listen() 실패 : %d", errVal);
 		return FALSE;
 	}
 
@@ -95,7 +95,7 @@ BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	if (m_hIOCPHandle == NULL)
 	{
 		errVal = WSAGetLastError();
-		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"CreateIoCompletionPort(생성) 실패 : %d", errVal);
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"CreateIoCompletionPort(생성) 실패 : %d", errVal);
 		return FALSE;
 	}
 
@@ -106,7 +106,7 @@ BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	if (retVal == SOCKET_ERROR)
 	{
 		errVal = WSAGetLastError();
-		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"WSAIoctl(lpfnAcceptEx) 실패 : %d", errVal);
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"WSAIoctl(lpfnAcceptEx) 실패 : %d", errVal);
 		return FALSE;
 	}
 
@@ -114,7 +114,7 @@ BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	if (retVal == SOCKET_ERROR)
 	{
 		errVal = WSAGetLastError();
-		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"WSAIoctl(lpfnGetAcceptExSockaddrs) 실패 : %d", errVal);
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"WSAIoctl(lpfnGetAcceptExSockaddrs) 실패 : %d", errVal);
 		return FALSE;
 	}
 
@@ -123,7 +123,7 @@ BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	if (m_hPostAcceptExThread == 0)
 	{
 		errVal = GetLastError();
-		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"PostAcceptExThread running fail.. : %d", errVal);
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"PostAcceptExThread running fail.. : %d", errVal);
 		return FALSE;
 	}
 
@@ -139,7 +139,7 @@ BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 		if (hWorkerThread == 0)
 		{
 			errVal = GetLastError();
-			g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"WorkerThread[%d] running fail.. : %d", i, errVal);
+			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"WorkerThread[%d] running fail.. : %d", i, errVal);
 			return FALSE;
 		}
 
@@ -207,7 +207,7 @@ BOOL CLanServer::PostAcceptEx(INT index)
 	if (newAcceptEx->m_sSessionSocket == INVALID_SOCKET)
 	{
 		errVal = WSAGetLastError();
-		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"PostAcceptEx socket() 실패 : %d", errVal);
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"PostAcceptEx socket() 실패 : %d", errVal);
 		return FALSE;
 	}
 
@@ -223,7 +223,7 @@ BOOL CLanServer::PostAcceptEx(INT index)
 		if (errVal != WSA_IO_PENDING)
 		{
 			if (errVal != WSAECONNABORTED && errVal != WSAECONNRESET)
-				g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"AcceptEx() Error : %d", errVal);
+				g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"AcceptEx() Error : %d", errVal);
 
 			if (InterlockedDecrement(&newAcceptEx->m_iIOCount) == 0)
 			{
@@ -244,7 +244,7 @@ BOOL CLanServer::AcceptExCompleted(CSession *pSession)
 	if (retVal == SOCKET_ERROR)
 	{
 		errVal = WSAGetLastError();
-		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"setsockopt(SO_UPDATE_ACCEPT_CONTEXT) 실패 : %d", errVal);
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"setsockopt(SO_UPDATE_ACCEPT_CONTEXT) 실패 : %d", errVal);
 		return FALSE;
 	}
 
@@ -271,7 +271,7 @@ BOOL CLanServer::AcceptExCompleted(CSession *pSession)
 	// 연결 실패 : FALSE
 	if (!m_stackDisconnectIndex.Pop(&index))
 	{
-		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"m_stackDisconnectIndex.Pop(&index) failed");
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"m_stackDisconnectIndex.Pop(&index) failed");
 		return FALSE;
 	}
 
@@ -400,7 +400,7 @@ void CLanServer::PostAcceptAPCEnqueue(INT index)
 	if (retVal == FALSE)
 	{
 		errVal = GetLastError();
-		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"QueueUserAPC() 실패 : %d", errVal);
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"QueueUserAPC() 실패 : %d", errVal);
 	}
 }
 
