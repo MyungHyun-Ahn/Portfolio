@@ -5,7 +5,7 @@ CLogger *g_Logger;
 
 CLogger::CLogger()
 {
-	InitializeSRWLock(&m_Filelock);
+	InitializeSRWLock(&m_FileMapLock);
 }
 
 CLogger::~CLogger()
@@ -77,6 +77,7 @@ void CLogger::WriteLog(const WCHAR *directory, const WCHAR *type, LOG_LEVEL logL
 	}
 
 	// lockMap 탐색
+	AcquireSRWLockExclusive(&m_FileMapLock);
 	auto it = m_lockMap.find(fileName);
 	if (it != m_lockMap.end())
 	{
@@ -86,6 +87,7 @@ void CLogger::WriteLog(const WCHAR *directory, const WCHAR *type, LOG_LEVEL logL
 		InitializeSRWLock(&newSRWLock);
 		m_lockMap.insert(std::make_pair(fileName, newSRWLock));
 	}
+	ReleaseSRWLockExclusive(&m_FileMapLock);
 
 	// 여기 코드부터는 map에 없는 경우는 없음
 	SRWLOCK srwLock = m_lockMap[fileName];
@@ -118,7 +120,6 @@ void CLogger::WriteLog(const WCHAR *directory, const WCHAR *type, LOG_LEVEL logL
 	}
 
 	AcquireSRWLockExclusive(&srwLock);
-
 	FILE *pFile = _wfsopen(fileName, L"a, ccs = UTF-16LE", _SH_DENYWR);
 	if (pFile == nullptr)
 	{

@@ -36,7 +36,7 @@ private:
 	}
 
 private:
-	SRWLOCK m_Filelock;
+	SRWLOCK m_FileMapLock;
 	SRWLOCK m_Consolelock;
 
 	std::unordered_map<std::wstring, SRWLOCK> m_lockMap;
