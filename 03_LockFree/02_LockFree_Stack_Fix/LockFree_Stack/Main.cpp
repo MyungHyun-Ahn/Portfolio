@@ -9,7 +9,7 @@
 // 스레드 2개로 해야 분석이 편함
 #define THREAD_COUNT 2
 
-CLFStack<UINT64> lockfreeStack;
+CLFStack<UINT64, TRUE> lockfreeStack;
 
 unsigned int ThreadFunc(LPVOID lpParam)
 {
