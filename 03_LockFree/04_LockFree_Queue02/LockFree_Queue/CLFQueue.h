@@ -52,18 +52,6 @@ public:
 		newNode->next = NULL;
 		ULONG_PTR combinedNode = CombineIdentAndAddr(ident, (ULONG_PTR)newNode);
 
-		ULONG_PTR readTail = m_pTail;
-		Node *readTailAddr = (Node *)GetAddress(readTail);
-		ULONG_PTR next = readTailAddr->next;
-
-		while (next != NULL)
-		{
-			InterlockedCompareExchange(&m_pTail, next, readTail);
-			readTail = m_pTail; // 다시 읽기
-			readTailAddr = (Node *)GetAddress(readTail);
-			next = readTailAddr->next;
-		}
-
 		while (true)
 		{
 			ULONG_PTR readTail = m_pTail;
@@ -73,36 +61,19 @@ public:
 			// 해결 2
 			// - Enqueue 상단부
 
+			// readTail과 같다면 Tail을 교체
 
-			// CAS 01
-			// 읽어온 Tail의 next가 NULL이라면 combinedNode로 바꾸기
-			if (InterlockedCompareExchange(&readTailAddr->next, combinedNode, NULL) == NULL)
+			if (InterlockedCompareExchange(&m_pTail, combinedNode, readTail) == readTail)
 			{
-				// 인덱스 발급
-				UINT64 index = InterlockedIncrement64(&logIndex);
-				logging[index % LOG_MAX] = { index, GetCurrentThreadId(), ENQUEUE_CAS1, 0, readTail, m_pTail, combinedNode, next };
-
-				// CAS 02
-				// 읽어온 Tail과 같다면 m_pTail을 바꾸기
-				if (InterlockedCompareExchange(&m_pTail, combinedNode, readTail) != readTail)
+				if (InterlockedCompareExchange(&readTailAddr->next, combinedNode, NULL) == NULL)
 				{
-					// CAS 02 실패 로그
-					// CAS 02 실패시 newNode->next 체크 NULL이 아닌지 -> NULL이 아닐 것임
-					UINT64 index = InterlockedIncrement64(&logIndex);
-					logging[index % LOG_MAX] = { index, GetCurrentThreadId(), ENQUEUE_CAS2, 2, readTail, m_pTail, combinedNode, next };
-
+					break;
 				}
 				else
 				{
-					// 성공 로그
-					// Tail을 바꿨음
-					UINT64 index = InterlockedIncrement64(&logIndex);
-					logging[index % LOG_MAX] = { index, GetCurrentThreadId(), ENQUEUE_CAS2, 0, readTail, m_pTail, combinedNode, next };
+					__debugbreak();
 				}
-
-				break; // 여기까지 했다면 break;
 			}
-
 		}
 
 		// Enqueue 성공
@@ -125,16 +96,6 @@ public:
 		Node *readTailAddr = (Node *)GetAddress(readTail);
 		ULONG_PTR readTailNext = readTailAddr->next;
 
-		// while (readTailNext != NULL)
-		// {
-		// 	InterlockedCompareExchange(&m_pTail, readTailNext, readTail);
-		// 	readTail = m_pTail; // 다시 읽기
-		// 	readTailAddr = (Node *)GetAddress(readTail);
-		// 	readTailNext = readTailAddr->next;
-		// }
-		// 
-		// Sleep(0);
-
 		while (true)
 		{
 			ULONG_PTR readHead = m_pHead;
@@ -145,28 +106,7 @@ public:
 			// Head->next NULL인 경우는 큐가 비었을 때 뿐
 			if (next == NULL)
 			{
-				// 여기 오는 경우는 head->next 를 잘못보고 있는 경우
-				// th01 readHead = 1 // 같은 걸 읽고 들어오고
-				// th02 readHead = 1
-				// th01 이 Pop 을 완료 해버림
-				// th01 이 다시 Push 를 하는데 주소가 같은 Node 가 할당됨
-				// th
-
-				// UINT64 index = InterlockedIncrement64(&logIndex);
-				// logging[index % LOG_MAX] = { index, GetCurrentThreadId(), DEQUEUE, 3, readHead, next, readTail, readTailNext };
-				// 
-				// // tail->next가 NULL이 아닌 경우
-				// if (readTailNext != NULL)
-				// 	__debugbreak();
-
 				continue;
-				// 이 시점에 진짜 head->next NULL인지 확인
-				// 그리고 어쩌다 head->next NULL이 되었는지도 확인
-
-				// UINT64 index = InterlockedIncrement64(&logIndex);
-				// logging[index % LOG_MAX] = { index, GetCurrentThreadId(), DEQUEUE, 3, readHead, next, readTail, readTailNext };
-				// __debugbreak();
-				return false;
 			}
 			else
 			{
