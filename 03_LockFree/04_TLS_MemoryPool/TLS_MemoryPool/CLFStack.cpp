@@ -1,0 +1,9 @@
+#include <new>
+#include <stdio.h>
+#include <windows.h>
+#include <process.h>
+#include "LFDefine.h"
+#include "CLFMemoryPool.h"
+#include "CTLSSharedMemoryPool.h"
+#include "CTLSMemoryPool.h"
+#include "CLFStack.h"
