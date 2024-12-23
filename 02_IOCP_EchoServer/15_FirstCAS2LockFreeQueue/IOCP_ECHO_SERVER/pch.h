@@ -63,3 +63,4 @@
 #include "CMonitor.h"
 #include "CCrashDump.h"
 #include "CMyFileLoader.h"
+#include "CProfileManager.h"

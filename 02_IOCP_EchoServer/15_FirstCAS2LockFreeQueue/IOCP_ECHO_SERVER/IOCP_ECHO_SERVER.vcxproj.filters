@@ -75,6 +75,9 @@
     <ClInclude Include="CSmartPtr.h">
       <Filter>Tools</Filter>
     </ClInclude>
+    <ClInclude Include="CProfileManager.h">
+      <Filter>Tools</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -124,6 +127,9 @@
       <Filter>DataStructures</Filter>
     </ClCompile>
     <ClCompile Include="CSmartPtr.cpp">
+      <Filter>Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="CProfileManager.cpp">
       <Filter>Tools</Filter>
     </ClCompile>
   </ItemGroup>

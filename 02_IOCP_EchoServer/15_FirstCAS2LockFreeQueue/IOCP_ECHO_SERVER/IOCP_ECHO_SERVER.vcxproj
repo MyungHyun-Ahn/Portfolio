@@ -155,6 +155,7 @@
     <ClInclude Include="CLogger.h" />
     <ClInclude Include="CMonitor.h" />
     <ClInclude Include="CMyFileLoader.h" />
+    <ClInclude Include="CProfileManager.h" />
     <ClInclude Include="CRecvBuffer.h" />
     <ClInclude Include="CRingBuffer.h" />
     <ClInclude Include="CSerializableBuffer.h" />
@@ -176,6 +177,7 @@
     <ClCompile Include="CLogger.cpp" />
     <ClCompile Include="CMonitor.cpp" />
     <ClCompile Include="CMyFileLoader.cpp" />
+    <ClCompile Include="CProfileManager.cpp" />
     <ClCompile Include="CRecvBuffer.cpp" />
     <ClCompile Include="CRingBuffer.cpp" />
     <ClCompile Include="CSerializableBuffer.cpp" />

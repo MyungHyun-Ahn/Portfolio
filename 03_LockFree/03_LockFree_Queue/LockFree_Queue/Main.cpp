@@ -5,39 +5,135 @@
 #include "LFDefine.h"
 #include "CLFMemoryPool.h"
 #include "CLFStack.h"
+#include "CProfileManager.h"
 #include "CLFQueue.h"
+#include <queue>
 
 // 스레드 2개로 해야 분석이 편함
 #define THREAD_COUNT 2
+#define TEST_LOOP_COUNT 500000
+#define ENQUEUE_DEQUEUE_COUNT 64
 
-CLFQueue<UINT64> lockfreeQueue;
+CLFQueue<UINT64, FALSE> lockfreeQueue1;
+CLFQueue<UINT64, TRUE> lockfreeQueue2;
 
-unsigned int ThreadFunc(LPVOID lpParam)
+std::queue<UINT64> stdQueue;
+
+unsigned int CAS01ThreadFunc(LPVOID lpParam)
 {
-	while (1)
+	for (int i = 0; i < TEST_LOOP_COUNT; i++)
+	// while (1)
 	{
-		int thId = GetCurrentThreadId();
+		PROFILE_BEGIN(1, "ThreadFunc");
 
-		for (UINT64 i = 0; i < 3; i++)
+		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
 		{
-			lockfreeQueue.Enqueue(i);
+			lockfreeQueue1.Enqueue(i);
 
 		}
 
-		for (UINT64 i = 0; i < 3; i++)
+		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
 		{
 			UINT64 data;
-			lockfreeQueue.Dequeue(&data);
+			lockfreeQueue1.Dequeue(&data);
 		}
 	}
+
+	return 0;
+}
+
+unsigned int CAS02ThreadFunc(LPVOID lpParam)
+{
+	for (int i = 0; i < TEST_LOOP_COUNT; i++)
+		// while (1)
+	{
+		PROFILE_BEGIN(1, "ThreadFunc");
+
+		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
+		{
+			lockfreeQueue2.Enqueue(i);
+
+		}
+
+		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
+		{
+			UINT64 data;
+			lockfreeQueue2.Dequeue(&data);
+		}
+	}
+
+	return 0;
+}
+
+SRWLOCK lock;
+
+unsigned int stdQueueThreadFunc(LPVOID lpParam)
+{
+	for (int i = 0; i < TEST_LOOP_COUNT; i++)
+		// while (1)
+	{
+		PROFILE_BEGIN(1, "ThreadFunc");
+
+		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
+		{
+			PROFILE_BEGIN(1, "Enqueue");
+			AcquireSRWLockExclusive(&lock);
+			stdQueue.push(i);
+			ReleaseSRWLockExclusive(&lock);
+		}
+
+		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
+		{
+			PROFILE_BEGIN(1, "Dequeue");
+			AcquireSRWLockExclusive(&lock);
+			UINT64 data;
+			data = stdQueue.front();
+			stdQueue.pop();
+			ReleaseSRWLockExclusive(&lock);
+		}
+	}
+
+	return 0;
 }
 
 int main()
 {
+	g_ProfileMgr = CProfileManager::GetInstance();
+
+	InitializeSRWLock(&lock);
+
 	HANDLE arrTh[THREAD_COUNT];
 	for (int i = 0; i < THREAD_COUNT; i++)
 	{
-		arrTh[i] = (HANDLE)_beginthreadex(nullptr, 0, ThreadFunc, nullptr, CREATE_SUSPENDED, nullptr);
+		arrTh[i] = (HANDLE)_beginthreadex(nullptr, 0, CAS01ThreadFunc, nullptr, CREATE_SUSPENDED, nullptr);
+		if (arrTh[i] == 0)
+			return 1;
+	}
+
+	for (int i = 0; i < THREAD_COUNT; i++)
+	{
+		ResumeThread(arrTh[i]);
+	}
+
+	WaitForMultipleObjects(THREAD_COUNT, arrTh, true, INFINITE);
+
+	for (int i = 0; i < THREAD_COUNT; i++)
+	{
+		arrTh[i] = (HANDLE)_beginthreadex(nullptr, 0, CAS02ThreadFunc, nullptr, CREATE_SUSPENDED, nullptr);
+		if (arrTh[i] == 0)
+			return 1;
+	}
+
+	for (int i = 0; i < THREAD_COUNT; i++)
+	{
+		ResumeThread(arrTh[i]);
+	}
+
+	WaitForMultipleObjects(THREAD_COUNT, arrTh, true, INFINITE);
+
+	for (int i = 0; i < THREAD_COUNT; i++)
+	{
+		arrTh[i] = (HANDLE)_beginthreadex(nullptr, 0, stdQueueThreadFunc, nullptr, CREATE_SUSPENDED, nullptr);
 		if (arrTh[i] == 0)
 			return 1;
 	}

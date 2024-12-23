@@ -28,8 +28,133 @@ struct QueueNode
 	ULONG_PTR next;
 };
 
-template<typename T>
+template<typename T, bool CAS2First = FALSE>
 class CLFQueue
+{
+
+};
+
+// CAS1을 먼저 수행하는버전
+template<typename T>
+class CLFQueue<T, FALSE>
+{
+public:
+	using Node = QueueNode<T>;
+
+	CLFQueue()
+		: m_iSize(0)
+	{
+		UINT_PTR ident = InterlockedIncrement(&m_ullCurrentIdentifier);
+		Node *pHead = m_QueueNodePool.Alloc();
+		pHead->next = NULL;
+		m_pHead = CombineIdentAndAddr(ident, (ULONG_PTR)pHead);
+		m_pTail = m_pHead;
+	}
+
+	void Enqueue(T t)
+	{
+		PROFILE_BEGIN(1, "Enqueue");
+
+		UINT_PTR ident = InterlockedIncrement(&m_ullCurrentIdentifier);
+		Node *newNode = m_QueueNodePool.Alloc();
+		newNode->data = t;
+		newNode->next = NULL;
+		ULONG_PTR combinedNode = CombineIdentAndAddr(ident, (ULONG_PTR)newNode);
+
+		while (true)
+		{
+			ULONG_PTR readTail = m_pTail;
+			Node *readTailAddr = (Node *)GetAddress(readTail);
+			ULONG_PTR next = readTailAddr->next;
+
+			// 해결 2
+			// - Enqueue 상단부
+
+			// readTail과 같다면 Tail을 교체
+
+			if (InterlockedCompareExchange(&m_pTail, combinedNode, readTail) == readTail)
+			{
+				if (InterlockedCompareExchange(&readTailAddr->next, combinedNode, NULL) == NULL)
+				{
+					break;
+				}
+				else
+				{
+					__debugbreak();
+				}
+			}
+		}
+
+		// Enqueue 성공
+		InterlockedIncrement(&m_iSize);
+	}
+
+	bool Dequeue(T *t)
+	{
+		// 2번 밖에 Dequeue 안하는 상황
+		// -1 했는데 0은 있는 거
+		if (InterlockedDecrement(&m_iSize) < 0)
+		{
+			InterlockedIncrement(&m_iSize);
+			return false;
+		}
+
+		PROFILE_BEGIN(1, "Dequeue");
+
+		// 여기까지 온 경우는 큐가 비었을 상황은 없음
+
+		ULONG_PTR readTail = m_pTail;
+		Node *readTailAddr = (Node *)GetAddress(readTail);
+		ULONG_PTR readTailNext = readTailAddr->next;
+
+		while (true)
+		{
+			ULONG_PTR readHead = m_pHead;
+			Node *readHeadAddr = (Node *)GetAddress(readHead);
+			ULONG_PTR next = readHeadAddr->next;
+			Node *nextAddr = (Node *)GetAddress(next);
+
+			// Head->next NULL인 경우는 큐가 비었을 때 뿐
+			if (next == NULL)
+			{
+				continue;
+			}
+			else
+			{
+				// readHead == m_pHead 면 m_pHead = next
+				if (InterlockedCompareExchange(&m_pHead, next, readHead) == readHead)
+				{
+					// 성공했는데 m_pTail의 next가 NULL이 아닌 경우?
+
+					// DEQUEUE 성공 로그
+					UINT64 index = InterlockedIncrement64(&logIndex);
+					logging[index % LOG_MAX] = { index, GetCurrentThreadId(), DEQUEUE, 0, readHead, next, m_pTail, ((Node *)GetAddress(m_pTail))->next };
+
+					// 여기서 문제가 생길것 같은데?
+					*t = nextAddr->data;
+
+					Node *readHeadAddr = (Node *)GetAddress(readHead);
+					m_QueueNodePool.Free(readHeadAddr);
+					break;
+				}
+			}
+		}
+
+		return true;
+	}
+
+private:
+	ULONG_PTR			m_pHead = NULL;
+	ULONG_PTR			m_pTail = NULL;
+	ULONG_PTR			m_ullCurrentIdentifier = 0; // ABA 문제를 해결하기 위한 식별자
+	/*inline static */CLFMemoryPool<Node> m_QueueNodePool = CLFMemoryPool<Node>(0, false);
+	LONG				m_iSize = 0;
+};
+
+
+// CAS2를 먼저 수행하는 버전
+template<typename T>
+class CLFQueue<T, TRUE>
 {
 public:
 	using Node = QueueNode<T>;
@@ -46,6 +171,8 @@ public:
 
 	void Enqueue(T t)
 	{
+		PROFILE_BEGIN(1, "Enqueue");
+
 		UINT_PTR ident = InterlockedIncrement(&m_ullCurrentIdentifier);
 		Node *newNode = m_QueueNodePool.Alloc();
 		newNode->data = t;
@@ -79,25 +206,25 @@ public:
 			if (InterlockedCompareExchange(&readTailAddr->next, combinedNode, NULL) == NULL)
 			{
 				// 인덱스 발급
-				UINT64 index = InterlockedIncrement64(&logIndex);
-				logging[index % LOG_MAX] = { index, GetCurrentThreadId(), ENQUEUE_CAS1, 0, readTail, m_pTail, combinedNode, next };
+				// UINT64 index = InterlockedIncrement64(&logIndex);
+				// logging[index % LOG_MAX] = { index, GetCurrentThreadId(), ENQUEUE_CAS1, 0, readTail, m_pTail, combinedNode, next };
 
 				// CAS 02
 				// 읽어온 Tail과 같다면 m_pTail을 바꾸기
 				if (InterlockedCompareExchange(&m_pTail, combinedNode, readTail) != readTail)
 				{
-					// CAS 02 실패 로그
-					// CAS 02 실패시 newNode->next 체크 NULL이 아닌지 -> NULL이 아닐 것임
-					UINT64 index = InterlockedIncrement64(&logIndex);
-					logging[index % LOG_MAX] = { index, GetCurrentThreadId(), ENQUEUE_CAS2, 2, readTail, m_pTail, combinedNode, next };
+					// // CAS 02 실패 로그
+					// // CAS 02 실패시 newNode->next 체크 NULL이 아닌지 -> NULL이 아닐 것임
+					// UINT64 index = InterlockedIncrement64(&logIndex);
+					// logging[index % LOG_MAX] = { index, GetCurrentThreadId(), ENQUEUE_CAS2, 2, readTail, m_pTail, combinedNode, next };
 
 				}
 				else
 				{
-					// 성공 로그
-					// Tail을 바꿨음
-					UINT64 index = InterlockedIncrement64(&logIndex);
-					logging[index % LOG_MAX] = { index, GetCurrentThreadId(), ENQUEUE_CAS2, 0, readTail, m_pTail, combinedNode, next };
+					// // 성공 로그
+					// // Tail을 바꿨음
+					// UINT64 index = InterlockedIncrement64(&logIndex);
+					// logging[index % LOG_MAX] = { index, GetCurrentThreadId(), ENQUEUE_CAS2, 0, readTail, m_pTail, combinedNode, next };
 				}
 
 				break; // 여기까지 했다면 break;
@@ -119,19 +246,21 @@ public:
 			return false;
 		}
 
+		PROFILE_BEGIN(1, "Dequeue");
+
 		// 여기까지 온 경우는 큐가 비었을 상황은 없음
 
 		ULONG_PTR readTail = m_pTail;
 		Node *readTailAddr = (Node *)GetAddress(readTail);
 		ULONG_PTR readTailNext = readTailAddr->next;
 
-		// while (readTailNext != NULL)
-		// {
-		// 	InterlockedCompareExchange(&m_pTail, readTailNext, readTail);
-		// 	readTail = m_pTail; // 다시 읽기
-		// 	readTailAddr = (Node *)GetAddress(readTail);
-		// 	readTailNext = readTailAddr->next;
-		// }
+		while (readTailNext != NULL)
+		{
+			InterlockedCompareExchange(&m_pTail, readTailNext, readTail);
+			readTail = m_pTail; // 다시 읽기
+			readTailAddr = (Node *)GetAddress(readTail);
+			readTailNext = readTailAddr->next;
+		}
 		// 
 		// Sleep(0);
 
@@ -176,8 +305,8 @@ public:
 					// 성공했는데 m_pTail의 next가 NULL이 아닌 경우?
 
 					// DEQUEUE 성공 로그
-					UINT64 index = InterlockedIncrement64(&logIndex);
-					logging[index % LOG_MAX] = { index, GetCurrentThreadId(), DEQUEUE, 0, readHead, next, m_pTail, ((Node *)GetAddress(m_pTail))->next };
+					// UINT64 index = InterlockedIncrement64(&logIndex);
+					// logging[index % LOG_MAX] = { index, GetCurrentThreadId(), DEQUEUE, 0, readHead, next, m_pTail, ((Node *)GetAddress(m_pTail))->next };
 
 					// 여기서 문제가 생길것 같은데?
 					*t = nextAddr->data;

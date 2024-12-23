@@ -1,5 +1,6 @@
 #pragma once
 
+#pragma warning(disable : 6001)
 // #define SAFE_MODE
 
 template<typename DATA>

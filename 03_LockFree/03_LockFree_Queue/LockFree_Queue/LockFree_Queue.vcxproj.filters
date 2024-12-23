@@ -5,12 +5,14 @@
     <ClInclude Include="LFDefine.h" />
     <ClInclude Include="CLFMemoryPool.h" />
     <ClInclude Include="CLFQueue.h" />
+    <ClInclude Include="CProfileManager.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CLFStack.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="CLFMemoryPool.cpp" />
     <ClCompile Include="CLFQueue.cpp" />
+    <ClCompile Include="CProfileManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="CAS02_DEBUG01.txt" />

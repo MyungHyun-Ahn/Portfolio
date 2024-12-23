@@ -40,6 +40,8 @@ int main()
 	g_Logger->SetMainDirectory(L"LogFile");
 	g_Logger->SetLogLevel(LOG_LEVEL::DEBUG);
 
+	g_ProfileMgr = CProfileManager::GetInstance();
+
 	CCrashDump crashDump;
 	g_Server = new CEchoServer;
 	g_Server->Start(openIP.c_str(), openPort, 16, 4, 65535);

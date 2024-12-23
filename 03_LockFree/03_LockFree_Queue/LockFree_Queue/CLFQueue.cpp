@@ -4,6 +4,7 @@
 #include <process.h>
 #include "LFDefine.h"
 #include "CLFMemoryPool.h"
+#include "CProfileManager.h"
 #include "CLFQueue.h"
 
 
