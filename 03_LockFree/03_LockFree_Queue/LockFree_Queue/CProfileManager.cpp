@@ -18,7 +18,7 @@ CProfileManager::CProfileManager()
 	if (m_dwInfosTlsIdx == TLS_OUT_OF_INDEXES)
 	{
 		DWORD err = GetLastError();
-		throw err;
+		__debugbreak();
 	}
 }
 
@@ -93,7 +93,7 @@ void CProfileManager::DataOutToFile()
 	fclose(fp);
 }
 
-void CProfileManager::ResetProfile()
+void CProfileManager::ResetProfile() noexcept
 {
 	for (int infoIdx = 1; infoIdx <= m_lCurrentInfosIdx; infoIdx++)
 	{
@@ -104,7 +104,7 @@ void CProfileManager::ResetProfile()
 	}
 }
 
-void CProfileManager::Clear()
+void CProfileManager::Clear() noexcept
 {
 	for (int infoIdx = 1; infoIdx <= m_lCurrentInfosIdx; infoIdx++)
 	{
@@ -114,7 +114,7 @@ void CProfileManager::Clear()
 	}
 }
 
-CProfile::CProfile(int index, const char *funcName, const char *tagName)
+CProfile::CProfile(int index, const char *funcName, const char *tagName) noexcept
 {
 	int idx = (int)TlsGetValue(g_ProfileMgr->m_dwInfosTlsIdx);
 
@@ -147,7 +147,7 @@ CProfile::CProfile(int index, const char *funcName, const char *tagName)
 	QueryPerformanceCounter(&m_iStartTime);
 }
 
-CProfile::~CProfile()
+CProfile::~CProfile() noexcept
 {
 	LARGE_INTEGER endTime;
 	QueryPerformanceCounter(&endTime);
@@ -182,12 +182,12 @@ CProfile::~CProfile()
 	}
 }
 
-void stTlsProfileInfo::Init()
+void stTlsProfileInfo::Init() noexcept
 {
 	arrProfile = new stPROFILE[MAX_PROFILE_ARR_SIZE];
 }
 
-void stTlsProfileInfo::Reset()
+void stTlsProfileInfo::Reset() noexcept
 {
 	for (int i = 0; i < currentProfileSize; i++)
 	{
@@ -202,7 +202,7 @@ void stTlsProfileInfo::Reset()
 	}
 }
 
-void stTlsProfileInfo::Clear()
+void stTlsProfileInfo::Clear() noexcept
 {
 	delete[] arrProfile;
 }

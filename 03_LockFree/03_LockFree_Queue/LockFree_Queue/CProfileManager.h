@@ -74,17 +74,17 @@ struct stTlsProfileInfo
 	// 두 가지가 동기화 문제를 일으킬 확률은 매우 낮음
 	LONG resetFlag = FALSE;
 
-	void Init();
-	void Reset();
-	void Clear();
+	void Init() noexcept;
+	void Reset() noexcept;
+	void Clear() noexcept;
 };
 
 // RAII 패턴으로 Profile 정보 기록
 class CProfile
 {
 public:
-	CProfile(int index, const char *funcName, const char *tagName);
-	~CProfile();
+	CProfile(int index, const char *funcName, const char *tagName) noexcept;
+	~CProfile() noexcept;
 
 	stPROFILE		*m_stProfile;
 	LARGE_INTEGER	m_iStartTime;
@@ -100,12 +100,12 @@ public:
 
 	// 언제든지 저장 내역을 출력하고 싶으면
 	// 이 함수를 호출한다.
-	void DataOutToFile();
-	void ResetProfile();
-	void Clear();
+	void DataOutToFile(); 
+	void ResetProfile() noexcept;
+	void Clear() noexcept;
 
 	// TlsIndex 할당
-	inline LONG AllocThreadInfo()
+	inline LONG AllocThreadInfo() noexcept
 	{
 		LONG idx = InterlockedIncrement(&m_lCurrentInfosIdx);
 		if (m_iMaxThreadCount + 1 <= idx)

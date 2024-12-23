@@ -31,17 +31,19 @@ struct QueueNode
 template<typename T, bool CAS2First = FALSE>
 class CLFQueue
 {
-
 };
 
 // CAS1을 먼저 수행하는버전
 template<typename T>
 class CLFQueue<T, FALSE>
 {
+	static_assert(std::is_fundamental<T>::value || std::is_pointer<T>::value,
+		"T must be a fundamental type or a pointer type.");
+
 public:
 	using Node = QueueNode<T>;
 
-	CLFQueue()
+	CLFQueue() noexcept
 		: m_iSize(0)
 	{
 		UINT_PTR ident = InterlockedIncrement(&m_ullCurrentIdentifier);
@@ -51,7 +53,7 @@ public:
 		m_pTail = m_pHead;
 	}
 
-	void Enqueue(T t)
+	void Enqueue(T t) noexcept
 	{
 		PROFILE_BEGIN(1, "Enqueue");
 
@@ -89,7 +91,7 @@ public:
 		InterlockedIncrement(&m_iSize);
 	}
 
-	bool Dequeue(T *t)
+	bool Dequeue(T *t) noexcept
 	{
 		// 2번 밖에 Dequeue 안하는 상황
 		// -1 했는데 0은 있는 거
@@ -156,10 +158,13 @@ private:
 template<typename T>
 class CLFQueue<T, TRUE>
 {
+	static_assert(std::is_fundamental<T>::value || std::is_pointer<T>::value,
+		"T must be a fundamental type or a pointer type.");
+
 public:
 	using Node = QueueNode<T>;
 
-	CLFQueue() 
+	CLFQueue() noexcept
 		: m_iSize(0)
 	{
 		UINT_PTR ident = InterlockedIncrement(&m_ullCurrentIdentifier);
@@ -169,7 +174,7 @@ public:
 		m_pTail = m_pHead;
 	}
 
-	void Enqueue(T t)
+	void Enqueue(T t) noexcept
 	{
 		PROFILE_BEGIN(1, "Enqueue");
 
@@ -236,7 +241,7 @@ public:
 		InterlockedIncrement(&m_iSize);
 	}
 
-	bool Dequeue(T *t)
+	bool Dequeue(T *t) noexcept
 	{
 		// 2번 밖에 Dequeue 안하는 상황
 		// -1 했는데 0은 있는 거

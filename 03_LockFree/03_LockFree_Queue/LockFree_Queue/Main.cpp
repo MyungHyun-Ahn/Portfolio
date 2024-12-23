@@ -10,9 +10,14 @@
 #include <queue>
 
 // 스레드 2개로 해야 분석이 편함
-#define THREAD_COUNT 2
+#define THREAD_COUNT 4
 #define TEST_LOOP_COUNT 500000
 #define ENQUEUE_DEQUEUE_COUNT 64
+
+class Test
+{
+	int val;
+};
 
 CLFQueue<UINT64, FALSE> lockfreeQueue1;
 CLFQueue<UINT64, TRUE> lockfreeQueue2;

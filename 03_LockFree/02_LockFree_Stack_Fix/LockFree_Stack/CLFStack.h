@@ -36,7 +36,7 @@ class CLFStack<T, TRUE>
 public:
 	using Node = StackNode<T>;
 
-	void Push(T data)
+	void Push(T data) noexcept
 	{
 		// 새로 Push 할 때만 식별자 발급
 		ULONG_PTR ident = InterlockedIncrement(&m_ullCurrentIdentifier);
@@ -56,7 +56,7 @@ public:
 		InterlockedIncrement(&m_iUseCount);
 	}
 
-	void Pop(T *data)
+	void Pop(T *data) noexcept
 	{
 		ULONG_PTR readTop;
 		ULONG_PTR newTop;
@@ -90,7 +90,7 @@ class CLFStack<T, FALSE>
 public:
 	using Node = StackNode<T>;
 
-	void Push(T data)
+	void Push(T data) noexcept
 	{
 		// 새로 Push 할 때만 식별자 발급
 		ULONG_PTR ident = InterlockedIncrement(&m_ullCurrentIdentifier);

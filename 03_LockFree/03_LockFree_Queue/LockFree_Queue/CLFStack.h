@@ -19,10 +19,13 @@ class CLFStack
 template<typename T>
 class CLFStack<T, TRUE>
 {
+	static_assert(std::is_fundamental<T>::value || std::is_pointer<T>::value,
+		"T must be a fundamental type or a pointer type.");
+
 public:
 	using Node = StackNode<T>;
 
-	void Push(T data)
+	void Push(T data) noexcept
 	{
 		// 새로 Push 할 때만 식별자 발급
 		ULONG_PTR ident = InterlockedIncrement(&m_ullCurrentIdentifier);
@@ -42,7 +45,7 @@ public:
 		InterlockedIncrement(&m_iUseCount);
 	}
 
-	void Pop(T *data)
+	void Pop(T *data) noexcept
 	{
 		ULONG_PTR readTop;
 		ULONG_PTR newTop;
@@ -73,10 +76,13 @@ public:
 template<typename T>
 class CLFStack<T, FALSE>
 {
+	static_assert(std::is_fundamental<T>::value || std::is_pointer<T>::value,
+		"T must be a fundamental type or a pointer type.");
+
 public:
 	using Node = StackNode<T>;
 
-	void Push(T data)
+	void Push(T data) noexcept
 	{
 		// 새로 Push 할 때만 식별자 발급
 		ULONG_PTR ident = InterlockedIncrement(&m_ullCurrentIdentifier);
