@@ -157,7 +157,7 @@ public:
 		return m_TLSSharedMemoryPool.GetCapacity();
 	}
 
-	LONG GetUsedSize()
+	LONG GetUseCount()
 	{
 		LONG usedSize = 0;
 		for (int i = 1; i <= m_iTLSMemoryPoolsCurrentSize; i++)
