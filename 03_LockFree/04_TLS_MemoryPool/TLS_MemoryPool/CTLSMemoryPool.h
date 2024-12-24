@@ -1,15 +1,15 @@
 #pragma once
-template<typename DATA>
+template<typename DATA, bool UseQueue = TRUE>
 class CTLSMemoryPoolManager;
 
-template<typename DATA>
+template<typename DATA, bool UseQueue = TRUE>
 class CTLSMemoryPool
 {
 public:
-	friend class CTLSMemoryPoolManager<DATA>;
+	friend class CTLSMemoryPoolManager<DATA, UseQueue>;
 
 private:
-	CTLSMemoryPool(CTLSSharedMemoryPool<DATA> *sharedPool) : m_pTLSSharedMemoryPool(sharedPool)
+	CTLSMemoryPool(CTLSSharedMemoryPool<DATA, UseQueue> *sharedPool) : m_pTLSSharedMemoryPool(sharedPool)
 	{
 		m_MyBucket = Bucket<DATA>::GetTLSBucket();
 		m_FreeBucket = Bucket<DATA>::GetFreeBucket();
@@ -95,14 +95,14 @@ private:
 
 	LONG	m_lUsedCount = 0;
 
-	CTLSSharedMemoryPool<DATA> *m_pTLSSharedMemoryPool = nullptr;
+	CTLSSharedMemoryPool<DATA, UseQueue> *m_pTLSSharedMemoryPool = nullptr;
 };
 
-template<typename DATA>
+template<typename DATA, bool UseQueue>
 class CTLSMemoryPoolManager
 {
 public:
-	friend class CTLSMemoryPool<DATA>;
+	friend class CTLSMemoryPool<DATA, UseQueue>;
 
 	CTLSMemoryPoolManager() noexcept
 	{
@@ -132,7 +132,7 @@ public:
 		{
 			tlsIndex = AllocTLSMemoryPoolIdx();
 			TlsSetValue(m_dwTLSMemoryPoolIdx, (LPVOID)tlsIndex);
-			m_arrTLSMemoryPools[tlsIndex] = new CTLSMemoryPool<DATA>(&m_TLSSharedMemoryPool);
+			m_arrTLSMemoryPools[tlsIndex] = new CTLSMemoryPool<DATA, UseQueue>(&m_TLSSharedMemoryPool);
 		}
 
 		DATA *ptr = m_arrTLSMemoryPools[tlsIndex]->Alloc();
@@ -146,7 +146,7 @@ public:
 		{
 			tlsIndex = AllocTLSMemoryPoolIdx();
 			TlsSetValue(m_dwTLSMemoryPoolIdx, (LPVOID)tlsIndex);
-			m_arrTLSMemoryPools[tlsIndex] = new CTLSMemoryPool<DATA>(&m_TLSSharedMemoryPool);
+			m_arrTLSMemoryPools[tlsIndex] = new CTLSMemoryPool<DATA, UseQueue>(&m_TLSSharedMemoryPool);
 		}
 
 		m_arrTLSMemoryPools[tlsIndex]->Free(freePtr);
@@ -175,8 +175,8 @@ private:
 	DWORD			m_dwTLSMemoryPoolIdx;
 
 	// 인덱스 0번은 TLS의 초기값으로 사용이 불가능
-	CTLSMemoryPool<DATA>	*m_arrTLSMemoryPools[m_iThreadCount];
+	CTLSMemoryPool<DATA, UseQueue>	*m_arrTLSMemoryPools[m_iThreadCount];
 	LONG					m_iTLSMemoryPoolsCurrentSize = 0;
 
-	CTLSSharedMemoryPool<DATA> m_TLSSharedMemoryPool = CTLSSharedMemoryPool<DATA>();
+	CTLSSharedMemoryPool<DATA, UseQueue> m_TLSSharedMemoryPool = CTLSSharedMemoryPool<DATA, UseQueue>();
 };

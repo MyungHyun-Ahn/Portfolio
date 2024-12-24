@@ -12,7 +12,7 @@
 #include <queue>
 
 // 스레드 2개로 해야 분석이 편함
-#define THREAD_COUNT 4
+#define THREAD_COUNT 2
 #define TEST_LOOP_COUNT 100000
 #define ENQUEUE_DEQUEUE_COUNT 128
 
@@ -26,7 +26,7 @@ unsigned int CAS01ThreadFunc(LPVOID lpParam)
 	for (int i = 0; i < TEST_LOOP_COUNT; i++)
 	// while (1)
 	{
-		PROFILE_BEGIN(1, "ThreadFunc");
+		PROFILE_BEGIN(1, "CAS01");
 
 		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
 		{
@@ -49,7 +49,7 @@ unsigned int CAS02ThreadFunc(LPVOID lpParam)
 	for (int i = 0; i < TEST_LOOP_COUNT; i++)
 		// while (1)
 	{
-		PROFILE_BEGIN(1, "ThreadFunc");
+		PROFILE_BEGIN(1, "CAS02");
 
 		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
 		{
@@ -74,7 +74,7 @@ unsigned int stdQueueThreadFunc(LPVOID lpParam)
 	for (int i = 0; i < TEST_LOOP_COUNT; i++)
 		// while (1)
 	{
-		PROFILE_BEGIN(1, "ThreadFunc");
+		PROFILE_BEGIN(1, "stdQueue");
 
 		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
 		{
@@ -107,7 +107,7 @@ public:
 	BYTE buffer[1 * KB];
 };
 
-CLFMemoryPool<LargeBuffer> lfMemoryPool = CLFMemoryPool<LargeBuffer>(0, false);
+CTLSMemoryPoolManager<LargeBuffer, FALSE> lfMemoryPool = CTLSMemoryPoolManager<LargeBuffer, FALSE>();
 
 unsigned int LFMemoryPoolThreadFunc(LPVOID lpParam)
 {
@@ -135,7 +135,7 @@ unsigned int LFMemoryPoolThreadFunc(LPVOID lpParam)
 	return 0;
 }
 
-CTLSMemoryPoolManager<LargeBuffer> tlsMemoryPool = CTLSMemoryPoolManager<LargeBuffer>();
+CTLSMemoryPoolManager<LargeBuffer, TRUE> tlsMemoryPool = CTLSMemoryPoolManager<LargeBuffer, TRUE>();
 
 unsigned int TLSMemoryPoolThreadFunc(LPVOID lpParam)
 {
@@ -197,19 +197,19 @@ int main()
 	InitializeSRWLock(&lock);
 
 	HANDLE arrTh[THREAD_COUNT];
-	// for (int i = 0; i < THREAD_COUNT; i++)
-	// {
-	// 	arrTh[i] = (HANDLE)_beginthreadex(nullptr, 0, LFMemoryPoolThreadFunc, nullptr, CREATE_SUSPENDED, nullptr);
-	// 	if (arrTh[i] == 0)
-	// 		return 1;
-	// }
-	// 
-	// for (int i = 0; i < THREAD_COUNT; i++)
-	// {
-	// 	ResumeThread(arrTh[i]);
-	// }
-	// 
-	// WaitForMultipleObjects(THREAD_COUNT, arrTh, true, INFINITE);
+	for (int i = 0; i < THREAD_COUNT; i++)
+	{
+		arrTh[i] = (HANDLE)_beginthreadex(nullptr, 0, LFMemoryPoolThreadFunc, nullptr, CREATE_SUSPENDED, nullptr);
+		if (arrTh[i] == 0)
+			return 1;
+	}
+	
+	for (int i = 0; i < THREAD_COUNT; i++)
+	{
+		ResumeThread(arrTh[i]);
+	}
+	
+	WaitForMultipleObjects(THREAD_COUNT, arrTh, true, INFINITE);
 
 	for (int i = 0; i < THREAD_COUNT; i++)
 	{
