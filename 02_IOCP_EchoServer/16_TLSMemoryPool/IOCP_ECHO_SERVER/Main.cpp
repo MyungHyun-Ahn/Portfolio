@@ -35,7 +35,7 @@ int main()
 		serverConfigLoader.Load(L"Server", L"IP", &openIP);
 		serverConfigLoader.Load(L"Server", L"PORT", &openPort);
 	}
-
+	
 	g_Logger = CLogger::GetInstance();
 	g_Logger->SetMainDirectory(L"LogFile");
 	g_Logger->SetLogLevel(LOG_LEVEL::DEBUG);

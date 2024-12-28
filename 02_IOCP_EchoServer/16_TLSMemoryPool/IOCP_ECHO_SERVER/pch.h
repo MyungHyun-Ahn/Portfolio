@@ -47,6 +47,8 @@
 
 #include "CSmartPtr.h"
 
+#include "CLogger.h"
+
 // Lock-Free
 #include "LFDefine.h"
 #include "CLFMemoryPool.h"
@@ -63,7 +65,6 @@
 #include "CRecvBuffer.h"
 #include "CSerializableBufferView.h"
 
-#include "CLogger.h"
 #include "CMonitor.h"
 #include "CCrashDump.h"
 #include "CMyFileLoader.h"

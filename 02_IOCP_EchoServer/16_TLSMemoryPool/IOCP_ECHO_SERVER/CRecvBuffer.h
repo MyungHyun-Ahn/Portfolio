@@ -72,6 +72,9 @@ public:
 		s_sbufferPool.Free(delBuffer);
 	}
 
+	inline static LONG GetPoolCapacity() { return s_sbufferPool.GetCapacity(); }
+	inline static LONG GetPoolUsage() { return s_sbufferPool.GetUseCount(); }
+
 private:
 	char			*m_PQueue = nullptr;
 
@@ -85,4 +88,3 @@ private:
 	// inline static CLFMemoryPool<CRecvBuffer> s_sbufferPool = CLFMemoryPool<CRecvBuffer>(5000, false);
 	inline static CTLSMemoryPoolManager<CRecvBuffer> s_sbufferPool = CTLSMemoryPoolManager<CRecvBuffer>();
 };
-

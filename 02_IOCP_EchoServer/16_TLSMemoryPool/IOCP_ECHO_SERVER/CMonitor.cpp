@@ -183,6 +183,8 @@ void CMonitor::MonitoringConsole(INT sessionCount, INT playerCount)
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Pool capacity");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSession pool capacity \t: %d, usage \t: %d", CSession::GetPoolCapacity(), CSession::GetPoolUsage());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tBuffer pool capacity \t: %d, usage \t: %d", CSerializableBuffer::GetPoolCapacity(), CSerializableBuffer::GetPoolUsage());
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tView pool capacity \t: %d, usage \t: %d", CSerializableBufferView::GetPoolCapacity(), CSerializableBufferView::GetPoolUsage());
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRecv pool capacity \t: %d, usage \t: %d", CRecvBuffer::GetPoolCapacity(), CRecvBuffer::GetPoolUsage());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"TPS");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tAccept\t : %d", m_lAcceptTPS);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRecv\t : %d", m_lRecvTPS);

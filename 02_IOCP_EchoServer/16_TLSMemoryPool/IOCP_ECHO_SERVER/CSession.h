@@ -162,7 +162,7 @@ private:
 	OverlappedEx m_RecvOverlapped;
 	OverlappedEx m_SendOverlapped;
 
-	inline static CLFMemoryPool<CSession> s_sSessionPool = CLFMemoryPool<CSession>(1000, false);
+	inline static CTLSMemoryPoolManager<CSession> s_sSessionPool = CTLSMemoryPoolManager<CSession>();
 
 #ifdef POSTSEND_LOST_DEBUG
 	UINT64 sendIndex = 0;
