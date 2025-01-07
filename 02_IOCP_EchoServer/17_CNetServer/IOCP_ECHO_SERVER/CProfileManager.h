@@ -1,36 +1,11 @@
 #pragma once
 
-#include <timeapi.h>
-#pragma comment(lib, "Winmm.lib")
-
 #pragma warning(disable : 26495)
 #pragma warning(disable : 6386)
 #pragma warning(disable : 6385)
 
-#define SINGLE(type)		private:										\
-								type();										\
-								~type();									\
-								inline static type *m_instPtr = nullptr;	\
-							public:											\
-								static type *GetInstance()					\
-								{											\
-									if (m_instPtr == nullptr)				\
-									{										\
-										m_instPtr = new type();				\
-										atexit(Destory);					\
-									}										\
-																			\
-									return m_instPtr;						\
-								}											\
-																			\
-								static void Destory()						\
-								{											\
-									delete m_instPtr;						\
-									m_instPtr = nullptr;					\
-								}
-
 #define PROFILE_BEGIN(num, tagName)											\
-				__int64 tlsIdx_##num = (__int64)TlsGetValue(g_ProfileMgr->m_dwInfosTlsIdx); \
+				int tlsIdx_##num = (int)TlsGetValue(g_ProfileMgr->m_dwInfosTlsIdx); \
 				if (tlsIdx_##num == 0)	\
 				{	\
 					tlsIdx_##num = g_ProfileMgr->AllocThreadInfo(); \
@@ -77,20 +52,20 @@ struct stTlsProfileInfo
 	// 두 가지가 동기화 문제를 일으킬 확률은 매우 낮음
 	LONG resetFlag = FALSE;
 
-	void Init() noexcept;
-	void Reset() noexcept;
-	void Clear() noexcept;
+	void Init();
+	void Reset();
+	void Clear();
 };
 
 // RAII 패턴으로 Profile 정보 기록
 class CProfile
 {
 public:
-	CProfile(int index, const char *funcName, const char *tagName) noexcept;
-	~CProfile() noexcept;
+	CProfile(int index, const char *funcName, const char *tagName);
+	~CProfile();
 
-	stPROFILE		*m_stProfile;
-	DWORD64	m_iStartTime;
+	stPROFILE *m_stProfile;
+	LARGE_INTEGER	m_iStartTime;
 };
 
 
@@ -103,12 +78,12 @@ public:
 
 	// 언제든지 저장 내역을 출력하고 싶으면
 	// 이 함수를 호출한다.
-	void DataOutToFile(); 
-	void ResetProfile() noexcept;
-	void Clear() noexcept;
+	void DataOutToFile();
+	void ResetProfile();
+	void Clear();
 
 	// TlsIndex 할당
-	inline LONG AllocThreadInfo() noexcept
+	inline LONG AllocThreadInfo()
 	{
 		LONG idx = InterlockedIncrement(&m_lCurrentInfosIdx);
 		if (m_iMaxThreadCount + 1 <= idx)
@@ -129,6 +104,8 @@ public:
 	LARGE_INTEGER m_lFreq;
 
 	LONG m_lResetFlag = FALSE;
+
+	std::map<std::wstring, stPROFILE> m_mapProfiles;
 };
 
 extern CProfileManager *g_ProfileMgr;

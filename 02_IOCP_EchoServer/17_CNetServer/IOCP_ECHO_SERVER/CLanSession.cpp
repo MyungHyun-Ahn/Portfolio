@@ -1,8 +1,8 @@
 #include "pch.h"
-#include "CSession.h"
+#include "CLanSession.h"
 #include "CLanServer.h"
 
-void CSession::RecvCompleted(int size)
+void CLanSession::RecvCompleted(int size)
 {
     m_pRecvBuffer->MoveRear(size);
     InterlockedIncrement(&g_monitor.m_lRecvTPS);
@@ -15,11 +15,11 @@ void CSession::RecvCompleted(int size)
 		// 딜레이 된걸 처리해야함
 		USHORT delayedHeaderSize = m_pDelayedBuffer->isReadHeaderSize();
 		// 헤더 사이즈 부족
-		if (delayedHeaderSize < (int)DEFINE::HEADER_SIZE)
+		if (delayedHeaderSize < (int)CSerializableBuffer<TRUE>::DEFINE::HEADER_SIZE)
 		{
 			// 헤더가 딜레이 됐나?
 			// 딜레이 됐다면 여기에 모자른 만큼써줌
-			int requireHeaderSize = (int)DEFINE::HEADER_SIZE - delayedHeaderSize;
+			int requireHeaderSize = (int)CSerializableBuffer<TRUE>::DEFINE::HEADER_SIZE - delayedHeaderSize;
 			// 헤더가 2번씩 밀릴일은 없을 것임
 			// 짤린 헤더를 써주고
 			m_pDelayedBuffer->WriteDelayedHeader(m_pRecvBuffer->GetFrontPtr(), requireHeaderSize);
@@ -52,7 +52,7 @@ void CSession::RecvCompleted(int size)
             // 필요한만큼 쓸 수 있으면
             m_pDelayedBuffer->Copy(m_pRecvBuffer->GetFrontPtr(), requireSize);
             m_pRecvBuffer->MoveFront(requireSize);
-            g_Server->OnRecv(m_uiSessionID, CSmartPtr<CSerializableBufferView>(m_pDelayedBuffer));
+            g_LanServer->OnRecv(m_uiSessionID, CSmartPtr<CSerializableBufferView<TRUE>>(m_pDelayedBuffer));
             m_pDelayedBuffer = nullptr;
         }
 	}
@@ -61,9 +61,9 @@ void CSession::RecvCompleted(int size)
     while (currentUseSize > 0)
     {
         USHORT packetHeader;
-        CSerializableBufferView *view = CSerializableBufferView::Alloc();
+        CSerializableBufferView<TRUE> *view = CSerializableBufferView<TRUE>::Alloc();
         
-        if (currentUseSize < PACKET_HEADER_SIZE)
+        if (currentUseSize < (int)CSerializableBuffer<TRUE>::DEFINE::HEADER_SIZE)
         {
             // Peek 실패 delayedBuffer로
             delayFlag = true;
@@ -105,7 +105,7 @@ void CSession::RecvCompleted(int size)
         view->Init(m_pRecvBuffer, offsetStart, offsetEnd);
 
         m_pRecvBuffer->MoveFront(PACKET_HEADER_SIZE + packetHeader);
-        g_Server->OnRecv(m_uiSessionID, view);
+        g_LanServer->OnRecv(m_uiSessionID, view);
 
         currentUseSize = m_pRecvBuffer->GetUseSize();
     }
@@ -121,7 +121,7 @@ void CSession::RecvCompleted(int size)
 }
 
 // 인큐할 때 직렬화 버퍼의 포인터를 인큐
-bool CSession::SendPacket(CSerializableBuffer *message)
+bool CLanSession::SendPacket(CSerializableBuffer<TRUE> *message)
 {
     // 여기서 올라간 RefCount는 SendCompleted에서 내려감
     // 혹은 ReleaseSession
@@ -130,7 +130,7 @@ bool CSession::SendPacket(CSerializableBuffer *message)
     return TRUE;
 }
 
-void CSession::SendCompleted(int size)
+void CLanSession::SendCompleted(int size)
 {
     // m_SendBuffer.MoveFront(size);
 
@@ -143,7 +143,7 @@ void CSession::SendCompleted(int size)
         // RefCount를 낮추고 0이라면 보낸 거 삭제
         if (m_arrPSendBufs[count]->DecreaseRef() == 0)
         {
-            CSerializableBuffer::Free(m_arrPSendBufs[count]);
+            CSerializableBuffer<TRUE>::Free(m_arrPSendBufs[count]);
         }
     }
 
@@ -166,7 +166,7 @@ void CSession::SendCompleted(int size)
     }
 }
 
-bool CSession::PostRecv()
+bool CLanSession::PostRecv()
 {
     int errVal;
     int retVal;
@@ -182,7 +182,7 @@ bool CSession::PostRecv()
     ZeroMemory(&m_RecvOverlapped, sizeof(OVERLAPPED));
 
     InterlockedIncrement(&m_iIOCountAndRelease);
-	if ((m_iIOCountAndRelease & CSession::RELEASE_FLAG) == CSession::RELEASE_FLAG)
+	if ((m_iIOCountAndRelease & CLanSession::RELEASE_FLAG) == CLanSession::RELEASE_FLAG)
 	{
 		InterlockedDecrement(&m_iIOCountAndRelease);
 		return FALSE;
@@ -211,7 +211,7 @@ bool CSession::PostRecv()
     return TRUE;
 }
 
-bool CSession::PostSend(BOOL isCompleted)
+bool CLanSession::PostSend(BOOL isCompleted)
 {
     int errVal;
     int retVal;
@@ -249,7 +249,7 @@ bool CSession::PostSend(BOOL isCompleted)
     int count;
     for (count = 0; count < m_iSendCount; count++)
     {
-        CSerializableBuffer *pBuffer;
+        CSerializableBuffer<TRUE> *pBuffer;
         // 못꺼낸 것
         if (!m_lfSendBufferQueue.Dequeue(&pBuffer))
         {
@@ -272,7 +272,7 @@ bool CSession::PostSend(BOOL isCompleted)
     ZeroMemory(&m_SendOverlapped, sizeof(OVERLAPPED));
     
     InterlockedIncrement(&m_iIOCountAndRelease);
-	if ((m_iIOCountAndRelease & CSession::RELEASE_FLAG) == CSession::RELEASE_FLAG)
+	if ((m_iIOCountAndRelease & CLanSession::RELEASE_FLAG) == CLanSession::RELEASE_FLAG)
 	{
 		InterlockedDecrement(&m_iIOCountAndRelease);
 		return FALSE;

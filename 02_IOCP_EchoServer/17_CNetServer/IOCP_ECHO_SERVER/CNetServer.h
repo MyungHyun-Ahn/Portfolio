@@ -1,7 +1,7 @@
 #pragma once
-class CSession;
+class CNetSession;
 
-class CLanServer
+class CNetServer
 {
 public:
 	BOOL Start(const CHAR *openIP, const USHORT port, USHORT createWorkerThreadCount, USHORT maxWorkerThreadCount, INT maxSessionCount);
@@ -9,20 +9,20 @@ public:
 
 	inline LONG GetSessionCount() { return m_iSessionCount; }
 
-	void SendPacket(const UINT64 sessionID, CSerializableBuffer *sBuffer);
+	void SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer);
 	BOOL Disconnect(const UINT64 sessionID);
-	BOOL ReleaseSession(CSession *pSession);
+	BOOL ReleaseSession(CNetSession *pSession);
 
 	virtual bool OnConnectionRequest(const WCHAR *ip, USHORT port) = 0;
 	virtual void OnAccept(const UINT64 sessionID) = 0;
 	virtual void OnClientLeave(const UINT64 sessionID) = 0;
-	virtual void OnRecv(const UINT64 sessionID, CSerializableBufferView *message) = 0;
-	virtual void OnRecv(const UINT64 sessionID, CSmartPtr<CSerializableBufferView> message) = 0;
+	virtual void OnRecv(const UINT64 sessionID, CSerializableBufferView<FALSE> *message) = 0;
+	virtual void OnRecv(const UINT64 sessionID, CSmartPtr<CSerializableBufferView<FALSE>> message) = 0;
 	virtual void OnError(int errorcode, WCHAR *errMsg) = 0;
 
 	void FristPostAcceptEx();
 	BOOL PostAcceptEx(INT index);
-	BOOL AcceptExCompleted(CSession *pSession);
+	BOOL AcceptExCompleted(CNetSession *pSession);
 
 private:
 	inline static USHORT GetIndex(UINT64 sessionId)
@@ -58,7 +58,7 @@ private:
 	INT						m_iCurrentID = 0;
 
 	USHORT					m_usMaxSessionCount = 65535;
-	CSession				*m_arrPSessions[65535];
+	CNetSession *m_arrPSessions[65535];
 	CLFStack<USHORT>		m_stackDisconnectIndex;
 
 	// Worker
@@ -76,11 +76,12 @@ private:
 
 	HANDLE				m_hPostAcceptExThread;
 	BOOL				m_bIsPostAcceptExRun = TRUE;
-	CSession			*m_arrAcceptExSessions[ACCEPTEX_COUNT];
+	CNetSession *m_arrAcceptExSessions[ACCEPTEX_COUNT];
 	CLFStack<USHORT>    m_stackFreeAcceptExIndex;
 
 	// IOCP วฺต้
 	HANDLE m_hIOCPHandle = INVALID_HANDLE_VALUE;
 };
 
-extern CLanServer *g_Server;
+extern CNetServer *g_NetServer;
+

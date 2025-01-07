@@ -1,20 +1,20 @@
 #include "pch.h"
-#include "CLanServer.h"
-#include "CSession.h"
+#include "CNetServer.h"
+#include "CNetSession.h"
 
-CLanServer *g_Server;
+CNetServer *g_NetServer;
 
-unsigned int WorkerThreadFunc(LPVOID lpParam)
+unsigned int NetWorkerThreadFunc(LPVOID lpParam)
 {
-	return g_Server->WorkerThread();
+	return g_NetServer->WorkerThread();
 }
 
-unsigned int PostAcceptThreadFunc(LPVOID lpParam)
+unsigned int NetPostAcceptThreadFunc(LPVOID lpParam)
 {
-	return g_Server->PostAcceptThread();
+	return g_NetServer->PostAcceptThread();
 }
 
-BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorkerThreadCount, USHORT maxWorkerThreadCount, INT maxSessionCount)
+BOOL CNetServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorkerThreadCount, USHORT maxWorkerThreadCount, INT maxSessionCount)
 {
 	int retVal;
 	int errVal;
@@ -119,7 +119,7 @@ BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	}
 
 	// CreatePostAcceptExThread
-	m_hPostAcceptExThread = (HANDLE)_beginthreadex(nullptr, 0, PostAcceptThreadFunc, nullptr, 0, nullptr);
+	m_hPostAcceptExThread = (HANDLE)_beginthreadex(nullptr, 0, NetPostAcceptThreadFunc, nullptr, 0, nullptr);
 	if (m_hPostAcceptExThread == 0)
 	{
 		errVal = GetLastError();
@@ -135,7 +135,7 @@ BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	// CreateWorkerThread
 	for (int i = 1; i <= createWorkerThreadCount; i++)
 	{
-		HANDLE hWorkerThread = (HANDLE)_beginthreadex(nullptr, 0, WorkerThreadFunc, nullptr, 0, nullptr);
+		HANDLE hWorkerThread = (HANDLE)_beginthreadex(nullptr, 0, NetWorkerThreadFunc, nullptr, 0, nullptr);
 		if (hWorkerThread == 0)
 		{
 			errVal = GetLastError();
@@ -150,9 +150,9 @@ BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	return TRUE;
 }
 
-void CLanServer::SendPacket(const UINT64 sessionID, CSerializableBuffer *sBuffer)
+void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer)
 {
-	CSession *pSession = m_arrPSessions[GetIndex(sessionID)];
+	CNetSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 
 	// 이미 삭제된 세션
 	if (pSession == nullptr)
@@ -160,17 +160,23 @@ void CLanServer::SendPacket(const UINT64 sessionID, CSerializableBuffer *sBuffer
 
 	InterlockedIncrement(&pSession->m_iIOCountAndRelease);
 	// ReleaseFlag가 이미 켜진 상황
-	if ((pSession->m_iIOCountAndRelease & CSession::RELEASE_FLAG) == CSession::RELEASE_FLAG)
+	if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
 	{
 		InterlockedDecrement(&pSession->m_iIOCountAndRelease);
 		return;
 	}
 
 
-	USHORT header = sBuffer->GetDataSize();
-	if (header != sizeof(__int64))
-		__debugbreak();
-	sBuffer->EnqueueHeader((char *)&header, sizeof(USHORT));
+	NetHeader header;
+	header.code = 0; // 코드
+	header.len = sBuffer->GetDataSize();
+	header.randKey = rand() % 256;
+	header.checkSum = CEncryption::CalCheckSum(sBuffer->GetContentBufferPtr(), sBuffer->GetDataSize());
+	sBuffer->EnqueueHeader((char *)&header, sizeof(NetHeader));
+
+	// CheckSum 부터 암호화하기 위해
+	CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetBufferSize() - 4, header.randKey);
+
 	pSession->SendPacket(sBuffer);
 	pSession->PostSend(0);
 
@@ -181,15 +187,15 @@ void CLanServer::SendPacket(const UINT64 sessionID, CSerializableBuffer *sBuffer
 	}
 }
 
-BOOL CLanServer::Disconnect(const UINT64 sessionID)
+BOOL CNetServer::Disconnect(const UINT64 sessionID)
 {
-	CSession *pSession = m_arrPSessions[GetIndex(sessionID)];
+	CNetSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 	if (pSession == nullptr)
 		return FALSE;
 
 	// ReleaseFlag가 이미 켜진 상황
 	InterlockedIncrement(&pSession->m_iIOCountAndRelease);
-	if ((pSession->m_iIOCountAndRelease & CSession::RELEASE_FLAG) == CSession::RELEASE_FLAG)
+	if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
 	{
 		InterlockedDecrement(&pSession->m_iIOCountAndRelease);
 		return FALSE;
@@ -207,20 +213,20 @@ BOOL CLanServer::Disconnect(const UINT64 sessionID)
 	return TRUE;
 }
 
-BOOL CLanServer::ReleaseSession(CSession *pSession)
+BOOL CNetServer::ReleaseSession(CNetSession *pSession)
 {
 	// IoCount 체크와 ReleaseFlag 변경을 동시에
-	if (InterlockedCompareExchange(&pSession->m_iIOCountAndRelease, CSession::RELEASE_FLAG, 0) != 0)
+	if (InterlockedCompareExchange(&pSession->m_iIOCountAndRelease, CNetSession::RELEASE_FLAG, 0) != 0)
 	{
 		// ioCount 0이 아니거나 이미 Release 진행 중인게 있다면 return
 		return FALSE;
 	}
-	
+
 
 	USHORT index = GetIndex(pSession->m_uiSessionID);
 	m_arrPSessions[index] = nullptr;
 	closesocket(pSession->m_sSessionSocket);
-	CSession::Free(pSession);
+	CNetSession::Free(pSession);
 	InterlockedDecrement(&m_iSessionCount);
 
 	m_stackDisconnectIndex.Push(index);
@@ -228,7 +234,7 @@ BOOL CLanServer::ReleaseSession(CSession *pSession)
 	return TRUE;
 }
 
-void CLanServer::FristPostAcceptEx()
+void CNetServer::FristPostAcceptEx()
 {
 	// 처음에 AcceptEx를 걸어두고 시작
 	for (int i = 0; i < ACCEPTEX_COUNT; i++)
@@ -237,12 +243,12 @@ void CLanServer::FristPostAcceptEx()
 	}
 }
 
-BOOL CLanServer::PostAcceptEx(INT index)
+BOOL CNetServer::PostAcceptEx(INT index)
 {
 	int retVal;
 	int errVal;
 
-	CSession *newAcceptEx = CSession::Alloc();
+	CNetSession *newAcceptEx = CNetSession::Alloc();
 	newAcceptEx->m_iIOCountAndRelease = 0;
 	m_arrAcceptExSessions[index] = newAcceptEx;
 
@@ -278,7 +284,7 @@ BOOL CLanServer::PostAcceptEx(INT index)
 	return TRUE;
 }
 
-BOOL CLanServer::AcceptExCompleted(CSession *pSession)
+BOOL CNetServer::AcceptExCompleted(CNetSession *pSession)
 {
 	int retVal;
 	int errVal;
@@ -318,7 +324,7 @@ BOOL CLanServer::AcceptExCompleted(CSession *pSession)
 		return FALSE;
 	}
 
-	UINT64 combineId = CLanServer::CombineIndex(index, ++m_iCurrentID);
+	UINT64 combineId = CNetServer::CombineIndex(index, ++m_iCurrentID);
 
 	pSession->Init(combineId);
 
@@ -330,19 +336,19 @@ BOOL CLanServer::AcceptExCompleted(CSession *pSession)
 	return TRUE;
 }
 
-int CLanServer::WorkerThread()
+int CNetServer::WorkerThread()
 {
 	int retVal;
 	DWORD flag = 0;
 	while (m_bIsWorkerRun)
 	{
 		DWORD dwTransferred = 0;
-		CSession *pSession = nullptr;
+		CNetSession *pSession = nullptr;
 		OverlappedEx *lpOverlapped = nullptr;
 
 		retVal = GetQueuedCompletionStatus(m_hIOCPHandle, &dwTransferred
-										, (PULONG_PTR)&pSession, (LPOVERLAPPED *)&lpOverlapped
-										, INFINITE);
+			, (PULONG_PTR)&pSession, (LPOVERLAPPED *)&lpOverlapped
+			, INFINITE);
 
 		if (lpOverlapped == nullptr)
 		{
@@ -400,19 +406,19 @@ int CLanServer::WorkerThread()
 				// 해제된 인덱스에 다시 AcceptEx를 검
 				PostAcceptAPCEnqueue(index);
 			}
-				break;
+			break;
 			case IOOperation::RECV:
 			{
 				pSession->RecvCompleted(dwTransferred);
 				pSession->PostRecv();
 			}
-				break;
+			break;
 			case IOOperation::SEND:
 			{
 				pSession->SendCompleted(dwTransferred);
 				pSession->PostSend();
 			}
-				break;
+			break;
 			}
 		}
 
@@ -426,7 +432,7 @@ int CLanServer::WorkerThread()
 	return 0;
 }
 
-int CLanServer::PostAcceptThread()
+int CNetServer::PostAcceptThread()
 {
 	while (m_bIsPostAcceptExRun)
 	{
@@ -437,7 +443,7 @@ int CLanServer::PostAcceptThread()
 	return 0;
 }
 
-void CLanServer::PostAcceptAPCEnqueue(INT index)
+void CNetServer::PostAcceptAPCEnqueue(INT index)
 {
 	int retVal;
 	int errVal;
@@ -452,9 +458,9 @@ void CLanServer::PostAcceptAPCEnqueue(INT index)
 	}
 }
 
-void CLanServer::PostAcceptAPCFunc(ULONG_PTR lpParam)
+void CNetServer::PostAcceptAPCFunc(ULONG_PTR lpParam)
 {
-	CLanServer *pServer = (CLanServer *)lpParam;
+	CNetServer *pServer = (CNetServer *)lpParam;
 
 	// 스택이 빌때까지 반복
 	USHORT index;

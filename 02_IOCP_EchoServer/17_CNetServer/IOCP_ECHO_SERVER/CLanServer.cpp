@@ -1,17 +1,17 @@
 #include "pch.h"
 #include "CLanServer.h"
-#include "CSession.h"
+#include "CLanSession.h"
 
-CLanServer *g_Server;
+CLanServer *g_LanServer;
 
-unsigned int WorkerThreadFunc(LPVOID lpParam)
+unsigned int LanWorkerThreadFunc(LPVOID lpParam)
 {
-	return g_Server->WorkerThread();
+	return g_LanServer->WorkerThread();
 }
 
-unsigned int PostAcceptThreadFunc(LPVOID lpParam)
+unsigned int LanPostAcceptThreadFunc(LPVOID lpParam)
 {
-	return g_Server->PostAcceptThread();
+	return g_LanServer->PostAcceptThread();
 }
 
 BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorkerThreadCount, USHORT maxWorkerThreadCount, INT maxSessionCount)
@@ -119,7 +119,7 @@ BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	}
 
 	// CreatePostAcceptExThread
-	m_hPostAcceptExThread = (HANDLE)_beginthreadex(nullptr, 0, PostAcceptThreadFunc, nullptr, 0, nullptr);
+	m_hPostAcceptExThread = (HANDLE)_beginthreadex(nullptr, 0, LanPostAcceptThreadFunc, nullptr, 0, nullptr);
 	if (m_hPostAcceptExThread == 0)
 	{
 		errVal = GetLastError();
@@ -135,7 +135,7 @@ BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	// CreateWorkerThread
 	for (int i = 1; i <= createWorkerThreadCount; i++)
 	{
-		HANDLE hWorkerThread = (HANDLE)_beginthreadex(nullptr, 0, WorkerThreadFunc, nullptr, 0, nullptr);
+		HANDLE hWorkerThread = (HANDLE)_beginthreadex(nullptr, 0, LanWorkerThreadFunc, nullptr, 0, nullptr);
 		if (hWorkerThread == 0)
 		{
 			errVal = GetLastError();
@@ -150,9 +150,9 @@ BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	return TRUE;
 }
 
-void CLanServer::SendPacket(const UINT64 sessionID, CSerializableBuffer *sBuffer)
+void CLanServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<TRUE> *sBuffer)
 {
-	CSession *pSession = m_arrPSessions[GetIndex(sessionID)];
+	CLanSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 
 	// 이미 삭제된 세션
 	if (pSession == nullptr)
@@ -160,16 +160,15 @@ void CLanServer::SendPacket(const UINT64 sessionID, CSerializableBuffer *sBuffer
 
 	InterlockedIncrement(&pSession->m_iIOCountAndRelease);
 	// ReleaseFlag가 이미 켜진 상황
-	if ((pSession->m_iIOCountAndRelease & CSession::RELEASE_FLAG) == CSession::RELEASE_FLAG)
+	if ((pSession->m_iIOCountAndRelease & CLanSession::RELEASE_FLAG) == CLanSession::RELEASE_FLAG)
 	{
 		InterlockedDecrement(&pSession->m_iIOCountAndRelease);
 		return;
 	}
 
 
+	// 헤더 2바이트임 Lan 서버는
 	USHORT header = sBuffer->GetDataSize();
-	if (header != sizeof(__int64))
-		__debugbreak();
 	sBuffer->EnqueueHeader((char *)&header, sizeof(USHORT));
 	pSession->SendPacket(sBuffer);
 	pSession->PostSend(0);
@@ -183,13 +182,13 @@ void CLanServer::SendPacket(const UINT64 sessionID, CSerializableBuffer *sBuffer
 
 BOOL CLanServer::Disconnect(const UINT64 sessionID)
 {
-	CSession *pSession = m_arrPSessions[GetIndex(sessionID)];
+	CLanSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 	if (pSession == nullptr)
 		return FALSE;
 
 	// ReleaseFlag가 이미 켜진 상황
 	InterlockedIncrement(&pSession->m_iIOCountAndRelease);
-	if ((pSession->m_iIOCountAndRelease & CSession::RELEASE_FLAG) == CSession::RELEASE_FLAG)
+	if ((pSession->m_iIOCountAndRelease & CLanSession::RELEASE_FLAG) == CLanSession::RELEASE_FLAG)
 	{
 		InterlockedDecrement(&pSession->m_iIOCountAndRelease);
 		return FALSE;
@@ -207,10 +206,10 @@ BOOL CLanServer::Disconnect(const UINT64 sessionID)
 	return TRUE;
 }
 
-BOOL CLanServer::ReleaseSession(CSession *pSession)
+BOOL CLanServer::ReleaseSession(CLanSession *pSession)
 {
 	// IoCount 체크와 ReleaseFlag 변경을 동시에
-	if (InterlockedCompareExchange(&pSession->m_iIOCountAndRelease, CSession::RELEASE_FLAG, 0) != 0)
+	if (InterlockedCompareExchange(&pSession->m_iIOCountAndRelease, CLanSession::RELEASE_FLAG, 0) != 0)
 	{
 		// ioCount 0이 아니거나 이미 Release 진행 중인게 있다면 return
 		return FALSE;
@@ -220,7 +219,7 @@ BOOL CLanServer::ReleaseSession(CSession *pSession)
 	USHORT index = GetIndex(pSession->m_uiSessionID);
 	m_arrPSessions[index] = nullptr;
 	closesocket(pSession->m_sSessionSocket);
-	CSession::Free(pSession);
+	CLanSession::Free(pSession);
 	InterlockedDecrement(&m_iSessionCount);
 
 	m_stackDisconnectIndex.Push(index);
@@ -242,7 +241,7 @@ BOOL CLanServer::PostAcceptEx(INT index)
 	int retVal;
 	int errVal;
 
-	CSession *newAcceptEx = CSession::Alloc();
+	CLanSession *newAcceptEx = CLanSession::Alloc();
 	newAcceptEx->m_iIOCountAndRelease = 0;
 	m_arrAcceptExSessions[index] = newAcceptEx;
 
@@ -278,7 +277,7 @@ BOOL CLanServer::PostAcceptEx(INT index)
 	return TRUE;
 }
 
-BOOL CLanServer::AcceptExCompleted(CSession *pSession)
+BOOL CLanServer::AcceptExCompleted(CLanSession *pSession)
 {
 	int retVal;
 	int errVal;
@@ -337,7 +336,7 @@ int CLanServer::WorkerThread()
 	while (m_bIsWorkerRun)
 	{
 		DWORD dwTransferred = 0;
-		CSession *pSession = nullptr;
+		CLanSession *pSession = nullptr;
 		OverlappedEx *lpOverlapped = nullptr;
 
 		retVal = GetQueuedCompletionStatus(m_hIOCPHandle, &dwTransferred

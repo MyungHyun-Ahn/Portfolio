@@ -1,25 +1,10 @@
 #pragma once
-
-struct SendDebug
-{
-	UINT64 m_Index;
-	USHORT m_ThreadId;
-	USHORT m_Where;		// 0 - SendCompleted
-						// 1 - SendPacket
-						// 2 - RecvCompleted
-						// ff - sendCompleted
-	USHORT m_IsSuccess;
-	USHORT m_Why;		// 실패시 이유
-						// 1 - UseSize
-						// 2 - SendFlag
-};
-
-class CSession
+class CNetSession
 {
 public:
-	friend class CLanServer;
+	friend class CNetServer;
 
-	CSession()
+	CNetSession()
 		: m_sSessionSocket(INVALID_SOCKET)
 		, m_uiSessionID(0)
 		, m_AcceptExOverlapped(IOOperation::ACCEPTEX)
@@ -29,7 +14,7 @@ public:
 
 	}
 
-	CSession(SOCKET socket, UINT64 sessionID)
+	CNetSession(SOCKET socket, UINT64 sessionID)
 		: m_sSessionSocket(socket)
 		, m_uiSessionID(sessionID)
 		, m_AcceptExOverlapped(IOOperation::ACCEPTEX)
@@ -39,7 +24,7 @@ public:
 
 	}
 
-	~CSession()
+	~CNetSession()
 	{
 	}
 
@@ -67,14 +52,14 @@ public:
 		{
 			if (m_arrPSendBufs[count]->DecreaseRef() == 0)
 			{
-				CSerializableBuffer::Free(m_arrPSendBufs[count]);
+				CSerializableBuffer<FALSE>::Free(m_arrPSendBufs[count]);
 			}
 		}
 
 		LONG useBufferSize = m_lfSendBufferQueue.GetUseSize();
 		for (int i = 0; i < useBufferSize; i++)
 		{
-			CSerializableBuffer *pBuffer;
+			CSerializableBuffer<FALSE> *pBuffer;
 			// 못꺼낸 것
 			if (!m_lfSendBufferQueue.Dequeue(&pBuffer))
 			{
@@ -86,7 +71,7 @@ public:
 			// RefCount를 낮추고 0이라면 보낸 거 삭제
 			if (pBuffer->DecreaseRef() == 0)
 			{
-				CSerializableBuffer::Free(pBuffer);
+				CSerializableBuffer<FALSE>::Free(pBuffer);
 			}
 		}
 
@@ -111,20 +96,20 @@ public:
 
 	void RecvCompleted(int size);
 
-	bool SendPacket(CSerializableBuffer *message);
+	bool SendPacket(CSerializableBuffer<FALSE> *message);
 	void SendCompleted(int size);
 
 	bool PostRecv();
 	bool PostSend(BOOL isCompleted = FALSE);
 
 public:
-	inline static CSession *Alloc()
+	inline static CNetSession *Alloc()
 	{
-		CSession *pSession = s_sSessionPool.Alloc();
+		CNetSession *pSession = s_sSessionPool.Alloc();
 		return pSession;
 	}
 
-	inline static void Free(CSession *delSession)
+	inline static void Free(CNetSession *delSession)
 	{
 		delSession->Clear();
 		s_sSessionPool.Free(delSession);
@@ -146,17 +131,17 @@ private:
 	// CRingBuffer m_RecvBuffer;
 	CRecvBuffer *m_pRecvBuffer = nullptr;
 	// 최대 무조건 1개 -> 있거나 없거나
-	CSerializableBufferView *m_pDelayedBuffer = nullptr;
+	CSerializableBufferView<FALSE> *m_pDelayedBuffer = nullptr;
 
-	CLFQueue<CSerializableBuffer *> m_lfSendBufferQueue;
-	CSerializableBuffer				*m_arrPSendBufs[WSASEND_MAX_BUFFER_COUNT];
+	CLFQueue<CSerializableBuffer<FALSE> *> m_lfSendBufferQueue;
+	CSerializableBuffer<FALSE> *m_arrPSendBufs[WSASEND_MAX_BUFFER_COUNT];
 	LONG							m_iSendCount = 0;
 
 	OverlappedEx m_AcceptExOverlapped;
 	OverlappedEx m_RecvOverlapped;
 	OverlappedEx m_SendOverlapped;
 
-	inline static CTLSMemoryPoolManager<CSession> s_sSessionPool = CTLSMemoryPoolManager<CSession>();
+	inline static CTLSMemoryPoolManager<CNetSession, 16, 4> s_sSessionPool = CTLSMemoryPoolManager<CNetSession, 16, 4>();
 	inline static LONG RELEASE_FLAG = 0x80000000;
 
 #ifdef POSTSEND_LOST_DEBUG

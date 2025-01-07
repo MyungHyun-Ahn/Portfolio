@@ -11,8 +11,7 @@
 #include "CLFQueue.h"
 #include <queue>
 
-// 스레드 2개로 해야 분석이 편함
-#define THREAD_COUNT 2
+#define THREAD_COUNT 4
 #define TEST_LOOP_COUNT 100000
 #define ENQUEUE_DEQUEUE_COUNT 128
 
@@ -109,25 +108,25 @@ public:
 
 CTLSMemoryPoolManager<LargeBuffer, FALSE> lfMemoryPool = CTLSMemoryPoolManager<LargeBuffer, FALSE>();
 
-unsigned int LFMemoryPoolThreadFunc(LPVOID lpParam)
+unsigned int StackTLSPool(LPVOID lpParam)
 {
 	for (int i = 0; i < TEST_LOOP_COUNT; i++)
 		// while (1)
 	{
-		PROFILE_BEGIN(1, nullptr);
+		//PROFILE_BEGIN(1, nullptr);
 
 		// Alloc
 		LargeBuffer *Bufs[ENQUEUE_DEQUEUE_COUNT];
 
 		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
 		{
-			// PROFILE_BEGIN(1, "Alloc");
+			PROFILE_BEGIN(1, "Alloc");
 			Bufs[i] = lfMemoryPool.Alloc();
 		}
 
 		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
 		{
-			// PROFILE_BEGIN(1, "Free");
+			PROFILE_BEGIN(1, "Free");
 			lfMemoryPool.Free(Bufs[i]);
 		}
 	}
@@ -137,25 +136,25 @@ unsigned int LFMemoryPoolThreadFunc(LPVOID lpParam)
 
 CTLSMemoryPoolManager<LargeBuffer, TRUE> tlsMemoryPool = CTLSMemoryPoolManager<LargeBuffer, TRUE>();
 
-unsigned int TLSMemoryPoolThreadFunc(LPVOID lpParam)
+unsigned int QueueTLSPool(LPVOID lpParam)
 {
 	for (int i = 0; i < TEST_LOOP_COUNT; i++)
 		// while (1)
 	{
-		PROFILE_BEGIN(1, nullptr);
+		// PROFILE_BEGIN(1, nullptr);
 
 		// Alloc
 		LargeBuffer *Bufs[ENQUEUE_DEQUEUE_COUNT];
 
 		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
 		{
-			// PROFILE_BEGIN(1, "Alloc");
+			PROFILE_BEGIN(1, "Alloc");
 			Bufs[i] = tlsMemoryPool.Alloc();
 		}
 
 		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
 		{
-			// PROFILE_BEGIN(1, "Free");
+			PROFILE_BEGIN(1, "Free");
 			tlsMemoryPool.Free(Bufs[i]);
 		}
 	}
@@ -163,25 +162,25 @@ unsigned int TLSMemoryPoolThreadFunc(LPVOID lpParam)
 	return 0;
 }
 
-unsigned int NewDeleteThreadFunc(LPVOID lpParam)
+unsigned int NewDelete(LPVOID lpParam)
 {
 	for (int i = 0; i < TEST_LOOP_COUNT; i++)
 		// while (1)
 	{
-		PROFILE_BEGIN(1, nullptr);
+		// PROFILE_BEGIN(1, nullptr);
 
 		// Alloc
 		LargeBuffer *Bufs[ENQUEUE_DEQUEUE_COUNT];
 
 		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
 		{
-			// PROFILE_BEGIN(1, "Alloc");
+			PROFILE_BEGIN(1, "Alloc");
 			Bufs[i] = new LargeBuffer;
 		}
 
 		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
 		{
-			// PROFILE_BEGIN(1, "Free");
+			PROFILE_BEGIN(1, "Free");
 			delete Bufs[i];
 		}
 	}
@@ -199,7 +198,7 @@ int main()
 	HANDLE arrTh[THREAD_COUNT];
 	for (int i = 0; i < THREAD_COUNT; i++)
 	{
-		arrTh[i] = (HANDLE)_beginthreadex(nullptr, 0, LFMemoryPoolThreadFunc, nullptr, CREATE_SUSPENDED, nullptr);
+		arrTh[i] = (HANDLE)_beginthreadex(nullptr, 0, StackTLSPool, nullptr, CREATE_SUSPENDED, nullptr);
 		if (arrTh[i] == 0)
 			return 1;
 	}
@@ -213,7 +212,7 @@ int main()
 
 	for (int i = 0; i < THREAD_COUNT; i++)
 	{
-		arrTh[i] = (HANDLE)_beginthreadex(nullptr, 0, TLSMemoryPoolThreadFunc, nullptr, CREATE_SUSPENDED, nullptr);
+		arrTh[i] = (HANDLE)_beginthreadex(nullptr, 0, QueueTLSPool, nullptr, CREATE_SUSPENDED, nullptr);
 		if (arrTh[i] == 0)
 			return 1;
 	}
@@ -227,7 +226,7 @@ int main()
 
 	for (int i = 0; i < THREAD_COUNT; i++)
 	{
-		arrTh[i] = (HANDLE)_beginthreadex(nullptr, 0, NewDeleteThreadFunc, nullptr, CREATE_SUSPENDED, nullptr);
+		arrTh[i] = (HANDLE)_beginthreadex(nullptr, 0, NewDelete, nullptr, CREATE_SUSPENDED, nullptr);
 		if (arrTh[i] == 0)
 			return 1;
 	}

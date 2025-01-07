@@ -271,7 +271,7 @@ public:
 				// next가 0xFFFF보다 작으면 잘못 읽은 것임
 				if (next < 0xFFFF)
 				{
-					// g_Logger->WriteLog(L"SYSTEM", L"LockFreeQueue", LOG_LEVEL::ERR, L"0xFFFF");
+					g_Logger->WriteLog(L"SYSTEM", L"LockFreeQueue", LOG_LEVEL::ERR, L"0xFFFF");
 					continue;
 				}
 

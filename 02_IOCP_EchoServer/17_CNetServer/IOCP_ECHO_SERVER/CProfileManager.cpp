@@ -1,27 +1,17 @@
-#include <new>
-#include <stdio.h>
-#include <windows.h>
-#include <process.h>
-#include <time.h>
-#include "LFDefine.h"
-#include "CLFMemoryPool.h"
-#include "CTLSSharedMemoryPool.h"
-#include "CTLSMemoryPool.h"
+#include "pch.h"
 #include "CProfileManager.h"
-#include "CLFQueue.h"
 
 CProfileManager *g_ProfileMgr;
 
 CProfileManager::CProfileManager()
 {
-	timeBeginPeriod(1);
-	// QueryPerformanceFrequency(&m_lFreq);
+	QueryPerformanceFrequency(&m_lFreq);
 
 	m_dwInfosTlsIdx = TlsAlloc();
 	if (m_dwInfosTlsIdx == TLS_OUT_OF_INDEXES)
 	{
 		DWORD err = GetLastError();
-		__debugbreak();
+		throw err;
 	}
 }
 
@@ -29,7 +19,6 @@ CProfileManager::~CProfileManager()
 {
 	DataOutToFile();
 	Clear();
-	timeEndPeriod(1);
 	TlsFree(m_dwInfosTlsIdx);
 }
 
@@ -66,7 +55,7 @@ void CProfileManager::DataOutToFile()
 		fprintf_s(fp, "------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n");
 
 		stTlsProfileInfo *pInfo = m_arrProfileInfos[infoIdx];
-		
+
 		for (int profileIdx = 0; profileIdx < pInfo->currentProfileSize; profileIdx++)
 		{
 			stPROFILE *pProfile = &pInfo->arrProfile[profileIdx];
@@ -97,7 +86,7 @@ void CProfileManager::DataOutToFile()
 	fclose(fp);
 }
 
-void CProfileManager::ResetProfile() noexcept
+void CProfileManager::ResetProfile()
 {
 	for (int infoIdx = 1; infoIdx <= m_lCurrentInfosIdx; infoIdx++)
 	{
@@ -108,7 +97,7 @@ void CProfileManager::ResetProfile() noexcept
 	}
 }
 
-void CProfileManager::Clear() noexcept
+void CProfileManager::Clear()
 {
 	for (int infoIdx = 1; infoIdx <= m_lCurrentInfosIdx; infoIdx++)
 	{
@@ -118,9 +107,9 @@ void CProfileManager::Clear() noexcept
 	}
 }
 
-CProfile::CProfile(int index, const char *funcName, const char *tagName) noexcept
+CProfile::CProfile(int index, const char *funcName, const char *tagName)
 {
-	__int64 idx = (__int64)TlsGetValue(g_ProfileMgr->m_dwInfosTlsIdx);
+	int idx = (int)TlsGetValue(g_ProfileMgr->m_dwInfosTlsIdx);
 
 	stPROFILE *pProfile = &g_ProfileMgr->m_arrProfileInfos[idx]->arrProfile[index];
 	if (pProfile->isUsed == false)
@@ -148,16 +137,15 @@ CProfile::CProfile(int index, const char *funcName, const char *tagName) noexcep
 
 	m_stProfile = pProfile;
 
-	m_iStartTime = __rdtsc();
-	// QueryPerformanceCounter(&m_iStartTime);
+	QueryPerformanceCounter(&m_iStartTime);
 }
 
-CProfile::~CProfile() noexcept
+CProfile::~CProfile()
 {
-	DWORD64 endTime = __rdtsc();
-	// QueryPerformanceCounter(&endTime);
+	LARGE_INTEGER endTime;
+	QueryPerformanceCounter(&endTime);
 
-	DWORD64 runtime = endTime - m_iStartTime;
+	__int64 runtime = endTime.QuadPart - m_iStartTime.QuadPart;
 
 	m_stProfile->iCall++;
 	m_stProfile->iTotalTime += runtime;
@@ -187,18 +175,18 @@ CProfile::~CProfile() noexcept
 	}
 }
 
-void stTlsProfileInfo::Init() noexcept
+void stTlsProfileInfo::Init()
 {
 	arrProfile = new stPROFILE[MAX_PROFILE_ARR_SIZE];
 }
 
-void stTlsProfileInfo::Reset() noexcept
+void stTlsProfileInfo::Reset()
 {
 	for (int i = 0; i < currentProfileSize; i++)
 	{
 		arrProfile->iCall = 0;
 		arrProfile->iTotalTime = 0;
-		
+
 		for (int i = 0; i < stPROFILE::MINMAX_REMOVE_COUNT; i++)
 		{
 			arrProfile->iMinTime[i] = INT64_MAX;
@@ -207,7 +195,7 @@ void stTlsProfileInfo::Reset() noexcept
 	}
 }
 
-void stTlsProfileInfo::Clear() noexcept
+void stTlsProfileInfo::Clear()
 {
 	delete[] arrProfile;
 }
