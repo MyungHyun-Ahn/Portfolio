@@ -171,7 +171,7 @@ void CLanServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<TRUE> *s
 	USHORT header = sBuffer->GetDataSize();
 	sBuffer->EnqueueHeader((char *)&header, sizeof(USHORT));
 	pSession->SendPacket(sBuffer);
-	// pSession->PostSend(0);
+	pSession->PostSend(0);
 
 	if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 	{
@@ -404,7 +404,6 @@ int CLanServer::WorkerThread() noexcept
 			{
 				pSession->RecvCompleted(dwTransferred);
 				pSession->PostRecv();
-				pSession->PostSend();
 			}
 				break;
 			case IOOperation::SEND:
