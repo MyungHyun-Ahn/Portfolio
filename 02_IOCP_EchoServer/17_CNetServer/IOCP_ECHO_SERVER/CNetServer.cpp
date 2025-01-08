@@ -4,17 +4,17 @@
 
 CNetServer *g_NetServer;
 
-unsigned int NetWorkerThreadFunc(LPVOID lpParam)
+unsigned int NetWorkerThreadFunc(LPVOID lpParam) noexcept
 {
 	return g_NetServer->WorkerThread();
 }
 
-unsigned int NetPostAcceptThreadFunc(LPVOID lpParam)
+unsigned int NetPostAcceptThreadFunc(LPVOID lpParam) noexcept
 {
 	return g_NetServer->PostAcceptThread();
 }
 
-BOOL CNetServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorkerThreadCount, USHORT maxWorkerThreadCount, INT maxSessionCount)
+BOOL CNetServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorkerThreadCount, USHORT maxWorkerThreadCount, INT maxSessionCount) noexcept
 {
 	int retVal;
 	int errVal;
@@ -129,9 +129,6 @@ BOOL CNetServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"[SYSTEM] PostAcceptExThread running..");
 
-	// 500개 AcceptEx 예약
-	FristPostAcceptEx();
-
 	// CreateWorkerThread
 	for (int i = 1; i <= createWorkerThreadCount; i++)
 	{
@@ -150,7 +147,7 @@ BOOL CNetServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	return TRUE;
 }
 
-void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer)
+void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept
 {
 	CNetSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 
@@ -187,7 +184,7 @@ void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *
 	}
 }
 
-BOOL CNetServer::Disconnect(const UINT64 sessionID)
+BOOL CNetServer::Disconnect(const UINT64 sessionID) noexcept
 {
 	CNetSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 	if (pSession == nullptr)
@@ -213,7 +210,7 @@ BOOL CNetServer::Disconnect(const UINT64 sessionID)
 	return TRUE;
 }
 
-BOOL CNetServer::ReleaseSession(CNetSession *pSession)
+BOOL CNetServer::ReleaseSession(CNetSession *pSession) noexcept
 {
 	// IoCount 체크와 ReleaseFlag 변경을 동시에
 	if (InterlockedCompareExchange(&pSession->m_iIOCountAndRelease, CNetSession::RELEASE_FLAG, 0) != 0)
@@ -234,7 +231,7 @@ BOOL CNetServer::ReleaseSession(CNetSession *pSession)
 	return TRUE;
 }
 
-void CNetServer::FristPostAcceptEx()
+void CNetServer::FristPostAcceptEx() noexcept
 {
 	// 처음에 AcceptEx를 걸어두고 시작
 	for (int i = 0; i < ACCEPTEX_COUNT; i++)
@@ -243,7 +240,7 @@ void CNetServer::FristPostAcceptEx()
 	}
 }
 
-BOOL CNetServer::PostAcceptEx(INT index)
+BOOL CNetServer::PostAcceptEx(INT index) noexcept
 {
 	int retVal;
 	int errVal;
@@ -284,7 +281,7 @@ BOOL CNetServer::PostAcceptEx(INT index)
 	return TRUE;
 }
 
-BOOL CNetServer::AcceptExCompleted(CNetSession *pSession)
+BOOL CNetServer::AcceptExCompleted(CNetSession *pSession) noexcept
 {
 	int retVal;
 	int errVal;
@@ -336,7 +333,7 @@ BOOL CNetServer::AcceptExCompleted(CNetSession *pSession)
 	return TRUE;
 }
 
-int CNetServer::WorkerThread()
+int CNetServer::WorkerThread() noexcept
 {
 	int retVal;
 	DWORD flag = 0;
@@ -432,8 +429,14 @@ int CNetServer::WorkerThread()
 	return 0;
 }
 
-int CNetServer::PostAcceptThread()
+int CNetServer::PostAcceptThread() noexcept
 {
+	// IOCP의 병행성 관리를 받기 위한 GQCS
+	GetQueuedCompletionStatus(m_hIOCPHandle, nullptr, nullptr, nullptr, 0);
+
+	// 등록한 수만큼 AcceptEx 예약
+	FristPostAcceptEx();
+
 	while (m_bIsPostAcceptExRun)
 	{
 		// Update
@@ -451,7 +454,7 @@ int CNetServer::PostAcceptThread()
 	return 0;
 }
 
-void CNetServer::PostAcceptAPCEnqueue(INT index)
+void CNetServer::PostAcceptAPCEnqueue(INT index) noexcept
 {
 	int retVal;
 	int errVal;
@@ -466,7 +469,7 @@ void CNetServer::PostAcceptAPCEnqueue(INT index)
 	}
 }
 
-void CNetServer::PostAcceptAPCFunc(ULONG_PTR lpParam)
+void CNetServer::PostAcceptAPCFunc(ULONG_PTR lpParam) noexcept
 {
 	CNetServer *pServer = (CNetServer *)lpParam;
 

@@ -11,7 +11,7 @@ public:
 	};
 
 
-	CSerializableBuffer()
+	CSerializableBuffer() noexcept
 	{
 		m_Buffer = new char[m_MaxSize];
 		m_HeaderFront = 0;
@@ -19,7 +19,7 @@ public:
 		m_Rear = (int)DEFINE::HEADER_SIZE;
 	}
 
-	CSerializableBuffer(int size) : m_MaxSize(size)
+	CSerializableBuffer(int size) noexcept : m_MaxSize(size)
 	{
 		m_Buffer = new char[m_MaxSize];
 		m_HeaderFront = 0;
@@ -27,36 +27,36 @@ public:
 		m_Rear = (int)DEFINE::HEADER_SIZE;
 	}
 
-	virtual ~CSerializableBuffer() 
+	virtual ~CSerializableBuffer() noexcept
 	{
 		delete m_Buffer;
 	}
 
 
-	inline void Clear()
+	inline void Clear() noexcept
 	{
 		m_HeaderFront = 0;
 		m_Front = (int)DEFINE::HEADER_SIZE;
 		m_Rear = (int)DEFINE::HEADER_SIZE;
 	}
 
-	bool EnqueueHeader(char *buffer, int size);
-	bool Enqueue(char *buffer, int size);
-	bool Dequeue(char *buffer, int size);
+	bool EnqueueHeader(char *buffer, int size) noexcept;
+	bool Enqueue(char *buffer, int size) noexcept;
+	bool Dequeue(char *buffer, int size) noexcept;
 
-	inline int GetBufferSize() const { return m_MaxSize; }
-	inline int GetDataSize() const { return m_Rear - m_Front; }
-	inline int GetHeaderSize() const { return  (int)DEFINE::HEADER_SIZE; }
-	inline int GetFullSize() const { return GetDataSize() + GetHeaderSize(); }
+	inline int GetBufferSize() const noexcept { return m_MaxSize; }
+	inline int GetDataSize() const noexcept { return m_Rear - m_Front; }
+	inline int GetHeaderSize() const noexcept { return  (int)DEFINE::HEADER_SIZE; }
+	inline int GetFullSize() const noexcept { return GetDataSize() + GetHeaderSize(); }
 
 	// 외부에서 버퍼를 직접 조작하기 위한 용도
-	inline char *GetBufferPtr() { return m_Buffer; }
-	inline char *GetContentBufferPtr() { return m_Buffer + m_Front; }
-	inline int MoveWritePos(int size) { m_Rear += size; return m_Rear; }
-	inline int MoveReadPos(int size) { m_Front += size; return m_Front; }
+	inline char *GetBufferPtr() const noexcept { return m_Buffer; }
+	inline char *GetContentBufferPtr() const noexcept { return m_Buffer + m_Front; }
+	inline int MoveWritePos(int size) noexcept { m_Rear += size; return m_Rear; }
+	inline int MoveReadPos(int size) noexcept { m_Front += size; return m_Front; }
 
 public:
-	inline CSerializableBuffer &operator<<(char chData)
+	inline CSerializableBuffer &operator<<(char chData) noexcept
 	{
 		if (m_MaxSize - m_Rear > sizeof(char))
 		{
@@ -71,7 +71,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator<<(unsigned char byData)
+	inline CSerializableBuffer &operator<<(unsigned char byData) noexcept
 	{
 		if (m_MaxSize - m_Rear > sizeof(unsigned char))
 		{
@@ -86,7 +86,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator<<(short shData)
+	inline CSerializableBuffer &operator<<(short shData) noexcept
 	{
 		if (m_MaxSize - m_Rear > sizeof(short))
 		{
@@ -101,7 +101,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator<<(unsigned short wData)
+	inline CSerializableBuffer &operator<<(unsigned short wData) noexcept
 	{
 		if (m_MaxSize - m_Rear > sizeof(unsigned short))
 		{
@@ -116,7 +116,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator<<(int iData)
+	inline CSerializableBuffer &operator<<(int iData) noexcept
 	{
 		if (m_MaxSize - m_Rear > sizeof(int))
 		{
@@ -131,7 +131,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator<<(long lData)
+	inline CSerializableBuffer &operator<<(long lData) noexcept
 	{
 		if (m_MaxSize - m_Rear > sizeof(long))
 		{
@@ -146,7 +146,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator<<(unsigned long lData)
+	inline CSerializableBuffer &operator<<(unsigned long lData) noexcept
 	{
 		if (m_MaxSize - m_Rear > sizeof(unsigned long))
 		{
@@ -161,7 +161,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator<<(float fData)
+	inline CSerializableBuffer &operator<<(float fData) noexcept
 	{
 		if (m_MaxSize - m_Rear > sizeof(float))
 		{
@@ -176,7 +176,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator<<(__int64 iData)
+	inline CSerializableBuffer &operator<<(__int64 iData) noexcept
 	{
 		if (m_MaxSize - m_Rear > sizeof(__int64))
 		{
@@ -191,7 +191,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator<<(unsigned __int64 uiData)
+	inline CSerializableBuffer &operator<<(unsigned __int64 uiData) noexcept
 	{
 		if (m_MaxSize - m_Rear > sizeof(unsigned __int64))
 		{
@@ -206,7 +206,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator<<(double dData)
+	inline CSerializableBuffer &operator<<(double dData) noexcept
 	{
 		if (m_MaxSize - m_Rear > sizeof(double))
 		{
@@ -220,7 +220,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator>>(char &chData)
+	inline CSerializableBuffer &operator>>(char &chData) noexcept
 	{
 		if (GetDataSize() < sizeof(char))
 		{
@@ -233,7 +233,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator>>(unsigned char &byData)
+	inline CSerializableBuffer &operator>>(unsigned char &byData) noexcept
 	{
 		if (GetDataSize() < sizeof(unsigned char))
 		{
@@ -246,7 +246,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator>>(short &shData)
+	inline CSerializableBuffer &operator>>(short &shData) noexcept
 	{
 		if (GetDataSize() < sizeof(short))
 		{
@@ -259,7 +259,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator>>(unsigned short &wData)
+	inline CSerializableBuffer &operator>>(unsigned short &wData) noexcept
 	{
 		if (GetDataSize() < sizeof(char))
 		{
@@ -272,7 +272,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator>>(int &iData)
+	inline CSerializableBuffer &operator>>(int &iData) noexcept
 	{
 		if (GetDataSize() < sizeof(int))
 		{
@@ -285,7 +285,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator>>(long &lData)
+	inline CSerializableBuffer &operator>>(long &lData) noexcept
 	{
 		if (GetDataSize() < sizeof(long))
 		{
@@ -298,7 +298,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator>>(unsigned long &ulData)
+	inline CSerializableBuffer &operator>>(unsigned long &ulData) noexcept
 	{
 		if (GetDataSize() < sizeof(unsigned long))
 		{
@@ -311,7 +311,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator>>(float &fData)
+	inline CSerializableBuffer &operator>>(float &fData) noexcept
 	{
 		if (GetDataSize() < sizeof(float))
 		{
@@ -324,7 +324,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator>>(__int64 &iData)
+	inline CSerializableBuffer &operator>>(__int64 &iData) noexcept
 	{
 		if (GetDataSize() < sizeof(__int64))
 		{
@@ -337,7 +337,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator>>(unsigned __int64 &uiData)
+	inline CSerializableBuffer &operator>>(unsigned __int64 &uiData) noexcept
 	{
 		if (GetDataSize() < sizeof(unsigned __int64))
 		{
@@ -350,7 +350,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator>>(double &dData)
+	inline CSerializableBuffer &operator>>(double &dData) noexcept
 	{
 		if (GetDataSize() < sizeof(double))
 		{
@@ -364,7 +364,7 @@ public:
 	}
 
 public:
-	inline static CSerializableBuffer *Alloc()
+	inline static CSerializableBuffer *Alloc() noexcept
 	{
 		// 할당하고 초기화해서 반환
 		CSerializableBuffer *pSBuffer = s_sbufferPool.Alloc();
@@ -372,16 +372,16 @@ public:
 		return pSBuffer;
 	}
 
-	inline static void Free(CSerializableBuffer *delSBuffer)
+	inline static void Free(CSerializableBuffer *delSBuffer) noexcept
 	{
 		s_sbufferPool.Free(delSBuffer);
 	}
 
-	inline static LONG GetPoolCapacity() { return s_sbufferPool.GetCapacity(); }
-	inline static LONG GetPoolUsage() { return s_sbufferPool.GetUseCount(); }
+	inline static LONG GetPoolCapacity() noexcept { return s_sbufferPool.GetCapacity(); }
+	inline static LONG GetPoolUsage() noexcept { return s_sbufferPool.GetUseCount(); }
 
-	inline LONG IncreaseRef() { return InterlockedIncrement(&m_iRefCount); }
-	inline LONG DecreaseRef() { return InterlockedDecrement(&m_iRefCount); }
+	inline LONG IncreaseRef() noexcept { return InterlockedIncrement(&m_iRefCount); }
+	inline LONG DecreaseRef() noexcept { return InterlockedDecrement(&m_iRefCount); }
 
 private:
 	char *m_Buffer;
@@ -397,7 +397,7 @@ private:
 };
 
 template<bool isLanServer>
-bool CSerializableBuffer<isLanServer>::EnqueueHeader(char *buffer, int size)
+bool CSerializableBuffer<isLanServer>::EnqueueHeader(char *buffer, int size) noexcept
 {
 	// 이 상황은 이미 헤더를 삽입한 것
 	//	* CGameServer::SendSector에서 발생 가능
@@ -413,7 +413,7 @@ bool CSerializableBuffer<isLanServer>::EnqueueHeader(char *buffer, int size)
 }
 
 template<bool isLanServer>
-bool CSerializableBuffer<isLanServer>::Enqueue(char *buffer, int size)
+bool CSerializableBuffer<isLanServer>::Enqueue(char *buffer, int size) noexcept
 {
 	if (m_MaxSize - m_Rear > size)
 	{
@@ -429,7 +429,7 @@ bool CSerializableBuffer<isLanServer>::Enqueue(char *buffer, int size)
 }
 
 template<bool isLanServer>
-bool CSerializableBuffer<isLanServer>::Dequeue(char *buffer, int size)
+bool CSerializableBuffer<isLanServer>::Dequeue(char *buffer, int size) noexcept
 {
 	if (GetDataSize() < size)
 	{

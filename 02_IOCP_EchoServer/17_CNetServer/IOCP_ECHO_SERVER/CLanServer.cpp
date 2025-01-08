@@ -4,17 +4,17 @@
 
 CLanServer *g_LanServer;
 
-unsigned int LanWorkerThreadFunc(LPVOID lpParam)
+unsigned int LanWorkerThreadFunc(LPVOID lpParam) noexcept
 {
 	return g_LanServer->WorkerThread();
 }
 
-unsigned int LanPostAcceptThreadFunc(LPVOID lpParam)
+unsigned int LanPostAcceptThreadFunc(LPVOID lpParam) noexcept
 {
 	return g_LanServer->PostAcceptThread();
 }
 
-BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorkerThreadCount, USHORT maxWorkerThreadCount, INT maxSessionCount)
+BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorkerThreadCount, USHORT maxWorkerThreadCount, INT maxSessionCount) noexcept
 {
 	int retVal;
 	int errVal;
@@ -150,7 +150,7 @@ BOOL CLanServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	return TRUE;
 }
 
-void CLanServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<TRUE> *sBuffer)
+void CLanServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<TRUE> *sBuffer) noexcept
 {
 	CLanSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 
@@ -180,7 +180,7 @@ void CLanServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<TRUE> *s
 	}
 }
 
-BOOL CLanServer::Disconnect(const UINT64 sessionID)
+BOOL CLanServer::Disconnect(const UINT64 sessionID) noexcept
 {
 	CLanSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 	if (pSession == nullptr)
@@ -206,7 +206,7 @@ BOOL CLanServer::Disconnect(const UINT64 sessionID)
 	return TRUE;
 }
 
-BOOL CLanServer::ReleaseSession(CLanSession *pSession)
+BOOL CLanServer::ReleaseSession(CLanSession *pSession) noexcept
 {
 	// IoCount 체크와 ReleaseFlag 변경을 동시에
 	if (InterlockedCompareExchange(&pSession->m_iIOCountAndRelease, CLanSession::RELEASE_FLAG, 0) != 0)
@@ -227,7 +227,7 @@ BOOL CLanServer::ReleaseSession(CLanSession *pSession)
 	return TRUE;
 }
 
-void CLanServer::FristPostAcceptEx()
+void CLanServer::FristPostAcceptEx() noexcept
 {
 	// 처음에 AcceptEx를 걸어두고 시작
 	for (int i = 0; i < ACCEPTEX_COUNT; i++)
@@ -236,7 +236,7 @@ void CLanServer::FristPostAcceptEx()
 	}
 }
 
-BOOL CLanServer::PostAcceptEx(INT index)
+BOOL CLanServer::PostAcceptEx(INT index) noexcept
 {
 	int retVal;
 	int errVal;
@@ -277,7 +277,7 @@ BOOL CLanServer::PostAcceptEx(INT index)
 	return TRUE;
 }
 
-BOOL CLanServer::AcceptExCompleted(CLanSession *pSession)
+BOOL CLanServer::AcceptExCompleted(CLanSession *pSession) noexcept
 {
 	int retVal;
 	int errVal;
@@ -329,7 +329,7 @@ BOOL CLanServer::AcceptExCompleted(CLanSession *pSession)
 	return TRUE;
 }
 
-int CLanServer::WorkerThread()
+int CLanServer::WorkerThread() noexcept
 {
 	int retVal;
 	DWORD flag = 0;
@@ -425,7 +425,7 @@ int CLanServer::WorkerThread()
 	return 0;
 }
 
-int CLanServer::PostAcceptThread()
+int CLanServer::PostAcceptThread() noexcept
 {
 	while (m_bIsPostAcceptExRun)
 	{
@@ -436,7 +436,7 @@ int CLanServer::PostAcceptThread()
 	return 0;
 }
 
-void CLanServer::PostAcceptAPCEnqueue(INT index)
+void CLanServer::PostAcceptAPCEnqueue(INT index) noexcept
 {
 	int retVal;
 	int errVal;
@@ -451,7 +451,7 @@ void CLanServer::PostAcceptAPCEnqueue(INT index)
 	}
 }
 
-void CLanServer::PostAcceptAPCFunc(ULONG_PTR lpParam)
+void CLanServer::PostAcceptAPCFunc(ULONG_PTR lpParam) noexcept
 {
 	CLanServer *pServer = (CLanServer *)lpParam;
 

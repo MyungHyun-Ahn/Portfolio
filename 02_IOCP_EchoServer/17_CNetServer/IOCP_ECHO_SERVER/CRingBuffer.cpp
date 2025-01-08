@@ -2,22 +2,22 @@
 #include "CRingBuffer.h"
 
 // 디폴트 생성자 10000 바이트 크기 생성
-CRingBuffer::CRingBuffer()
+CRingBuffer::CRingBuffer() noexcept
 {
 	m_PQueue = new char[m_iCapacity];
 }
 
-CRingBuffer::CRingBuffer(int size) : m_iCapacity(size + 1)
+CRingBuffer::CRingBuffer(int size) noexcept : m_iCapacity(size + 1)
 {
 	m_PQueue = new char[m_iCapacity];
 }
 
-CRingBuffer::~CRingBuffer()
+CRingBuffer::~CRingBuffer() noexcept
 {
 	delete m_PQueue;
 }
 
-int CRingBuffer::Enqueue(char *data, int size)
+int CRingBuffer::Enqueue(char *data, int size) noexcept
 {
 	// 공간 부족
 	int freeSize = GetFreeSize();
@@ -40,7 +40,7 @@ int CRingBuffer::Enqueue(char *data, int size)
 	return size;
 }
 
-int CRingBuffer::Dequeue(char *buffer, int size)
+int CRingBuffer::Dequeue(char *buffer, int size) noexcept
 {
 	int ret = Peek(buffer, size);
 	if (ret == -1)
@@ -50,7 +50,7 @@ int CRingBuffer::Dequeue(char *buffer, int size)
 	return ret;
 }
 
-int CRingBuffer::Peek(char *buffer, int size)
+int CRingBuffer::Peek(char *buffer, int size) noexcept
 {
 	if (GetUseSize() < size) {
 		return -1;
@@ -72,7 +72,7 @@ int CRingBuffer::Peek(char *buffer, int size)
 	return size;
 }
 
-int CRingBuffer::Peek(char *buffer, int size, int offset)
+int CRingBuffer::Peek(char *buffer, int size, int offset) noexcept
 {
 	if (GetUseSize(offset) < size) {
 		return -1;

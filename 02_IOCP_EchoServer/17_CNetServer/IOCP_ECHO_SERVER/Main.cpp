@@ -5,7 +5,7 @@
 
 BOOL monitorThreadRunning = TRUE;
 
-unsigned int MonitorThreadFunc(LPVOID lpParam)
+unsigned int MonitorThreadFunc(LPVOID lpParam) noexcept
 {
 	DWORD mTime = timeGetTime();
 	while (monitorThreadRunning)

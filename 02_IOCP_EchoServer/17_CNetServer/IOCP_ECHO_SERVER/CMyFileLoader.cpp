@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "CMyFileLoader.h"
 
-VOID CMyFileLoader::Parse(const WCHAR *fileName)
+VOID CMyFileLoader::Parse(const WCHAR *fileName) noexcept
 {
 	size_t retVal;
 
@@ -128,7 +128,7 @@ VOID CMyFileLoader::Parse(const WCHAR *fileName)
 	return;
 }
 
-BOOL CMyFileLoader::Load(const WCHAR *classStr, const WCHAR *keyStr, USHORT *outValue)
+BOOL CMyFileLoader::Load(const WCHAR *classStr, const WCHAR *keyStr, USHORT *outValue) noexcept
 {
 	auto classIt = m_parsedDatas.find(classStr);
 	if (classIt == m_parsedDatas.end())
@@ -149,7 +149,7 @@ BOOL CMyFileLoader::Load(const WCHAR *classStr, const WCHAR *keyStr, USHORT *out
 	return TRUE;
 }
 
-BOOL CMyFileLoader::Load(const WCHAR *classStr, const WCHAR *keyStr, INT *outValue)
+BOOL CMyFileLoader::Load(const WCHAR *classStr, const WCHAR *keyStr, INT *outValue) noexcept
 {
 	auto classIt = m_parsedDatas.find(classStr);
 	if (classIt == m_parsedDatas.end())
@@ -170,7 +170,7 @@ BOOL CMyFileLoader::Load(const WCHAR *classStr, const WCHAR *keyStr, INT *outVal
 	return TRUE;
 }
 
-BOOL CMyFileLoader::Load(const WCHAR *classStr, const WCHAR *keyStr, BYTE *outValue)
+BOOL CMyFileLoader::Load(const WCHAR *classStr, const WCHAR *keyStr, BYTE *outValue) noexcept
 {
 	auto classIt = m_parsedDatas.find(classStr);
 	if (classIt == m_parsedDatas.end())
@@ -191,7 +191,7 @@ BOOL CMyFileLoader::Load(const WCHAR *classStr, const WCHAR *keyStr, BYTE *outVa
 	return TRUE;
 }
 
-BOOL CMyFileLoader::Load(const WCHAR *classStr, const WCHAR *keyStr, std::string *str)
+BOOL CMyFileLoader::Load(const WCHAR *classStr, const WCHAR *keyStr, std::string *str) noexcept
 {
 	auto classIt = m_parsedDatas.find(classStr);
 	if (classIt == m_parsedDatas.end())
@@ -211,7 +211,7 @@ BOOL CMyFileLoader::Load(const WCHAR *classStr, const WCHAR *keyStr, std::string
 	return TRUE;
 }
 
-BOOL CMyFileLoader::Load(const WCHAR *classStr, const WCHAR *keyStr, std::wstring *wstr)
+BOOL CMyFileLoader::Load(const WCHAR *classStr, const WCHAR *keyStr, std::wstring *wstr) noexcept
 {
 	auto classIt = m_parsedDatas.find(classStr);
 	if (classIt == m_parsedDatas.end())

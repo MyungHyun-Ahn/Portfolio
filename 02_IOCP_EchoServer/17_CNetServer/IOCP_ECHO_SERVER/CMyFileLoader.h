@@ -4,14 +4,14 @@ class CMyFileLoader
 {
 public:
 	// 기본적으로 std::wstring 으로 저장
-	VOID Parse(const WCHAR *fileName);
+	VOID Parse(const WCHAR *fileName) noexcept;
 
 	// 필요하면 더 구현할 것
-	BOOL		Load(const WCHAR *classStr, const WCHAR *keyStr, USHORT *outValue);
-	BOOL		Load(const WCHAR *classStr, const WCHAR *keyStr, INT *outValue);
-	BOOL		Load(const WCHAR *classStr, const WCHAR *keyStr, BYTE *outValue);
-	BOOL		Load(const WCHAR *classStr, const WCHAR *keyStr, std::string *str);
-	BOOL		Load(const WCHAR *classStr, const WCHAR *keyStr, std::wstring *wstr);
+	BOOL		Load(const WCHAR *classStr, const WCHAR *keyStr, USHORT *outValue) noexcept;
+	BOOL		Load(const WCHAR *classStr, const WCHAR *keyStr, INT *outValue) noexcept;
+	BOOL		Load(const WCHAR *classStr, const WCHAR *keyStr, BYTE *outValue) noexcept;
+	BOOL		Load(const WCHAR *classStr, const WCHAR *keyStr, std::string *str) noexcept;
+	BOOL		Load(const WCHAR *classStr, const WCHAR *keyStr, std::wstring *wstr) noexcept;
 
 private:
 	// 파싱해서 데이터를 가지고 있을 자료구조

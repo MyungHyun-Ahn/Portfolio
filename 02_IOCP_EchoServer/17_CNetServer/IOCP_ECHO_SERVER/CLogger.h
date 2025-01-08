@@ -13,24 +13,24 @@ class CLogger
 {
 	SINGLE(CLogger)
 public:
-	void WriteLog(const WCHAR *directory, const WCHAR *type, LOG_LEVEL logLevel, const WCHAR *fmt, ...);
-	void WriteLogHex(const WCHAR *directory, const WCHAR *type, LOG_LEVEL logLevel, const WCHAR *log, BYTE *pByte, int byteLen);
-	void WriteLogConsole(LOG_LEVEL logLevel, const WCHAR *fmt, ...);
+	void WriteLog(const WCHAR *directory, const WCHAR *type, LOG_LEVEL logLevel, const WCHAR *fmt, ...) noexcept;
+	void WriteLogHex(const WCHAR *directory, const WCHAR *type, LOG_LEVEL logLevel, const WCHAR *log, BYTE *pByte, int byteLen) noexcept;
+	void WriteLogConsole(LOG_LEVEL logLevel, const WCHAR *fmt, ...) noexcept;
 
-	inline void SetMainDirectory(const WCHAR *directoryName) 
+	inline void SetMainDirectory(const WCHAR *directoryName) noexcept
 	{ 
 		m_mainLogDirectoryName = directoryName; 
 		CreateDirectory(directoryName, NULL);
 	}
-	inline void SetLogLevel(LOG_LEVEL logLevel) { m_LogLevel = logLevel; }
+	inline void SetLogLevel(LOG_LEVEL logLevel) noexcept { m_LogLevel = logLevel; }
 
 private:
-	void ConsoleLock()
+	void ConsoleLock() noexcept
 	{
 		AcquireSRWLockExclusive(&m_Consolelock);
 	}
 
-	void ConsoleUnLock()
+	void ConsoleUnLock() noexcept
 	{
 		ReleaseSRWLockExclusive(&m_Consolelock);
 	}

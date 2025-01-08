@@ -165,7 +165,7 @@ public:
 		return true;
 	}
 
-	inline LONG GetUseSize() noexcept { return m_iSize; }
+	inline LONG GetUseSize() const noexcept { return m_iSize; }
 
 private:
 	ULONG_PTR			m_pHead = NULL;
@@ -289,7 +289,7 @@ public:
 		return true;
 	}
 
-	inline LONG GetUseSize() noexcept { return m_iSize; }
+	inline LONG GetUseSize() const noexcept { return m_iSize; }
 
 private:
 	ULONG_PTR			m_pHead = NULL;

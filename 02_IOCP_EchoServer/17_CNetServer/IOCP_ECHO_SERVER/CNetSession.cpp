@@ -2,7 +2,7 @@
 #include "CNetSession.h"
 #include "CNetServer.h"
 
-void CNetSession::RecvCompleted(int size)
+void CNetSession::RecvCompleted(int size) noexcept
 {
 	m_pRecvBuffer->MoveRear(size);
 	InterlockedIncrement(&g_monitor.m_lRecvTPS);
@@ -191,7 +191,7 @@ void CNetSession::RecvCompleted(int size)
 }
 
 // 인큐할 때 직렬화 버퍼의 포인터를 인큐
-bool CNetSession::SendPacket(CSerializableBuffer<FALSE> *message)
+bool CNetSession::SendPacket(CSerializableBuffer<FALSE> *message) noexcept
 {
 	// 여기서 올라간 RefCount는 SendCompleted에서 내려감
 	// 혹은 ReleaseSession
@@ -200,7 +200,7 @@ bool CNetSession::SendPacket(CSerializableBuffer<FALSE> *message)
 	return TRUE;
 }
 
-void CNetSession::SendCompleted(int size)
+void CNetSession::SendCompleted(int size) noexcept
 {
 	// m_SendBuffer.MoveFront(size);
 
@@ -236,7 +236,7 @@ void CNetSession::SendCompleted(int size)
 	}
 }
 
-bool CNetSession::PostRecv()
+bool CNetSession::PostRecv() noexcept
 {
 	int errVal;
 	int retVal;
@@ -281,7 +281,7 @@ bool CNetSession::PostRecv()
 	return TRUE;
 }
 
-bool CNetSession::PostSend(BOOL isCompleted)
+bool CNetSession::PostSend(BOOL isCompleted) noexcept
 {
 	int errVal;
 	int retVal;

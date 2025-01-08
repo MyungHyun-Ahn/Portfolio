@@ -15,7 +15,7 @@ struct Bucket
 	static constexpr int BUCKET_SIZE = bucketSize;
 	static constexpr int TLS_BUCKET_COUNT = bucketCount;
 
-	~Bucket()
+	~Bucket() noexcept
 	{
 		// 누수 감지 코드 등 넣어도 됨
 	}
@@ -138,14 +138,14 @@ public:
 	}
 
 public:
-	LONG GetCapacity()
+	LONG GetCapacity() const noexcept
 	{
 		return m_iCapacity;
 	}
 
 private:
 	// 버킷 크기만큼의 노드 리스트를 생성(스택)
-	TLSMemoryPoolNode<DATA> *CreateNodeList()
+	TLSMemoryPoolNode<DATA> *CreateNodeList() noexcept
 	{
 		TLSMemoryPoolNode<DATA> *pTop = nullptr;
 		for (int i = 0; i < Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE; i++)
@@ -277,14 +277,14 @@ public:
 	}
 
 public:
-	LONG GetCapacity()
+	LONG GetCapacity() const noexcept
 	{
 		return m_iCapacity;
 	}
 
 private:
 	// 버킷 크기만큼의 노드 리스트를 생성(스택)
-	TLSMemoryPoolNode<DATA> *CreateNodeList()
+	TLSMemoryPoolNode<DATA> *CreateNodeList() noexcept
 	{
 		TLSMemoryPoolNode<DATA> *pTop = nullptr;
 		for (int i = 0; i < Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE; i++)

@@ -4,23 +4,23 @@
 #include "CEchoServer.h"
 
 
-bool CEchoServer::OnConnectionRequest(const WCHAR *ip, USHORT port)
+bool CEchoServer::OnConnectionRequest(const WCHAR *ip, USHORT port) noexcept
 {
     return true;
 }
 
-void CEchoServer::OnAccept(const UINT64 sessionID)
+void CEchoServer::OnAccept(const UINT64 sessionID) noexcept
 {
     CSerializableBuffer<TRUE> *buffer = CSerializableBuffer<TRUE>::Alloc();
     *buffer << (UINT64)LOGIN_PACKET;
     SendPacket(sessionID, buffer);
 }
 
-void CEchoServer::OnClientLeave(const UINT64 sessionID)
+void CEchoServer::OnClientLeave(const UINT64 sessionID) noexcept
 {
 }
 
-void CEchoServer::OnRecv(const UINT64 sessionID, CSerializableBufferView<TRUE> *message)
+void CEchoServer::OnRecv(const UINT64 sessionID, CSerializableBufferView<TRUE> *message) noexcept
 {
     __int64 num;
     *message >> num;
@@ -34,8 +34,8 @@ void CEchoServer::OnRecv(const UINT64 sessionID, CSerializableBufferView<TRUE> *
 
     InterlockedIncrement(&g_monitor.m_lRecvTPS);
 }
-
-void CEchoServer::OnRecv(const UINT64 sessionID, CSmartPtr<CSerializableBufferView<TRUE>> message)
+ 
+void CEchoServer::OnRecv(const UINT64 sessionID, CSmartPtr<CSerializableBufferView<TRUE>> message) noexcept
 {
 	__int64 num;
 	(*message) >> num;
@@ -48,6 +48,6 @@ void CEchoServer::OnRecv(const UINT64 sessionID, CSmartPtr<CSerializableBufferVi
     InterlockedIncrement(&g_monitor.m_lRecvTPS);
 }
 
-void CEchoServer::OnError(int errorcode, WCHAR *errMsg)
+void CEchoServer::OnError(int errorcode, WCHAR *errMsg) noexcept
 {
 }

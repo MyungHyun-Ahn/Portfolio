@@ -4,7 +4,7 @@
 
 CMonitor g_monitor;
 
-CMonitor::CMonitor(HANDLE hProcess)
+CMonitor::CMonitor(HANDLE hProcess) noexcept
 {
 	if (hProcess == INVALID_HANDLE_VALUE)
 	{
@@ -48,7 +48,7 @@ CMonitor::CMonitor(HANDLE hProcess)
 	UpdatePDH();
 }
 
-void CMonitor::Update(INT sessionCount, INT playerCount)
+void CMonitor::Update(INT sessionCount, INT playerCount) noexcept
 {
 	UpdateCpuTime();
 	UpdateMemory();
@@ -60,7 +60,7 @@ void CMonitor::Update(INT sessionCount, INT playerCount)
 	UpdateServer();
 }
 
-void CMonitor::UpdateCpuTime()
+void CMonitor::UpdateCpuTime() noexcept
 {
 	// 프로세서 사용률을 갱신
 	// FILETIME 구조체를 사용하지만 ULARGE_INTEGER와 구조가 같으므로 이를 사용
@@ -132,19 +132,19 @@ void CMonitor::UpdateCpuTime()
 	m_ftProcess_LastUser = user;
 }
 
-void CMonitor::UpdateServer()
+void CMonitor::UpdateServer() noexcept
 {
 	InterlockedExchange(&m_lAcceptTPS, 0);
 	InterlockedExchange(&m_lRecvTPS, 0);
 	InterlockedExchange(&m_lSendTPS, 0);
 }
 
-void CMonitor::UpdateMemory()
+void CMonitor::UpdateMemory() noexcept
 {
 	GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS *)&m_stPmc, sizeof(m_stPmc));
 }
 
-void CMonitor::UpdatePDH()
+void CMonitor::UpdatePDH() noexcept
 {
 	PdhCollectQueryData(m_ProcessNPMemoryQuery);
 	PdhCollectQueryData(m_SystemNPMemoryQuery);
@@ -155,7 +155,7 @@ void CMonitor::UpdatePDH()
 	PdhGetFormattedCounterValue(m_SystemAvailableMemoryCounter, PDH_FMT_LARGE, NULL, &m_SystemAvailableMemoryVal);
 }
 
-void CMonitor::MonitoringConsole(INT sessionCount, INT playerCount)
+void CMonitor::MonitoringConsole(INT sessionCount, INT playerCount) noexcept
 {
 	// Cpu Usage
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"----------------------------------------");

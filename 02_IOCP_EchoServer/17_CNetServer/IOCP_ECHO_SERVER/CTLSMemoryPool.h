@@ -9,13 +9,13 @@ public:
 	friend class CTLSMemoryPoolManager<DATA, bucketSize, bucketCount, UseQueue>;
 
 private:
-	CTLSMemoryPool(CTLSSharedMemoryPool<DATA, bucketSize, bucketCount, UseQueue> *sharedPool) : m_pTLSSharedMemoryPool(sharedPool)
+	CTLSMemoryPool(CTLSSharedMemoryPool<DATA, bucketSize, bucketCount, UseQueue> *sharedPool) noexcept : m_pTLSSharedMemoryPool(sharedPool)
 	{
 		m_MyBucket = Bucket<DATA, bucketSize, bucketCount>::GetTLSBucket();
 		m_FreeBucket = Bucket<DATA, bucketSize, bucketCount>::GetFreeBucket();
 	}
 
-	~CTLSMemoryPool()
+	~CTLSMemoryPool() noexcept
 	{
 
 	}
@@ -152,12 +152,12 @@ public:
 		m_arrTLSMemoryPools[tlsIndex]->Free(freePtr);
 	}
 
-	LONG GetCapacity()
+	LONG GetCapacity() noexcept
 	{
 		return m_TLSSharedMemoryPool.GetCapacity();
 	}
 
-	LONG GetUseCount()
+	LONG GetUseCount() const noexcept
 	{
 		LONG usedSize = 0;
 		for (int i = 1; i <= m_iTLSMemoryPoolsCurrentSize; i++)

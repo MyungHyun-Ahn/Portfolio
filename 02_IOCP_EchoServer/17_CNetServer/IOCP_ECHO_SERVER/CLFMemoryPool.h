@@ -9,7 +9,7 @@ struct MemoryPoolNode
 #ifdef SAFE_MODE
 	void *poolPtr;
 #endif
-	MemoryPoolNode() = default;
+	MemoryPoolNode() noexcept = default;
 
 	DATA data;
 	ULONG_PTR next;
@@ -27,7 +27,7 @@ class CLFMemoryPool
 public:
 	// 이 부분은 싱글 스레드에서 진행
 	// - 다른 스레드가 생성되고는 절대 초기화를 진행하면 안됨
-	__forceinline CLFMemoryPool(int initCount, bool placementNewFlag)
+	__forceinline CLFMemoryPool(int initCount, bool placementNewFlag) noexcept
 		: m_iCapacity(0), m_bPlacementNewFlag(placementNewFlag)
 	{
 		// initCount 만큼 FreeList 할당
@@ -51,7 +51,7 @@ public:
 	}
 
 	// 다른 스레드가 모두 해제된 이후에 진행됨
-	__forceinline ~CLFMemoryPool()
+	__forceinline ~CLFMemoryPool() noexcept
 	{
 		// FreeList에 있는 것 삭제
 		while (m_pTop != NULL)
@@ -69,7 +69,7 @@ public:
 	}
 
 	// Pop 행동
-	DATA *Alloc()
+	DATA *Alloc() noexcept
 	{
 		Node *node;
 
@@ -126,7 +126,7 @@ public:
 	}
 
 	// 스택으로 치면 Push 행동
-	void Free(DATA *ptr)
+	void Free(DATA *ptr) noexcept
 	{
 #ifdef SAFE_MODE
 		unsigned __int64 intPtr = (__int64)ptr;
@@ -164,7 +164,7 @@ public:
 	}
 
 private:
-	__forceinline Node *PlacementNewAlloc()
+	__forceinline Node *PlacementNewAlloc() noexcept
 	{
 		Node *mallocNode = (Node *)malloc(sizeof(Node));
 		Node *newNode = new (mallocNode) Node;
@@ -175,7 +175,7 @@ private:
 		return newNode;
 	}
 
-	__forceinline Node *NewAlloc()
+	__forceinline Node *NewAlloc() noexcept
 	{
 		Node *newNode = new Node;
 #ifdef SAFE_MODE
@@ -186,8 +186,8 @@ private:
 	}
 
 public:
-	inline LONG GetCapacity() { return m_iCapacity; }
-	inline LONG GetUseCount() { return m_iUseCount; }
+	inline LONG GetCapacity() const noexcept { return m_iCapacity; }
+	inline LONG GetUseCount() const noexcept { return m_iUseCount; }
 
 private:
 	bool		m_bPlacementNewFlag;

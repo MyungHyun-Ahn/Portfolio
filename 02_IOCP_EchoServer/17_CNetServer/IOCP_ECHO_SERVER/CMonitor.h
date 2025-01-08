@@ -2,15 +2,15 @@
 class CMonitor
 {
 public:
-	CMonitor(HANDLE hProcess = INVALID_HANDLE_VALUE);
+	CMonitor(HANDLE hProcess = INVALID_HANDLE_VALUE) noexcept;
 
-	void Update(INT sessionCount, INT playerCount);
-	void UpdateCpuTime();
-	void UpdateServer();
-	void UpdateMemory();
-	void UpdatePDH();
+	void Update(INT sessionCount, INT playerCount) noexcept;
+	void UpdateCpuTime() noexcept;
+	void UpdateServer() noexcept;
+	void UpdateMemory() noexcept;
+	void UpdatePDH() noexcept;
 
-	void MonitoringConsole(INT sessionCount, INT playerCount);
+	void MonitoringConsole(INT sessionCount, INT playerCount) noexcept;
 
 public:
 	// CPU 모니터링 정보

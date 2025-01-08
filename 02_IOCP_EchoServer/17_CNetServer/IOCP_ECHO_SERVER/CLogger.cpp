@@ -12,7 +12,7 @@ CLogger::~CLogger()
 {
 }
 
-void CLogger::WriteLog(const WCHAR *directory, const WCHAR *type, LOG_LEVEL logLevel, const WCHAR *fmt, ...)
+void CLogger::WriteLog(const WCHAR *directory, const WCHAR *type, LOG_LEVEL logLevel, const WCHAR *fmt, ...) noexcept
 {
 	if (m_LogLevel > logLevel)
 		return;
@@ -133,7 +133,7 @@ void CLogger::WriteLog(const WCHAR *directory, const WCHAR *type, LOG_LEVEL logL
 	ReleaseSRWLockExclusive(&srwLock);
 }
 
-void CLogger::WriteLogHex(const WCHAR *directory, const WCHAR *type, LOG_LEVEL logLevel, const WCHAR *logName, BYTE *pBytes, int byteLen)
+void CLogger::WriteLogHex(const WCHAR *directory, const WCHAR *type, LOG_LEVEL logLevel, const WCHAR *logName, BYTE *pBytes, int byteLen) noexcept
 {
 	int offset = 0;
 	WCHAR *messageBuf = new WCHAR[10000];
@@ -150,7 +150,7 @@ void CLogger::WriteLogHex(const WCHAR *directory, const WCHAR *type, LOG_LEVEL l
 	delete[] messageBuf;
 }
 
-void CLogger::WriteLogConsole(LOG_LEVEL logLevel, const WCHAR *fmt, ...)
+void CLogger::WriteLogConsole(LOG_LEVEL logLevel, const WCHAR *fmt, ...) noexcept
 {
 	if (m_LogLevel > logLevel)
 	{

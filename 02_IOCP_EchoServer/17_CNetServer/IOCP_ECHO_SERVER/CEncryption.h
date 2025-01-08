@@ -2,7 +2,7 @@
 class CEncryption
 {
 public:
-	static void Encoding(char *msg, int len, int randKey)
+	static void Encoding(char *msg, int len, int randKey) noexcept
 	{
 		char prevP = 0;
 		char prevE = 0;
@@ -16,7 +16,7 @@ public:
 		}
 	}
 
-	static void Decoding(char *msg, int len, int randKey)
+	static void Decoding(char *msg, int len, int randKey) noexcept
 	{
 		char prevP = 0;
 		char prevE = 0;
@@ -30,7 +30,7 @@ public:
 		}
 	}
 
-	static BYTE CalCheckSum(char *msg, int len)
+	static BYTE CalCheckSum(char *msg, int len) noexcept
 	{
 		int sum = 0;
 		for (int i = 0; i < len; i++)

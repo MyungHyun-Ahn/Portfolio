@@ -2,7 +2,7 @@
 #include "CLanSession.h"
 #include "CLanServer.h"
 
-void CLanSession::RecvCompleted(int size)
+void CLanSession::RecvCompleted(int size) noexcept
 {
     m_pRecvBuffer->MoveRear(size);
 
@@ -120,7 +120,7 @@ void CLanSession::RecvCompleted(int size)
 }
 
 // 인큐할 때 직렬화 버퍼의 포인터를 인큐
-bool CLanSession::SendPacket(CSerializableBuffer<TRUE> *message)
+bool CLanSession::SendPacket(CSerializableBuffer<TRUE> *message) noexcept
 {
     // 여기서 올라간 RefCount는 SendCompleted에서 내려감
     // 혹은 ReleaseSession
@@ -129,7 +129,7 @@ bool CLanSession::SendPacket(CSerializableBuffer<TRUE> *message)
     return TRUE;
 }
 
-void CLanSession::SendCompleted(int size)
+void CLanSession::SendCompleted(int size) noexcept
 {
     // m_SendBuffer.MoveFront(size);
 
@@ -164,7 +164,7 @@ void CLanSession::SendCompleted(int size)
     }
 }
 
-bool CLanSession::PostRecv()
+bool CLanSession::PostRecv() noexcept
 {
     int errVal;
     int retVal;
@@ -209,7 +209,7 @@ bool CLanSession::PostRecv()
     return TRUE;
 }
 
-bool CLanSession::PostSend(BOOL isCompleted)
+bool CLanSession::PostSend(BOOL isCompleted) noexcept
 {
     int errVal;
     int retVal;

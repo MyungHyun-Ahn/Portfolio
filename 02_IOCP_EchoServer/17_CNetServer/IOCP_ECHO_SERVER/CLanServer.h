@@ -4,41 +4,41 @@ class CLanSession;
 class CLanServer
 {
 public:
-	BOOL Start(const CHAR *openIP, const USHORT port, USHORT createWorkerThreadCount, USHORT maxWorkerThreadCount, INT maxSessionCount);
-	// void Stop();
+	BOOL Start(const CHAR *openIP, const USHORT port, USHORT createWorkerThreadCount, USHORT maxWorkerThreadCount, INT maxSessionCount) noexcept;
+	// void Stop() noexcept;
 
-	inline LONG GetSessionCount() { return m_iSessionCount; }
+	inline LONG GetSessionCount() const noexcept { return m_iSessionCount; }
 
-	void SendPacket(const UINT64 sessionID, CSerializableBuffer<TRUE> *sBuffer);
-	BOOL Disconnect(const UINT64 sessionID);
-	BOOL ReleaseSession(CLanSession *pSession);
+	void SendPacket(const UINT64 sessionID, CSerializableBuffer<TRUE> *sBuffer) noexcept;
+	BOOL Disconnect(const UINT64 sessionID) noexcept;
+	BOOL ReleaseSession(CLanSession *pSession) noexcept;
 
-	virtual bool OnConnectionRequest(const WCHAR *ip, USHORT port) = 0;
-	virtual void OnAccept(const UINT64 sessionID) = 0;
-	virtual void OnClientLeave(const UINT64 sessionID) = 0;
-	virtual void OnRecv(const UINT64 sessionID, CSerializableBufferView<TRUE> *message) = 0;
-	virtual void OnRecv(const UINT64 sessionID, CSmartPtr<CSerializableBufferView<TRUE>> message) = 0;
-	virtual void OnError(int errorcode, WCHAR *errMsg) = 0;
+	virtual bool OnConnectionRequest(const WCHAR *ip, USHORT port) noexcept = 0;
+	virtual void OnAccept(const UINT64 sessionID) noexcept = 0;
+	virtual void OnClientLeave(const UINT64 sessionID) noexcept = 0;
+	virtual void OnRecv(const UINT64 sessionID, CSerializableBufferView<TRUE> *message) noexcept = 0;
+	virtual void OnRecv(const UINT64 sessionID, CSmartPtr<CSerializableBufferView<TRUE>> message) noexcept = 0;
+	virtual void OnError(int errorcode, WCHAR *errMsg) noexcept = 0;
 
-	void FristPostAcceptEx();
-	BOOL PostAcceptEx(INT index);
-	BOOL AcceptExCompleted(CLanSession *pSession);
+	void FristPostAcceptEx() noexcept;
+	BOOL PostAcceptEx(INT index) noexcept;
+	BOOL AcceptExCompleted(CLanSession *pSession) noexcept;
 
 private:
-	inline static USHORT GetIndex(UINT64 sessionId)
+	inline static USHORT GetIndex(UINT64 sessionId) noexcept
 	{
 		UINT64 mask64 = sessionId & SESSION_INDEX_MASK;
 		mask64 = mask64 >> 48;
 		return (USHORT)mask64;
 	}
 
-	inline static UINT64 GetId(UINT64 sessionId)
+	inline static UINT64 GetId(UINT64 sessionId) noexcept
 	{
 		UINT64 mask64 = sessionId & SESSION_ID_MASK;
 		return mask64;
 	}
 
-	inline static UINT64 CombineIndex(USHORT index, UINT64 id)
+	inline static UINT64 CombineIndex(USHORT index, UINT64 id) noexcept
 	{
 		UINT64 index64 = index;
 		index64 = index64 << 48;
@@ -46,11 +46,11 @@ private:
 	}
 
 public:
-	int WorkerThread();
-	int PostAcceptThread();
+	int WorkerThread() noexcept;
+	int PostAcceptThread() noexcept;
 
-	void PostAcceptAPCEnqueue(INT index);
-	static void PostAcceptAPCFunc(ULONG_PTR lpParam);
+	void PostAcceptAPCEnqueue(INT index) noexcept;
+	static void PostAcceptAPCFunc(ULONG_PTR lpParam) noexcept;
 
 private:
 	// Session

@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "CRecvBuffer.h"
 
-int CRecvBuffer::Peek(char *buffer, int size)
+int CRecvBuffer::Peek(char *buffer, int size) noexcept
 {
 	if (GetUseSize() < size) {
 		return -1;
@@ -11,7 +11,7 @@ int CRecvBuffer::Peek(char *buffer, int size)
 	return size;
 }
 
-int CRecvBuffer::Peek(char *buffer, int size, int offset)
+int CRecvBuffer::Peek(char *buffer, int size, int offset) noexcept
 {
 	if (GetUseSize(offset) < size) {
 		return -1;

@@ -4,7 +4,7 @@ class CNetSession
 public:
 	friend class CNetServer;
 
-	CNetSession()
+	CNetSession() noexcept
 		: m_sSessionSocket(INVALID_SOCKET)
 		, m_uiSessionID(0)
 		, m_AcceptExOverlapped(IOOperation::ACCEPTEX)
@@ -14,7 +14,7 @@ public:
 
 	}
 
-	CNetSession(SOCKET socket, UINT64 sessionID)
+	CNetSession(SOCKET socket, UINT64 sessionID) noexcept
 		: m_sSessionSocket(socket)
 		, m_uiSessionID(sessionID)
 		, m_AcceptExOverlapped(IOOperation::ACCEPTEX)
@@ -24,24 +24,24 @@ public:
 
 	}
 
-	~CNetSession()
+	~CNetSession() noexcept
 	{
 	}
 
-	void Init(UINT64 sessionID)
+	void Init(UINT64 sessionID) noexcept
 	{
 		m_uiSessionID = sessionID;
 		m_iSendFlag = FALSE;
 	}
 
-	void Init(SOCKET socket, UINT64 sessionID)
+	void Init(SOCKET socket, UINT64 sessionID) noexcept
 	{
 		m_sSessionSocket = socket;
 		m_uiSessionID = sessionID;
 		m_iSendFlag = FALSE;
 	}
 
-	void Clear()
+	void Clear() noexcept
 	{
 		// ReleaseSession 당시에 남아있는 send 링버퍼를 확인
 		// * 남아있는 경우가 확인됨
@@ -94,29 +94,29 @@ public:
 		m_pRecvBuffer = nullptr;
 	}
 
-	void RecvCompleted(int size);
+	void RecvCompleted(int size) noexcept;
 
-	bool SendPacket(CSerializableBuffer<FALSE> *message);
-	void SendCompleted(int size);
+	bool SendPacket(CSerializableBuffer<FALSE> *message) noexcept;
+	void SendCompleted(int size) noexcept;
 
-	bool PostRecv();
-	bool PostSend(BOOL isCompleted = FALSE);
+	bool PostRecv() noexcept;
+	bool PostSend(BOOL isCompleted = FALSE) noexcept;
 
 public:
-	inline static CNetSession *Alloc()
+	inline static CNetSession *Alloc() noexcept
 	{
 		CNetSession *pSession = s_sSessionPool.Alloc();
 		return pSession;
 	}
 
-	inline static void Free(CNetSession *delSession)
+	inline static void Free(CNetSession *delSession) noexcept
 	{
 		delSession->Clear();
 		s_sSessionPool.Free(delSession);
 	}
 
-	inline static LONG GetPoolCapacity() { return s_sSessionPool.GetCapacity(); }
-	inline static LONG GetPoolUsage() { return s_sSessionPool.GetUseCount(); }
+	inline static LONG GetPoolCapacity() noexcept { return s_sSessionPool.GetCapacity(); }
+	inline static LONG GetPoolUsage() noexcept { return s_sSessionPool.GetUseCount(); }
 
 private:
 	LONG m_iIOCountAndRelease = RELEASE_FLAG;

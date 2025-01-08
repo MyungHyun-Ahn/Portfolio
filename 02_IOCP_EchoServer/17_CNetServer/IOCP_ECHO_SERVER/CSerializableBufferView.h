@@ -5,8 +5,8 @@ template<bool isLanServer>
 class CSerializableBufferView
 {
 public:
-	CSerializableBufferView() = default;
-	virtual ~CSerializableBufferView() = default;
+	CSerializableBufferView() noexcept = default;
+	virtual ~CSerializableBufferView() noexcept = default;
 
 
 private:
@@ -14,7 +14,7 @@ private:
 	friend class CNetSession;
 
 	// 오프셋 시작과 끝을 받음
-	inline void Init(CSmartPtr<CRecvBuffer> spRecvBuffer, int offsetStart, int offsetEnd)
+	inline void Init(CSmartPtr<CRecvBuffer> spRecvBuffer, int offsetStart, int offsetEnd) noexcept
 	{
 		m_spRecvBuffer = spRecvBuffer;
 		m_pBuffer = m_spRecvBuffer->GetOffsetPtr(offsetStart);
@@ -26,7 +26,7 @@ private:
 	}
 
 	// 이거 하고서는 Copy를 꼭 해줘야함
-	inline void InitAndAlloc(int size)
+	inline void InitAndAlloc(int size) noexcept
 	{
 		m_pBuffer = new char[size];
 		m_iBufferSize = size;
@@ -36,7 +36,7 @@ private:
 		m_iReadHeaderSize = 0;
 	}
 
-	inline void Clear()
+	inline void Clear() noexcept
 	{
 		m_iReadHeaderSize = 0;
 		if (m_spRecvBuffer.GetRealPtr() != nullptr)
@@ -51,7 +51,7 @@ private:
 		}
 	}
 	// 이걸 보고 헤더가 딜레이 된 것이라면 지연처리 작업
-	inline USHORT isReadHeaderSize()
+	inline USHORT isReadHeaderSize() noexcept
 	{
 		return m_iReadHeaderSize;
 	}
@@ -59,34 +59,34 @@ private:
 
 
 	// 오프셋부터 쓰는 용도
-	bool Copy(char *buffer, int offset, int size);
+	bool Copy(char *buffer, int offset, int size) noexcept;
 	// 뒤로 이어서 쓰는 용도
-	bool Copy(char *buffer, int size);
+	bool Copy(char *buffer, int size) noexcept;
 
-	bool GetHeader(char *buffer, int size);
+	bool GetHeader(char *buffer, int size) noexcept;
 
-	inline int GetDataSize() const { return m_Rear - m_Front; }
-	inline int GetHeaderSize() const { return  (int)CSerializableBuffer<isLanServer>::DEFINE::HEADER_SIZE; }
-	inline int GetFullSize() const { return GetDataSize() + GetHeaderSize(); }
+	inline int GetDataSize() const noexcept { return m_Rear - m_Front; }
+	inline int GetHeaderSize() const noexcept { return  (int)CSerializableBuffer<isLanServer>::DEFINE::HEADER_SIZE; }
+	inline int GetFullSize() const noexcept { return GetDataSize() + GetHeaderSize(); }
 
 	// 외부에서 버퍼를 직접 조작하기 위한 용도
-	inline char *GetBufferPtr() { return m_pBuffer; }
-	inline char *GetContentBufferPtr() { return m_pBuffer + m_Front; }
-	inline int MoveWritePos(int size) { m_Rear += size; return m_Rear; }
+	inline char *GetBufferPtr() const noexcept { return m_pBuffer; }
+	inline char *GetContentBufferPtr() const noexcept { return m_pBuffer + m_Front; }
+	inline int MoveWritePos(int size) noexcept { m_Rear += size; return m_Rear; }
 	inline int MoveReadPos(int size) { m_Front += size; return m_Front; }
 
 	// delayedHeader에 쓴다.
-	bool WriteDelayedHeader(char *buffer, int size);
-	bool GetDelayedHeader(char *buffer, int size);
+	bool WriteDelayedHeader(char *buffer, int size) noexcept;
+	bool GetDelayedHeader(char *buffer, int size) noexcept;
 
-	inline static CSerializableBufferView *Alloc()
+	inline static CSerializableBufferView *Alloc() noexcept
 	{
 		CSerializableBufferView *pSBuffer = s_sbufferPool.Alloc();
 		return pSBuffer;
 	}
 
 public:
-	inline static void Free(CSerializableBufferView *delSBuffer)
+	inline static void Free(CSerializableBufferView *delSBuffer) noexcept
 	{
 		// 직접 할당 받은 버퍼가 아니라면 recv 버퍼는 nullptr이 아님
 		delSBuffer->Clear();
@@ -96,10 +96,10 @@ public:
 
 	// operator
 public:
-	bool Dequeue(char *buffer, int size);
+	bool Dequeue(char *buffer, int size) noexcept;
 
 	// 데이터 넣는 건 필요 없음
-	inline CSerializableBufferView &operator>>(char &chData)
+	inline CSerializableBufferView &operator>>(char &chData) noexcept
 	{
 		if (GetDataSize() < sizeof(char))
 		{
@@ -112,7 +112,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBufferView &operator>>(unsigned char &byData)
+	inline CSerializableBufferView &operator>>(unsigned char &byData) noexcept
 	{
 		if (GetDataSize() < sizeof(unsigned char))
 		{
@@ -125,7 +125,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBufferView &operator>>(short &shData)
+	inline CSerializableBufferView &operator>>(short &shData) noexcept
 	{
 		if (GetDataSize() < sizeof(short))
 		{
@@ -138,7 +138,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBufferView &operator>>(unsigned short &wData)
+	inline CSerializableBufferView &operator>>(unsigned short &wData) noexcept
 	{
 		if (GetDataSize() < sizeof(char))
 		{
@@ -151,7 +151,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBufferView &operator>>(int &iData)
+	inline CSerializableBufferView &operator>>(int &iData) noexcept
 	{
 		if (GetDataSize() < sizeof(int))
 		{
@@ -164,7 +164,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBufferView &operator>>(long &lData)
+	inline CSerializableBufferView &operator>>(long &lData) noexcept
 	{
 		if (GetDataSize() < sizeof(long))
 		{
@@ -177,7 +177,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBufferView &operator>>(unsigned long &ulData)
+	inline CSerializableBufferView &operator>>(unsigned long &ulData) noexcept
 	{
 		if (GetDataSize() < sizeof(unsigned long))
 		{
@@ -190,7 +190,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBufferView &operator>>(float &fData)
+	inline CSerializableBufferView &operator>>(float &fData) noexcept
 	{
 		if (GetDataSize() < sizeof(float))
 		{
@@ -203,7 +203,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBufferView &operator>>(__int64 &iData)
+	inline CSerializableBufferView &operator>>(__int64 &iData) noexcept
 	{
 		int size = GetDataSize();
 		if (size < sizeof(__int64))
@@ -217,7 +217,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBufferView &operator>>(unsigned __int64 &uiData)
+	inline CSerializableBufferView &operator>>(unsigned __int64 &uiData) noexcept
 	{
 		if (GetDataSize() < sizeof(unsigned __int64))
 		{
@@ -230,7 +230,7 @@ public:
 		return *this;
 	}
 
-	inline CSerializableBufferView &operator>>(double &dData)
+	inline CSerializableBufferView &operator>>(double &dData) noexcept
 	{
 		if (GetDataSize() < sizeof(double))
 		{
@@ -243,11 +243,11 @@ public:
 		return *this;
 	}
 
-	inline static LONG GetPoolCapacity() { return s_sbufferPool.GetCapacity(); }
-	inline static LONG GetPoolUsage() { return s_sbufferPool.GetUseCount(); }
+	inline static LONG GetPoolCapacity() noexcept { return s_sbufferPool.GetCapacity(); }
+	inline static LONG GetPoolUsage() noexcept { return s_sbufferPool.GetUseCount(); }
 
-	inline LONG IncreaseRef() { return InterlockedIncrement(&m_iRefCount); }
-	inline LONG DecreaseRef() { return InterlockedDecrement(&m_iRefCount); }
+	inline LONG IncreaseRef() noexcept { return InterlockedIncrement(&m_iRefCount); }
+	inline LONG DecreaseRef() noexcept { return InterlockedDecrement(&m_iRefCount); }
 
 
 private:
@@ -269,7 +269,7 @@ private:
 
 // offset은 거의 0만 쓸 듯?
 template<bool isLanServer>
-bool CSerializableBufferView<isLanServer>::Copy(char *buffer, int offset, int size)
+bool CSerializableBufferView<isLanServer>::Copy(char *buffer, int offset, int size) noexcept
 {
 	if (m_iBufferSize - m_Rear < size)
 	{
@@ -288,7 +288,7 @@ bool CSerializableBufferView<isLanServer>::Copy(char *buffer, int offset, int si
 }
 
 template<bool isLanServer>
-bool CSerializableBufferView<isLanServer>::Copy(char *buffer, int size)
+bool CSerializableBufferView<isLanServer>::Copy(char *buffer, int size) noexcept
 {
 	if (m_iBufferSize - m_Rear < size)
 	{
@@ -307,7 +307,7 @@ bool CSerializableBufferView<isLanServer>::Copy(char *buffer, int size)
 }
 
 template<bool isLanServer>
-bool CSerializableBufferView<isLanServer>::Dequeue(char *buffer, int size)
+bool CSerializableBufferView<isLanServer>::Dequeue(char *buffer, int size) noexcept
 {
 	if (GetDataSize() < size)
 	{
@@ -321,7 +321,7 @@ bool CSerializableBufferView<isLanServer>::Dequeue(char *buffer, int size)
 }
 
 template<bool isLanServer>
-bool CSerializableBufferView<isLanServer>::GetHeader(char *buffer, int size)
+bool CSerializableBufferView<isLanServer>::GetHeader(char *buffer, int size) noexcept
 {
 	if (size < (int)CSerializableBuffer<isLanServer>::DEFINE::HEADER_SIZE)
 	{
@@ -334,7 +334,7 @@ bool CSerializableBufferView<isLanServer>::GetHeader(char *buffer, int size)
 }
 
 template<bool isLanServer>
-bool CSerializableBufferView<isLanServer>::WriteDelayedHeader(char *buffer, int size)
+bool CSerializableBufferView<isLanServer>::WriteDelayedHeader(char *buffer, int size) noexcept
 {
 	if (m_iReadHeaderSize + size > (int)CSerializableBuffer<isLanServer>::DEFINE::HEADER_SIZE)
 	{
@@ -347,7 +347,7 @@ bool CSerializableBufferView<isLanServer>::WriteDelayedHeader(char *buffer, int 
 }
 
 template<bool isLanServer>
-bool CSerializableBufferView<isLanServer>::GetDelayedHeader(char *buffer, int size)
+bool CSerializableBufferView<isLanServer>::GetDelayedHeader(char *buffer, int size) noexcept
 {
 	if (size < m_iReadHeaderSize)
 	{
