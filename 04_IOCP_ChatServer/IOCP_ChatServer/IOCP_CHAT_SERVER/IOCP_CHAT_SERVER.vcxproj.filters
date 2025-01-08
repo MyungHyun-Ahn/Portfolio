@@ -42,9 +42,6 @@
     <ClInclude Include="DefineServer.h">
       <Filter>Network</Filter>
     </ClInclude>
-    <ClInclude Include="CEchoServer.h">
-      <Filter>Content</Filter>
-    </ClInclude>
     <ClInclude Include="CMonitor.h">
       <Filter>Tools</Filter>
     </ClInclude>
@@ -99,6 +96,9 @@
     <ClInclude Include="CNetSession.h">
       <Filter>Network\Net</Filter>
     </ClInclude>
+    <ClInclude Include="CChatServer.h">
+      <Filter>Content</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -112,9 +112,6 @@
     </ClCompile>
     <ClCompile Include="CLogger.cpp">
       <Filter>Tools</Filter>
-    </ClCompile>
-    <ClCompile Include="CEchoServer.cpp">
-      <Filter>Content</Filter>
     </ClCompile>
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="CMonitor.cpp">
@@ -167,6 +164,9 @@
     </ClCompile>
     <ClCompile Include="CNetSession.cpp">
       <Filter>Network\Net</Filter>
+    </ClCompile>
+    <ClCompile Include="CChatServer.cpp">
+      <Filter>Content</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

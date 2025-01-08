@@ -24,7 +24,7 @@
     <ProjectGuid>{fb05af3b-4227-4b8f-996d-91a26222df5f}</ProjectGuid>
     <RootNamespace>IOCPECHOLOCK</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>IOCP_ECHO_SERVER</ProjectName>
+    <ProjectName>IOCP_CHAT_SERVER</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -146,8 +146,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="CChatServer.h" />
     <ClInclude Include="CCrashDump.h" />
-    <ClInclude Include="CEchoServer.h" />
     <ClInclude Include="CEncryption.h" />
     <ClInclude Include="CLanServer.h" />
     <ClInclude Include="CLFMemoryPool.h" />
@@ -173,8 +173,8 @@
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CChatServer.cpp" />
     <ClCompile Include="CCrashDump.cpp" />
-    <ClCompile Include="CEchoServer.cpp" />
     <ClCompile Include="CEncryption.cpp" />
     <ClCompile Include="CLanServer.cpp" />
     <ClCompile Include="CLFMemoryPool.cpp" />

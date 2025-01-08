@@ -441,7 +441,7 @@ int CNetServer::PostAcceptThread() noexcept
 	{
 		// Update
 		// -> 여기서 Update 로직 수행
-		// -> virtual 함수로 OnUpdate 같은 거 만들어서
+		// -> 반환값은 프레임 제어를 위해 
 		DWORD sleepTime = OnUpdate();
 
 		// Heartbeat
