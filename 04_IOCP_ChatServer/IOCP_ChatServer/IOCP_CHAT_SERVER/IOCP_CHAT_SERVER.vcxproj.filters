@@ -99,6 +99,21 @@
     <ClInclude Include="CChatServer.h">
       <Filter>Content</Filter>
     </ClInclude>
+    <ClInclude Include="CPlayer.h">
+      <Filter>Content</Filter>
+    </ClInclude>
+    <ClInclude Include="CommonProtocol.h">
+      <Filter>Content</Filter>
+    </ClInclude>
+    <ClInclude Include="CProcessPacket.h">
+      <Filter>Content</Filter>
+    </ClInclude>
+    <ClInclude Include="CSector.h">
+      <Filter>Content</Filter>
+    </ClInclude>
+    <ClInclude Include="CGenPacket.h">
+      <Filter>Content</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -166,6 +181,18 @@
       <Filter>Network\Net</Filter>
     </ClCompile>
     <ClCompile Include="CChatServer.cpp">
+      <Filter>Content</Filter>
+    </ClCompile>
+    <ClCompile Include="CPlayer.cpp">
+      <Filter>Content</Filter>
+    </ClCompile>
+    <ClCompile Include="CProcessPacket.cpp">
+      <Filter>Content</Filter>
+    </ClCompile>
+    <ClCompile Include="CSector.cpp">
+      <Filter>Content</Filter>
+    </ClCompile>
+    <ClCompile Include="CGenPacket.cpp">
       <Filter>Content</Filter>
     </ClCompile>
   </ItemGroup>

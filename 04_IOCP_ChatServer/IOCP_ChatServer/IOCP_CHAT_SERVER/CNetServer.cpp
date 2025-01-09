@@ -9,9 +9,9 @@ unsigned int NetWorkerThreadFunc(LPVOID lpParam) noexcept
 	return g_NetServer->WorkerThread();
 }
 
-unsigned int NetPostAcceptThreadFunc(LPVOID lpParam) noexcept
+unsigned int NetServerFrameThreadFunc(LPVOID lpParam) noexcept
 {
-	return g_NetServer->PostAcceptThread();
+	return g_NetServer->ServerFrameThread();
 }
 
 BOOL CNetServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorkerThreadCount, USHORT maxWorkerThreadCount, INT maxSessionCount) noexcept
@@ -119,8 +119,8 @@ BOOL CNetServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	}
 
 	// CreatePostAcceptExThread
-	m_hPostAcceptExThread = (HANDLE)_beginthreadex(nullptr, 0, NetPostAcceptThreadFunc, nullptr, 0, nullptr);
-	if (m_hPostAcceptExThread == 0)
+	m_hServerFrameThread = (HANDLE)_beginthreadex(nullptr, 0, NetServerFrameThreadFunc, nullptr, 0, nullptr);
+	if (m_hServerFrameThread == 0)
 	{
 		errVal = GetLastError();
 		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"PostAcceptExThread running fail.. : %d", errVal);
@@ -223,8 +223,12 @@ BOOL CNetServer::ReleaseSession(CNetSession *pSession) noexcept
 	USHORT index = GetIndex(pSession->m_uiSessionID);
 	m_arrPSessions[index] = nullptr;
 	closesocket(pSession->m_sSessionSocket);
+	UINT64 freeSessionId = pSession->m_uiSessionID;
 	CNetSession::Free(pSession);
 	InterlockedDecrement(&m_iSessionCount);
+
+	ClientLeaveAPCEnqueue(freeSessionId);
+	// OnClientLeave(freeSessionId);
 
 	m_stackDisconnectIndex.Push(index);
 
@@ -321,7 +325,7 @@ BOOL CNetServer::AcceptExCompleted(CNetSession *pSession) noexcept
 		return FALSE;
 	}
 
-	UINT64 combineId = CNetServer::CombineIndex(index, ++m_iCurrentID);
+	UINT64 combineId = CNetServer::CombineIndex(index, InterlockedIncrement64(&m_iCurrentID));
 
 	pSession->Init(combineId);
 
@@ -385,23 +389,20 @@ int CNetServer::WorkerThread() noexcept
 				if (!AcceptExCompleted(pSession))
 				{
 					// 실패한 인덱스에 대한 예약은 다시 걸어줌
-					PostAcceptAPCEnqueue(index);
+					AcceptAPCEnqueue(index, 0);
 					break;
 				}
 
 				InterlockedIncrement(&pSession->m_iIOCountAndRelease);
 
 				// OnAccept 처리는 여기서
-				OnAccept(pSession->m_uiSessionID);
+				AcceptAPCEnqueue(index, pSession->m_uiSessionID);
 
 				// 해당 세션에 대해 Recv 예약
 				pSession->PostRecv();
 
 				if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 					ReleaseSession(pSession);
-
-				// 해제된 인덱스에 다시 AcceptEx를 검
-				PostAcceptAPCEnqueue(index);
 			}
 			break;
 			case IOOperation::RECV:
@@ -429,7 +430,7 @@ int CNetServer::WorkerThread() noexcept
 	return 0;
 }
 
-int CNetServer::PostAcceptThread() noexcept
+int CNetServer::ServerFrameThread() noexcept
 {
 	// IOCP의 병행성 관리를 받기 위한 GQCS
 	GetQueuedCompletionStatus(m_hIOCPHandle, nullptr, nullptr, nullptr, 0);
@@ -437,7 +438,7 @@ int CNetServer::PostAcceptThread() noexcept
 	// 등록한 수만큼 AcceptEx 예약
 	FristPostAcceptEx();
 
-	while (m_bIsPostAcceptExRun)
+	while (m_bIsServerFrameRun)
 	{
 		// Update
 		// -> 여기서 Update 로직 수행
@@ -456,14 +457,14 @@ int CNetServer::PostAcceptThread() noexcept
 	return 0;
 }
 
-void CNetServer::PostAcceptAPCEnqueue(INT index) noexcept
+void CNetServer::AcceptAPCEnqueue(INT index, UINT64 sessionId) noexcept
 {
 	int retVal;
 	int errVal;
 
 	m_stackFreeAcceptExIndex.Push(index);
 
-	retVal = QueueUserAPC(PostAcceptAPCFunc, m_hPostAcceptExThread, (ULONG_PTR)this);
+	retVal = QueueUserAPC(AcceptAPCFunc, m_hServerFrameThread, (ULONG_PTR)sessionId);
 	if (retVal == FALSE)
 	{
 		errVal = GetLastError();
@@ -471,14 +472,36 @@ void CNetServer::PostAcceptAPCEnqueue(INT index) noexcept
 	}
 }
 
-void CNetServer::PostAcceptAPCFunc(ULONG_PTR lpParam) noexcept
+// lpParam에는 SessionId가 넘어옴
+void CNetServer::AcceptAPCFunc(ULONG_PTR lpParam) noexcept
 {
-	CNetServer *pServer = (CNetServer *)lpParam;
+	// OnAccept 호출
+	if (lpParam != 0)
+		g_NetServer->OnAccept(lpParam);
 
-	// 스택이 빌때까지 반복
+	// AcceptEx 작업
 	USHORT index;
-	while (pServer->m_stackFreeAcceptExIndex.Pop(&index))
+	while (g_NetServer->m_stackFreeAcceptExIndex.Pop(&index))
 	{
-		pServer->PostAcceptEx(index);
+		g_NetServer->PostAcceptEx(index);
 	}
+}
+
+void CNetServer::ClientLeaveAPCEnqueue(UINT64 sessionId) noexcept
+{
+	int retVal;
+	int errVal;
+
+	retVal = QueueUserAPC(ClientLeaveAPCFunc, m_hServerFrameThread, (ULONG_PTR)sessionId);
+	if (retVal == FALSE)
+	{
+		errVal = GetLastError();
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"QueueUserAPC() 실패 : %d", errVal);
+	}
+}
+
+// lpParam에는 SessionId가 넘어옴
+void CNetServer::ClientLeaveAPCFunc(ULONG_PTR lpParam) noexcept
+{
+	g_NetServer->OnClientLeave(lpParam);
 }

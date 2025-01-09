@@ -51,18 +51,21 @@ private:
 
 public:
 	int WorkerThread() noexcept;
-	int PostAcceptThread() noexcept;
+	int ServerFrameThread() noexcept;
 
-	void PostAcceptAPCEnqueue(INT index) noexcept;
-	static void PostAcceptAPCFunc(ULONG_PTR lpParam) noexcept;
+	void AcceptAPCEnqueue(INT index, UINT64 sessionId) noexcept;
+	static void AcceptAPCFunc(ULONG_PTR lpParam) noexcept;
+
+	void ClientLeaveAPCEnqueue(UINT64 sessionId) noexcept;
+	static void ClientLeaveAPCFunc(ULONG_PTR lpParam) noexcept;
 
 private:
 	// Session
 	LONG					m_iSessionCount = 0;
-	INT						m_iCurrentID = 0;
+	LONG64					m_iCurrentID = 0;
 
 	USHORT					m_usMaxSessionCount = 65535;
-	CNetSession *m_arrPSessions[65535];
+	CNetSession				*m_arrPSessions[65535];
 	CLFStack<USHORT>		m_stackDisconnectIndex;
 
 	// Worker
@@ -78,9 +81,9 @@ private:
 	LPFN_GETACCEPTEXSOCKADDRS		m_lpfnGetAcceptExSockaddrs = NULL;
 	GUID							m_guidGetAcceptExSockaddrs = WSAID_GETACCEPTEXSOCKADDRS;
 
-	HANDLE				m_hPostAcceptExThread;
-	BOOL				m_bIsPostAcceptExRun = TRUE;
-	CNetSession *m_arrAcceptExSessions[ACCEPTEX_COUNT];
+	HANDLE				m_hServerFrameThread;
+	BOOL				m_bIsServerFrameRun = TRUE;
+	CNetSession			*m_arrAcceptExSessions[ACCEPTEX_COUNT];
 	CLFStack<USHORT>    m_stackFreeAcceptExIndex;
 
 	// IOCP วฺต้

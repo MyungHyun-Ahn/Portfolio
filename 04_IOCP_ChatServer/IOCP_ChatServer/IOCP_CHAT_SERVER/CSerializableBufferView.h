@@ -94,6 +94,8 @@ public:
 		s_sbufferPool.Free(delSBuffer);
 	}
 
+	inline UINT64 GetSessionID() const noexcept { return m_uiSessionId; }
+
 	// operator
 public:
 	bool Dequeue(char *buffer, int size) noexcept;
@@ -262,6 +264,7 @@ private:
 	USHORT m_iReadHeaderSize = 0;
 
 	LONG			m_iRefCount = 0;
+	UINT64			m_uiSessionId = 0;
 
 	// inline static CLFMemoryPool<CSerializableBufferView> s_sbufferPool = CLFMemoryPool<CSerializableBufferView>(5000, false);
 	inline static CTLSMemoryPoolManager<CSerializableBufferView, 8, 8> s_sbufferPool = CTLSMemoryPoolManager<CSerializableBufferView, 8, 8>();

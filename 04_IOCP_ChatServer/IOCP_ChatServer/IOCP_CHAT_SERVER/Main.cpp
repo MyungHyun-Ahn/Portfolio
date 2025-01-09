@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "CNetServer.h"
 #include "CNetSession.h"
+#include "CPlayer.h"
+#include "CSector.h"
 #include "CChatServer.h"
 
 BOOL monitorThreadRunning = TRUE;

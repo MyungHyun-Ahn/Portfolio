@@ -41,15 +41,8 @@ void CNetSession::RecvCompleted(int size) noexcept
 		// code 다른게 오면 끊음
 		if (header.code != 0)
 		{
-			m_pDelayedBuffer->IncreaseRef();
-			// m_pDelayedBuffer의 삭제
-			// OnRecv에서 RefCount 조작을 시작함 -> 여기서 걸렸다면 Ref는 0일 것임
-			// 올렸다 내려서 지워도 되는지 확인
-			if (m_pDelayedBuffer->DecreaseRef() == 0)
-			{
-				CSerializableBufferView<FALSE>::Free(m_pDelayedBuffer);
-				m_pDelayedBuffer = nullptr;
-			}
+			CSerializableBufferView<FALSE>::Free(m_pDelayedBuffer);
+			m_pDelayedBuffer = nullptr;
 
 			// 여기서 끊는게 맞음?
 			g_NetServer->Disconnect(m_uiSessionID);
@@ -89,7 +82,8 @@ void CNetSession::RecvCompleted(int size) noexcept
 				return;
 			}
 
-			g_NetServer->OnRecv(m_uiSessionID, CSmartPtr<CSerializableBufferView<FALSE>>(m_pDelayedBuffer));
+			m_pDelayedBuffer->m_uiSessionId = m_uiSessionID;
+			g_NetServer->OnRecv(m_uiSessionID, m_pDelayedBuffer);
 			m_pDelayedBuffer = nullptr;
 		}
 	}
@@ -120,14 +114,7 @@ void CNetSession::RecvCompleted(int size) noexcept
 		// code 다른게 오면 끊음
 		if (packetHeader.code != 0)
 		{
-			view->IncreaseRef();
-			// m_pDelayedBuffer의 삭제
-			// OnRecv에서 RefCount 조작을 시작함 -> 여기서 걸렸다면 Ref는 0일 것임
-			// 올렸다 내려서 지워도 되는지 확인
-			if (view->DecreaseRef() == 0)
-			{
-				CSerializableBufferView<FALSE>::Free(view);
-			}
+			CSerializableBufferView<FALSE>::Free(view);
 
 			// 여기서 끊는게 맞음?
 			g_NetServer->Disconnect(m_uiSessionID);
@@ -175,6 +162,7 @@ void CNetSession::RecvCompleted(int size) noexcept
 			return;
 		}
 
+		view->m_uiSessionId = m_uiSessionID;
 		g_NetServer->OnRecv(m_uiSessionID, view);
 
 		currentUseSize = m_pRecvBuffer->GetUseSize();
