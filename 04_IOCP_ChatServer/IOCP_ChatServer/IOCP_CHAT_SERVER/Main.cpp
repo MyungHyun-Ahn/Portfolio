@@ -47,6 +47,7 @@ int main()
 
 	CCrashDump crashDump;
 	g_NetServer = new CChatServer;
+
 	g_NetServer->Start(openIP.c_str(), openPort, 16, 4, 65535);
 
 	MonitorThreadFunc(nullptr);

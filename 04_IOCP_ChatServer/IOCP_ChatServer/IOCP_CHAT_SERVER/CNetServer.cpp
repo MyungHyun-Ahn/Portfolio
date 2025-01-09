@@ -2,7 +2,7 @@
 #include "CNetServer.h"
 #include "CNetSession.h"
 
-CNetServer *g_NetServer;
+CNetServer *g_NetServer = nullptr;
 
 unsigned int NetWorkerThreadFunc(LPVOID lpParam) noexcept
 {
@@ -118,16 +118,15 @@ BOOL CNetServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 		return FALSE;
 	}
 
-	// CreatePostAcceptExThread
 	m_hServerFrameThread = (HANDLE)_beginthreadex(nullptr, 0, NetServerFrameThreadFunc, nullptr, 0, nullptr);
 	if (m_hServerFrameThread == 0)
 	{
 		errVal = GetLastError();
-		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"PostAcceptExThread running fail.. : %d", errVal);
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"ServerFrameThread running fail.. : %d", errVal);
 		return FALSE;
 	}
 
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"[SYSTEM] PostAcceptExThread running..");
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"[SYSTEM] ServerFrameThread running..");
 
 	// CreateWorkerThread
 	for (int i = 1; i <= createWorkerThreadCount; i++)
@@ -433,7 +432,13 @@ int CNetServer::WorkerThread() noexcept
 int CNetServer::ServerFrameThread() noexcept
 {
 	// IOCP의 병행성 관리를 받기 위한 GQCS
-	GetQueuedCompletionStatus(m_hIOCPHandle, nullptr, nullptr, nullptr, 0);
+	DWORD dwTransferred = 0;
+	CNetSession *pSession = nullptr;
+	OverlappedEx *lpOverlapped = nullptr;
+
+	GetQueuedCompletionStatus(m_hIOCPHandle, &dwTransferred
+		, (PULONG_PTR)&pSession, (LPOVERLAPPED *)&lpOverlapped
+		, 0);
 
 	// 등록한 수만큼 AcceptEx 예약
 	FristPostAcceptEx();
