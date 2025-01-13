@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "ServerSetting.h"
 #include "CNetServer.h"
 #include "CNetSession.h"
 
@@ -154,6 +155,9 @@ void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *
 	if (pSession == nullptr)
 		return;
 
+	if (sessionID != pSession->m_uiSessionID)
+		return;
+
 	InterlockedIncrement(&pSession->m_iIOCountAndRelease);
 	// ReleaseFlag가 이미 켜진 상황
 	if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
@@ -163,18 +167,21 @@ void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *
 	}
 
 
-	NetHeader header;
-	header.code = 0; // 코드
-	header.len = sBuffer->GetDataSize();
-	header.randKey = rand() % 256;
-	header.checkSum = CEncryption::CalCheckSum(sBuffer->GetContentBufferPtr(), sBuffer->GetDataSize());
-	sBuffer->EnqueueHeader((char *)&header, sizeof(NetHeader));
+	if (!sBuffer->GetIsEnqueueHeader())
+	{
+		NetHeader header;
+		header.code = PACKET_KEY; // 코드
+		header.len = sBuffer->GetDataSize();
+		header.randKey = rand() % 256;
+		header.checkSum = CEncryption::CalCheckSum(sBuffer->GetContentBufferPtr(), sBuffer->GetDataSize());
+		sBuffer->EnqueueHeader((char *)&header, sizeof(NetHeader));
 
-	// CheckSum 부터 암호화하기 위해
-	CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetBufferSize() - 4, header.randKey);
+		// CheckSum 부터 암호화하기 위해
+		CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetBufferSize() - 4, header.randKey);
+	}
 
 	pSession->SendPacket(sBuffer);
-	pSession->PostSend(0);
+	pSession->PostSend();
 
 	if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 	{
@@ -189,6 +196,9 @@ BOOL CNetServer::Disconnect(const UINT64 sessionID) noexcept
 	if (pSession == nullptr)
 		return FALSE;
 
+	if (sessionID != pSession->m_uiSessionID)
+		return FALSE;
+
 	// ReleaseFlag가 이미 켜진 상황
 	InterlockedIncrement(&pSession->m_iIOCountAndRelease);
 	if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
@@ -197,8 +207,10 @@ BOOL CNetServer::Disconnect(const UINT64 sessionID) noexcept
 		return FALSE;
 	}
 
+	CCrashDump::Crash();
+
 	// Io 실패 유도
-	// CancelIoEx((HANDLE)pSession->m_sSessionSocket, nullptr);
+	CancelIoEx((HANDLE)pSession->m_sSessionSocket, nullptr);
 
 	if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 	{
@@ -368,7 +380,7 @@ int CNetServer::WorkerThread() noexcept
 		// 소켓 정상 종료
 		else if (dwTransferred == 0 && lpOverlapped->m_Operation != IOOperation::ACCEPTEX)
 		{
-			Disconnect(pSession->m_uiSessionID);
+			// Disconnect(pSession->m_uiSessionID);
 		}
 		else
 		{
@@ -452,7 +464,7 @@ int CNetServer::ServerFrameThread() noexcept
 
 		// Heartbeat
 		// -> OnHeartbeat로 Disconnect 수행
-		OnHeartBeat();
+		// OnHeartBeat();
 
 		// Alertable Wait 상태로 전환
 		// + 프레임 제어

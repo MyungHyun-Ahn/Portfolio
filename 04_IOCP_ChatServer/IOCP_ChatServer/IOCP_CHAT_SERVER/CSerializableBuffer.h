@@ -38,6 +38,7 @@ public:
 		m_HeaderFront = 0;
 		m_Front = (int)DEFINE::HEADER_SIZE;
 		m_Rear = (int)DEFINE::HEADER_SIZE;
+		m_isEnqueueHeader = FALSE;
 	}
 
 	bool EnqueueHeader(char *buffer, int size) noexcept;
@@ -48,6 +49,7 @@ public:
 	inline int GetDataSize() const noexcept { return m_Rear - m_Front; }
 	inline int GetHeaderSize() const noexcept { return  (int)DEFINE::HEADER_SIZE; }
 	inline int GetFullSize() const noexcept { return GetDataSize() + GetHeaderSize(); }
+	inline int GetIsEnqueueHeader() const noexcept { return m_isEnqueueHeader; }
 
 	// 외부에서 버퍼를 직접 조작하기 위한 용도
 	inline char *GetBufferPtr() const noexcept { return m_Buffer; }
@@ -391,6 +393,7 @@ private:
 	int m_MaxSize = (int)DEFINE::DEFAULT_SIZE;
 
 	LONG			m_iRefCount = 0;
+	BOOL			m_isEnqueueHeader = 0;
 
 	// inline static CLFMemoryPool<CSerializableBuffer> s_sbufferPool = CLFMemoryPool<CSerializableBuffer>(5000, false);
 	inline static CTLSMemoryPoolManager<CSerializableBuffer> s_sbufferPool = CTLSMemoryPoolManager<CSerializableBuffer>();
@@ -399,6 +402,8 @@ private:
 template<bool isLanServer>
 bool CSerializableBuffer<isLanServer>::EnqueueHeader(char *buffer, int size) noexcept
 {
+	m_isEnqueueHeader = TRUE;
+
 	// 이 상황은 이미 헤더를 삽입한 것
 	//	* CGameServer::SendSector에서 발생 가능
 	//  * 싱글 스레드에서는 문제가 발생할 여지가 없으므로 그냥 return true
@@ -415,7 +420,7 @@ bool CSerializableBuffer<isLanServer>::EnqueueHeader(char *buffer, int size) noe
 template<bool isLanServer>
 bool CSerializableBuffer<isLanServer>::Enqueue(char *buffer, int size) noexcept
 {
-	if (m_MaxSize - m_Rear > size)
+	if (m_MaxSize - m_Rear < size)
 	{
 		// TODO: resize
 

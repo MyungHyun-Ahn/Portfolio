@@ -12,6 +12,27 @@ public:
 	friend class CChatServer;
 	friend class CChatProcessPacket;
 
+	inline void Clear() noexcept
+	{
+		m_usSectorY = 0xFF;
+		m_usSectorX = 0xFF; 
+	}
+
+	inline static CPlayer *Alloc() noexcept
+	{
+		CPlayer *newPlayer = s_PlayerPool.Alloc();
+		newPlayer->Clear();
+		return newPlayer;
+	}
+
+	inline static void Free(CPlayer *delPlayer) noexcept
+	{
+		s_PlayerPool.Free(delPlayer);
+	}
+
+	inline static LONG GetPoolCapacity() noexcept { return s_PlayerPool.GetCapacity(); }
+	inline static LONG GetPoolUsage() noexcept { return s_PlayerPool.GetUseCount(); }
+
 private:
 	INT64	m_iAccountNo;
 	DWORD	m_dwPrevRecvTime;

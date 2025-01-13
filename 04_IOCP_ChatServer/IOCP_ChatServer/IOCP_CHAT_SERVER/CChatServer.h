@@ -1,7 +1,7 @@
 #pragma once
 
-#define MAX_SECTOR_Y 10
-#define MAX_SECTOR_X 10
+#define MAX_SECTOR_Y 50
+#define MAX_SECTOR_X 50
 
 class CChatProcessPacketInterface;
 
@@ -30,6 +30,9 @@ public:
 	DWORD		OnUpdate() noexcept override;
 	void		OnHeartBeat() noexcept override;
 
+	inline int GetPlayerCount() { return m_umapLoginPlayer.size(); }
+	inline int GetJobQCount() { return m_RecvJobQ.GetUseSize(); }
+
 private:
 	std::unordered_map<UINT64, CNonLoginPlayer>		m_umapNonLoginPlayer;
 	std::unordered_map<UINT64, CPlayer *>			m_umapLoginPlayer;
@@ -37,9 +40,3 @@ private:
 	CLFQueue<CSerializableBufferView<FALSE> *>		m_RecvJobQ;
 	CSector											m_arrCSector[MAX_SECTOR_Y][MAX_SECTOR_X];
 };
-
-extern unsigned int FPS;
-extern unsigned int NON_LOGIN_TIME_OUT;
-extern unsigned int LOGIN_TIME_OUT;
-extern unsigned int NON_LOGIN_TIME_OUT_CHECK;
-extern unsigned int LOGIN_TIME_OUT_CHECK;

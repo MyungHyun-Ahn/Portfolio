@@ -54,6 +54,7 @@ public:
 	LONG m_lAcceptTPS = 0;
 	LONG m_lRecvTPS = 0;
 	LONG m_lSendTPS = 0;
+	LONG m_lUpdateTPS = 0;
 };
 
 extern CMonitor g_monitor;

@@ -79,18 +79,19 @@ void CLogger::WriteLog(const WCHAR *directory, const WCHAR *type, LOG_LEVEL logL
 	// lockMap 탐색
 	AcquireSRWLockExclusive(&m_FileMapLock);
 	auto it = m_lockMap.find(fileName);
-	if (it != m_lockMap.end())
+	if (it == m_lockMap.end())
 	{
 		// 없다면 디렉터리 생성하고 SRWLOCK 객체 생성
 		CreateDirectory(directoryName, NULL);
-		SRWLOCK newSRWLock;
-		InitializeSRWLock(&newSRWLock);
+		SRWLOCK *newSRWLock = new SRWLOCK;
+		InitializeSRWLock(newSRWLock);
 		m_lockMap.insert(std::make_pair(fileName, newSRWLock));
+		it = m_lockMap.find(fileName);
 	}
 	ReleaseSRWLockExclusive(&m_FileMapLock);
 
 	// 여기 코드부터는 map에 없는 경우는 없음
-	SRWLOCK srwLock = m_lockMap[fileName];
+	SRWLOCK *srwLock = it->second;
 
 	WCHAR messageBuf[256];
 
@@ -119,18 +120,18 @@ void CLogger::WriteLog(const WCHAR *directory, const WCHAR *type, LOG_LEVEL logL
 		}
 	}
 
-	AcquireSRWLockExclusive(&srwLock);
+	AcquireSRWLockExclusive(srwLock);
 	FILE *pFile = _wfsopen(fileName, L"a, ccs = UTF-16LE", _SH_DENYWR);
 	if (pFile == nullptr)
 	{
 		wprintf(L"file open fail, errorCode = %d\n", GetLastError());
-		ReleaseSRWLockExclusive(&srwLock);
+		ReleaseSRWLockExclusive(srwLock);
 		return;
 	}
 	fwrite(totalBuf, 1, wcslen(totalBuf) * sizeof(WCHAR), pFile);
 
 	fclose(pFile);
-	ReleaseSRWLockExclusive(&srwLock);
+	ReleaseSRWLockExclusive(srwLock);
 }
 
 void CLogger::WriteLogHex(const WCHAR *directory, const WCHAR *type, LOG_LEVEL logLevel, const WCHAR *logName, BYTE *pBytes, int byteLen) noexcept

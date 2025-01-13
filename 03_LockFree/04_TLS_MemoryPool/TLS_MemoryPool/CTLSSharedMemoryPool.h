@@ -9,15 +9,16 @@ struct TLSMemoryPoolNode
 	TLSMemoryPoolNode<DATA> *next;
 };
 
-template<typename DATA>
+template<typename DATA, int bucketSize = 64, int bucketCount = 2>
 struct Bucket
 {
-	static constexpr int BUCKET_SIZE = 128;
-	static constexpr int TLS_BUCKET_COUNT = 3;
+	static constexpr int BUCKET_SIZE = bucketSize;
+	static constexpr int TLS_BUCKET_COUNT = bucketCount;
 
-	~Bucket()
+	~Bucket() noexcept
 	{
 		// 누수 감지 코드 등 넣어도 됨
+		// __debugbreak();
 	}
 
 	static Bucket *GetTLSBucket() noexcept
@@ -68,7 +69,7 @@ struct Bucket
 
 // 기본 값은 큐 쓰도록
 // 테스트 결과 큐가 조금 더 괜찮았음
-template<typename DATA, bool useQueue = TRUE>
+template<typename DATA, int bucketSize = 64, int bucketCount = 2, bool useQueue = TRUE>
 class CTLSSharedMemoryPool
 {
 
@@ -76,11 +77,11 @@ class CTLSSharedMemoryPool
 
 // 버킷 풀, 사실 상 스택
 // Capacity 를 공용 풀에서만 측정해도 될 듯
-template<typename DATA>
-class CTLSSharedMemoryPool<DATA, FALSE>
+template<typename DATA, int bucketSize, int bucketCount>
+class CTLSSharedMemoryPool<DATA, bucketSize, bucketCount, FALSE>
 {
 public:
-	using Node = MemoryPoolNode<Bucket<DATA>>;
+	using Node = MemoryPoolNode<Bucket<DATA, bucketSize, bucketCount>>;
 
 	// BUCKET_SIZE 만큼 연결된 버킷의 m_pTop을 반환
 	TLSMemoryPoolNode<DATA> *Alloc() noexcept
@@ -92,7 +93,7 @@ public:
 
 			// 없으면 찐 할당
 			TLSMemoryPoolNode<DATA> *retTop = CreateNodeList();
-			InterlockedAdd(&m_iCapacity, Bucket<DATA>::BUCKET_SIZE);
+			InterlockedAdd(&m_iCapacity, Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE);
 			return retTop;
 
 		}
@@ -123,7 +124,7 @@ public:
 		ULONG_PTR readTop;
 		Node *newTop = s_BucketPool.Alloc();
 		newTop->data.m_pTop = freePtr;
-		newTop->data.m_iSize = Bucket<DATA>::BUCKET_SIZE;
+		newTop->data.m_iSize = Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE;
 		ULONG_PTR combinedNewTop = CombineIdentAndAddr(ident, (ULONG_PTR)newTop);
 
 		do
@@ -138,17 +139,17 @@ public:
 	}
 
 public:
-	LONG GetCapacity()
+	LONG GetCapacity() const noexcept
 	{
 		return m_iCapacity;
 	}
 
 private:
 	// 버킷 크기만큼의 노드 리스트를 생성(스택)
-	TLSMemoryPoolNode<DATA> *CreateNodeList()
+	TLSMemoryPoolNode<DATA> *CreateNodeList() noexcept
 	{
 		TLSMemoryPoolNode<DATA> *pTop = nullptr;
-		for (int i = 0; i < Bucket<DATA>::BUCKET_SIZE; i++)
+		for (int i = 0; i < Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE; i++)
 		{
 			TLSMemoryPoolNode<DATA> *newNode = new TLSMemoryPoolNode<DATA>();
 			newNode->next = pTop;
@@ -165,14 +166,14 @@ private:
 	inline static CLFMemoryPool<Node> s_BucketPool = CLFMemoryPool<Node>(100, false);
 };
 
-template<typename DATA>
-class CTLSSharedMemoryPool<DATA, TRUE>
+template<typename DATA, int bucketSize, int bucketCount>
+class CTLSSharedMemoryPool<DATA, bucketSize, bucketCount, TRUE>
 {
 public:
-	using Node = MemoryPoolNode<Bucket<DATA>>;
+	using Node = MemoryPoolNode<Bucket<DATA, bucketSize, bucketCount>>;
 
 	// 생성자
-	CTLSSharedMemoryPool<DATA>() noexcept
+	CTLSSharedMemoryPool<DATA, bucketSize, bucketCount>() noexcept
 	{
 		m_NULL = InterlockedIncrement(&s_iQueueIdentifier) % 0xFFFF;
 		ULONG_PTR ident = InterlockedIncrement(&m_ullCurrentIdentifier);
@@ -192,7 +193,7 @@ public:
 
 			// 없으면 찐 할당
 			TLSMemoryPoolNode<DATA> *retTop = CreateNodeList();
-			InterlockedAdd(&m_iCapacity, Bucket<DATA>::BUCKET_SIZE);
+			InterlockedAdd(&m_iCapacity, Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE);
 			return retTop;
 
 		}
@@ -249,7 +250,7 @@ public:
 
 		Node *newNode = s_BucketPool.Alloc();
 		newNode->data.m_pTop = freePtr;
-		newNode->data.m_iSize = Bucket<DATA>::BUCKET_SIZE;
+		newNode->data.m_iSize = Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE;
 		newNode->next = m_NULL;
 
 		ULONG_PTR combinedNode = CombineIdentAndAddr(ident, (ULONG_PTR)newNode);
@@ -277,17 +278,17 @@ public:
 	}
 
 public:
-	LONG GetCapacity()
+	LONG GetCapacity() const noexcept
 	{
 		return m_iCapacity;
 	}
 
 private:
 	// 버킷 크기만큼의 노드 리스트를 생성(스택)
-	TLSMemoryPoolNode<DATA> *CreateNodeList()
+	TLSMemoryPoolNode<DATA> *CreateNodeList() noexcept
 	{
 		TLSMemoryPoolNode<DATA> *pTop = nullptr;
-		for (int i = 0; i < Bucket<DATA>::BUCKET_SIZE; i++)
+		for (int i = 0; i < Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE; i++)
 		{
 			TLSMemoryPoolNode<DATA> *newNode = new TLSMemoryPoolNode<DATA>();
 			newNode->next = pTop;

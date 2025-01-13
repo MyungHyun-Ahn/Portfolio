@@ -21,13 +21,14 @@ bool CChatProcessPacket::PacketProcReqLogin(UINT64 sessionId, CSmartPtr<CSeriali
 		{
 			// 이번에도 없으면 버그
 			m_pChatServer->Disconnect(sessionId);
-			return false;
+			return true;
 		}
 	}
+
 	INT64 accountNo;
 	*message >> accountNo;
 	
-	CPlayer *loginPlayer = new CPlayer;
+	CPlayer *loginPlayer = CPlayer::Alloc();
 	loginPlayer->m_iAccountNo = accountNo;
 	loginPlayer->m_dwPrevRecvTime = timeGetTime();
 
@@ -53,7 +54,7 @@ bool CChatProcessPacket::PacketProcReqSectorMove(UINT64 sessionId, CSmartPtr<CSe
 	if (it == umapPlayer.end())
 	{
 		m_pChatServer->Disconnect(sessionId);
-		return false;
+		return true;
 	}
 
 	CPlayer *player = it->second;
@@ -65,7 +66,8 @@ bool CChatProcessPacket::PacketProcReqSectorMove(UINT64 sessionId, CSmartPtr<CSe
 
 	*message >> accountNo >> sectorX >> sectorY;
 
-	m_pChatServer->m_arrCSector[player->m_usSectorY][player->m_usSectorX].m_players.erase(sessionId);
+	if (player->m_usSectorY != 0xFF && player->m_usSectorX != 0xFF)
+		m_pChatServer->m_arrCSector[player->m_usSectorY][player->m_usSectorX].m_players.erase(sessionId);
 	m_pChatServer->m_arrCSector[sectorY][sectorX].m_players.insert(std::make_pair(sessionId, player));
 	player->m_usSectorY = sectorY;
 	player->m_usSectorX = sectorX;
@@ -83,7 +85,7 @@ bool CChatProcessPacket::PacketProcReqMessage(UINT64 sessionId, CSmartPtr<CSeria
 	if (it == umapPlayer.end())
 	{
 		m_pChatServer->Disconnect(sessionId);
-		return false;
+		return true;
 	}
 
 	CPlayer *player = it->second;
@@ -92,14 +94,13 @@ bool CChatProcessPacket::PacketProcReqMessage(UINT64 sessionId, CSmartPtr<CSeria
 	INT64 accountNo;
 	WORD messageLen;
 	*message >> accountNo >> messageLen;
-	WCHAR *chatMessage = new WCHAR[messageLen / 2];
+	WCHAR chatMessage[256];
 	message->Dequeue((char *)chatMessage, messageLen);
 
 	CSerializableBuffer<FALSE> *messageRes = CGenPacket::makePacketResMessage(accountNo, player->m_szID, player->m_szNickname, messageLen, chatMessage);
-	delete[] chatMessage;
 
 	messageRes->IncreaseRef();
-
+	
 	m_pChatServer->SendSector(NULL, player->m_usSectorY, player->m_usSectorX, messageRes);
 
 	if (messageRes->DecreaseRef() == 0)
@@ -115,7 +116,7 @@ bool CChatProcessPacket::PacketProcReqHeartBeat(UINT64 sessionId, CSmartPtr<CSer
 	if (it == umapPlayer.end())
 	{
 		m_pChatServer->Disconnect(sessionId);
-		return false;
+		return true;
 	}
 
 	it->second->m_dwPrevRecvTime = timeGetTime();

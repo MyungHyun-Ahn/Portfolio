@@ -150,6 +150,7 @@
     <ClInclude Include="CCrashDump.h" />
     <ClInclude Include="CEncryption.h" />
     <ClInclude Include="CGenPacket.h" />
+    <ClInclude Include="ChatSetting.h" />
     <ClInclude Include="CLanServer.h" />
     <ClInclude Include="CLFMemoryPool.h" />
     <ClInclude Include="CLFQueue.h" />
@@ -176,12 +177,14 @@
     <ClInclude Include="DefineSingleton.h" />
     <ClInclude Include="LFDefine.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="ServerSetting.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CChatServer.cpp" />
     <ClCompile Include="CCrashDump.cpp" />
     <ClCompile Include="CEncryption.cpp" />
     <ClCompile Include="CGenPacket.cpp" />
+    <ClCompile Include="ChatSetting.cpp" />
     <ClCompile Include="CLanServer.cpp" />
     <ClCompile Include="CLFMemoryPool.cpp" />
     <ClCompile Include="CLFQueue.cpp" />
@@ -210,6 +213,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="ServerSetting.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ServerConfig.conf" />

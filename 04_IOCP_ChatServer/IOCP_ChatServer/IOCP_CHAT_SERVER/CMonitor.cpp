@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "CMonitor.h"
-#include "CLanSession.h"
+#include "CPlayer.h"
+#include "CNetSession.h"
 
 CMonitor g_monitor;
 
@@ -15,7 +16,7 @@ CMonitor::CMonitor(HANDLE hProcess) noexcept
 	HWND console = GetConsoleWindow();
 	RECT r;
 	GetWindowRect(console, &r);
-	MoveWindow(console, r.left, r.top, 500, 600, TRUE);
+	MoveWindow(console, r.left, r.top, 700, 900, TRUE);
 
 	// 프로세서 개수 확인
 	//  * 프로세스 실행률 계산시 cpu 개수로 나누어 실제 사용률을 구함
@@ -35,7 +36,7 @@ CMonitor::CMonitor(HANDLE hProcess) noexcept
 	PdhOpenQuery(NULL, NULL, &m_SystemNPMemoryQuery);
 	PdhOpenQuery(NULL, NULL, &m_SystemAvailableMemoryQuery);
 
-	PdhAddCounter(m_ProcessNPMemoryQuery, L"\\Process(IOCP_ECHO_SERVER)\\Pool Nonpaged Bytes", NULL, &m_ProcessNPMemoryCounter);
+	PdhAddCounter(m_ProcessNPMemoryQuery, L"\\Process(IOCP_CHAT_SERVER)\\Pool Nonpaged Bytes", NULL, &m_ProcessNPMemoryCounter);
 	PdhAddCounter(m_SystemNPMemoryQuery, L"\\Memory\\Pool Nonpaged Bytes", NULL, &m_SystemNPMemoryCounter);
 	PdhAddCounter(m_SystemAvailableMemoryQuery, L"\\Memory\\Available MBytes", NULL, &m_SystemAvailableMemoryCounter);
 	
@@ -137,6 +138,7 @@ void CMonitor::UpdateServer() noexcept
 	InterlockedExchange(&m_lAcceptTPS, 0);
 	InterlockedExchange(&m_lRecvTPS, 0);
 	InterlockedExchange(&m_lSendTPS, 0);
+	m_lUpdateTPS = 0;
 }
 
 void CMonitor::UpdateMemory() noexcept
@@ -180,14 +182,17 @@ void CMonitor::MonitoringConsole(INT sessionCount, INT playerCount) noexcept
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Info");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tAccept total \t: %lld", m_lAcceptTotal);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSession count \t: %d", sessionCount);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tPlayer count \t: %d", playerCount);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Pool capacity");
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSession pool capacity \t: %d, usage \t: %d", CLanSession::GetPoolCapacity(), CLanSession::GetPoolUsage());
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tBuffer pool capacity \t: %d, usage \t: %d", CSerializableBuffer<TRUE>::GetPoolCapacity(), CSerializableBuffer<TRUE>::GetPoolUsage());
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tView pool capacity \t: %d, usage \t: %d", CSerializableBufferView<TRUE>::GetPoolCapacity(), CSerializableBufferView<TRUE>::GetPoolUsage());
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSession pool capacity \t: %d, usage \t: %d", CNetSession::GetPoolCapacity(), CNetSession::GetPoolUsage());
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tBuffer pool capacity \t: %d, usage \t: %d", CSerializableBuffer<FALSE>::GetPoolCapacity(), CSerializableBuffer<FALSE>::GetPoolUsage());
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tView pool capacity \t: %d, usage \t: %d", CSerializableBufferView<FALSE>::GetPoolCapacity(), CSerializableBufferView<FALSE>::GetPoolUsage());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRecv pool capacity \t: %d, usage \t: %d", CRecvBuffer::GetPoolCapacity(), CRecvBuffer::GetPoolUsage());
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tPlayer pool capacity \t: %d, usage \t: %d", CPlayer::GetPoolCapacity(), CPlayer::GetPoolUsage());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"TPS");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tAccept\t : %d", m_lAcceptTPS);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRecv\t : %d", m_lRecvTPS);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSend\t : %d", m_lSendTPS);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tUpdate\t : %d", m_lUpdateTPS);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"----------------------------------------");
 }

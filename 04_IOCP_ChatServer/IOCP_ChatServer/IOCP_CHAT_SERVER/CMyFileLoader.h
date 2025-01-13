@@ -9,6 +9,7 @@ public:
 	// 필요하면 더 구현할 것
 	BOOL		Load(const WCHAR *classStr, const WCHAR *keyStr, USHORT *outValue) noexcept;
 	BOOL		Load(const WCHAR *classStr, const WCHAR *keyStr, INT *outValue) noexcept;
+	BOOL		Load(const WCHAR *classStr, const WCHAR *keyStr, unsigned int *outValue) noexcept;
 	BOOL		Load(const WCHAR *classStr, const WCHAR *keyStr, BYTE *outValue) noexcept;
 	BOOL		Load(const WCHAR *classStr, const WCHAR *keyStr, std::string *str) noexcept;
 	BOOL		Load(const WCHAR *classStr, const WCHAR *keyStr, std::wstring *wstr) noexcept;

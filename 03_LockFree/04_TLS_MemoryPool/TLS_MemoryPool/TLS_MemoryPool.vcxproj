@@ -142,7 +142,9 @@
     <ClInclude Include="CLFStack.h" />
     <ClInclude Include="CProfileManager.h" />
     <ClInclude Include="CTLSMemoryPool.h" />
+    <ClInclude Include="CTLSPagePool.h" />
     <ClInclude Include="CTLSSharedMemoryPool.h" />
+    <ClInclude Include="CTLSSharedPagePool.h" />
     <ClInclude Include="LFDefine.h" />
   </ItemGroup>
   <ItemGroup>
@@ -151,7 +153,9 @@
     <ClCompile Include="CLFStack.cpp" />
     <ClCompile Include="CProfileManager.cpp" />
     <ClCompile Include="CTLSMemoryPool.cpp" />
+    <ClCompile Include="CTLSPagePool.cpp" />
     <ClCompile Include="CTLSSharedMemoryPool.cpp" />
+    <ClCompile Include="CTLSSharedPagePool.cpp" />
     <ClCompile Include="Main.cpp" />
   </ItemGroup>
   <ItemGroup>

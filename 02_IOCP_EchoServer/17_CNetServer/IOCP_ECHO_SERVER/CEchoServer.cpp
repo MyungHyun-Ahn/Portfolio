@@ -22,6 +22,10 @@ void CEchoServer::OnClientLeave(const UINT64 sessionID) noexcept
 
 void CEchoServer::OnRecv(const UINT64 sessionID, CSerializableBufferView<TRUE> *message) noexcept
 {
+
+    if (rand() % 2)
+        Disconnect(sessionID);
+
     __int64 num;
     *message >> num;
     CSerializableBufferView<TRUE>::Free(message);

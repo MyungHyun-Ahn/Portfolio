@@ -78,8 +78,8 @@ void CLanSession::RecvCompleted(int size) noexcept
         }
 
         int useSize = m_pRecvBuffer->GetUseSize();
-        m_pRecvBuffer->Peek((char *)&packetHeader, PACKET_HEADER_SIZE);
-        if (useSize < PACKET_HEADER_SIZE + packetHeader)
+        m_pRecvBuffer->Peek((char *)&packetHeader, (int)CSerializableBuffer<TRUE>::DEFINE::HEADER_SIZE);
+        if (useSize < (int)CSerializableBuffer<TRUE>::DEFINE::HEADER_SIZE + packetHeader)
         {
             // 직접 할당해서 뒤로 밀기 Delayed
             delayFlag = true;
@@ -97,13 +97,13 @@ void CLanSession::RecvCompleted(int size) noexcept
         // 실질적으로 Recv 버퍼 입장에서는 읽은 것
         // - 하나의 메시지가 완전히 완성된 상태
         int offsetStart = m_pRecvBuffer->GetFrontOffset();
-        int offsetEnd = offsetStart + packetHeader + PACKET_HEADER_SIZE;
+        int offsetEnd = offsetStart + packetHeader + (int)CSerializableBuffer<TRUE>::DEFINE::HEADER_SIZE;
 
         // 이 view를 그냥 써도 됨
         // Init 에서 RecvBuffer의 Ref가 증가
         view->Init(m_pRecvBuffer, offsetStart, offsetEnd);
 
-        m_pRecvBuffer->MoveFront(PACKET_HEADER_SIZE + packetHeader);
+        m_pRecvBuffer->MoveFront((int)CSerializableBuffer<TRUE>::DEFINE::HEADER_SIZE + packetHeader);
         g_LanServer->OnRecv(m_uiSessionID, view);
 
         currentUseSize = m_pRecvBuffer->GetUseSize();

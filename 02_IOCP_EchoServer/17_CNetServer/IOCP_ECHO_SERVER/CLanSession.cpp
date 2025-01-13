@@ -194,7 +194,7 @@ bool CLanSession::PostRecv() noexcept
         errVal = WSAGetLastError();
         if (errVal != WSA_IO_PENDING)
         {
-            if (errVal != WSAECONNABORTED && errVal != WSAECONNRESET)
+            if (errVal != WSAECONNABORTED && errVal != WSAECONNRESET && errVal != WSAEINTR)
                 g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"WSARecv() Error : %d", errVal);
 
 			// 사실 여기선 0이 될 일이 없음
@@ -284,9 +284,11 @@ bool CLanSession::PostSend(BOOL isCompleted) noexcept
         errVal = WSAGetLastError();
 		if (errVal != WSA_IO_PENDING)
 		{
-            if (errVal != WSAECONNABORTED && errVal != WSAECONNRESET)
-			    g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"WSASend() Error : %d", errVal);
-
+            if (errVal != WSAECONNABORTED && errVal != WSAECONNRESET && errVal != WSAEINTR)
+            {
+                __debugbreak();
+                g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"WSASend() Error : %d", errVal);
+            }
             // 사실 여기선 0이 될 일이 없음
             // 반환값을 사용안해도 됨
 			if (InterlockedDecrement(&m_iIOCountAndRelease) == 0)

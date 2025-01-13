@@ -170,6 +170,27 @@ BOOL CMyFileLoader::Load(const WCHAR *classStr, const WCHAR *keyStr, INT *outVal
 	return TRUE;
 }
 
+BOOL CMyFileLoader::Load(const WCHAR *classStr, const WCHAR *keyStr, unsigned int *outValue) noexcept
+{
+	auto classIt = m_parsedDatas.find(classStr);
+	if (classIt == m_parsedDatas.end())
+	{
+		// class 없음
+		return FALSE;
+	}
+
+	auto keyIt = classIt->second.find(keyStr);
+	if (keyIt == classIt->second.end())
+	{
+		// value 없음
+		return FALSE;
+	}
+
+	unsigned int out = _wtoi(keyIt->second.c_str());
+	*outValue = out;
+	return TRUE;
+}
+
 BOOL CMyFileLoader::Load(const WCHAR *classStr, const WCHAR *keyStr, BYTE *outValue) noexcept
 {
 	auto classIt = m_parsedDatas.find(classStr);

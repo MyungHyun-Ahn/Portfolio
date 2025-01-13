@@ -114,6 +114,12 @@
     <ClInclude Include="CGenPacket.h">
       <Filter>Content</Filter>
     </ClInclude>
+    <ClInclude Include="ChatSetting.h">
+      <Filter>Content</Filter>
+    </ClInclude>
+    <ClInclude Include="ServerSetting.h">
+      <Filter>Network</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -194,6 +200,12 @@
     </ClCompile>
     <ClCompile Include="CGenPacket.cpp">
       <Filter>Content</Filter>
+    </ClCompile>
+    <ClCompile Include="ChatSetting.cpp">
+      <Filter>Content</Filter>
+    </ClCompile>
+    <ClCompile Include="ServerSetting.cpp">
+      <Filter>Network</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

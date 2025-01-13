@@ -3,25 +3,15 @@
 #include "CNetSession.h"
 #include "CPlayer.h"
 #include "CSector.h"
+#include "ChatSetting.h"
 #include "CChatServer.h"
 #include "CommonProtocol.h"
 #include "CProcessPacket.h"
 
-unsigned int FPS = 25;
-#define FRAME_PER_TICK 1000 / FPS
-
-unsigned int NON_LOGIN_TIME_OUT = 2 * 1000;
-unsigned int LOGIN_TIME_OUT = 40 * 1000;
-
-unsigned int NON_LOGIN_TIME_OUT_CHECK = 2 * 1000;
-unsigned int LOGIN_TIME_OUT_CHECK = 40 * 1000;
-
-#define SECTOR_VIEW_START 1
-#define SECTOR_VIEW_COUNT 3
-
 CChatServer::CChatServer() noexcept
 {
 	m_pProcessPacket = new CChatProcessPacket;
+	m_pProcessPacket->SetChatServer(this);
 }
 
 void CChatServer::Update() noexcept
@@ -31,8 +21,10 @@ void CChatServer::Update() noexcept
 	for (int i = 0; i < jobCount; i++)
 	{
 		CSerializableBufferView<FALSE> *recvJob;
-		if (m_RecvJobQ.Dequeue(&recvJob))
+		if (!m_RecvJobQ.Dequeue(&recvJob))
 			__debugbreak();
+
+		g_monitor.m_lUpdateTPS++;
 
 		WORD type;
 		*recvJob >> type;
@@ -79,13 +71,13 @@ void CChatServer::SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX, CSeri
 			if (startY + y < 0 || startY + y >= MAX_SECTOR_Y || startX + x < 0 || startX + x >= MAX_SECTOR_X)
 				continue;
 
-			CSector &sector = m_arrCSector[y][x];
+			CSector &sector = m_arrCSector[y + startY][x + startX];
 			for (auto &it : sector.m_players)
 			{
 				if (it.first == sessionId)
 					continue;
 
-				SendPacket(sessionId, message);
+				SendPacket(it.first, message);
 			}
 		}
 	}
@@ -93,12 +85,13 @@ void CChatServer::SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX, CSeri
 
 bool CChatServer::OnConnectionRequest(const WCHAR *ip, USHORT port) noexcept
 {
-	return false;
+	return true;
 }
 
 // Apc 에서 수행됨
 void CChatServer::OnAccept(const UINT64 sessionID) noexcept
 {
+	g_monitor.m_lUpdateTPS++;
 	CNonLoginPlayer nonLogin = { timeGetTime() };
 	m_umapNonLoginPlayer.insert(std::make_pair(sessionID, nonLogin));
 }
@@ -106,6 +99,8 @@ void CChatServer::OnAccept(const UINT64 sessionID) noexcept
 // Apc 에서 수행됨
 void CChatServer::OnClientLeave(const UINT64 sessionID) noexcept
 {
+	g_monitor.m_lUpdateTPS++;
+
 	auto it1 = m_umapNonLoginPlayer.find(sessionID);
 	if (it1 != m_umapNonLoginPlayer.end())
 	{
@@ -114,11 +109,13 @@ void CChatServer::OnClientLeave(const UINT64 sessionID) noexcept
 	}
 
 	auto it2 = m_umapLoginPlayer.find(sessionID);
-	CPlayer *player = it2->second;
 	if (it2 != m_umapLoginPlayer.end())
 	{
-		m_umapNonLoginPlayer.erase(sessionID);
-		delete player;
+		CPlayer *player = it2->second;
+		if (player->m_usSectorY != 0xFF && player->m_usSectorX != 0xFF)
+			m_arrCSector[player->m_usSectorY][player->m_usSectorX].m_players.erase(sessionID);
+		m_umapLoginPlayer.erase(sessionID);
+		CPlayer::Free(player);
 		return;
 	}
 }
@@ -145,14 +142,14 @@ DWORD CChatServer::OnUpdate() noexcept
 
 	int dTime = timeGetTime() - prevTick;
 	// 다음 깨어나야 하는 시간
-	if (dTime - prevTick < FRAME_PER_TICK)
+	if (dTime < FRAME_PER_TICK)
 		return FRAME_PER_TICK - dTime;
 
 	// 진짜 Update
 	Update();
 
 	prevTick += FRAME_PER_TICK;
-	return FRAME_PER_TICK - (timeGetTime() - prevTick);
+	return 0;
 }
 
 void CChatServer::OnHeartBeat() noexcept

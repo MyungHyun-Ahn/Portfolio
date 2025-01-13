@@ -106,7 +106,7 @@ public:
 	BYTE buffer[1 * KB];
 };
 
-CTLSMemoryPoolManager<LargeBuffer, FALSE> lfMemoryPool = CTLSMemoryPoolManager<LargeBuffer, FALSE>();
+CTLSMemoryPoolManager<LargeBuffer> lfMemoryPool = CTLSMemoryPoolManager<LargeBuffer>();
 
 unsigned int StackTLSPool(LPVOID lpParam)
 {
@@ -134,7 +134,7 @@ unsigned int StackTLSPool(LPVOID lpParam)
 	return 0;
 }
 
-CTLSMemoryPoolManager<LargeBuffer, TRUE> tlsMemoryPool = CTLSMemoryPoolManager<LargeBuffer, TRUE>();
+CTLSMemoryPoolManager<LargeBuffer> tlsMemoryPool = CTLSMemoryPoolManager<LargeBuffer>();
 
 unsigned int QueueTLSPool(LPVOID lpParam)
 {
@@ -239,4 +239,6 @@ int main()
 	WaitForMultipleObjects(THREAD_COUNT, arrTh, true, INFINITE);
 
 	printf("정상종료\n");
+
+	return 0;
 }

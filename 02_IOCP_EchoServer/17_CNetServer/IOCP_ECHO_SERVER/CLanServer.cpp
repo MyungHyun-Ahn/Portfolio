@@ -195,7 +195,7 @@ BOOL CLanServer::Disconnect(const UINT64 sessionID) noexcept
 	}
 
 	// Io 실패 유도
-	// CancelIoEx((HANDLE)pSession->m_sSessionSocket, nullptr);
+	CancelIoEx((HANDLE)pSession->m_sSessionSocket, nullptr);
 
 	if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 	{

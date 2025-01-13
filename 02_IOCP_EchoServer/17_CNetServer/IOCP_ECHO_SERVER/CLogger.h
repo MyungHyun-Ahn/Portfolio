@@ -39,7 +39,7 @@ private:
 	SRWLOCK m_FileMapLock;
 	SRWLOCK m_Consolelock;
 
-	std::unordered_map<std::wstring, SRWLOCK> m_lockMap;
+	std::unordered_map<std::wstring, SRWLOCK *> m_lockMap;
 
 	INT64 m_LogCount = 0;
 	LOG_LEVEL m_LogLevel = LOG_LEVEL::DEBUG;

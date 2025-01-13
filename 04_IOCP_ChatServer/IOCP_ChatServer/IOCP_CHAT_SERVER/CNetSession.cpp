@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "ServerSetting.h"
 #include "CNetSession.h"
 #include "CNetServer.h"
 
@@ -39,11 +40,11 @@ void CNetSession::RecvCompleted(int size) noexcept
 		NetHeader header;
 		m_pDelayedBuffer->GetHeader((char *)&header, sizeof(NetHeader));
 		// code 다른게 오면 끊음
-		if (header.code != 0)
+		if (header.code != PACKET_KEY)
 		{
 			CSerializableBufferView<FALSE>::Free(m_pDelayedBuffer);
 			m_pDelayedBuffer = nullptr;
-
+			__debugbreak();
 			// 여기서 끊는게 맞음?
 			g_NetServer->Disconnect(m_uiSessionID);
 			return;
@@ -68,6 +69,7 @@ void CNetSession::RecvCompleted(int size) noexcept
 			// OnRecv 호출 전 패킷 검증
 			CEncryption::Decoding(m_pDelayedBuffer->GetBufferPtr() + 4, m_pDelayedBuffer->GetFullSize() - 4, header.randKey);
 			BYTE dataCheckSum = CEncryption::CalCheckSum(m_pDelayedBuffer->GetContentBufferPtr(), m_pDelayedBuffer->GetDataSize());
+			m_pDelayedBuffer->GetHeader((char *)&header, (int)CSerializableBuffer<FALSE>::DEFINE::HEADER_SIZE);
 			if (dataCheckSum != header.checkSum) // code 다른 것도 걸러낼 것임
 			{
 				CSerializableBufferView<FALSE>::Free(m_pDelayedBuffer);
@@ -76,6 +78,8 @@ void CNetSession::RecvCompleted(int size) noexcept
 				// Ref 감소
 				if (m_pRecvBuffer->DecreaseRef() == 0)
 					CRecvBuffer::Free(m_pRecvBuffer);
+
+				__debugbreak();
 
 				// 여기서 끊는게 맞음?
 				g_NetServer->Disconnect(m_uiSessionID);
@@ -112,9 +116,11 @@ void CNetSession::RecvCompleted(int size) noexcept
 		int useSize = m_pRecvBuffer->GetUseSize();
 		m_pRecvBuffer->Peek((char *)&packetHeader, (int)CSerializableBuffer<FALSE>::DEFINE::HEADER_SIZE);
 		// code 다른게 오면 끊음
-		if (packetHeader.code != 0)
+		if (packetHeader.code != PACKET_KEY)
 		{
 			CSerializableBufferView<FALSE>::Free(view);
+
+			__debugbreak();
 
 			// 여기서 끊는게 맞음?
 			g_NetServer->Disconnect(m_uiSessionID);
@@ -149,6 +155,7 @@ void CNetSession::RecvCompleted(int size) noexcept
 		// OnRecv 호출 전 패킷 검증
 		CEncryption::Decoding(view->GetBufferPtr() + 4, view->GetFullSize() - 4, packetHeader.randKey);
 		BYTE dataCheckSum = CEncryption::CalCheckSum(view->GetContentBufferPtr(), view->GetDataSize());
+		view->GetHeader((char *)&packetHeader, (int)CSerializableBuffer<FALSE>::DEFINE::HEADER_SIZE);
 		if (dataCheckSum != packetHeader.checkSum) // code 다른 것도 걸러낼 것임
 		{
 			CSerializableBufferView<FALSE>::Free(view);
@@ -156,6 +163,8 @@ void CNetSession::RecvCompleted(int size) noexcept
 			// Ref 감소
 			if (m_pRecvBuffer->DecreaseRef() == 0)
 				CRecvBuffer::Free(m_pRecvBuffer);
+
+			__debugbreak();
 
 			// 여기서 끊는게 맞음?
 			g_NetServer->Disconnect(m_uiSessionID);
@@ -303,6 +312,8 @@ bool CNetSession::PostSend(BOOL isCompleted) noexcept
 	WSABUF wsaBuf[WSASEND_MAX_BUFFER_COUNT];
 
 	m_iSendCount = min(sendUseSize, WSASEND_MAX_BUFFER_COUNT);
+
+	InterlockedAdd(&g_monitor.m_lSendTPS, m_iSendCount);
 
 	int count;
 	for (count = 0; count < m_iSendCount; count++)
