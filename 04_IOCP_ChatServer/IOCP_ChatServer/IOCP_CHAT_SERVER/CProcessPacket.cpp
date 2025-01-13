@@ -96,7 +96,7 @@ bool CChatProcessPacket::PacketProcReqMessage(UINT64 sessionId, CSmartPtr<CSeria
 	message->Dequeue((char *)chatMessage, messageLen);
 
 	CSerializableBuffer<FALSE> *messageRes = CGenPacket::makePacketResMessage(accountNo, player->m_szID, player->m_szNickname, messageLen, chatMessage);
-	delete chatMessage;
+	delete[] chatMessage;
 
 	messageRes->IncreaseRef();
 

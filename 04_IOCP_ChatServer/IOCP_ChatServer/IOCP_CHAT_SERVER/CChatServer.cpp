@@ -11,9 +11,9 @@ unsigned int FPS = 25;
 #define FRAME_PER_TICK 1000 / FPS
 
 unsigned int NON_LOGIN_TIME_OUT = 2 * 1000;
-unsigned int LOGIN_TIME_OUT = 30 * 1000;
+unsigned int LOGIN_TIME_OUT = 40 * 1000;
 
-unsigned int NON_LOGIN_TIME_OUT_CHECK = 3 * 1000;
+unsigned int NON_LOGIN_TIME_OUT_CHECK = 2 * 1000;
 unsigned int LOGIN_TIME_OUT_CHECK = 40 * 1000;
 
 #define SECTOR_VIEW_START 1
@@ -38,8 +38,11 @@ void CChatServer::Update() noexcept
 		*recvJob >> type;
 		m_pProcessPacket->ConsumPacket((en_PACKET_TYPE)type, recvJob->GetSessionID(), CSmartPtr<CSerializableBufferView<FALSE>>(recvJob));
 
-		recvJob->DecreaseRef();
+		if (recvJob->DecreaseRef() == 0)
+			CSerializableBufferView<FALSE>::Free(recvJob);
 	}
+
+	// 여기에서 Sector를 1번 순회하며 전송작업 진행
 }
 
 void CChatServer::NonLoginHeartBeat() noexcept
