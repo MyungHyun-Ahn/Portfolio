@@ -399,7 +399,7 @@ private:
 	BOOL			m_isEnqueueHeader = 0;
 	UINT64			m_uiSessionId = 0;
 
-	inline static CTLSMemoryPoolManager<CSerializableBuffer> s_sbufferPool = CTLSMemoryPoolManager<CSerializableBuffer>();
+	inline static CTLSMemoryPoolManager<CSerializableBuffer, 16, 8> s_sbufferPool = CTLSMemoryPoolManager<CSerializableBuffer, 16, 8>();
 };
 
 template<bool isLanServer>
