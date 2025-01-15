@@ -41,7 +41,7 @@ struct Bucket
 		m_iSize = 0;
 	}
 
-	int Push(TLSMemoryPoolNode<DATA> *freeNode) noexcept
+	inline int Push(TLSMemoryPoolNode<DATA> *freeNode) noexcept
 	{
 		// Top 갱신
 		freeNode->next = m_pTop;
@@ -50,7 +50,7 @@ struct Bucket
 		return m_iSize;
 	}
 
-	TLSMemoryPoolNode<DATA> *Pop() noexcept
+	inline TLSMemoryPoolNode<DATA> *Pop() noexcept
 	{
 		if (m_iSize == 0)
 			return nullptr;
@@ -58,6 +58,7 @@ struct Bucket
 		TLSMemoryPoolNode<DATA> *ret = m_pTop;
 		m_pTop = m_pTop->next;
 		m_iSize--;
+
 		return ret;
 	}
 
@@ -92,6 +93,20 @@ public:
 
 			// 없으면 찐 할당
 			TLSMemoryPoolNode<DATA> *retTop = CreateNodeList();
+
+			TLSMemoryPoolNode<DATA> *node = retTop;
+			int cnt = 0;
+			while (true)
+			{
+				cnt++;
+				node = node->next;
+				if (node == nullptr)
+					break;
+			}
+
+			if (cnt != Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE)
+				__debugbreak();
+
 			InterlockedAdd(&m_iCapacity, Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE);
 			return retTop;
 
@@ -110,6 +125,7 @@ public:
 
 		// Pop 성공
 		TLSMemoryPoolNode<DATA> *retTop = readTopAddr->data.m_pTop;
+
 		readTopAddr->data.Clear();
 		s_BucketPool.Free(readTopAddr);
 		return retTop;
@@ -232,11 +248,25 @@ public:
 				if (InterlockedCompareExchange(&m_pHead, next, readHead) == readHead)
 				{
 					Node *readHeadAddr = (Node *)GetAddress(readHead);
+					
 					s_BucketPool.Free(readHeadAddr);
 					break;
 				}
 			}
 		}
+
+		TLSMemoryPoolNode<DATA> *node = retTop;
+		int cnt = 0;
+		while (true)
+		{
+			cnt++;
+			node = node->next;
+			if (node == nullptr)
+				break;
+		}
+
+		if (cnt != Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE)
+			__debugbreak();
 
 		return retTop;
 	}

@@ -51,6 +51,7 @@ private:
 			delete[] m_pBuffer;
 		}
 		m_pBuffer = nullptr;
+		m_uiSessionId = 0;
 	}
 	// 이걸 보고 헤더가 딜레이 된 것이라면 지연처리 작업
 	inline USHORT isReadHeaderSize() noexcept

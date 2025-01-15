@@ -386,7 +386,7 @@ public:
 	inline LONG DecreaseRef() noexcept { return InterlockedDecrement(&m_iRefCount); }
 
 	inline void SetSessionId(UINT64 id) noexcept { m_uiSessionId = id; }
-	inline UINT64 GetSessionId() { return m_uiSessionId; }
+	inline UINT64 GetSessionId() noexcept { return m_uiSessionId; }
 
 private:
 	char *m_Buffer;
@@ -399,7 +399,7 @@ private:
 	BOOL			m_isEnqueueHeader = 0;
 	UINT64			m_uiSessionId = 0;
 
-	inline static CTLSMemoryPoolManager<CSerializableBuffer, 16, 8> s_sbufferPool = CTLSMemoryPoolManager<CSerializableBuffer, 16, 8>();
+	inline static CTLSMemoryPoolManager<CSerializableBuffer, 32, 8> s_sbufferPool = CTLSMemoryPoolManager<CSerializableBuffer, 32, 8>();
 };
 
 template<bool isLanServer>

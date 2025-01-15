@@ -23,20 +23,40 @@ private:
 	DATA *Alloc() noexcept
 	{
 		// 가득 찬 상황
+		int a = 0;
+
 		if (m_iCurrentBucketIndex == Bucket<DATA, bucketSize, bucketCount>::TLS_BUCKET_COUNT)
 		{
+			a = 1;
 			m_iCurrentBucketIndex--;
 		}
 		else if (m_iCurrentBucketIndex != -1 && m_MyBucket[m_iCurrentBucketIndex].m_iSize == 0)
 		{
+			a = 2;
 			m_iCurrentBucketIndex--;
 		}
 
 		if (m_iCurrentBucketIndex == -1)
 		{
-			m_MyBucket[0].m_pTop = m_pTLSSharedMemoryPool->Alloc();
-			m_MyBucket[0].m_iSize = Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE;
+			a = 3;
 			m_iCurrentBucketIndex++;
+			m_MyBucket[m_iCurrentBucketIndex].m_pTop = m_pTLSSharedMemoryPool->Alloc();
+			m_MyBucket[m_iCurrentBucketIndex].m_iSize = Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE;
+			
+			// 공용 풀로 반환
+			// 반환할 때 bucketSize 만큼 다 있는지 체크
+			TLSMemoryPoolNode<DATA> *node = m_MyBucket[m_iCurrentBucketIndex].m_pTop;
+			int cnt = 0;
+			while (true)
+			{
+				cnt++;
+				node = node->next;
+				if (node == nullptr)
+					break;
+			}
+
+			if (cnt != Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE)
+				__debugbreak();
 		}
 
 		TLSMemoryPoolNode<DATA> *retNode = m_MyBucket[m_iCurrentBucketIndex].Pop();
@@ -55,8 +75,22 @@ private:
 			if (retSize == Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE)
 			{
 				// 공용 풀로 반환
+				TLSMemoryPoolNode<DATA> *node = m_FreeBucket->m_pTop;
+				int cnt = 0;
+				while (true)
+				{
+					cnt++;
+					node = node->next;
+					if (node == nullptr)
+						break;
+				}
+
+				if (cnt != Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE)
+					__debugbreak();
+
 				m_pTLSSharedMemoryPool->Free(m_FreeBucket->m_pTop);
-				m_FreeBucket->Clear();
+				m_FreeBucket->m_pTop = nullptr;
+				m_FreeBucket->m_iSize = 0;
 			}
 		}
 		else
@@ -71,18 +105,14 @@ private:
 			}
 			else
 			{
-				m_MyBucket[0].m_pTop = (TLSMemoryPoolNode<DATA> *)delPtr;
-				m_MyBucket[0].m_iSize++;
 				m_iCurrentBucketIndex++;
+
+				m_MyBucket[m_iCurrentBucketIndex].Push((TLSMemoryPoolNode<DATA> *)delPtr);
 			}
 		}
 
 		m_lUsedCount--;
-
 	}
-
-public:
-	static constexpr int MyBucketCount = 2;
 
 private:
 
