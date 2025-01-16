@@ -79,7 +79,6 @@ void CNetSession::RecvCompleted(int size) noexcept
 				if (m_pRecvBuffer->DecreaseRef() == 0)
 					CRecvBuffer::Free(m_pRecvBuffer);
 
-				// __debugbreak();
 
 				// 여기서 끊는게 맞음?
 				g_NetServer->Disconnect(m_uiSessionID);
@@ -219,8 +218,12 @@ void CNetSession::SendCompleted(int size) noexcept
 	// m_iSendCount를 믿고 할당 해제를 진행
 	// * 논블락킹 I/O일 때만 Send를 요청한 데이터보다 덜 보내는 상황이 발생 가능
 	// * 비동기 I/O는 무조건 전부 보내고 완료 통지가 도착함
+
+	int sendCount = m_iSendCount;
+	m_iSendCount = 0;
+
 	int count;
-	for (count = 0; count < m_iSendCount; count++)
+	for (count = 0; count < sendCount; count++)
 	{
 		// RefCount를 낮추고 0이라면 보낸 거 삭제
 		if (m_arrPSendBufs[count]->DecreaseRef() == 0)
@@ -233,8 +236,6 @@ void CNetSession::SendCompleted(int size) noexcept
 	{
 		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"CSession::SendCompleted %d != %d", count + 1, m_iSendCount);
 	}
-
-	m_iSendCount = 0;
 
 #ifdef POSTSEND_LOST_DEBUG
 	UINT64 index = InterlockedIncrement(&sendIndex);

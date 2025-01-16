@@ -215,13 +215,19 @@ public:
 
 		TLSMemoryPoolNode<DATA> *retTop;
 
+		ULONG_PTR readHead;
+		ULONG_PTR readTail;
+		Node *readHeadAddr;
+		ULONG_PTR next;
+		Node *nextAddr;
+
 		while (true)
 		{
-			ULONG_PTR readHead = m_pHead;
-			ULONG_PTR readTail = m_pTail;
-			Node *readHeadAddr = (Node *)GetAddress(readHead);
-			ULONG_PTR next = readHeadAddr->next;
-			Node *nextAddr = (Node *)GetAddress(next);
+			readHead = m_pHead;
+			readTail = m_pTail;
+			readHeadAddr = (Node *)GetAddress(readHead);
+			next = readHeadAddr->next;
+			nextAddr = (Node *)GetAddress(next);
 
 			// Head와 Tail이 같다면 한번 밀어주고 Dequeue 수행
 			if (readHead == readTail)
@@ -247,13 +253,13 @@ public:
 				retTop = nextAddr->data.m_pTop;
 				if (InterlockedCompareExchange(&m_pHead, next, readHead) == readHead)
 				{
-					Node *readHeadAddr = (Node *)GetAddress(readHead);
-					
-					s_BucketPool.Free(readHeadAddr);
 					break;
 				}
 			}
 		}
+
+		readHeadAddr = (Node *)GetAddress(readHead);
+		s_BucketPool.Free(readHeadAddr);
 
 		TLSMemoryPoolNode<DATA> *node = retTop;
 		int cnt = 0;
@@ -279,6 +285,20 @@ public:
 
 		Node *newNode = s_BucketPool.Alloc();
 		newNode->data.m_pTop = freePtr;
+
+		TLSMemoryPoolNode<DATA> *node = freePtr;
+		int cnt = 0;
+		while (true)
+		{
+			cnt++;
+			node = node->next;
+			if (node == nullptr)
+				break;
+		}
+
+		if (cnt != Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE)
+			__debugbreak();
+
 		newNode->data.m_iSize = Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE;
 		newNode->next = m_NULL;
 

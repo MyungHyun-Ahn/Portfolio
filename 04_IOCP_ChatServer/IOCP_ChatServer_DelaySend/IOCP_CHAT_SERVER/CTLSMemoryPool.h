@@ -89,8 +89,7 @@ private:
 					__debugbreak();
 
 				m_pTLSSharedMemoryPool->Free(m_FreeBucket->m_pTop);
-				m_FreeBucket->m_pTop = nullptr;
-				m_FreeBucket->m_iSize = 0;
+				m_FreeBucket->Clear();
 			}
 		}
 		else

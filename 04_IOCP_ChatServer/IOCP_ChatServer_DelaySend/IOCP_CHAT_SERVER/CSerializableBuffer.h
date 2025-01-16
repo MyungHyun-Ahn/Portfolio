@@ -371,19 +371,39 @@ public:
 		// 할당하고 초기화해서 반환
 		CSerializableBuffer *pSBuffer = s_sbufferPool.Alloc();
 		pSBuffer->Clear();
+		pSBuffer->isFree = FALSE;
 		return pSBuffer;
 	}
 
 	inline static void Free(CSerializableBuffer *delSBuffer) noexcept
 	{
+		if (delSBuffer->isFree)
+			__debugbreak();
+
+		delSBuffer->isFree = TRUE;
+
 		s_sbufferPool.Free(delSBuffer);
 	}
 
 	inline static LONG GetPoolCapacity() noexcept { return s_sbufferPool.GetCapacity(); }
 	inline static LONG GetPoolUsage() noexcept { return s_sbufferPool.GetUseCount(); }
 
-	inline LONG IncreaseRef() noexcept { return InterlockedIncrement(&m_iRefCount); }
-	inline LONG DecreaseRef() noexcept { return InterlockedDecrement(&m_iRefCount); }
+	inline LONG IncreaseRef() noexcept 
+	{
+		LONG back = InterlockedIncrement(&m_iRefCount);
+		LONG index = InterlockedIncrement(&logIndex);
+		log[index % 100] = back;
+		return back; 
+	}
+	inline LONG DecreaseRef() noexcept 
+	{ 
+		LONG back = InterlockedDecrement(&m_iRefCount);
+		if (back == -1)
+			__debugbreak();
+		LONG index = InterlockedIncrement(&logIndex);
+		log[index % 100] = back;
+		return back;
+	}
 
 	inline void SetSessionId(UINT64 id) noexcept { m_uiSessionId = id; }
 	inline UINT64 GetSessionId() noexcept { return m_uiSessionId; }
@@ -394,6 +414,9 @@ private:
 	int m_Front = 0;
 	int m_Rear = 0;
 	int m_MaxSize = (int)DEFINE::DEFAULT_SIZE;
+	int log[100];
+	LONG logIndex;
+	BOOL isFree = FALSE;
 
 	LONG			m_iRefCount = 0;
 	BOOL			m_isEnqueueHeader = 0;

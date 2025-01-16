@@ -60,8 +60,15 @@ public:
 		// * 남아있는 경우가 확인됨
 		// * 남은 직렬화 버퍼를 할당 해제하고 세션 삭제
 
+		if (m_pDelayedBuffer != nullptr)
+		{
+			CSerializableBufferView<FALSE>::Free(m_pDelayedBuffer);
+			m_pDelayedBuffer = nullptr;
+		}
 
-		for (int count = 0; count < m_iSendCount; count++)
+		int sendCount = m_iSendCount;
+		m_iSendCount = 0;
+		for (int count = 0; count < sendCount; count++)
 		{
 			if (m_arrPSendBufs[count]->DecreaseRef() == 0)
 			{
@@ -98,11 +105,12 @@ public:
 		{
 			if (m_pRecvBuffer->DecreaseRef() == 0)
 				CRecvBuffer::Free(m_pRecvBuffer);
+
+			m_pRecvBuffer = nullptr;
 		}
 
 		m_sSessionSocket = INVALID_SOCKET;
 		m_uiSessionID = 0;
-		m_pRecvBuffer = nullptr;
 	}
 
 	void RecvCompleted(int size) noexcept;

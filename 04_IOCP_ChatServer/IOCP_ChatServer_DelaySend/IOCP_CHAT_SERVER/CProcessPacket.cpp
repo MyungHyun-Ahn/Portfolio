@@ -126,6 +126,7 @@ bool CChatProcessPacket::PacketProcReqMessage(UINT64 sessionId, CSmartPtr<CSeria
 
 	CSerializableBuffer<FALSE> *messageRes = CGenPacket::makePacketResMessage(accountNo, player->m_szID, player->m_szNickname, messageLen, chatMessage);
 
+	// ¿©±â¼­ 1
 	messageRes->IncreaseRef();
 	messageRes->SetSessionId(sessionId);
 	m_pChatServer->m_arrCSector[player->m_usSectorY][player->m_usSectorX].m_sendMsgQ.push_back(messageRes);

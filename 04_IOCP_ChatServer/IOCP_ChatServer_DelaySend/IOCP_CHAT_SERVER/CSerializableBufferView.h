@@ -85,7 +85,7 @@ private:
 	inline static CSerializableBufferView *Alloc() noexcept
 	{
 		CSerializableBufferView *pSBuffer = s_sbufferPool.Alloc();
-		// pSBuffer->Clear();
+		pSBuffer->isFree = FALSE;
 		return pSBuffer;
 	}
 
@@ -93,8 +93,10 @@ public:
 	inline static void Free(CSerializableBufferView *delSBuffer) noexcept
 	{
 		// 직접 할당 받은 버퍼가 아니라면 recv 버퍼는 nullptr이 아님
+		if (delSBuffer->isFree)
+			__debugbreak();
+		delSBuffer->isFree = TRUE;
 		delSBuffer->Clear();
-
 		s_sbufferPool.Free(delSBuffer);
 	}
 
@@ -262,6 +264,7 @@ private:
 	int m_HeaderFront = 0;
 	int m_Front = 0;
 	int m_Rear = 0;
+	bool isFree = FALSE;
 	CSmartPtr<CRecvBuffer> m_spRecvBuffer;
 	// 사이즈 헤더 조차도 밀림을 방지하기 위한 버퍼
 	char m_delayedHeader[(int)CSerializableBuffer<isLanServer>::DEFINE::HEADER_SIZE];
