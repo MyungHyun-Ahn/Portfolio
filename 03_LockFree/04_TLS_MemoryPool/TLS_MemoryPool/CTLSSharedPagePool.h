@@ -1,82 +1,139 @@
 #pragma once
-
-// KB 사이즈에 의해 Bucket의 크기가 결정됨
-// ex 4KB -> BucketSize = 64 / 4 = 16
-template<int sizeKB = 4>
-struct TLSPagePoolNode
-{
-	TLSPagePoolNode() = default;
-
-	void *ptr;
-	TLSPagePoolNode *next;
-};
-
-template<int sizeKB = 4, int bucketCount = 2>
-struct Bucket
-{
-	// 64로 나누어 떨어지면 컴파일 실패
-	static_assert(64 % sizeKB != 0);
-	// 64 보다 큰 값이 들어오면 컴파일 실패
-	static_assert(sizeKB > 64);
-
-	// 버킷 사이즈 계산
-	static constexpr int BUCKET_SIZE = 64 / sizeKB;
-	static constexpr int TLS_BUCKET_COUNT = bucketCount;
-
-
-	~Bucket() noexcept
-	{
-
-	}
-
-	static Bucket *GetTLSBucket() noexcept
-	{
-		thread_local Bucket buckets[TLS_BUCKET_COUNT];
-		Bucket *pPtr = buckets;
-		return pPtr;
-	}
-
-	static Bucket *GetFreeBucket() noexcept
-	{
-		thread_local Bucket freeBucket;
-		return &freeBucket;
-	}
-
-	void Clear() noexcept
-	{
-		m_pTop = nullptr;
-		m_iSize = nullptr;
-	}
-
-	int Push(TLSPagePoolNode<sizeKB> *freeNode) noexcept
-	{
-		freeNode->next = m_pTop;
-		m_pTop = freeNode;
-		m_iSize++;
-		return m_iSize;
-	}
-
-	TLSPagePoolNode<sizeKB> *Pop() noexcept
-	{
-		if (m_iSize == 0)
-			return nullptr;
-
-		TLSPagePoolNode<sizeKB> *ret = m_pTop;
-		m_pTop = m_pTop->next;
-		m_iSize--;
-		return ret;
-	}
-
-	TLSPagePoolNode<sizeKB> *m_pTop = nullptr;
-	int m_iSize = 0;
-};
-
-template<LONG sizeKB = 4, int bucketSize = 2>
+template<int sizeByte = 4 * 1024, int bucketCount = 2>
 class CTLSSharedPagePool
 {
 public:
-	using Node = MemoryPoolNode<Bucket<sizeKB, bucketSize>>;
+	friend class CTLSPagePool<sizeByte, bucketCount>;
 
+	using BucketNode = TLSMemoryPoolNode<PageBucket<sizeByte, bucketCount>>;
+	using Node = TLSPagePoolNode<sizeByte>;
+
+	CTLSSharedPagePool() noexcept
+	{
+		m_NULL = InterlockedIncrement(&s_iQueueIdentifier) % 0xFFFF;
+		ULONG_PTR ident = InterlockedIncrement(&m_ullCurrentIdentifier);
+		BucketNode *pHead = s_BucketPool.Alloc();
+		pHead->next = (BucketNode *)m_NULL;
+		m_pHead = CombineIdentAndAddr(ident, (ULONG_PTR)pHead);
+		m_pTail = m_pHead;
+	}
+
+	Node *Alloc() noexcept
+	{
+		// Free 상태인 Bucket이 있는지 먼저 체크
+		if (InterlockedDecrement(&m_iUseCount) < 0)
+		{
+			InterlockedIncrement(&m_iUseCount);
+
+			// 없으면 찐 할당
+			Node *retTop = CreateNodeList();
+			InterlockedAdd(&m_iCapacity, 64); // 64KB 단위로 집계
+			return retTop;
+		}
+
+		Node *retTop;
+
+		while (true)
+		{
+			ULONG_PTR readHead = m_pHead;
+			ULONG_PTR readTail = m_pTail;
+			BucketNode *readHeadAddr = (BucketNode *)GetAddress(readHead);
+			ULONG_PTR next = (ULONG_PTR)readHeadAddr->next;
+			BucketNode *nextAddr = (BucketNode *)GetAddress(next);
+
+			// Head와 Tail이 같다면 한번 밀어주고 Dequeue 수행
+			if (readHead == readTail)
+			{
+				BucketNode *readTailAddr = (BucketNode *)GetAddress(readTail);
+				ULONG_PTR readTailNext = (ULONG_PTR)readTailAddr->next;
+				InterlockedCompareExchange(&m_pTail, readTailNext, readTail);
+			}
+
+			// Head->next NULL인 경우는 큐가 비었을 때 뿐
+			if (next == m_NULL)
+			{
+				continue;
+			}
+			else
+			{
+
+				if (next < 0xFFFF)
+				{
+					continue;
+				}
+
+				retTop = nextAddr->data.m_pTop;
+				if (InterlockedCompareExchange(&m_pHead, next, readHead) == readHead)
+				{
+					BucketNode *readHeadAddr = (BucketNode *)GetAddress(readHead);
+					s_BucketPool.Free(readHeadAddr);
+					break;
+				}
+			}
+		}
+
+		return retTop;
+	}
+
+	// Enqueue
+	void Free(TLSPagePoolNode<sizeByte> *freePtr) noexcept
+	{
+		// 반납
+		ULONG_PTR ident = InterlockedIncrement(&m_ullCurrentIdentifier);
+
+		BucketNode *newNode = s_BucketPool.Alloc();
+		newNode->data.m_pTop = freePtr;
+		newNode->data.m_iSize = PageBucket<sizeByte, bucketCount>::BUCKET_SIZE;
+		newNode->next = (BucketNode *)m_NULL;
+
+		ULONG_PTR combinedNode = CombineIdentAndAddr(ident, (ULONG_PTR)newNode);
+
+		while (true)
+		{
+			ULONG_PTR readTail = m_pTail;
+			Node *readTailAddr = (Node *)GetAddress(readTail);
+			ULONG_PTR next = (ULONG_PTR)readTailAddr->next;
+
+			if (next != m_NULL)
+			{
+				InterlockedCompareExchange(&m_pTail, next, readTail);
+				continue;
+			}
+
+			if (InterlockedCompareExchange((ULONG_PTR *) & readTailAddr->next, combinedNode, m_NULL) == m_NULL)
+			{
+				InterlockedCompareExchange(&m_pTail, combinedNode, readTail);
+				break;
+			}
+		}
+
+		InterlockedIncrement(&m_iUseCount);
+	}
+
+public:
+	LONG GetCapacity() const noexcept
+	{
+		return m_iCapacity;
+	}
+
+private:
+	// 버킷 개수만큼 VirtualAlloc 할당해서 나눠주기
+	Node *CreateNodeList() noexcept
+	{
+		// 64KB 할당 단위
+		BYTE *ptr = (BYTE *)VirtualAlloc(nullptr, 64 * 1024, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+
+		Node *pTop = nullptr;
+		for (int i = 0; i < PageBucket<sizeByte, bucketCount>::BUCKET_SIZE; i++)
+		{
+			Node *node = s_NodePool.Alloc();
+			node->next = pTop;
+			node->ptr = (BYTE *)ptr + i * sizeByte;
+			pTop = node;
+		}
+
+		return pTop;
+	}
 
 private:
 	ULONG_PTR			m_pHead = NULL;
@@ -87,7 +144,7 @@ private:
 	ULONG_PTR			m_NULL; // NULL 체크용
 
 	inline static LONG	s_iQueueIdentifier = 0;
-	inline static CTLSMemoryPoolManager<Node> s_BucketPool = CTLSMemoryPoolManager<Node>();
-	inline static CTLSMemoryPoolManager<TLSPagePoolNode<sizeKB>> s_NodePool = CTLSMemoryPoolManager<TLSPagePoolNode<sizeKB>>();
+	inline static CTLSMemoryPoolManager<BucketNode, 64, 2> s_BucketPool = CTLSMemoryPoolManager<BucketNode, 64, 2>();
+	inline static CTLSMemoryPoolManager<Node, 64, 2> s_NodePool = CTLSMemoryPoolManager<Node, 64, 2>();
 };
 

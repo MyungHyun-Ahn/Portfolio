@@ -1,26 +1,5 @@
 #pragma once
 
-#define ENQUEUE_CAS1 0
-#define ENQUEUE_CAS2 1
-#define DEQUEUE 2
-
-struct QueueDebug
-{
-	UINT64 index;
-	DWORD threadId;
-	USHORT operation;
-	USHORT failedReason;
-	ULONG_PTR addr1;
-	ULONG_PTR addr2;
-	ULONG_PTR addr3;
-	ULONG_PTR addr4;
-};
-
-#define LOG_MAX 200000
-
-extern QueueDebug logging[200000];
-extern LONG64 logIndex;
-
 struct alignas(16) QUEUE_NODE_PTR
 {
 	ULONG_PTR ptr;
@@ -44,8 +23,7 @@ template<typename DATA>
 struct QueueNode<DATA, FALSE>
 {
 	DATA data;
-	// InterlockedCompareExchange128에 사용할 변수는 16바이트 경계맞춤 해야함
-	QUEUE_NODE_PTR next;
+	ULONG_PTR next;
 };
 
 template<typename T, bool CAS2First = FALSE>
@@ -121,14 +99,6 @@ public:
 			return false;
 		}
 
-		PROFILE_BEGIN(1, "Dequeue");
-
-		// 여기까지 온 경우는 큐가 비었을 상황은 없음
-
-		ULONG_PTR readTail = m_pTail;
-		Node *readTailAddr = (Node *)GetAddress(readTail);
-		ULONG_PTR readTailNext = readTailAddr->next;
-
 		while (true)
 		{
 			ULONG_PTR readHead = m_pHead;
@@ -144,16 +114,10 @@ public:
 			else
 			{
 				// readHead == m_pHead 면 m_pHead = next
+				*t = nextAddr->data;
 				if (InterlockedCompareExchange(&m_pHead, next, readHead) == readHead)
 				{
-					// 성공했는데 m_pTail의 next가 NULL이 아닌 경우?
-
-					// DEQUEUE 성공 로그
-					UINT64 index = InterlockedIncrement64(&logIndex);
-					logging[index % LOG_MAX] = { index, GetCurrentThreadId(), DEQUEUE, 0, readHead, next, m_pTail, ((Node *)GetAddress(m_pTail))->next };
-
 					// 여기서 문제가 생길것 같은데?
-					*t = nextAddr->data;
 
 					Node *readHeadAddr = (Node *)GetAddress(readHead);
 					m_QueueNodePool.Free(readHeadAddr);
@@ -200,8 +164,6 @@ public:
 
 	void Enqueue(T t) noexcept
 	{
-		PROFILE_BEGIN(1, "Enqueue");
-
 		UINT_PTR ident = InterlockedIncrement(&m_ullCurrentIdentifier);
 		Node *newNode = m_QueueNodePool.Alloc();
 		newNode->data = t;
@@ -213,17 +175,15 @@ public:
 			ULONG_PTR readTail = m_pTail;
 			Node *readTailAddr = (Node *)GetAddress(readTail);
 			ULONG_PTR next = readTailAddr->next;
+			UINT_PTR readEnqueueId = m_ENQUEUE_ID;
 
-			if (next != m_NULL)
-			{
-				InterlockedCompareExchange(&m_pTail, next, readTail);
+			if (readEnqueueId != m_ENQUEUE_ID)
 				continue;
-			}
 
 			if (InterlockedCompareExchange(&readTailAddr->next, combinedNode, m_NULL) == m_NULL)
 			{
+				InterlockedIncrement(&m_ENQUEUE_ID);
 				InterlockedCompareExchange(&m_pTail, combinedNode, readTail);
-
 				break; // 여기까지 했다면 break;
 			}
 
@@ -243,23 +203,14 @@ public:
 			return false;
 		}
 
-		PROFILE_BEGIN(1, "Dequeue");
+		// PROFILE_BEGIN(1, "Dequeue");
 
 		while (true)
 		{
 			ULONG_PTR readHead = m_pHead;
-			ULONG_PTR readTail = m_pTail;
 			Node *readHeadAddr = (Node *)GetAddress(readHead);
 			ULONG_PTR next = readHeadAddr->next;
 			Node *nextAddr = (Node *)GetAddress(next);
-
-			// Head와 Tail이 같다면 한번 밀어주고 Dequeue 수행
-			if (readHead == readTail)
-			{
-				Node *readTailAddr = (Node *)GetAddress(readTail);
-				ULONG_PTR readTailNext = readTailAddr->next;
-				InterlockedCompareExchange(&m_pTail, readTailNext, readTail);
-			}
 
 			// Head->next NULL인 경우는 큐가 비었을 때 뿐
 			if (next == m_NULL)
@@ -295,10 +246,12 @@ private:
 	ULONG_PTR			m_pHead = NULL;
 	ULONG_PTR			m_pTail = NULL;
 	ULONG_PTR			m_ullCurrentIdentifier = 0; // ABA 문제를 해결하기 위한 식별자
-	inline static CTLSMemoryPoolManager<Node> m_QueueNodePool = CTLSMemoryPoolManager<Node>();
+	inline static CTLSMemoryPoolManager<Node,64 ,2> m_QueueNodePool = CTLSMemoryPoolManager<Node, 64, 2>();
 	LONG				m_iSize = 0;
 
 	ULONG_PTR			m_NULL;
+	ULONG_PTR			m_ENQUEUE_ID = 0;
+
 	inline static LONG	s_iQueueIdentifier = 0;
 };
 

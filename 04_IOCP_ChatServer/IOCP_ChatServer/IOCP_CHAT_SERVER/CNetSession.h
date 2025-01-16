@@ -56,6 +56,8 @@ public:
 			}
 		}
 
+		m_iSendCount = 0;
+
 		LONG useBufferSize = m_lfSendBufferQueue.GetUseSize();
 		for (int i = 0; i < useBufferSize; i++)
 		{

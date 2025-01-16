@@ -1,101 +1,9 @@
-#include <stdio.h>
-#include <windows.h>
-#include <process.h>
-#include <new>
-#include "LFDefine.h"
-#include "CLFMemoryPool.h"
-#include "CTLSSharedMemoryPool.h"
-#include "CTLSMemoryPool.h"
-#include "CLFStack.h"
-#include "CProfileManager.h"
-#include "CLFQueue.h"
+#include "pch.h"
 #include <queue>
 
 #define THREAD_COUNT 4
 #define TEST_LOOP_COUNT 100000
 #define ENQUEUE_DEQUEUE_COUNT 128
-
-CLFQueue<UINT64, FALSE> lockfreeQueue1;
-CLFQueue<UINT64, TRUE> lockfreeQueue2;
-
-std::queue<UINT64> stdQueue;
-
-unsigned int CAS01ThreadFunc(LPVOID lpParam)
-{
-	for (int i = 0; i < TEST_LOOP_COUNT; i++)
-	// while (1)
-	{
-		PROFILE_BEGIN(1, "CAS01");
-
-		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
-		{
-			lockfreeQueue1.Enqueue(i);
-
-		}
-
-		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
-		{
-			UINT64 data;
-			lockfreeQueue1.Dequeue(&data);
-		}
-	}
-
-	return 0;
-}
-
-unsigned int CAS02ThreadFunc(LPVOID lpParam)
-{
-	for (int i = 0; i < TEST_LOOP_COUNT; i++)
-		// while (1)
-	{
-		PROFILE_BEGIN(1, "CAS02");
-
-		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
-		{
-			lockfreeQueue2.Enqueue(i);
-
-		}
-
-		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
-		{
-			UINT64 data;
-			lockfreeQueue2.Dequeue(&data);
-		}
-	}
-
-	return 0;
-}
-
-SRWLOCK lock;
-
-unsigned int stdQueueThreadFunc(LPVOID lpParam)
-{
-	for (int i = 0; i < TEST_LOOP_COUNT; i++)
-		// while (1)
-	{
-		PROFILE_BEGIN(1, "stdQueue");
-
-		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
-		{
-			PROFILE_BEGIN(1, "Enqueue");
-			AcquireSRWLockExclusive(&lock);
-			stdQueue.push(i);
-			ReleaseSRWLockExclusive(&lock);
-		}
-
-		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
-		{
-			PROFILE_BEGIN(1, "Dequeue");
-			AcquireSRWLockExclusive(&lock);
-			UINT64 data;
-			data = stdQueue.front();
-			stdQueue.pop();
-			ReleaseSRWLockExclusive(&lock);
-		}
-	}
-
-	return 0;
-}
 
 #define KB 1024
 
@@ -106,7 +14,7 @@ public:
 	BYTE buffer[1 * KB];
 };
 
-CTLSMemoryPoolManager<LargeBuffer> lfMemoryPool = CTLSMemoryPoolManager<LargeBuffer>();
+CTLSMemoryPoolManager<LargeBuffer, 64, 2, false> lfMemoryPool = CTLSMemoryPoolManager<LargeBuffer, 64, 2, false>();
 
 unsigned int StackTLSPool(LPVOID lpParam)
 {
@@ -134,7 +42,7 @@ unsigned int StackTLSPool(LPVOID lpParam)
 	return 0;
 }
 
-CTLSMemoryPoolManager<LargeBuffer> tlsMemoryPool = CTLSMemoryPoolManager<LargeBuffer>();
+CTLSMemoryPoolManager<LargeBuffer, 64, 2, true> tlsMemoryPool = CTLSMemoryPoolManager<LargeBuffer, 64, 2, true>();
 
 unsigned int QueueTLSPool(LPVOID lpParam)
 {
@@ -188,17 +96,41 @@ unsigned int NewDelete(LPVOID lpParam)
 	return 0;
 }
 
+CTLSPagePoolManager<128, 2> pagePool;
+
+unsigned int TestCode(LPVOID lpParam)
+{
+	while (true)
+	{
+		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
+		{
+			ULONG_PTR ptrs[128];
+
+			for (int i = 0; i < (128 * 1024) / 1024; i++)
+			{
+				ptrs[i] = (ULONG_PTR)pagePool.Alloc();
+				if ((~ptrs[i] & 0b111) != 0b111)
+					__debugbreak();
+			}
+
+			for (int i = 0; i < (128 * 1024) / 1024; i++)
+			{
+				pagePool.Free((void *)ptrs[i]);
+			}
+		}
+	}
+
+	return 0;
+}
 
 int main()
 {
 	g_ProfileMgr = CProfileManager::GetInstance();
 
-	InitializeSRWLock(&lock);
-
 	HANDLE arrTh[THREAD_COUNT];
 	for (int i = 0; i < THREAD_COUNT; i++)
 	{
-		arrTh[i] = (HANDLE)_beginthreadex(nullptr, 0, StackTLSPool, nullptr, CREATE_SUSPENDED, nullptr);
+		arrTh[i] = (HANDLE)_beginthreadex(nullptr, 0, TestCode, nullptr, CREATE_SUSPENDED, nullptr);
 		if (arrTh[i] == 0)
 			return 1;
 	}
@@ -210,33 +142,33 @@ int main()
 	
 	WaitForMultipleObjects(THREAD_COUNT, arrTh, true, INFINITE);
 
-	for (int i = 0; i < THREAD_COUNT; i++)
-	{
-		arrTh[i] = (HANDLE)_beginthreadex(nullptr, 0, QueueTLSPool, nullptr, CREATE_SUSPENDED, nullptr);
-		if (arrTh[i] == 0)
-			return 1;
-	}
-
-	for (int i = 0; i < THREAD_COUNT; i++)
-	{
-		ResumeThread(arrTh[i]);
-	}
-
-	WaitForMultipleObjects(THREAD_COUNT, arrTh, true, INFINITE);
-
-	for (int i = 0; i < THREAD_COUNT; i++)
-	{
-		arrTh[i] = (HANDLE)_beginthreadex(nullptr, 0, NewDelete, nullptr, CREATE_SUSPENDED, nullptr);
-		if (arrTh[i] == 0)
-			return 1;
-	}
-
-	for (int i = 0; i < THREAD_COUNT; i++)
-	{
-		ResumeThread(arrTh[i]);
-	}
-
-	WaitForMultipleObjects(THREAD_COUNT, arrTh, true, INFINITE);
+	// for (int i = 0; i < THREAD_COUNT; i++)
+	// {
+	// 	arrTh[i] = (HANDLE)_beginthreadex(nullptr, 0, QueueTLSPool, nullptr, CREATE_SUSPENDED, nullptr);
+	// 	if (arrTh[i] == 0)
+	// 		return 1;
+	// }
+	// 
+	// for (int i = 0; i < THREAD_COUNT; i++)
+	// {
+	// 	ResumeThread(arrTh[i]);
+	// }
+	// 
+	// WaitForMultipleObjects(THREAD_COUNT, arrTh, true, INFINITE);
+	// 
+	// for (int i = 0; i < THREAD_COUNT; i++)
+	// {
+	// 	arrTh[i] = (HANDLE)_beginthreadex(nullptr, 0, NewDelete, nullptr, CREATE_SUSPENDED, nullptr);
+	// 	if (arrTh[i] == 0)
+	// 		return 1;
+	// }
+	// 
+	// for (int i = 0; i < THREAD_COUNT; i++)
+	// {
+	// 	ResumeThread(arrTh[i]);
+	// }
+	// 
+	// WaitForMultipleObjects(THREAD_COUNT, arrTh, true, INFINITE);
 
 	printf("정상종료\n");
 
