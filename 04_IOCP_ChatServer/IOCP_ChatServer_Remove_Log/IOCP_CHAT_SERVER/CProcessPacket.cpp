@@ -3,6 +3,7 @@
 #include "CNetSession.h"
 #include "CPlayer.h"
 #include "CSector.h"
+#include "ChatSetting.h"
 #include "CChatServer.h"
 #include "CommonProtocol.h"
 #include "CProcessPacket.h"

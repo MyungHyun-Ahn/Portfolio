@@ -80,6 +80,7 @@ private:
 		m_lUsedCount--;
 	}
 
+
 private:
 
 	Bucket<DATA, bucketSize, bucketCount> *m_MyBucket;

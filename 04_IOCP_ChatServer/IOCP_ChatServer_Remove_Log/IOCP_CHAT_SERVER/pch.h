@@ -68,3 +68,6 @@
 #include "CMonitor.h"
 #include "CCrashDump.h"
 #include "CMyFileLoader.h"
+
+#include "CSingleMemoryPool.h"
+#include "CDeque.h"

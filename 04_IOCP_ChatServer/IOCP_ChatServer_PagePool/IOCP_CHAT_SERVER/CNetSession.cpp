@@ -236,6 +236,7 @@ void CNetSession::SendCompleted(int size) noexcept
 	// * 논블락킹 I/O일 때만 Send를 요청한 데이터보다 덜 보내는 상황이 발생 가능
 	// * 비동기 I/O는 무조건 전부 보내고 완료 통지가 도착함
 	int count;
+	
 	for (count = 0; count < m_iSendCount; count++)
 	{
 		// RefCount를 낮추고 0이라면 보낸 거 삭제
@@ -243,11 +244,6 @@ void CNetSession::SendCompleted(int size) noexcept
 		{
 			CSerializableBuffer<FALSE>::Free(m_arrPSendBufs[count]);
 		}
-	}
-
-	if (count != m_iSendCount)
-	{
-		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"CSession::SendCompleted %d != %d", count + 1, m_iSendCount);
 	}
 
 	m_iSendCount = 0;
@@ -284,7 +280,10 @@ bool CNetSession::PostRecv() noexcept
 	ZeroMemory((m_pMyOverlappedStartAddr + 1), sizeof(OVERLAPPED));
 
 	DWORD flag = 0;
-	retVal = WSARecv(m_sSessionSocket, &wsaBuf, 1, nullptr, &flag, (LPWSAOVERLAPPED)(m_pMyOverlappedStartAddr + 1), NULL);
+	{
+		// PROFILE_BEGIN(0, "WSARecv");
+		retVal = WSARecv(m_sSessionSocket, &wsaBuf, 1, nullptr, &flag, (LPWSAOVERLAPPED)(m_pMyOverlappedStartAddr + 1), NULL);
+	}
 	if (retVal == SOCKET_ERROR)
 	{
 		errVal = WSAGetLastError();
@@ -340,6 +339,13 @@ bool CNetSession::PostSend(BOOL isCompleted) noexcept
 		return FALSE;
 	}
 
+	InterlockedIncrement(&m_iIOCountAndRelease);
+	if ((m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
+	{
+		InterlockedDecrement(&m_iIOCountAndRelease);
+		return FALSE;
+	}
+
 	WSABUF wsaBuf[WSASEND_MAX_BUFFER_COUNT];
 
 	m_iSendCount = min(sendUseSize, WSASEND_MAX_BUFFER_COUNT);
@@ -370,14 +376,10 @@ bool CNetSession::PostSend(BOOL isCompleted) noexcept
 
 	ZeroMemory((m_pMyOverlappedStartAddr + 2), sizeof(OVERLAPPED));
 
-	InterlockedIncrement(&m_iIOCountAndRelease);
-	if ((m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
 	{
-		InterlockedDecrement(&m_iIOCountAndRelease);
-		return FALSE;
+		// PROFILE_BEGIN(0, "WSASend");
+		retVal = WSASend(m_sSessionSocket, wsaBuf, m_iSendCount, nullptr, 0, (LPOVERLAPPED)(m_pMyOverlappedStartAddr + 2), NULL);
 	}
-
-	retVal = WSASend(m_sSessionSocket, wsaBuf, m_iSendCount, nullptr, 0, (LPOVERLAPPED)(m_pMyOverlappedStartAddr + 2), NULL);
 	if (retVal == SOCKET_ERROR)
 	{
 		errVal = WSAGetLastError();

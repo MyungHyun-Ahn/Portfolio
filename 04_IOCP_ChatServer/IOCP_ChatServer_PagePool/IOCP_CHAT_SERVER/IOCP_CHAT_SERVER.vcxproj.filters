@@ -123,6 +123,9 @@
     <ClInclude Include="CDeque.h">
       <Filter>DataStructures</Filter>
     </ClInclude>
+    <ClInclude Include="CSingleMemoryPool.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -214,6 +217,9 @@
       <Filter>Network</Filter>
     </ClCompile>
     <ClCompile Include="CDeque.cpp">
+      <Filter>DataStructures</Filter>
+    </ClCompile>
+    <ClCompile Include="CSingleMemoryPool.cpp">
       <Filter>DataStructures</Filter>
     </ClCompile>
   </ItemGroup>

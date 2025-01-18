@@ -1,9 +1,9 @@
 #pragma once
-template<int sizeByte = 4 * 1024, int bucketCount = 2>
+template<int sizeByte, int bucketCount, bool pageLock>
 class CTLSSharedPagePool
 {
 public:
-	friend class CTLSPagePool<sizeByte, bucketCount>;
+	friend class CTLSPagePool<sizeByte, bucketCount, pageLock>;
 
 	using BucketNode = TLSMemoryPoolNode<PageBucket<sizeByte, bucketCount>>;
 	using Node = TLSPagePoolNode<sizeByte>;
@@ -122,6 +122,16 @@ private:
 	{
 		// 64KB 할당 단위
 		BYTE *ptr = (BYTE *)VirtualAlloc(nullptr, 64 * 1024, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+
+		if constexpr (pageLock)
+		{
+			int err;
+			if (VirtualLock(ptr, 64 * 1024) == FALSE)
+			{
+				err = GetLastError();
+				__debugbreak();
+			}
+		}
 
 		Node *pTop = nullptr;
 		for (int i = 0; i < PageBucket<sizeByte, bucketCount>::BUCKET_SIZE; i++)

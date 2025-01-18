@@ -4,8 +4,8 @@ class CNetSession;
 class CNetServer
 {
 public:
-	BOOL Start(const CHAR *openIP, const USHORT port, USHORT createWorkerThreadCount, USHORT maxWorkerThreadCount, INT maxSessionCount) noexcept;
-	// void Stop();
+	BOOL Start(const CHAR *openIP, const USHORT port) noexcept;
+	void Stop();
 
 	inline LONG GetSessionCount() const noexcept { return m_iSessionCount; }
 
@@ -65,8 +65,8 @@ private:
 	LONG					m_iSessionCount = 0;
 	LONG64					m_iCurrentID = 0;
 
-	USHORT					m_usMaxSessionCount = 65535;
-	CNetSession				*m_arrPSessions[65535];
+	USHORT					m_usMaxSessionCount;
+	CNetSession				**m_arrPSessions;
 	CLFStack<USHORT>		m_stackDisconnectIndex;
 
 	// Worker
@@ -84,10 +84,12 @@ private:
 
 	HANDLE				m_hServerFrameThread;
 	BOOL				m_bIsServerFrameRun = TRUE;
-	CNetSession			*m_arrAcceptExSessions[ACCEPTEX_COUNT];
+	CNetSession			**m_arrAcceptExSessions;
 
 	// IOCP วฺต้
 	HANDLE m_hIOCPHandle = INVALID_HANDLE_VALUE;
+
+	LONG m_isStop = FALSE;
 };
 
 extern CNetServer *g_NetServer;

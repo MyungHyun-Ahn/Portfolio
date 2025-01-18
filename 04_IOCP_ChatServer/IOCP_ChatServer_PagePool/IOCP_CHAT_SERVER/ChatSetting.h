@@ -9,3 +9,6 @@ extern unsigned int LOGIN_TIME_OUT_CHECK;
 
 constexpr int SECTOR_VIEW_COUNT = 3;
 constexpr int SECTOR_VIEW_START = 1;
+
+constexpr int MAX_SECTOR_Y = 50;
+constexpr int MAX_SECTOR_X = 50;

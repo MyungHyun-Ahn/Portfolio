@@ -10,7 +10,8 @@ enum class IOOperation
 {
 	ACCEPTEX,
 	RECV,
-	SEND
+	SEND,
+	SENDPOST,
 };
 
 #pragma pack(push, 1)

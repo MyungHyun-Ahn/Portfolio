@@ -6,7 +6,7 @@ CProfileManager *g_ProfileMgr;
 CProfileManager::CProfileManager()
 {
 	QueryPerformanceFrequency(&m_lFreq);
-
+	timeBeginPeriod(1);
 	m_dwInfosTlsIdx = TlsAlloc();
 	if (m_dwInfosTlsIdx == TLS_OUT_OF_INDEXES)
 	{

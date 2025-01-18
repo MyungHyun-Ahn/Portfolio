@@ -148,6 +148,7 @@
   <ItemGroup>
     <ClInclude Include="CChatServer.h" />
     <ClInclude Include="CCrashDump.h" />
+    <ClInclude Include="CDeque.h" />
     <ClInclude Include="CEncryption.h" />
     <ClInclude Include="CGenPacket.h" />
     <ClInclude Include="ChatSetting.h" />
@@ -170,6 +171,7 @@
     <ClInclude Include="CSerializableBuffer.h" />
     <ClInclude Include="CSerializableBufferView.h" />
     <ClInclude Include="CLanSession.h" />
+    <ClInclude Include="CSingleMemoryPool.h" />
     <ClInclude Include="CSmartPtr.h" />
     <ClInclude Include="CTLSMemoryPool.h" />
     <ClInclude Include="CTLSSharedMemoryPool.h" />
@@ -182,6 +184,7 @@
   <ItemGroup>
     <ClCompile Include="CChatServer.cpp" />
     <ClCompile Include="CCrashDump.cpp" />
+    <ClCompile Include="CDeque.cpp" />
     <ClCompile Include="CEncryption.cpp" />
     <ClCompile Include="CGenPacket.cpp" />
     <ClCompile Include="ChatSetting.cpp" />
@@ -203,6 +206,7 @@
     <ClCompile Include="CSerializableBuffer.cpp" />
     <ClCompile Include="CSerializableBufferView.cpp" />
     <ClCompile Include="CLanSession.cpp" />
+    <ClCompile Include="CSingleMemoryPool.cpp" />
     <ClCompile Include="CSmartPtr.cpp" />
     <ClCompile Include="CTLSMemoryPool.cpp" />
     <ClCompile Include="CTLSSharedMemoryPool.cpp" />

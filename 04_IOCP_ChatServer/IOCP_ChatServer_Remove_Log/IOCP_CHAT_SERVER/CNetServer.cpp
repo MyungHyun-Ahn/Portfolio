@@ -188,7 +188,11 @@ void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *
 	}
 
 	pSession->SendPacket(sBuffer);
-	pSession->PostSend();
+
+	if (pSession->m_iSendFlag == FALSE)
+	{
+		PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)pSession, (LPOVERLAPPED)IOOperation::SENDPOST);
+	}
 
 	if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 	{
@@ -377,6 +381,15 @@ int CNetServer::WorkerThread() noexcept
 			, (PULONG_PTR)&pSession, (LPOVERLAPPED *)&lpOverlapped
 			, INFINITE);
 
+		IOOperation oper;
+		if (lpOverlapped != nullptr)
+		{
+			if ((ULONG_PTR)lpOverlapped == 3)
+				oper = IOOperation::SENDPOST;
+			else
+				oper = lpOverlapped->m_Operation;
+		}
+
 		if (lpOverlapped == nullptr)
 		{
 			if (retVal == FALSE)
@@ -393,13 +406,13 @@ int CNetServer::WorkerThread() noexcept
 			}
 		}
 		// 소켓 정상 종료
-		else if (dwTransferred == 0 && lpOverlapped->m_Operation != IOOperation::ACCEPTEX)
+		else if (dwTransferred == 0 && oper != IOOperation::ACCEPTEX && oper != IOOperation::SENDPOST)
 		{
 			Disconnect(pSession->m_uiSessionID);
 		}
 		else
 		{
-			switch (lpOverlapped->m_Operation)
+			switch (oper)
 			{
 			case IOOperation::ACCEPTEX:
 			{
@@ -444,6 +457,12 @@ int CNetServer::WorkerThread() noexcept
 			{
 				pSession->SendCompleted(dwTransferred);
 				pSession->PostSend();
+			}
+			break;
+			case IOOperation::SENDPOST:
+			{
+				pSession->PostSend();
+				continue;
 			}
 			break;
 			}

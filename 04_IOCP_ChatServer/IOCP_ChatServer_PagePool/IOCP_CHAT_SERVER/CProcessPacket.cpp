@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "CNetServer.h"
 #include "CNetSession.h"
+#include "ChatSetting.h"
 #include "CPlayer.h"
 #include "CSector.h"
 #include "CChatServer.h"

@@ -111,7 +111,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(char))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		chData = *(char *)(m_pBuffer + m_Front);
@@ -124,7 +124,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(unsigned char))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		byData = *(unsigned char *)(m_pBuffer + m_Front);
@@ -137,7 +137,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(short))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		shData = *(short *)(m_pBuffer + m_Front);
@@ -150,7 +150,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(char))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		wData = *(unsigned short *)(m_pBuffer + m_Front);
@@ -163,7 +163,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(int))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		iData = *(int *)(m_pBuffer + m_Front);
@@ -176,7 +176,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(long))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		lData = *(long *)(m_pBuffer + m_Front);
@@ -189,7 +189,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(unsigned long))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		ulData = *(unsigned long *)(m_pBuffer + m_Front);
@@ -202,7 +202,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(float))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		fData = *(float *)(m_pBuffer + m_Front);
@@ -216,7 +216,7 @@ public:
 		int size = GetDataSize();
 		if (size < sizeof(__int64))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		iData = *(__int64 *)(m_pBuffer + m_Front);
@@ -229,7 +229,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(unsigned __int64))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		uiData = *(unsigned __int64 *)(m_pBuffer + m_Front);
@@ -242,7 +242,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(double))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		dData = *(double *)(m_pBuffer + m_Front);

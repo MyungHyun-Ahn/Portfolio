@@ -119,31 +119,36 @@ public:
 	inline static LONG GetPoolUsage() noexcept { return s_sSessionPool.GetUseCount(); }
 
 private:
+	// 패딩 계산해서 세션 크기 최적화
+	// + Interlock 사용하는 변수들은 캐시라인 띄워놓기
+	// Release + IoCount
 	LONG m_iIOCountAndRelease = RELEASE_FLAG;
-	LONG m_iSendFlag = FALSE;
-	LONG m_iCacelIoCalled = FALSE;
-
+	LONG m_iSendCount = 0;
+	CRecvBuffer *m_pRecvBuffer = nullptr;
 	SOCKET m_sSessionSocket;
 	UINT64 m_uiSessionID;
+	WCHAR		m_ClientAddrBuffer[16];
+	// --- 64
 
 	char	    m_AcceptBuffer[64];
-	WCHAR		m_ClientAddrBuffer[16];
+	// --- 128
+
+	LONG		m_iSendFlag = FALSE;
 	USHORT		m_ClientPort;
-	// CRingBuffer m_RecvBuffer;
-	CRecvBuffer *m_pRecvBuffer = nullptr;
+	char		m_dummy01[2]; // 패딩 계산용
 	// 최대 무조건 1개 -> 있거나 없거나
 	CSerializableBufferView<FALSE> *m_pDelayedBuffer = nullptr;
-
 	CLFQueue<CSerializableBuffer<FALSE> *> m_lfSendBufferQueue;
-	CSerializableBuffer<FALSE> *m_arrPSendBufs[WSASEND_MAX_BUFFER_COUNT];
-	LONG							m_iSendCount = 0;
-
-
 	// m_pMyOverlappedStartAddr
 	//  + 0 : ACCEPTEX
 	//  + 1 : RECV
 	//  + 2 : SEND
 	OVERLAPPED *m_pMyOverlappedStartAddr = nullptr;
+	CSerializableBuffer<FALSE> *m_arrPSendBufs[WSASEND_MAX_BUFFER_COUNT]; // 8 * 32 = 256
+
+	LONG m_iCacelIoCalled = FALSE;
+
+	// 총 460바이트
 
 	inline static CTLSMemoryPoolManager<CNetSession, 16, 4> s_sSessionPool = CTLSMemoryPoolManager<CNetSession, 16, 4>();
 	inline static LONG RELEASE_FLAG = 0x80000000;

@@ -7,7 +7,7 @@ public:
 	enum class DEFINE
 	{
 		HEADER_SIZE = isLanServer ? 2 : 5,
-		DEFAULT_SIZE = 1400
+		DEFAULT_SIZE = 512
 	};
 
 

@@ -381,7 +381,11 @@ public:
 	}
 	inline LONG DecreaseRef() noexcept 
 	{ 
-		return InterlockedDecrement(&m_iRefCount);
+		LONG back = InterlockedDecrement(&m_iRefCount);
+		if (back == -1)
+			__debugbreak();
+
+		return back;
 	}
 
 	inline void SetSessionId(UINT64 id) noexcept { m_uiSessionId = id; }
@@ -399,7 +403,7 @@ private:
 	UINT64			m_uiSessionId = 0;
 
 	inline static CTLSMemoryPoolManager<CSerializableBuffer, 32, 8> s_sbufferPool = CTLSMemoryPoolManager<CSerializableBuffer, 32, 8>();
-	inline static CTLSPagePoolManager<512, 2> s_sPagePool512 = CTLSPagePoolManager<512, 2>();
+	inline static CTLSPagePoolManager<512, 2, false> s_sPagePool512 = CTLSPagePoolManager<512, 2, false>();
 };
 
 template<bool isLanServer>

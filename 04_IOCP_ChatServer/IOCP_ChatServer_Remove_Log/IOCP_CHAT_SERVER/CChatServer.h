@@ -1,8 +1,5 @@
 #pragma once
 
-#define MAX_SECTOR_Y 50
-#define MAX_SECTOR_X 50
-
 class CChatProcessPacketInterface;
 
 class CChatServer : public CNetServer

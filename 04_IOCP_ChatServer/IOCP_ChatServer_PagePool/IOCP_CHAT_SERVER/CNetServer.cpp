@@ -15,15 +15,23 @@ unsigned int NetServerFrameThreadFunc(LPVOID lpParam) noexcept
 	return g_NetServer->ServerFrameThread();
 }
 
-BOOL CNetServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorkerThreadCount, USHORT maxWorkerThreadCount, INT maxSessionCount) noexcept
+BOOL CNetServer::Start(const CHAR *openIP, const USHORT port) noexcept
 {
 	int retVal;
 	int errVal;
 	WSAData wsaData;
 
+	m_usMaxSessionCount = MAX_SESSION_COUNT;
+
+	m_arrPSessions = new CNetSession * [MAX_SESSION_COUNT];
+
+	ZeroMemory((char *)m_arrPSessions, sizeof(CNetSession *) * MAX_SESSION_COUNT);
+
+	m_arrAcceptExSessions = new CNetSession * [ACCEPTEX_COUNT];
+
 	// 디스커넥트 스택 채우기
-	USHORT val = 65534;
-	for (int i = 0; i < 65535; i++)
+	USHORT val = MAX_SESSION_COUNT - 1;
+	for (int i = 0; i < MAX_SESSION_COUNT; i++)
 	{
 		m_stackDisconnectIndex.Push(val--);
 	}
@@ -43,8 +51,6 @@ BOOL CNetServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"WSASocket() 실패 : %d", errVal);
 		return FALSE;
 	}
-
-	m_uiMaxWorkerThreadCount = maxWorkerThreadCount;
 
 	SOCKADDR_IN serverAddr;
 	ZeroMemory(&serverAddr, sizeof(serverAddr));
@@ -74,9 +80,7 @@ BOOL CNetServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	}
 
 	// LINGER option 설정
-	LINGER ling;
-	ling.l_linger = 0;
-	ling.l_onoff = 1;
+	LINGER ling{ 1, 0 };
 	retVal = setsockopt(m_sListenSocket, SOL_SOCKET, SO_LINGER, (char *)&ling, sizeof(ling));
 	if (retVal == SOCKET_ERROR)
 	{
@@ -95,7 +99,7 @@ BOOL CNetServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	}
 
 	// CP 핸들 생성
-	m_hIOCPHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, m_uiMaxWorkerThreadCount);
+	m_hIOCPHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, IOCP_ACTIVE_THREAD);
 	if (m_hIOCPHandle == NULL)
 	{
 		errVal = WSAGetLastError();
@@ -133,7 +137,7 @@ BOOL CNetServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"[SYSTEM] ServerFrameThread running..");
 
 	// CreateWorkerThread
-	for (int i = 1; i <= createWorkerThreadCount; i++)
+	for (int i = 1; i <= IOCP_WORKER_THREAD; i++)
 	{
 		HANDLE hWorkerThread = (HANDLE)_beginthreadex(nullptr, 0, NetWorkerThreadFunc, nullptr, 0, nullptr);
 		if (hWorkerThread == 0)
@@ -148,6 +152,35 @@ BOOL CNetServer::Start(const CHAR *openIP, const USHORT port, USHORT createWorke
 	}
 
 	return TRUE;
+}
+
+void CNetServer::Stop()
+{
+	// listen 소켓 닫기
+	InterlockedExchange(&m_isStop, TRUE);
+	closesocket(m_sListenSocket);
+
+	for (int i = 0; i < MAX_SESSION_COUNT; i++)
+	{
+		if (m_arrPSessions[i] != NULL)
+		{
+			Disconnect(m_arrPSessions[i]->m_uiSessionID);
+		}
+	}
+
+	// while SessionCount 0일 때까지
+	while (true)
+	{
+		// 세션 전부 끊고
+		if (m_iSessionCount == 0)
+		{
+			m_bIsWorkerRun = FALSE;
+			break;
+		}
+	}
+
+	m_bIsServerFrameRun = FALSE;
+	monitorThreadRunning = FALSE;
 }
 
 void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept
@@ -188,7 +221,11 @@ void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *
 	}
 
 	pSession->SendPacket(sBuffer);
-	pSession->PostSend();
+
+	if (pSession->m_iSendFlag == FALSE)
+	{
+		PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)pSession, (LPOVERLAPPED)IOOperation::SENDPOST);
+	}
 
 	if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 	{
@@ -199,6 +236,8 @@ void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *
 BOOL CNetServer::Disconnect(const UINT64 sessionID) noexcept
 {
 	CNetSession *pSession = m_arrPSessions[GetIndex(sessionID)];
+	if (pSession == nullptr)
+		return FALSE;
 
 	// ReleaseFlag가 이미 켜진 상황
 	InterlockedIncrement(&pSession->m_iIOCountAndRelease);
@@ -318,7 +357,9 @@ BOOL CNetServer::AcceptExCompleted(CNetSession *pSession) noexcept
 	if (retVal == SOCKET_ERROR)
 	{
 		errVal = WSAGetLastError();
-		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"setsockopt(SO_UPDATE_ACCEPT_CONTEXT) 실패 : %d", errVal);
+
+		if (!m_isStop)
+			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"setsockopt(SO_UPDATE_ACCEPT_CONTEXT) 실패 : %d", errVal);
 		return FALSE;
 	}
 
@@ -341,6 +382,8 @@ BOOL CNetServer::AcceptExCompleted(CNetSession *pSession) noexcept
 		return FALSE;
 
 
+	Sleep(0);
+
 	USHORT index;
 	// 연결 실패 : FALSE
 	if (!m_stackDisconnectIndex.Pop(&index))
@@ -357,6 +400,13 @@ BOOL CNetServer::AcceptExCompleted(CNetSession *pSession) noexcept
 	InterlockedIncrement(&g_monitor.m_lAcceptTPS);
 	InterlockedIncrement64(&g_monitor.m_lAcceptTotal);
 	m_arrPSessions[index] = pSession;
+
+	// 서버 중단 상태면 연결 끊기
+	if (m_isStop)
+	{
+		Disconnect(combineId);
+		return FALSE;
+	}
 
 	return TRUE;
 }
@@ -379,7 +429,10 @@ int CNetServer::WorkerThread() noexcept
 		IOOperation oper;
 		if (lpOverlapped != nullptr)
 		{
-			oper = g_OverlappedAlloc.CalOperation((ULONG_PTR)lpOverlapped);
+			if ((ULONG_PTR)lpOverlapped == 3)
+				oper = IOOperation::SENDPOST;
+			else
+				oper = g_OverlappedAlloc.CalOperation((ULONG_PTR)lpOverlapped);
 		}
 
 		if (lpOverlapped == nullptr)
@@ -398,7 +451,7 @@ int CNetServer::WorkerThread() noexcept
 			}
 		}
 		// 소켓 정상 종료
-		else if (dwTransferred == 0 && oper != IOOperation::ACCEPTEX)
+		else if (dwTransferred == 0 && oper != IOOperation::ACCEPTEX && oper != IOOperation::SENDPOST)
 		{
 			Disconnect(pSession->m_uiSessionID);
 		}
@@ -420,7 +473,10 @@ int CNetServer::WorkerThread() noexcept
 				if (!AcceptExCompleted(pSession))
 				{
 					// 실패한 인덱스에 대한 예약은 다시 걸어줌
-					PostAcceptEx(index);
+					if (!m_isStop)
+						PostAcceptEx(index);
+					else
+						CNetSession::Free(pSession);
 					break;
 				}
 
@@ -434,8 +490,10 @@ int CNetServer::WorkerThread() noexcept
 				if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 					ReleaseSession(pSession);
 
-				PostAcceptEx(index);
-
+				if (!m_isStop)
+					PostAcceptEx(index);
+				else
+					CNetSession::Free(pSession);
 				continue;
 			}
 			break;
@@ -449,6 +507,12 @@ int CNetServer::WorkerThread() noexcept
 			{
 				pSession->SendCompleted(dwTransferred);
 				pSession->PostSend();
+			}
+			break;
+			case IOOperation::SENDPOST:
+			{
+				pSession->PostSend();
+				continue;
 			}
 			break;
 			}

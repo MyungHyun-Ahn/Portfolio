@@ -1,8 +1,5 @@
 #pragma once
 
-#define MAX_SECTOR_Y 50
-#define MAX_SECTOR_X 50
-
 class CChatProcessPacketInterface;
 
 class CChatServer : public CNetServer
@@ -32,7 +29,7 @@ public:
 
 	void		DelaySendSector() noexcept;
 
-	inline int GetPlayerCount() noexcept { return m_umapLoginPlayer.size(); }
+	inline int GetPlayerCount() noexcept { return (int)m_umapLoginPlayer.size(); }
 	inline int GetJobQCount() noexcept { return m_RecvJobQ.GetUseSize(); }
 
 private:

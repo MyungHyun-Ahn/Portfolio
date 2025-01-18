@@ -22,6 +22,9 @@ unsigned int MonitorThreadFunc(LPVOID lpParam) noexcept
 		g_monitor.Update(g_NetServer->GetSessionCount(), ((CChatServer *)g_NetServer)->GetPlayerCount());
 
 		mTime += 1000;
+
+		if (GetAsyncKeyState(0x50))
+			g_ProfileMgr->DataOutToFile();
 	}
 
 	return 0;
@@ -29,6 +32,8 @@ unsigned int MonitorThreadFunc(LPVOID lpParam) noexcept
 
 int main()
 {
+	CCrashDump crashDump;
+
 	{
 		CMyFileLoader serverConfigLoader;
 		serverConfigLoader.Parse(L"ServerConfig.conf");
@@ -57,7 +62,6 @@ int main()
 
 	g_ProfileMgr = CProfileManager::GetInstance();
 
-	CCrashDump crashDump;
 	g_NetServer = new CChatServer;
 
 	g_NetServer->Start(openIP.c_str(), openPort, IOCP_WORKER_THREAD, IOCP_ACTIVE_THREAD, 65535);

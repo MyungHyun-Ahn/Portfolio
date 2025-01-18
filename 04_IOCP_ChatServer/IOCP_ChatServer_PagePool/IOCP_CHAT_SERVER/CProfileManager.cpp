@@ -34,6 +34,8 @@ void CProfileManager::DataOutToFile()
 		throw;
 	}
 
+	CreateDirectory(L"PROFILE", NULL);
+
 	sprintf_s(fileName, "PROFILE\\Profile_%04d%02d%02d_%02d%02d%02d.profile"
 		, nowTm.tm_year + 1900
 		, nowTm.tm_mon
@@ -109,7 +111,7 @@ void CProfileManager::Clear()
 
 CProfile::CProfile(int index, const char *funcName, const char *tagName)
 {
-	int idx = (int)TlsGetValue(g_ProfileMgr->m_dwInfosTlsIdx);
+	UINT64 idx = (UINT64)TlsGetValue(g_ProfileMgr->m_dwInfosTlsIdx);
 
 	stPROFILE *pProfile = &g_ProfileMgr->m_arrProfileInfos[idx]->arrProfile[index];
 	if (pProfile->isUsed == false)

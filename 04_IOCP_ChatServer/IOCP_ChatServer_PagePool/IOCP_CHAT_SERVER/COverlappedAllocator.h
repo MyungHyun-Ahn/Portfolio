@@ -8,6 +8,7 @@ enum class IOOperation
 	ACCEPTEX,
 	RECV,
 	SEND,
+	SENDPOST,
 	NONE = 400
 };
 
@@ -16,7 +17,15 @@ class COverlappedAllocator
 public:
 	COverlappedAllocator() noexcept
 	{
+		int err;
+		// 최소 최대 워킹셋 수정
+		// SetProcessWorkingSetSize(GetCurrentProcess(), 1000 * 1024 * 1024, (size_t)(10000) * 1024 * 1024);
 		m_pOverlappeds = (char *)VirtualAlloc(nullptr, 64 * 1024 * MAX_BUCKET_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+		// if (VirtualLock(m_pOverlappeds, 64 * 1024 * MAX_BUCKET_SIZE) == FALSE)
+		// {
+		// 	err = GetLastError();
+		// 	__debugbreak();
+		// }
 	}
 
 	OVERLAPPED *Alloc() noexcept
@@ -29,28 +38,26 @@ public:
 	}
 
 	// (내 OVERLAPPED 시작주소 - VirtualAlloc 할당 시작 주소) / sizeof(OVERLAPPED) * 3 = 내 OverlappedInfo 배열 시작 인덱스
-	inline int GetAcceptExIndex(ULONG_PTR myOverlappedPtr)
+	inline int GetAcceptExIndex(ULONG_PTR myOverlappedPtr) const noexcept
 	{
-		int AcceptExIndex = m_AcceptExIndex[(myOverlappedPtr - (ULONG_PTR)m_pOverlappeds) / (sizeof(OVERLAPPED) * 3)];
+		int AcceptExIndex = m_arrAcceptExIndex[(myOverlappedPtr - (ULONG_PTR)m_pOverlappeds) / (sizeof(OVERLAPPED) * 3)];
 		return AcceptExIndex;
 	}
 
-	inline void SetAcceptExIndex(ULONG_PTR myOverlappedPtr, int index)
+	inline void SetAcceptExIndex(ULONG_PTR myOverlappedPtr, int index) noexcept
 	{
-		m_AcceptExIndex[(myOverlappedPtr - (ULONG_PTR)m_pOverlappeds) / (sizeof(OVERLAPPED) * 3)] = index;
+		m_arrAcceptExIndex[(myOverlappedPtr - (ULONG_PTR)m_pOverlappeds) / (sizeof(OVERLAPPED) * 3)] = index;
 	}
 
 	// (내 OVERLAPPED 시작주소 - VirtualAlloc 할당 시작 주소) % (sizeof(OVERLAPPED) * 3) / sizeof(OVERLAPPED)
 	// - 0 : AcceptEx
 	// - 1 : Recv
 	// - 2 : Send
-	inline IOOperation CalOperation(ULONG_PTR myOverlappedPtr)
+	inline IOOperation CalOperation(ULONG_PTR myOverlappedPtr) const noexcept
 	{
 		IOOperation oper = (IOOperation)((myOverlappedPtr - (ULONG_PTR)m_pOverlappeds) % (sizeof(OVERLAPPED) * 3) / sizeof(OVERLAPPED));
 		return oper;
 	}
-
-	inline ULONG_PTR GetStartAddr() { return (ULONG_PTR)m_pOverlappeds; }
 
 private:
 	// 64KB를 1개의 버킷으로 간주
@@ -60,7 +67,7 @@ private:
 
 	LONG m_lSessionIndex = -1;
 	char *m_pOverlappeds = nullptr;
-	LONG m_AcceptExIndex[(64 * 1024 * MAX_BUCKET_SIZE) / (sizeof(OVERLAPPED) * 3)];
+	LONG m_arrAcceptExIndex[(64 * 1024 * MAX_BUCKET_SIZE) / (sizeof(OVERLAPPED) * 3)];
 };
 
 extern COverlappedAllocator g_OverlappedAlloc;

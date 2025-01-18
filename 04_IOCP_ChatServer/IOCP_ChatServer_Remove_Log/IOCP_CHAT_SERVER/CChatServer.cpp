@@ -188,7 +188,7 @@ void CChatServer::DelaySendSector() noexcept
 	{
 		for (int sectorX = 0; sectorX < MAX_SECTOR_X; sectorX++)
 		{
-			std::deque<CSerializableBuffer<FALSE> *> &msgQ = m_arrCSector[sectorY][sectorX].m_sendMsgQ;
+			CDeque<CSerializableBuffer<FALSE> *> &msgQ = m_arrCSector[sectorY][sectorX].m_sendMsgQ;
 			if (msgQ.empty())
 				continue;
 

@@ -169,6 +169,7 @@
     <ClInclude Include="CSector.h" />
     <ClInclude Include="CSerializableBuffer.h" />
     <ClInclude Include="CSerializableBufferView.h" />
+    <ClInclude Include="CSingleMemoryPool.h" />
     <ClInclude Include="CSmartPtr.h" />
     <ClInclude Include="CTLSMemoryPool.h" />
     <ClInclude Include="CTLSPagePool.h" />
@@ -204,6 +205,7 @@
     <ClCompile Include="CSector.cpp" />
     <ClCompile Include="CSerializableBuffer.cpp" />
     <ClCompile Include="CSerializableBufferView.cpp" />
+    <ClCompile Include="CSingleMemoryPool.cpp" />
     <ClCompile Include="CSmartPtr.cpp" />
     <ClCompile Include="CTLSMemoryPool.cpp" />
     <ClCompile Include="CTLSPagePool.cpp" />

@@ -7,7 +7,7 @@
 #include "ChatSetting.h"
 #include "CChatServer.h"
 
-BOOL monitorThreadRunning = TRUE;
+#pragma warning(disable : 4101)
 
 unsigned int MonitorThreadFunc(LPVOID lpParam) noexcept
 {
@@ -22,6 +22,14 @@ unsigned int MonitorThreadFunc(LPVOID lpParam) noexcept
 		g_monitor.Update(g_NetServer->GetSessionCount(), ((CChatServer *)g_NetServer)->GetPlayerCount());
 
 		mTime += 1000;
+
+		// 프로파일러 저장
+		if (GetAsyncKeyState(0x50))
+			g_ProfileMgr->DataOutToFile();
+
+		if (GetAsyncKeyState(0x53))
+			g_NetServer->Stop();
+
 	}
 
 	return 0;
@@ -29,6 +37,8 @@ unsigned int MonitorThreadFunc(LPVOID lpParam) noexcept
 
 int main()
 {
+	CCrashDump crashDump;
+
 	{
 		CMyFileLoader serverConfigLoader;
 		serverConfigLoader.Parse(L"ServerConfig.conf");
@@ -39,6 +49,8 @@ int main()
 		serverConfigLoader.Load(L"Server", L"IOCP_WORKER_THREAD", &IOCP_WORKER_THREAD);
 		serverConfigLoader.Load(L"Server", L"IOCP_ACTIVE_THREAD", &IOCP_ACTIVE_THREAD);
 		serverConfigLoader.Load(L"Server", L"USE_ZERO_COPY", &USE_ZERO_COPY);
+		serverConfigLoader.Load(L"Server", L"MAX_SESSION_COUNT", &MAX_SESSION_COUNT);
+		serverConfigLoader.Load(L"Server", L"ACCEPTEX_COUNT", &ACCEPTEX_COUNT);
 
 		serverConfigLoader.Load(L"ChatSetting", L"SERVER_FPS", &FPS);
 		if (FPS == 0)
@@ -57,10 +69,9 @@ int main()
 
 	g_ProfileMgr = CProfileManager::GetInstance();
 
-	CCrashDump crashDump;
 	g_NetServer = new CChatServer;
 
-	g_NetServer->Start(openIP.c_str(), openPort, IOCP_WORKER_THREAD, IOCP_ACTIVE_THREAD, 65535);
+	g_NetServer->Start(openIP.c_str(), openPort);
 
 	MonitorThreadFunc(nullptr);
 

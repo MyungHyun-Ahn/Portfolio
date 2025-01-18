@@ -1,5 +1,6 @@
 #pragma once
 
+// WSASend, WSARecv 페이지 락 최적화 목적
 // Byte 사이즈에 의해 Bucket의 크기가 결정됨
 // ex 4KB -> BucketSize = 64 * 1024 / 4 * 1024 = 16
 template<int sizeByte = 4 * 1024>
@@ -70,21 +71,21 @@ struct PageBucket
 	int m_iSize = 0;
 };
 
-template<int sizeByte = 4 * 1024, int bucketCount = 2>
+template<int sizeByte = 4 * 1024, int bucketCount = 2, int pageLock = false>
 class CTLSPagePoolManager;
 
-template<int sizeByte, int bucketCount>
+template<int sizeByte = 4 * 1024, int bucketCount = 2, bool pageLock = false>
 class CTLSSharedPagePool;
 
 
-template<int sizeByte = 4 * 1024, int bucketCount = 2>
+template<int sizeByte = 4 * 1024, int bucketCount = 2, bool pageLock = false>
 class CTLSPagePool
 {
 public:
-	friend class CTLSPagePoolManager<sizeByte, bucketCount>;
+	friend class CTLSPagePoolManager<sizeByte, bucketCount, pageLock>;
 
 private:
-	CTLSPagePool(CTLSSharedPagePool<sizeByte, bucketCount> *sharedPool) noexcept : m_pTLSSharedPagePool(sharedPool)
+	CTLSPagePool(CTLSSharedPagePool<sizeByte, bucketCount, pageLock> *sharedPool) noexcept : m_pTLSSharedPagePool(sharedPool)
 	{
 		m_MyBucket = PageBucket<sizeByte, bucketCount>::GetTLSPageBucket();
 		m_FreeBucket = PageBucket<sizeByte, bucketCount>::GetFreePageBucket();
@@ -169,14 +170,14 @@ private:
 
 	LONG	m_lUsedCount = 0;
 
-	CTLSSharedPagePool<sizeByte, bucketCount> *m_pTLSSharedPagePool = nullptr;
+	CTLSSharedPagePool<sizeByte, bucketCount, pageLock> *m_pTLSSharedPagePool = nullptr;
 };
 
-template<int sizeByte, int bucketCount>
+template<int sizeByte, int bucketCount, int pageLock>
 class CTLSPagePoolManager
 {
 public:
-	friend class CTLSPagePool<sizeByte, bucketCount>;
+	friend class CTLSPagePool<sizeByte, bucketCount, pageLock>;
 
 	CTLSPagePoolManager() noexcept
 	{
@@ -206,7 +207,7 @@ public:
 		{
 			tlsIndex = AllocTLSPagePoolIdx();
 			TlsSetValue(m_dwTLSPagePoolIdx, (LPVOID)tlsIndex);
-			m_arrTLSPagePools[tlsIndex] = new CTLSPagePool<sizeByte, bucketCount>(&m_TLSSharedPagePool);
+			m_arrTLSPagePools[tlsIndex] = new CTLSPagePool<sizeByte, bucketCount, pageLock>(&m_TLSSharedPagePool);
 		}
 		void *ptr = m_arrTLSPagePools[tlsIndex]->Alloc();
 		return ptr;
@@ -219,7 +220,7 @@ public:
 		{
 			tlsIndex = AllocTLSPagePoolIdx();
 			TlsSetValue(m_dwTLSPagePoolIdx, (LPVOID)tlsIndex);
-			m_arrTLSPagePools[tlsIndex] = new CTLSPagePool<sizeByte, bucketCount>(&m_TLSSharedPagePool);
+			m_arrTLSPagePools[tlsIndex] = new CTLSPagePool<sizeByte, bucketCount, pageLock>(&m_TLSSharedPagePool);
 		}
 
 		m_arrTLSPagePools[tlsIndex]->Free(freePtr);
@@ -241,8 +242,8 @@ private:
 	DWORD			m_dwTLSPagePoolIdx;
 
 	// 인덱스 0번은 TLS의 초기값으로 사용이 불가능
-	CTLSPagePool<sizeByte, bucketCount> *m_arrTLSPagePools[m_iThreadCount];
+	CTLSPagePool<sizeByte, bucketCount, pageLock> *m_arrTLSPagePools[m_iThreadCount];
 	LONG					m_iTLSPagePoolsCurrentSize = 0;
 
-	CTLSSharedPagePool<sizeByte, bucketCount> m_TLSSharedPagePool = CTLSSharedPagePool<sizeByte, bucketCount>();
+	CTLSSharedPagePool<sizeByte, bucketCount, pageLock> m_TLSSharedPagePool = CTLSSharedPagePool<sizeByte, bucketCount, pageLock>();
 };

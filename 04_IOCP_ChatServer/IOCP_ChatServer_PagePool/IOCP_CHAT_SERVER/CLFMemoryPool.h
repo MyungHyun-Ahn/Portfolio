@@ -28,7 +28,7 @@ class CLFMemoryPool
 public:
 	// 이 부분은 싱글 스레드에서 진행
 	// - 다른 스레드가 생성되고는 절대 초기화를 진행하면 안됨
-	__forceinline CLFMemoryPool(int initCount) noexcept
+	__forceinline CLFMemoryPool(int initCount = 0) noexcept
 		: m_iCapacity(0)
 	{
 		// initCount 만큼 FreeList 할당

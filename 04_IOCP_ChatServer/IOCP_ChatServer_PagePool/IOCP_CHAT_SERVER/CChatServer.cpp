@@ -1,9 +1,9 @@
 #include "pch.h"
 #include "CNetServer.h"
 #include "CNetSession.h"
+#include "ChatSetting.h"
 #include "CPlayer.h"
 #include "CSector.h"
-#include "ChatSetting.h"
 #include "CChatServer.h"
 #include "CommonProtocol.h"
 #include "CProcessPacket.h"
@@ -12,6 +12,8 @@ CChatServer::CChatServer() noexcept
 {
 	m_pProcessPacket = new CChatProcessPacket;
 	m_pProcessPacket->SetChatServer(this);
+	m_umapNonLoginPlayer.reserve(20000);
+	m_umapLoginPlayer.reserve(20000);
 }
 
 void CChatServer::Update() noexcept
@@ -146,7 +148,7 @@ DWORD CChatServer::OnUpdate() noexcept
 {
 	static DWORD prevTick = timeGetTime();
 
-	int dTime = timeGetTime() - prevTick;
+	UINT dTime = timeGetTime() - prevTick;
 	// 다음 깨어나야 하는 시간
 	if (dTime < FRAME_PER_TICK)
 		return FRAME_PER_TICK - dTime;
@@ -187,7 +189,7 @@ void CChatServer::DelaySendSector() noexcept
 	{
 		for (int sectorX = 0; sectorX < MAX_SECTOR_X; sectorX++)
 		{
-			std::deque<CSerializableBuffer<FALSE> *> &msgQ = m_arrCSector[sectorY][sectorX].m_sendMsgQ;
+			CDeque<CSerializableBuffer<FALSE> *> &msgQ = m_arrCSector[sectorY][sectorX].m_sendMsgQ;
 			if (msgQ.empty())
 				continue;
 

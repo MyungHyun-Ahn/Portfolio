@@ -288,7 +288,10 @@ bool CNetSession::PostRecv() noexcept
 
 
 	DWORD flag = 0;
-	retVal = WSARecv(m_sSessionSocket, &wsaBuf, 1, nullptr, &flag, (LPWSAOVERLAPPED)&m_RecvOverlapped, NULL);
+	{
+		PROFILE_BEGIN(0, "WSARecv");
+		retVal = WSARecv(m_sSessionSocket, &wsaBuf, 1, nullptr, &flag, (LPWSAOVERLAPPED)&m_RecvOverlapped, NULL);
+	}
 	if (retVal == SOCKET_ERROR)
 	{
 		errVal = WSAGetLastError();
@@ -386,7 +389,10 @@ bool CNetSession::PostSend(BOOL isCompleted) noexcept
 		return FALSE;
 	}
 
-	retVal = WSASend(m_sSessionSocket, wsaBuf, m_iSendCount, nullptr, 0, (LPOVERLAPPED)&m_SendOverlapped, NULL);
+	{
+		PROFILE_BEGIN(0, "WSASend");
+		retVal = WSASend(m_sSessionSocket, wsaBuf, m_iSendCount, nullptr, 0, (LPOVERLAPPED)&m_SendOverlapped, NULL);
+	}
 	if (retVal == SOCKET_ERROR)
 	{
 		errVal = WSAGetLastError();
