@@ -1,5 +1,9 @@
 #pragma once
 
+// 링버퍼 안씀
+// - Recv - recv 버퍼로 교체 -> SerializableBufferView로
+// - Send -> WSASend -> 직렬화버퍼 여러개
+
 // 링 버퍼는 오브젝트 풀이 필요 없음
 // * 왜냐 - Session에 물려 있다!
 

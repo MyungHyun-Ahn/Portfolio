@@ -9,11 +9,10 @@ public:
 		: m_sSessionSocket(INVALID_SOCKET)
 		, m_uiSessionID(0)
 	{
-		g_OverlappedAlloc.Alloc(&m_pMyOverlappedStartAddr);
-		int index = g_OverlappedAlloc.CalIndex((ULONG_PTR)m_pMyOverlappedStartAddr);
-		g_OverlappedAlloc.m_infos[index].operation = IOOperation::ACCEPTEX;
-		g_OverlappedAlloc.m_infos[index + 1].operation = IOOperation::RECV;
-		g_OverlappedAlloc.m_infos[index + 2].operation = IOOperation::SEND;
+		// + 0 : AcceptEx
+		// + 1 : Recv
+		// + 2 : Send
+		m_pMyOverlappedStartAddr = g_OverlappedAlloc.Alloc();
 	}
 
 	~CNetSession() noexcept

@@ -321,5 +321,5 @@ private:
 	ULONG_PTR			m_NULL; // NULL Ã¼Å©¿ë
 
 	inline static LONG	s_iQueueIdentifier = 0;
-	inline static CLFMemoryPool<Node> s_BucketPool = CLFMemoryPool<Node>(100, false);
+	inline static CLFMemoryPool<Node> s_BucketPool = CLFMemoryPool<Node>(100);
 };

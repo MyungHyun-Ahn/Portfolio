@@ -134,7 +134,6 @@ void CChatServer::OnRecv(const UINT64 sessionID, CSerializableBufferView<FALSE> 
 	m_RecvJobQ.Enqueue(message);
 }
 
-// 이 버전 Lock Free Queue 때문에 못씀
 void CChatServer::OnRecv(const UINT64 sessionID, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept
 {
 }

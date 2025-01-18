@@ -148,6 +148,7 @@
   <ItemGroup>
     <ClInclude Include="CChatServer.h" />
     <ClInclude Include="CCrashDump.h" />
+    <ClInclude Include="CDeque.h" />
     <ClInclude Include="CEncryption.h" />
     <ClInclude Include="CGenPacket.h" />
     <ClInclude Include="ChatSetting.h" />
@@ -183,6 +184,7 @@
   <ItemGroup>
     <ClCompile Include="CChatServer.cpp" />
     <ClCompile Include="CCrashDump.cpp" />
+    <ClCompile Include="CDeque.cpp" />
     <ClCompile Include="CEncryption.cpp" />
     <ClCompile Include="CGenPacket.cpp" />
     <ClCompile Include="ChatSetting.cpp" />

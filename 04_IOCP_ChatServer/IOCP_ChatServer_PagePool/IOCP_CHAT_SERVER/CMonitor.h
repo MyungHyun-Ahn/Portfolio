@@ -52,6 +52,8 @@ public:
 	PDH_HCOUNTER m_NetworkRecvKB2Counter;
 	PDH_HCOUNTER m_NetworkRetransmissionCounter;
 
+	LONG m_lMaxSendCount = 0;
+
 	PDH_FMT_COUNTERVALUE m_ProcessNPMemoryVal;
 	PDH_FMT_COUNTERVALUE m_SystemNPMemoryVal;
 	PDH_FMT_COUNTERVALUE m_SystemAvailableMemoryVal;

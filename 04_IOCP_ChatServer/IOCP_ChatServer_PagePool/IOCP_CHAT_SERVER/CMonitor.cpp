@@ -140,6 +140,7 @@ void CMonitor::UpdateServer() noexcept
 	InterlockedExchange(&m_lRecvTPS, 0);
 	InterlockedExchange(&m_lSendTPS, 0);
 	InterlockedExchange(&m_lUpdateTPS, 0);
+	InterlockedExchange(&m_lMaxSendCount, 0);
 	InterlockedExchange(&m_lServerFrame, 0);
 }
 
@@ -207,5 +208,6 @@ void CMonitor::MonitoringConsole(INT sessionCount, INT playerCount) noexcept
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRecv\t : %d", m_lRecvTPS);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSend\t : %d", m_lSendTPS);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tUpdate\t : %d", m_lUpdateTPS);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tMaxSend\t : %d", m_lMaxSendCount);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"----------------------------------------");
 }

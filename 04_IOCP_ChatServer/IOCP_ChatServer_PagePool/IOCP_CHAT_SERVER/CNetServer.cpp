@@ -279,7 +279,6 @@ BOOL CNetServer::PostAcceptEx(INT index) noexcept
 	int errVal;
 
 	CNetSession *newAcceptEx = CNetSession::Alloc();
-	// newAcceptEx->m_iIOCountAndRelease = 0;
 	m_arrAcceptExSessions[index] = newAcceptEx;
 
 	newAcceptEx->m_sSessionSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -290,9 +289,8 @@ BOOL CNetServer::PostAcceptEx(INT index) noexcept
 		return FALSE;
 	}
 
-	// InterlockedIncrement(&newAcceptEx->m_iIOCountAndRelease);
 	ZeroMemory(newAcceptEx->m_pMyOverlappedStartAddr, sizeof(OVERLAPPED));
-	g_OverlappedAlloc.m_infos[g_OverlappedAlloc.CalIndex((ULONG_PTR)newAcceptEx->m_pMyOverlappedStartAddr)].index = index;
+	g_OverlappedAlloc.SetAcceptExIndex((ULONG_PTR)newAcceptEx->m_pMyOverlappedStartAddr, index);
 
 	retVal = m_lpfnAcceptEx(m_sListenSocket, newAcceptEx->m_sSessionSocket
 		, newAcceptEx->m_AcceptBuffer, 0, sizeof(SOCKADDR_IN) + 16, sizeof(SOCKADDR_IN) + 16, NULL, newAcceptEx->m_pMyOverlappedStartAddr);
@@ -323,9 +321,6 @@ BOOL CNetServer::AcceptExCompleted(CNetSession *pSession) noexcept
 		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"setsockopt(SO_UPDATE_ACCEPT_CONTEXT) 실패 : %d", errVal);
 		return FALSE;
 	}
-
-	if (pSession == nullptr)
-		__debugbreak();
 
 	// 성공한 소켓에 대해 IOCP 등록
 	CreateIoCompletionPort((HANDLE)pSession->m_sSessionSocket, m_hIOCPHandle, (ULONG_PTR)pSession, 0);
@@ -381,10 +376,10 @@ int CNetServer::WorkerThread() noexcept
 			, INFINITE);
 
 		
-		OverlappedInfo *overlappedInfo = nullptr;
+		IOOperation oper;
 		if (lpOverlapped != nullptr)
 		{
-			overlappedInfo = &g_OverlappedAlloc.m_infos[g_OverlappedAlloc.CalIndex((ULONG_PTR)lpOverlapped)];
+			oper = g_OverlappedAlloc.CalOperation((ULONG_PTR)lpOverlapped);
 		}
 
 		if (lpOverlapped == nullptr)
@@ -403,18 +398,18 @@ int CNetServer::WorkerThread() noexcept
 			}
 		}
 		// 소켓 정상 종료
-		else if (dwTransferred == 0 && overlappedInfo->operation != IOOperation::ACCEPTEX)
+		else if (dwTransferred == 0 && oper != IOOperation::ACCEPTEX)
 		{
 			Disconnect(pSession->m_uiSessionID);
 		}
 		else
 		{
-			switch (overlappedInfo->operation)
+			switch (oper)
 			{
 			case IOOperation::ACCEPTEX:
 			{
 				// Accept가 성공한 세션 포인터를 얻어옴
-				INT index = overlappedInfo->index;
+				INT index = g_OverlappedAlloc.GetAcceptExIndex((ULONG_PTR)lpOverlapped);
 				pSession = m_arrAcceptExSessions[index];
 
 				// 이거 실패하면 연결 끊음
@@ -506,8 +501,6 @@ void CNetServer::AcceptAPCEnqueue(UINT64 sessionId) noexcept
 	int retVal;
 	int errVal;
 
-	// m_stackFreeAcceptExIndex.Push(index);
-
 	retVal = QueueUserAPC(AcceptAPCFunc, m_hServerFrameThread, (ULONG_PTR)sessionId);
 	if (retVal == FALSE)
 	{
@@ -522,13 +515,6 @@ void CNetServer::AcceptAPCFunc(ULONG_PTR lpParam) noexcept
 	// OnAccept 호출
 	if (lpParam != 0)
 		g_NetServer->OnAccept(lpParam);
-
-	// AcceptEx 작업
-	// USHORT index;
-	// while (g_NetServer->m_stackFreeAcceptExIndex.Pop(&index))
-	// {
-	// 	g_NetServer->PostAcceptEx(index);
-	// }
 }
 
 void CNetServer::ClientLeaveAPCEnqueue(UINT64 sessionId) noexcept

@@ -1,23 +1,14 @@
 #pragma once
 
+// 오버랩 구조체를 최대한 페이지를 적게 사용하고 몰아넣기 위한 할당기
+// - 할당 해제는 전혀 고려하지 않음
+
 enum class IOOperation
 {
 	ACCEPTEX,
 	RECV,
-	SEND
-};
-
-
-struct OverlappedInfo
-{
-	IOOperation		operation;
-	LONG			index;
-};
-
-struct OverlappedBucket
-{
-	char *Overlappeds = nullptr;
-	OverlappedInfo infos[(64 * 1024) / sizeof(OVERLAPPED)];
+	SEND,
+	NONE = 400
 };
 
 class COverlappedAllocator
@@ -28,35 +19,48 @@ public:
 		m_pOverlappeds = (char *)VirtualAlloc(nullptr, 64 * 1024 * MAX_BUCKET_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	}
 
-	void Alloc(OVERLAPPED **OverlappedPtr) noexcept
+	OVERLAPPED *Alloc() noexcept
 	{
 		LONG index = InterlockedIncrement(&m_lSessionIndex);
-		*OverlappedPtr = (OVERLAPPED *)(m_pOverlappeds + (32 * 3 * index));
+		OVERLAPPED *retOverlapped;
+		retOverlapped = (OVERLAPPED *)(m_pOverlappeds + (sizeof(OVERLAPPED) * 3 * index));
+
+		return retOverlapped;
 	}
 
-	// (내 OVERLAPPED 시작주소 - VirtualAlloc 할당 시작 주소) / sizeof(OVERLAPPED) = 내 OverlappedInfo 배열 시작 인덱스
-	inline int CalIndex(ULONG_PTR myOverlappedPtr)
+	// (내 OVERLAPPED 시작주소 - VirtualAlloc 할당 시작 주소) / sizeof(OVERLAPPED) * 3 = 내 OverlappedInfo 배열 시작 인덱스
+	inline int GetAcceptExIndex(ULONG_PTR myOverlappedPtr)
 	{
-		int infoStartIndex = (myOverlappedPtr - (ULONG_PTR)m_pOverlappeds) / sizeof(OVERLAPPED);
-		return infoStartIndex;
+		int AcceptExIndex = m_AcceptExIndex[(myOverlappedPtr - (ULONG_PTR)m_pOverlappeds) / (sizeof(OVERLAPPED) * 3)];
+		return AcceptExIndex;
+	}
+
+	inline void SetAcceptExIndex(ULONG_PTR myOverlappedPtr, int index)
+	{
+		m_AcceptExIndex[(myOverlappedPtr - (ULONG_PTR)m_pOverlappeds) / (sizeof(OVERLAPPED) * 3)] = index;
+	}
+
+	// (내 OVERLAPPED 시작주소 - VirtualAlloc 할당 시작 주소) % (sizeof(OVERLAPPED) * 3) / sizeof(OVERLAPPED)
+	// - 0 : AcceptEx
+	// - 1 : Recv
+	// - 2 : Send
+	inline IOOperation CalOperation(ULONG_PTR myOverlappedPtr)
+	{
+		IOOperation oper = (IOOperation)((myOverlappedPtr - (ULONG_PTR)m_pOverlappeds) % (sizeof(OVERLAPPED) * 3) / sizeof(OVERLAPPED));
+		return oper;
 	}
 
 	inline ULONG_PTR GetStartAddr() { return (ULONG_PTR)m_pOverlappeds; }
 
-	// 할당 해제는 안함
-	// Overlapped 구조체 32바이트
-	// VirtualAlloc 한번에
-	// 32 * 2048 총 세션 682개 넣을 수 있음
-	// 세션풀 20000개라 하면 20000 / 682 = 대충 30
 private:
 	// 64KB를 1개의 버킷으로 간주
+	// 처음 할당할 때 연결된 메모리 영역을 할당 받을 것임
+	// MAX_BUCKET_SIZE * 64KB의 영역을 할당
 	static constexpr int MAX_BUCKET_SIZE = 30;
 
 	LONG m_lSessionIndex = -1;
 	char *m_pOverlappeds = nullptr;
-
-public:
-	OverlappedInfo m_infos[(64 * 1024 * MAX_BUCKET_SIZE) / sizeof(OVERLAPPED)];
+	LONG m_AcceptExIndex[(64 * 1024 * MAX_BUCKET_SIZE) / (sizeof(OVERLAPPED) * 3)];
 };
 
 extern COverlappedAllocator g_OverlappedAlloc;

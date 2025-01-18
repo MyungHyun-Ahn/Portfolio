@@ -343,6 +343,10 @@ bool CNetSession::PostSend(BOOL isCompleted) noexcept
 	WSABUF wsaBuf[WSASEND_MAX_BUFFER_COUNT];
 
 	m_iSendCount = min(sendUseSize, WSASEND_MAX_BUFFER_COUNT);
+	// WSASEND_MAX_BUFFER_COUNT 만큼 1초에 몇번 보내는지 카운트
+	// 이 수치가 높다면 더 늘릴 것
+	if (m_iSendCount == WSASEND_MAX_BUFFER_COUNT)
+		InterlockedIncrement(&g_monitor.m_lMaxSendCount);
 
 	InterlockedAdd(&g_monitor.m_lSendTPS, m_iSendCount);
 

@@ -177,6 +177,8 @@ public:
 			ULONG_PTR next = readTailAddr->next;
 			UINT_PTR readEnqueueId = m_ENQUEUE_ID;
 
+			// 순서 꼬인 문제를 해결하기 위함
+			// 결국 Cas1과 Cas2가 묶인 꼴이 나옴
 			if (readEnqueueId != m_ENQUEUE_ID)
 				continue;
 

@@ -19,6 +19,7 @@ struct MemoryPoolNode
 #endif
 };
 
+// placement 지원 안함
 template<typename DATA>
 class CLFMemoryPool
 {
@@ -27,23 +28,14 @@ class CLFMemoryPool
 public:
 	// 이 부분은 싱글 스레드에서 진행
 	// - 다른 스레드가 생성되고는 절대 초기화를 진행하면 안됨
-	__forceinline CLFMemoryPool(int initCount, bool placementNewFlag) noexcept
-		: m_iCapacity(0), m_bPlacementNewFlag(placementNewFlag)
+	__forceinline CLFMemoryPool(int initCount) noexcept
+		: m_iCapacity(0)
 	{
 		// initCount 만큼 FreeList 할당
 		for (int i = 0; i < initCount; i++)
 		{
 			ULONG_PTR ident = InterlockedIncrement(&m_ullCurrentIdentifier);
-			Node *newTop;
-			if (m_bPlacementNewFlag)
-			{
-				newTop = PlacementNewAlloc();
-			}
-			else
-			{
-				newTop = NewAlloc();
-			}
-
+			Node *newTop = NewAlloc();
 			ULONG_PTR combinedNewTop = CombineIdentAndAddr(ident, (ULONG_PTR)newTop);
 			newTop->next = m_pTop;
 			m_pTop = combinedNewTop;
@@ -57,11 +49,6 @@ public:
 		while (m_pTop != NULL)
 		{
 			Node *delNode = (Node *)GetAddress(m_pTop);
-			if (m_bPlacementNewFlag)
-			{
-				delNode->data.~DATA();
-			}
-
 			m_pTop = delNode->next;
 			free(delNode);
 		}
@@ -77,14 +64,7 @@ public:
 		// - 이 시점에 Free 노드가 생겨도 그냥 할당해도 됨
 		if (m_pTop == NULL)
 		{
-			if (m_bPlacementNewFlag)
-			{
-				node = PlacementNewAlloc();
-			}
-			else
-			{
-				node = NewAlloc();
-			}
+			node = NewAlloc();
 		}
 		else
 		{
@@ -96,27 +76,13 @@ public:
 				readTop = m_pTop;
 				if (readTop == NULL)
 				{
-					if (m_bPlacementNewFlag)
-					{
-						node = PlacementNewAlloc();
-					}
-					else
-					{
-						node = NewAlloc();
-					}
-
+					node = NewAlloc();
 					break;
 				}
 
 				node = (Node *)GetAddress(readTop);
 				newTop = node->next;
 			} while (InterlockedCompareExchange(&m_pTop, newTop, readTop) != readTop);
-
-			// 반환될 노드가 결정된 이후 진행
-			if (m_bPlacementNewFlag)
-			{
-				node = new (node) Node;
-			}
 		}
 
 		InterlockedIncrement(&m_iUseCount);
@@ -141,13 +107,6 @@ public:
 #else
 		Node *newTop = (Node *)ptr;
 #endif
-		// nodePtr 소멸자 호출
-		// 먼저 진행되어야 함
-		if (m_bPlacementNewFlag)
-		{
-			newTop->data.~DATA();
-		}
-
 		ULONG_PTR ident = InterlockedIncrement(&m_ullCurrentIdentifier);
 		ULONG_PTR readTop;
 		ULONG_PTR combinedNewTop = CombineIdentAndAddr(ident, (ULONG_PTR)newTop);
@@ -164,17 +123,6 @@ public:
 	}
 
 private:
-	__forceinline Node *PlacementNewAlloc() noexcept
-	{
-		Node *mallocNode = (Node *)malloc(sizeof(Node));
-		Node *newNode = new (mallocNode) Node;
-#ifdef SAFE_MODE
-		newNode->poolPtr = this;
-#endif
-		InterlockedIncrement(&m_iCapacity);
-		return newNode;
-	}
-
 	__forceinline Node *NewAlloc() noexcept
 	{
 		Node *newNode = new Node;
@@ -190,7 +138,6 @@ public:
 	inline LONG GetUseCount() const noexcept { return m_iUseCount; }
 
 private:
-	bool		m_bPlacementNewFlag;
 	LONG		m_iUseCount = 0;
 	LONG		m_iCapacity = 0;
 	ULONG_PTR	m_ullCurrentIdentifier = 0;

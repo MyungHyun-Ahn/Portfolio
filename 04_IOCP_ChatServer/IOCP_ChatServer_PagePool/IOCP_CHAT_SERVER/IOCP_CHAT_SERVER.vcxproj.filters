@@ -120,6 +120,9 @@
     <ClInclude Include="COverlappedAllocator.h">
       <Filter>Network</Filter>
     </ClInclude>
+    <ClInclude Include="CDeque.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -209,6 +212,9 @@
     </ClCompile>
     <ClCompile Include="COverlappedAllocator.cpp">
       <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="CDeque.cpp">
+      <Filter>DataStructures</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -20,10 +20,11 @@ public:
 	virtual void OnRecv(const UINT64 sessionID, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept = 0;
 	virtual void OnError(int errorcode, WCHAR *errMsg) noexcept = 0;
 
+	// ÄÜÅÙÃ÷ ÇÁ·¹ÀÓ
 	virtual DWORD OnUpdate() noexcept = 0;
 	virtual void OnHeartBeat() noexcept = 0;
 
-
+	// AcceptEx
 	void FristPostAcceptEx() noexcept;
 	BOOL PostAcceptEx(INT index) noexcept;
 	BOOL AcceptExCompleted(CNetSession *pSession) noexcept;
@@ -84,7 +85,6 @@ private:
 	HANDLE				m_hServerFrameThread;
 	BOOL				m_bIsServerFrameRun = TRUE;
 	CNetSession			*m_arrAcceptExSessions[ACCEPTEX_COUNT];
-	CLFStack<USHORT>    m_stackFreeAcceptExIndex;
 
 	// IOCP ÇÚµé
 	HANDLE m_hIOCPHandle = INVALID_HANDLE_VALUE;
