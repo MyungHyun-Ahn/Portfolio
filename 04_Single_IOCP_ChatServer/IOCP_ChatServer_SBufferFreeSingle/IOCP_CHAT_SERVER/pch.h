@@ -42,6 +42,7 @@
 #include <new>
 #include <locale>
 #include <DbgHelp.h>
+#include <chrono>
 
 #include "DefineSingleton.h"
 #include "CProfileManager.h"

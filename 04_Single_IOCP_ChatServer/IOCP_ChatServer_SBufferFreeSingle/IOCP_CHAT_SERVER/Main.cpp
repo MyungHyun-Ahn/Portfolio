@@ -24,10 +24,10 @@ unsigned int MonitorThreadFunc(LPVOID lpParam) noexcept
 		mTime += 1000;
 
 		// 프로파일러 저장
-		if (GetAsyncKeyState(0x50))
+		if (GetAsyncKeyState(VK_F2))
 			g_ProfileMgr->DataOutToFile();
 
-		if (GetAsyncKeyState(0x53))
+		if (GetAsyncKeyState(VK_F1))
 			g_NetServer->Stop();
 
 	}

@@ -285,7 +285,7 @@ bool CNetSession::PostRecv() noexcept
 
 	DWORD flag = 0;
 	{
-		// PROFILE_BEGIN(0, "WSARecv");
+		PROFILE_BEGIN(0, "WSARecv");
 		retVal = WSARecv(m_sSessionSocket, &wsaBuf, 1, nullptr, &flag, (LPWSAOVERLAPPED)(m_pMyOverlappedStartAddr + 1), NULL);
 	}
 	if (retVal == SOCKET_ERROR)
@@ -381,7 +381,7 @@ bool CNetSession::PostSend(BOOL isCompleted) noexcept
 	ZeroMemory((m_pMyOverlappedStartAddr + 2), sizeof(OVERLAPPED));
 
 	{
-		// PROFILE_BEGIN(0, "WSASend");
+		PROFILE_BEGIN(0, "WSASend");
 		retVal = WSASend(m_sSessionSocket, wsaBuf, m_iSendCount, nullptr, 0, (LPOVERLAPPED)(m_pMyOverlappedStartAddr + 2), NULL);
 	}
 	if (retVal == SOCKET_ERROR)

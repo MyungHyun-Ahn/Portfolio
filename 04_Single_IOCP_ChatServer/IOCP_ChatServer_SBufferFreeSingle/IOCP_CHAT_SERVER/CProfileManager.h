@@ -65,7 +65,8 @@ public:
 	~CProfile();
 
 	stPROFILE *m_stProfile;
-	LARGE_INTEGER	m_iStartTime;
+	std::chrono::steady_clock::time_point m_iStartTime;
+	// LARGE_INTEGER	m_iStartTime;
 };
 
 
