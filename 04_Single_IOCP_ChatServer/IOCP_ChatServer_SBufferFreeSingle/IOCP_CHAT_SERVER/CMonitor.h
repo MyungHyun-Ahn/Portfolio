@@ -83,6 +83,14 @@ public:
 	PROCESS_MEMORY_COUNTERS_EX m_stPmc;
 
 	LONG m_lServerFrame = 0;
+
+	//
+	UINT64 m_LoopCount = 0;
+	UINT64 m_AcceptTPSTotal = 0;
+	UINT64 m_RecvTPSTotal = 0;
+	UINT64 m_SendTPSTotal = 0;
+	UINT64 m_UpdateTPSTotal = 0;
+
 };
 
 extern CMonitor g_monitor;

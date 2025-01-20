@@ -136,9 +136,14 @@ void CMonitor::UpdateCpuTime() noexcept
 
 void CMonitor::UpdateServer() noexcept
 {
+	m_LoopCount++;
+	m_AcceptTPSTotal += m_lAcceptTPS;
 	InterlockedExchange(&m_lAcceptTPS, 0);
+	m_RecvTPSTotal += m_lRecvTPS;
 	InterlockedExchange(&m_lRecvTPS, 0);
+	m_SendTPSTotal += m_lSendTPS;
 	InterlockedExchange(&m_lSendTPS, 0);
+	m_UpdateTPSTotal += m_lUpdateTPS;
 	InterlockedExchange(&m_lUpdateTPS, 0);
 	InterlockedExchange(&m_lMaxSendCount, 0);
 	InterlockedExchange(&m_lServerFrame, 0);
@@ -204,10 +209,10 @@ void CMonitor::MonitoringConsole(INT sessionCount, INT playerCount) noexcept
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRecv pool capacity \t: %d, usage \t: %d", CRecvBuffer::GetPoolCapacity(), CRecvBuffer::GetPoolUsage());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tPlayer pool capacity \t: %d, usage \t: %d\n", CPlayer::GetPoolCapacity(), CPlayer::GetPoolUsage());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"TPS");
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tAccept\t : %d", m_lAcceptTPS);
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRecv\t : %d", m_lRecvTPS);
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSend\t : %d", m_lSendTPS);
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tUpdate\t : %d", m_lUpdateTPS);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tAccept\t : %d \t Avr : %lf", m_lAcceptTPS, (DOUBLE)m_AcceptTPSTotal / m_LoopCount);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRecv\t : %d \t Avr : %lf", m_lRecvTPS, (DOUBLE)m_RecvTPSTotal / m_LoopCount);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSend\t : %d \t Avr : %lf", m_lSendTPS, (DOUBLE)m_SendTPSTotal / m_LoopCount);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tUpdate\t : %d \t Avr : %lf", m_lUpdateTPS, (DOUBLE)m_UpdateTPSTotal / m_LoopCount);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tMaxSend\t : %d", m_lMaxSendCount);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"----------------------------------------");
 }

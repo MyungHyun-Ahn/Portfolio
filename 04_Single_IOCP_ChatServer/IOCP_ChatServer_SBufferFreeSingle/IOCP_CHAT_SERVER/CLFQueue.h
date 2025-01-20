@@ -188,7 +188,6 @@ public:
 				InterlockedCompareExchange(&m_pTail, combinedNode, readTail);
 				break; // 여기까지 했다면 break;
 			}
-
 		}
 
 		// Enqueue 성공

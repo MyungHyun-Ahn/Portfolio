@@ -17,15 +17,15 @@ class COverlappedAllocator
 public:
 	COverlappedAllocator() noexcept
 	{
-		// int err;
+		int err;
 		// 최소 최대 워킹셋 수정
-		// SetProcessWorkingSetSize(GetCurrentProcess(), 1000 * 1024 * 1024, (size_t)(10000) * 1024 * 1024);
+		SetProcessWorkingSetSize(GetCurrentProcess(), 1000 * 1024 * 1024, (size_t)(10000) * 1024 * 1024);
 		m_pOverlappeds = (char *)VirtualAlloc(nullptr, 64 * 1024 * MAX_BUCKET_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-		// if (VirtualLock(m_pOverlappeds, 64 * 1024 * MAX_BUCKET_SIZE) == FALSE)
-		// {
-		// 	err = GetLastError();
-		// 	__debugbreak();
-		// }
+		if (VirtualLock(m_pOverlappeds, 64 * 1024 * MAX_BUCKET_SIZE) == FALSE)
+		{
+			err = GetLastError();
+			__debugbreak();
+		}
 	}
 
 	OVERLAPPED *Alloc() noexcept
