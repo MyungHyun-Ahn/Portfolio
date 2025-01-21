@@ -7,6 +7,7 @@ public:
 	CRecvBuffer() noexcept
 	{
 		m_PQueue = (char *)s_PagePool4KB.Alloc();
+		// m_PQueue = new char[4096];
 		m_iCapacity = 4096;
 	}
 	~CRecvBuffer() noexcept
@@ -87,5 +88,5 @@ private:
 	LONG			m_iRefCount = 0;
 
 	inline static CTLSMemoryPoolManager<CRecvBuffer, 16, 4> s_sbufferPool = CTLSMemoryPoolManager<CRecvBuffer, 16, 4>();
-	inline static CTLSPagePoolManager<4096, 2, true> s_PagePool4KB = CTLSPagePoolManager<4096, 2, true>();
+	inline static CTLSPagePoolManager<4096, 2, false> s_PagePool4KB = CTLSPagePoolManager<4096, 2, false>();
 };

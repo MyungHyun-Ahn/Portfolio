@@ -14,6 +14,7 @@ public:
 	CSerializableBuffer() noexcept
 	{
 		m_Buffer = (char *)s_sPagePool512.Alloc();
+		// m_Buffer = new char[512];
 		m_MaxSize = 512;
 		m_HeaderFront = 0;
 		m_Front = (int)DEFINE::HEADER_SIZE;
@@ -403,7 +404,7 @@ private:
 	UINT64			m_uiSessionId = 0;
 
 	inline static CSingleMemoryPool<CSerializableBuffer> s_sbufferPool = CSingleMemoryPool<CSerializableBuffer>();
-	inline static CTLSPagePoolManager<512, 2, true> s_sPagePool512 = CTLSPagePoolManager<512, 2, true>();
+	inline static CTLSPagePoolManager<512, 2, false> s_sPagePool512 = CTLSPagePoolManager<512, 2, false>();
 };
 
 template<bool isLanServer>
