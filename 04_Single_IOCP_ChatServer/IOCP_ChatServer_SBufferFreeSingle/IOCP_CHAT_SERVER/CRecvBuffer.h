@@ -12,7 +12,7 @@ public:
 	}
 	~CRecvBuffer() noexcept
 	{
-		s_PagePool4KB.Free(m_PQueue);
+		// s_PagePool4KB.Free(m_PQueue);
 	}
 
 	inline int GetCapacity() const noexcept { return m_iCapacity; }

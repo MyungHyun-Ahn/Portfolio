@@ -236,7 +236,6 @@ void CNetSession::SendCompleted(int size) noexcept
 	// * 논블락킹 I/O일 때만 Send를 요청한 데이터보다 덜 보내는 상황이 발생 가능
 	// * 비동기 I/O는 무조건 전부 보내고 완료 통지가 도착함
 
-	CDeque<CSerializableBuffer<FALSE> *> *freeList = new CDeque<CSerializableBuffer<FALSE> *>();
 
 	int count;
 	for (count = 0; count < m_iSendCount; count++)
@@ -244,13 +243,11 @@ void CNetSession::SendCompleted(int size) noexcept
 		// RefCount를 낮추고 0이라면 보낸 거 삭제
 		if (m_arrPSendBufs[count]->DecreaseRef() == 0)
 		{
-			freeList->push_back(m_arrPSendBufs[count]);
+			CSerializableBuffer<FALSE>::Free(m_arrPSendBufs[count]);
 		}
 	}
 
 	m_iSendCount = 0;
-
-	g_NetServer->SBufferFreeAPCEnqueue((ULONG_PTR)freeList);
 
 	InterlockedIncrement(&g_monitor.m_lSendTPS);
 
@@ -424,14 +421,11 @@ void CNetSession::Clear() noexcept
 		m_pDelayedBuffer = nullptr;
 	}
 
-	// 싱글 Enqueue - 싱글 Dequeue
-	CDeque<CSerializableBuffer<FALSE> *> *freeList = new CDeque<CSerializableBuffer<FALSE> *>();
-
 	for (int count = 0; count < m_iSendCount; count++)
 	{
 		if (m_arrPSendBufs[count]->DecreaseRef() == 0)
 		{
-			freeList->push_back(m_arrPSendBufs[count]);
+			CSerializableBuffer<FALSE>::Free(m_arrPSendBufs[count]);
 		}
 	}
 
@@ -452,12 +446,9 @@ void CNetSession::Clear() noexcept
 		// RefCount를 낮추고 0이라면 보낸 거 삭제
 		if (pBuffer->DecreaseRef() == 0)
 		{
-			freeList->push_back(pBuffer);
+			CSerializableBuffer<FALSE>::Free(pBuffer);
 		}
 	}
-
-	// freeList를 APC 큐로 전송
-	g_NetServer->SBufferFreeAPCEnqueue((ULONG_PTR)freeList);
 
 	useBufferSize = m_lfSendBufferQueue.GetUseSize();
 	if (useBufferSize != 0)

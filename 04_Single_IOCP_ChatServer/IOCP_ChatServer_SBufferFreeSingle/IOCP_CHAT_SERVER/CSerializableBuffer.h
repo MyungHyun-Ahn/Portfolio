@@ -14,7 +14,7 @@ public:
 	CSerializableBuffer() noexcept
 	{
 		m_Buffer = (char *)s_sPagePool512.Alloc();
-		// m_Buffer = new char[512];
+		// m_Buffer = new char[4096];
 		m_MaxSize = 512;
 		m_HeaderFront = 0;
 		m_Front = (int)DEFINE::HEADER_SIZE;

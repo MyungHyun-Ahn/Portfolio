@@ -126,15 +126,20 @@ BOOL CNetServer::Start(const CHAR *openIP, const USHORT port) noexcept
 		return FALSE;
 	}
 
-	m_hServerFrameThread = (HANDLE)_beginthreadex(nullptr, 0, NetServerFrameThreadFunc, nullptr, 0, nullptr);
-	if (m_hServerFrameThread == 0)
-	{
-		errVal = GetLastError();
-		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"ServerFrameThread running fail.. : %d", errVal);
-		return FALSE;
-	}
+	// AcceptEx 요청
+	FristPostAcceptEx();
 
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"[SYSTEM] ServerFrameThread running..");
+	// m_hServerFrameThread = (HANDLE)_beginthreadex(nullptr, 0, NetServerFrameThreadFunc, nullptr, 0, nullptr);
+	// if (m_hServerFrameThread == 0)
+	// {
+	// 	errVal = GetLastError();
+	// 	g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"ServerFrameThread running fail.. : %d", errVal);
+	// 	return FALSE;
+	// }
+	// 
+	// g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"[SYSTEM] ServerFrameThread running..");
+
+	PostQueuedCompletionStatus(m_hIOCPHandle, 0, 0, (LPOVERLAPPED)IOOperation::SECTOR_BROADCAST);
 
 	// CreateWorkerThread
 	for (int i = 1; i <= IOCP_WORKER_THREAD; i++)
@@ -221,15 +226,63 @@ void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *
 	}
 
 	pSession->SendPacket(sBuffer);
+	pSession->PostSend();
 
-	if (pSession->m_iSendFlag == FALSE)
+	if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
+	{
+		ReleaseSession(pSession);
+	}
+}
+
+// Sector 락이 잡힌 경우에만 PQCS
+void CNetServer::SendPacketPQCS(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept
+{
+	CNetSession *pSession = m_arrPSessions[GetIndex(sessionID)];
+
+	InterlockedIncrement(&pSession->m_iIOCountAndRelease);
+	// ReleaseFlag가 이미 켜진 상황
+	if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
+	{
+		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
+		{
+			ReleaseSession(pSession, TRUE);
+		}
+		return;
+	}
+
+	if (sessionID != pSession->m_uiSessionID)
+	{
+		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
+		{
+			ReleaseSession(pSession, TRUE);
+		}
+		return;
+	}
+
+	if (!sBuffer->GetIsEnqueueHeader())
+	{
+		NetHeader header;
+		header.code = PACKET_KEY; // 코드
+		header.len = sBuffer->GetDataSize();
+		header.randKey = rand() % 256;
+		header.checkSum = CEncryption::CalCheckSum(sBuffer->GetContentBufferPtr(), sBuffer->GetDataSize());
+		sBuffer->EnqueueHeader((char *)&header, sizeof(NetHeader));
+
+		// CheckSum 부터 암호화하기 위해
+		CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetBufferSize() - 4, header.randKey);
+	}
+
+	pSession->SendPacket(sBuffer);
+	// pSession->PostSend();
+
+	if (InterlockedExchange(&pSession->m_iSendFlag, TRUE) == FALSE)
 	{
 		PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)pSession, (LPOVERLAPPED)IOOperation::SENDPOST);
 	}
 
 	if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 	{
-		ReleaseSession(pSession);
+		ReleaseSession(pSession, TRUE);
 	}
 }
 
@@ -280,7 +333,7 @@ BOOL CNetServer::Disconnect(const UINT64 sessionID) noexcept
 	return TRUE;
 }
 
-BOOL CNetServer::ReleaseSession(CNetSession *pSession) noexcept
+BOOL CNetServer::ReleaseSession(CNetSession *pSession, BOOL isPQCS) noexcept
 {
 	// IoCount 체크와 ReleaseFlag 변경을 동시에
 	if (InterlockedCompareExchange(&pSession->m_iIOCountAndRelease, CNetSession::RELEASE_FLAG, 0) != 0)
@@ -289,6 +342,11 @@ BOOL CNetServer::ReleaseSession(CNetSession *pSession) noexcept
 		return FALSE;
 	}
 
+	if (isPQCS)
+	{
+		PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)pSession, (LPOVERLAPPED)IOOperation::RELEASE_SESSION);
+		return TRUE;
+	}
 
 	USHORT index = GetIndex(pSession->m_uiSessionID);
 	closesocket(pSession->m_sSessionSocket);
@@ -296,7 +354,22 @@ BOOL CNetServer::ReleaseSession(CNetSession *pSession) noexcept
 	CNetSession::Free(pSession);
 	InterlockedDecrement(&m_iSessionCount);
 
-	ClientLeaveAPCEnqueue(freeSessionId);
+	OnClientLeave(freeSessionId);
+
+	m_stackDisconnectIndex.Push(index);
+
+	return TRUE;
+}
+
+BOOL CNetServer::ReleaseSessionPQCS(CNetSession *pSession) noexcept
+{
+	USHORT index = GetIndex(pSession->m_uiSessionID);
+	closesocket(pSession->m_sSessionSocket);
+	UINT64 freeSessionId = pSession->m_uiSessionID;
+	CNetSession::Free(pSession);
+	InterlockedDecrement(&m_iSessionCount);
+
+	OnClientLeave(freeSessionId);
 
 	m_stackDisconnectIndex.Push(index);
 
@@ -427,12 +500,16 @@ int CNetServer::WorkerThread() noexcept
 
 		
 		IOOperation oper;
-		if (lpOverlapped != nullptr)
+		if ((UINT64)lpOverlapped >= 3)
 		{
-			if ((ULONG_PTR)lpOverlapped == 3)
-				oper = IOOperation::SENDPOST;
+			if ((UINT64)lpOverlapped < 0xFFFF)
+			{
+				oper = (IOOperation)(UINT64)lpOverlapped;
+			}
 			else
+			{
 				oper = g_OverlappedAlloc.CalOperation((ULONG_PTR)lpOverlapped);
+			}
 		}
 
 		if (lpOverlapped == nullptr)
@@ -451,7 +528,7 @@ int CNetServer::WorkerThread() noexcept
 			}
 		}
 		// 소켓 정상 종료
-		else if (dwTransferred == 0 && oper != IOOperation::ACCEPTEX && oper != IOOperation::SENDPOST)
+		else if (dwTransferred == 0 && oper != IOOperation::ACCEPTEX && (UINT)oper < 3)
 		{
 			Disconnect(pSession->m_uiSessionID);
 		}
@@ -483,7 +560,7 @@ int CNetServer::WorkerThread() noexcept
 				InterlockedIncrement(&pSession->m_iIOCountAndRelease);
 
 				// OnAccept 처리는 여기서
-				AcceptAPCEnqueue(pSession->m_uiSessionID);
+				OnAccept(pSession->m_uiSessionID);
 				// 해당 세션에 대해 Recv 예약
 				pSession->PostRecv();
 
@@ -511,7 +588,23 @@ int CNetServer::WorkerThread() noexcept
 			break;
 			case IOOperation::SENDPOST:
 			{
-				pSession->PostSend();
+				pSession->PostSend(TRUE);
+				continue;
+			}
+			break;
+			case IOOperation::RELEASE_SESSION:
+			{
+				ReleaseSessionPQCS(pSession);
+				continue;
+			}
+			break;
+			case IOOperation::SECTOR_BROADCAST:
+			{
+				OnSectorBroadcast();
+
+				// Sleep(100);
+
+				PostQueuedCompletionStatus(m_hIOCPHandle, 0, 0, (LPOVERLAPPED)IOOperation::SECTOR_BROADCAST);
 				continue;
 			}
 			break;
@@ -546,7 +639,7 @@ int CNetServer::ServerFrameThread() noexcept
 		// Update
 		// -> 여기서 Update 로직 수행
 		// -> 반환값은 프레임 제어를 위해 
-		DWORD sleepTime = OnUpdate();
+		// DWORD sleepTime = OnUpdate();
 
 		// Heartbeat
 		// -> OnHeartbeat로 Disconnect 수행
@@ -554,74 +647,8 @@ int CNetServer::ServerFrameThread() noexcept
 
 		// Alertable Wait 상태로 전환
 		// + 프레임 제어
-		SleepEx(sleepTime, TRUE);
+		// SleepEx(sleepTime, TRUE);
 	}
 
 	return 0;
-}
-
-void CNetServer::AcceptAPCEnqueue(UINT64 sessionId) noexcept
-{
-	int retVal;
-	int errVal;
-
-	retVal = QueueUserAPC(AcceptAPCFunc, m_hServerFrameThread, (ULONG_PTR)sessionId);
-	if (retVal == FALSE)
-	{
-		errVal = GetLastError();
-		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"QueueUserAPC() 실패 : %d", errVal);
-	}
-}
-
-// lpParam에는 SessionId가 넘어옴
-void CNetServer::AcceptAPCFunc(ULONG_PTR lpParam) noexcept
-{
-	// OnAccept 호출
-	if (lpParam != 0)
-		g_NetServer->OnAccept(lpParam);
-}
-
-void CNetServer::ClientLeaveAPCEnqueue(UINT64 sessionId) noexcept
-{
-	int retVal;
-	int errVal;
-
-	retVal = QueueUserAPC(ClientLeaveAPCFunc, m_hServerFrameThread, (ULONG_PTR)sessionId);
-	if (retVal == FALSE)
-	{
-		errVal = GetLastError();
-		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"QueueUserAPC() 실패 : %d", errVal);
-	}
-}
-
-// lpParam에는 SessionId가 넘어옴
-void CNetServer::ClientLeaveAPCFunc(ULONG_PTR lpParam) noexcept
-{
-	g_NetServer->OnClientLeave(lpParam);
-}
-
-void CNetServer::SBufferFreeAPCEnqueue(ULONG_PTR pFreeList) noexcept
-{
-	int retVal;
-	int errVal;
-
-	retVal = QueueUserAPC(SBufferFreeAPCFunc, m_hServerFrameThread, (ULONG_PTR)pFreeList);
-	if (retVal == FALSE)
-	{
-		errVal = GetLastError();
-		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"QueueUserAPC() 실패 : %d", errVal);
-	}
-}
-
-// CDeque 포인터가 전달됨
-void CNetServer::SBufferFreeAPCFunc(ULONG_PTR lpParam) noexcept
-{
-	CDeque<CSerializableBuffer<FALSE> *> *freeList = (CDeque<CSerializableBuffer<FALSE> *> *)lpParam;
-	for (auto it = freeList->begin(); it != freeList->end(); )
-	{
-		CSerializableBuffer<FALSE>::Free(*it);
-		it = freeList->erase(it);
-	}
-	
-	delete freeList;
 }

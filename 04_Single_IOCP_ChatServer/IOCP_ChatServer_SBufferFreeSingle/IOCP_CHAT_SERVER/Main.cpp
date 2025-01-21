@@ -29,11 +29,41 @@ unsigned int MonitorThreadFunc(LPVOID lpParam) noexcept
 
 		if (GetAsyncKeyState(VK_F1))
 			g_NetServer->Stop();
-
 	}
 
 	return 0;
 }
+
+#define GB (1024LL * 1024 * 1024) // 1GB
+#define PAGE_SIZE 4096            // 4KB
+
+BYTE *dummyPtr[(8 * GB) / (16 * PAGE_SIZE)];
+
+unsigned int TestThreadFunc(LPVOID lpParam) noexcept
+{
+	int err;
+	// 8GB
+	for (size_t i = 0; i < (8 * GB) / (16 * PAGE_SIZE); i++)
+	{
+		dummyPtr[i] = (BYTE *)VirtualAlloc(nullptr, (16 * PAGE_SIZE), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	}
+	DWORD mTime = timeGetTime();
+	while (TRUE)
+	{
+
+		for (size_t i = 0; i < (8 * GB) / (16 * PAGE_SIZE); i++)
+		{
+			for (size_t offset = 0; offset < (16 * PAGE_SIZE); offset += PAGE_SIZE)
+			{
+				BYTE *curPage = dummyPtr[i] + offset;
+				BYTE value = *curPage;
+				// 참조를 통한 페이지 인 유도
+				(*curPage)++;
+			}
+		}
+	}
+}
+
 
 int main()
 {
@@ -72,6 +102,8 @@ int main()
 	g_NetServer = new CChatServer;
 
 	g_NetServer->Start(openIP.c_str(), openPort);
+
+	// _beginthreadex(nullptr, 0, TestThreadFunc, nullptr, 0, nullptr);
 
 	MonitorThreadFunc(nullptr);
 

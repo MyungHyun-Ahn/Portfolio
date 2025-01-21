@@ -9,6 +9,8 @@ enum class IOOperation
 	RECV,
 	SEND,
 	SENDPOST,
+	SECTOR_BROADCAST,
+	RELEASE_SESSION,
 	NONE = 400
 };
 

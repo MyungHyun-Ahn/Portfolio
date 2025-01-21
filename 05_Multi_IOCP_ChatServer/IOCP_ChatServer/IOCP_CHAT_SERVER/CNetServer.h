@@ -10,8 +10,11 @@ public:
 	inline LONG GetSessionCount() const noexcept { return m_iSessionCount; }
 
 	void SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept;
+	void SendPacketPQCS(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept;
+
 	BOOL Disconnect(const UINT64 sessionID) noexcept;
-	BOOL ReleaseSession(CNetSession *pSession) noexcept;
+	BOOL ReleaseSession(CNetSession *pSession, BOOL isPQCS = FALSE) noexcept;
+	BOOL ReleaseSessionPQCS(CNetSession *pSession) noexcept;
 
 	virtual bool OnConnectionRequest(const WCHAR *ip, USHORT port) noexcept = 0;
 	virtual void OnAccept(const UINT64 sessionID) noexcept = 0;
@@ -21,8 +24,9 @@ public:
 	virtual void OnError(int errorcode, WCHAR *errMsg) noexcept = 0;
 
 	// 콘텐츠 프레임
-	virtual DWORD OnUpdate() noexcept = 0;
 	virtual void OnHeartBeat() noexcept = 0;
+
+	virtual void OnSectorBroadcast() noexcept = 0;
 
 	// AcceptEx
 	void FristPostAcceptEx() noexcept;
@@ -52,16 +56,9 @@ private:
 
 public:
 	int WorkerThread() noexcept;
+
+	// 나중에 하트비트 용도로 사용
 	int ServerFrameThread() noexcept;
-
-	void AcceptAPCEnqueue(UINT64 sessionId) noexcept;
-	static void AcceptAPCFunc(ULONG_PTR lpParam) noexcept;
-
-	void ClientLeaveAPCEnqueue(UINT64 sessionId) noexcept;
-	static void ClientLeaveAPCFunc(ULONG_PTR lpParam) noexcept;
-
-	void SBufferFreeAPCEnqueue(ULONG_PTR pFreeList) noexcept;
-	static void SBufferFreeAPCFunc(ULONG_PTR lpParam) noexcept;
 
 
 private:
