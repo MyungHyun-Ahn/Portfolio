@@ -21,10 +21,13 @@ class CChatProcessPacket : public CChatProcessPacketInterface
 		switch (type)
 		{
 		case en_PACKET_CS_CHAT_REQ_LOGIN:
+			InterlockedIncrement(&g_monitor.m_loginReq);
 			return PacketProcReqLogin(sessionId, message);
 		case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE:
+			InterlockedIncrement(&g_monitor.m_sectorMoveReq);
 			return PacketProcReqSectorMove(sessionId, message);
 		case en_PACKET_CS_CHAT_REQ_MESSAGE:
+			InterlockedIncrement(&g_monitor.m_chatMsgReq);
 			return PacketProcReqMessage(sessionId, message);
 		case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
 			return PacketProcReqHeartBeat(sessionId, message);

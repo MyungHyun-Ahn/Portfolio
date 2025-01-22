@@ -227,12 +227,12 @@ void CChatServer::OnSectorBroadcast() noexcept
 					// 락을 먼저 싹 잡고
 					sectors[sectorCount++] = &m_arrCSector[y + startY][x + startX];
 
-					AcquireSRWLockShared(&m_arrCSector[y + startY][x + startX].m_srwLock);
+					AcquireSRWLockExclusive(&m_arrCSector[y + startY][x + startX].m_srwLock);
 					userCount += m_arrCSector[y + startY][x + startX].m_players.size();
 
 				}
 			}
-
+			
 			// 메시지 전송
 			for (int msgI = 0; msgI < useSize; msgI++)
 			{
@@ -240,10 +240,11 @@ void CChatServer::OnSectorBroadcast() noexcept
 				if (!msgQ.Dequeue(&msg))
 					__debugbreak();
 
-
 				// SendPacketPQCS(msg->GetSessionId(), msg);
 
 				int checkUserCount = 0;
+
+				std::unordered_set<UINT64> checkPlayer;
 
 				for (int i = 0; i < sectorCount; i++)
 				{
@@ -251,9 +252,15 @@ void CChatServer::OnSectorBroadcast() noexcept
 					checkUserCount += playerMap.size();
 					for (auto it = playerMap.begin(); it != playerMap.end(); ++it)
 					{
+						// 이미 보냈던 플레이어라면
+						if (checkPlayer.find(it->first) != checkPlayer.end())
+							__debugbreak();
+
 						if (msg->GetSessionId() == it->first)
 							continue;
 
+						checkPlayer.insert(it->first);
+						InterlockedIncrement(&g_monitor.m_chatMsgRes);
 						SendPacketPQCS(it->first, msg);
 					}
 				}
@@ -268,7 +275,7 @@ void CChatServer::OnSectorBroadcast() noexcept
 			// 락 해제
 			for (int i = sectorCount - 1; i >= 0; i--)
 			{
-				ReleaseSRWLockShared(&sectors[i]->m_srwLock);
+				ReleaseSRWLockExclusive(&sectors[i]->m_srwLock);
 			}
 		}
 	}

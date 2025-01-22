@@ -207,6 +207,8 @@ void CChatServer::DelaySendSector() noexcept
 					for (auto msgIt = msgQ.begin(); msgIt != msgQ.end();)
 					{
 						UINT64 sessionId = (*msgIt)->GetSessionId();
+						
+						InterlockedIncrement(&g_monitor.m_chatMsgRes);
 						SendPacket(sessionId, *msgIt);
 
 
@@ -215,6 +217,7 @@ void CChatServer::DelaySendSector() noexcept
 							if (it.first == sessionId)
 								continue;
 
+							InterlockedIncrement(&g_monitor.m_chatMsgRes);
 							SendPacket(it.first, *msgIt);
 						}
 

@@ -192,13 +192,11 @@ bool CChatProcessPacket::PacketProcReqMessage(UINT64 sessionId, CSmartPtr<CSeria
 
 	if (message->GetDataSize() != messageLen)
 	{
-		// ReleaseSRWLockExclusive(&m_pChatServer->m_playerMapLock);
 		return false;
 	}
 
 	if (accountNo != player->m_iAccountNo)
 	{
-		// ReleaseSRWLockExclusive(&m_pChatServer->m_playerMapLock);
 		return false;
 	}
 	
@@ -209,7 +207,6 @@ bool CChatProcessPacket::PacketProcReqMessage(UINT64 sessionId, CSmartPtr<CSeria
 
 	if (message->GetDataSize() != 0)
 	{
-		// ReleaseSRWLockExclusive(&m_pChatServer->m_playerMapLock);
 		return false;
 	}
 
@@ -218,6 +215,7 @@ bool CChatProcessPacket::PacketProcReqMessage(UINT64 sessionId, CSmartPtr<CSeria
 	messageRes->IncreaseRef();
 	messageRes->SetSessionId(sessionId);
 	// 응답 패킷 자기 자신한텐 그 즉시
+	InterlockedIncrement(&g_monitor.m_chatMsgRes);
 	m_pChatServer->SendPacket(sessionId, messageRes);
 	// m_pChatServer->SendSector(sessionId, player->m_usSectorY, player->m_usSectorX, messageRes);
 	messageRes->IncreaseRef();

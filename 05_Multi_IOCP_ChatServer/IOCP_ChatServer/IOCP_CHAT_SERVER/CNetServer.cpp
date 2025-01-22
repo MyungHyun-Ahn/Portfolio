@@ -273,9 +273,8 @@ void CNetServer::SendPacketPQCS(const UINT64 sessionID, CSerializableBuffer<FALS
 	}
 
 	pSession->SendPacket(sBuffer);
-	// pSession->PostSend();
 
-	if (InterlockedExchange(&pSession->m_iSendFlag, TRUE) == FALSE)
+	if (pSession->m_iSendFlag == FALSE)
 	{
 		PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)pSession, (LPOVERLAPPED)IOOperation::SENDPOST);
 	}
@@ -588,7 +587,7 @@ int CNetServer::WorkerThread() noexcept
 			break;
 			case IOOperation::SENDPOST:
 			{
-				pSession->PostSend(TRUE);
+				pSession->PostSend();
 				continue;
 			}
 			break;

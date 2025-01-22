@@ -91,6 +91,13 @@ public:
 	UINT64 m_SendTPSTotal = 0;
 	UINT64 m_UpdateTPSTotal = 0;
 
+	// 초당 메시지 발생 빈도 체크
+	LONG m_loginReq = 0;
+	LONG m_sectorMoveReq = 0;
+	LONG m_chatMsgReq = 0;
+
+	// SendPacket 호출 횟수
+	LONG m_chatMsgRes = 0;
 };
 
 extern CMonitor g_monitor;
