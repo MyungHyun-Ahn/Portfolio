@@ -220,8 +220,11 @@ bool CChatProcessPacket::PacketProcReqMessage(UINT64 sessionId, CSmartPtr<CSeria
 	// 응답 패킷 자기 자신한텐 그 즉시
 	m_pChatServer->SendPacket(sessionId, messageRes);
 	// m_pChatServer->SendSector(sessionId, player->m_usSectorY, player->m_usSectorX, messageRes);
-
+	messageRes->IncreaseRef();
 	m_pChatServer->m_arrCSector[player->m_usSectorY][player->m_usSectorX].m_sendMsgLFQ.Enqueue(messageRes);
+
+	if (messageRes->DecreaseRef() == 0)
+		CSerializableBuffer<FALSE>::Free(messageRes);
 
 	// if (messageRes->DecreaseRef() == 0)
 	// 	CSerializableBuffer<FALSE>::Free(messageRes);

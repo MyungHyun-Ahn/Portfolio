@@ -601,9 +601,6 @@ int CNetServer::WorkerThread() noexcept
 			case IOOperation::SECTOR_BROADCAST:
 			{
 				OnSectorBroadcast();
-
-				// Sleep(100);
-
 				PostQueuedCompletionStatus(m_hIOCPHandle, 0, 0, (LPOVERLAPPED)IOOperation::SECTOR_BROADCAST);
 				continue;
 			}

@@ -64,7 +64,7 @@ void CChatServer::SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX, CSeri
 
 			sectors[sectorCount++] = &m_arrCSector[y + startY][x + startX];
 
-			// AcquireSRWLockShared(&m_arrCSector[y + startY][x + startX].m_srwLock);
+			AcquireSRWLockShared(&m_arrCSector[y + startY][x + startX].m_srwLock);
 		}
 	}
 
@@ -82,7 +82,7 @@ void CChatServer::SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX, CSeri
 
 	for (int i = sectorCount - 1; i >= 0; i--)
 	{
-		// ReleaseSRWLockShared(&sectors[i]->m_srwLock);
+		ReleaseSRWLockShared(&sectors[i]->m_srwLock);
 	}
 
 	// ReleaseSRWLockExclusive(&m_playerMapLock);
@@ -143,9 +143,8 @@ void CChatServer::OnClientLeave(const UINT64 sessionID) noexcept
 
 void CChatServer::OnRecv(const UINT64 sessionID, CSerializableBufferView<FALSE> *message) noexcept
 {
-	message->IncreaseRef();
-
 	InterlockedIncrement(&g_monitor.m_lUpdateTPS);
+	message->IncreaseRef();
 
 	WORD type;
 	*message >> type;
@@ -209,6 +208,9 @@ void CChatServer::OnSectorBroadcast() noexcept
 			int sectorCount = 0;
 			// 최대 3 x 3
 			CSector *sectors[3 * 3];
+
+			int userCount = 0;
+
 			// 섹터 순회
 			int startY = sectorY - SECTOR_VIEW_START;
 			int startX = sectorX - SECTOR_VIEW_START;
@@ -226,6 +228,8 @@ void CChatServer::OnSectorBroadcast() noexcept
 					sectors[sectorCount++] = &m_arrCSector[y + startY][x + startX];
 
 					AcquireSRWLockShared(&m_arrCSector[y + startY][x + startX].m_srwLock);
+					userCount += m_arrCSector[y + startY][x + startX].m_players.size();
+
 				}
 			}
 
@@ -239,9 +243,12 @@ void CChatServer::OnSectorBroadcast() noexcept
 
 				// SendPacketPQCS(msg->GetSessionId(), msg);
 
+				int checkUserCount = 0;
+
 				for (int i = 0; i < sectorCount; i++)
 				{
 					auto playerMap = sectors[i]->m_players;
+					checkUserCount += playerMap.size();
 					for (auto it = playerMap.begin(); it != playerMap.end(); ++it)
 					{
 						if (msg->GetSessionId() == it->first)
@@ -250,6 +257,9 @@ void CChatServer::OnSectorBroadcast() noexcept
 						SendPacketPQCS(it->first, msg);
 					}
 				}
+
+				if (userCount != checkUserCount)
+					__debugbreak();
 
 				if (msg->DecreaseRef() == 0)
 					CSerializableBuffer<FALSE>::Free(msg);

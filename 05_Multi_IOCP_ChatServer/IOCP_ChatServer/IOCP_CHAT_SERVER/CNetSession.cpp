@@ -6,7 +6,6 @@
 void CNetSession::RecvCompleted(int size) noexcept
 {
 	m_pRecvBuffer->MoveRear(size);
-	InterlockedIncrement(&g_monitor.m_lRecvTPS);
 
 	bool delayFlag = false;
 
@@ -102,6 +101,7 @@ void CNetSession::RecvCompleted(int size) noexcept
 				return;
 			}
 
+			InterlockedIncrement(&g_monitor.m_lRecvTPS);
 			m_pDelayedBuffer->m_uiSessionId = m_uiSessionID;
 			g_NetServer->OnRecv(m_uiSessionID, m_pDelayedBuffer);
 			m_pDelayedBuffer = nullptr;
@@ -201,6 +201,7 @@ void CNetSession::RecvCompleted(int size) noexcept
 		}
 
 		view->m_uiSessionId = m_uiSessionID;
+		InterlockedIncrement(&g_monitor.m_lRecvTPS);
 		g_NetServer->OnRecv(m_uiSessionID, view);
 
 		currentUseSize = m_pRecvBuffer->GetUseSize();
