@@ -29,6 +29,10 @@ public:
 	BOOL PostAcceptEx(INT index) noexcept;
 	BOOL AcceptExCompleted(CNetSession *pSession) noexcept;
 
+	// SendPost All
+	void PostSendAll();
+	void PostSendAllPQCS();
+
 private:
 	inline static USHORT GetIndex(UINT64 sessionId) noexcept
 	{

@@ -231,6 +231,8 @@ bool CNetSession::SendPacket(CSerializableBuffer<FALSE> *message) noexcept
 
 void CNetSession::SendCompleted(int size) noexcept
 {
+	InterlockedAdd(&g_monitor.m_lSendTPS, m_iSendCount);
+
 	// m_SendBuffer.MoveFront(size);
 
 	// m_iSendCount를 믿고 할당 해제를 진행
@@ -250,12 +252,7 @@ void CNetSession::SendCompleted(int size) noexcept
 
 	m_iSendCount = 0;
 
-	InterlockedIncrement(&g_monitor.m_lSendTPS);
-
-	if (!PostSend(TRUE))
-	{
-		InterlockedExchange(&m_iSendFlag, FALSE);
-	}
+	InterlockedExchange(&m_iSendFlag, FALSE);
 }
 
 bool CNetSession::PostRecv() noexcept
@@ -314,7 +311,7 @@ bool CNetSession::PostRecv() noexcept
 	return TRUE;
 }
 
-bool CNetSession::PostSend(BOOL isCompleted) noexcept
+bool CNetSession::PostSend() noexcept
 {
 	int errVal;
 	int retVal;
@@ -325,12 +322,10 @@ bool CNetSession::PostSend(BOOL isCompleted) noexcept
 		return FALSE;
 	}
 
-	if (!isCompleted)
+
+	if (InterlockedExchange(&m_iSendFlag, TRUE) == TRUE)
 	{
-		if (InterlockedExchange(&m_iSendFlag, TRUE) == TRUE)
-		{
-			return TRUE;
-		}
+		return TRUE;
 	}
 
 	// 여기서 얻은 만큼 쓸 것
@@ -355,8 +350,6 @@ bool CNetSession::PostSend(BOOL isCompleted) noexcept
 	// 이 수치가 높다면 더 늘릴 것
 	if (m_iSendCount == WSASEND_MAX_BUFFER_COUNT)
 		InterlockedIncrement(&g_monitor.m_lMaxSendCount);
-
-	InterlockedAdd(&g_monitor.m_lSendTPS, m_iSendCount);
 
 	int count;
 	for (count = 0; count < m_iSendCount; count++)

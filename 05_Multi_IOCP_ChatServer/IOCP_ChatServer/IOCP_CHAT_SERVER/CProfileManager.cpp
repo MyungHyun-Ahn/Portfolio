@@ -70,16 +70,19 @@ void CProfileManager::DataOutToFile()
 			totalTime -= pProfile->iMinTime[0];
 			totalTime -= pProfile->iMinTime[1];
 
-			__int64 average = totalTime / (pProfile->iCall - 4);
+			if (pProfile->iCall - 4 > 0)
+			{
+				__int64 average = totalTime / (pProfile->iCall - 4);
 
-			fprintf_s(fp, "%-15d | %-100s | %-15lld | %-15lld | %-15lld | %-15lld | %-15lld |\n"
-				, pInfo->threadId
-				, pProfile->szName
-				, totalTime
-				, average
-				, pProfile->iMinTime[0]
-				, pProfile->iMaxTime[0]
-				, pProfile->iCall - 4);
+				fprintf_s(fp, "%-15d | %-100s | %-15lld | %-15lld | %-15lld | %-15lld | %-15lld |\n"
+					, pInfo->threadId
+					, pProfile->szName
+					, totalTime
+					, average
+					, pProfile->iMinTime[0]
+					, pProfile->iMaxTime[0]
+					, pProfile->iCall - 4);
+			}
 		}
 
 		fprintf_s(fp, "------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n");
@@ -138,17 +141,21 @@ CProfile::CProfile(int index, const char *funcName, const char *tagName)
 	}
 
 	m_stProfile = pProfile;
+	m_iStartTime = std::chrono::high_resolution_clock::now();
 
-	QueryPerformanceCounter(&m_iStartTime);
+	// std::chrono::steady_clock::time_point
+	// QueryPerformanceCounter(&m_iStartTime);
 }
 
 CProfile::~CProfile()
 {
-	LARGE_INTEGER endTime;
-	QueryPerformanceCounter(&endTime);
+	// LARGE_INTEGER endTime;
+	// QueryPerformanceCounter(&endTime);
 
-	__int64 runtime = endTime.QuadPart - m_iStartTime.QuadPart;
-
+	std::chrono::steady_clock::time_point endTime = std::chrono::high_resolution_clock::now();
+	// __int64 runtime = endTime.QuadPart - m_iStartTime.QuadPart;
+	std::chrono::nanoseconds ns = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - m_iStartTime);
+	__int64 runtime = ns.count();
 	m_stProfile->iCall++;
 	m_stProfile->iTotalTime += runtime;
 

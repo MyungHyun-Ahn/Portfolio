@@ -15,6 +15,6 @@ public:
 private:
 	SRWLOCK m_srwLock;
 	std::unordered_map<UINT64, CPlayer *> m_players;
-	// CDeque<CSerializableBuffer<FALSE> *> m_sendMsgQ;
 	CLFQueue<CSerializableBuffer<FALSE> *> m_sendMsgLFQ;
 };
+

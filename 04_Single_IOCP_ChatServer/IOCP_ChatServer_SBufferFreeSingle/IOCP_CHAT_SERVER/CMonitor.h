@@ -96,6 +96,8 @@ public:
 	LONG m_sectorMoveReq = 0;
 	LONG m_chatMsgReq = 0;
 
+	LONG m_sendQEnqueueCount = 0;
+
 	// SendPacket È£Ãâ È½¼ö
 	LONG m_chatMsgRes = 0;
 

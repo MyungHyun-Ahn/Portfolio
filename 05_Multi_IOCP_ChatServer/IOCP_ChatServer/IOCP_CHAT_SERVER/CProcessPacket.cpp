@@ -11,21 +11,16 @@
 
 bool CChatProcessPacket::PacketProcReqLogin(UINT64 sessionId, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept
 {
+	CPlayer *loginPlayer = CPlayer::Alloc();
 	std::unordered_map<UINT64, CNonLoginPlayer> &umapNonLoginPlayer = m_pChatServer->m_umapNonLoginPlayer;
-	AcquireSRWLockExclusive(&m_pChatServer->m_playerMapLock);
-	auto it = umapNonLoginPlayer.find(sessionId);
-	if (it == umapNonLoginPlayer.end())
-	{
-		ReleaseSRWLockExclusive(&m_pChatServer->m_playerMapLock);
-		return false;
-	}
-
+	AcquireSRWLockExclusive(&m_pChatServer->m_nonLoginplayerMapLock);
 	// 이 플레이어에 대한 접근은 어차피 자기 자신 세션의 OnRecv에서만
 	// -> OnRecv 과정에서 RecvPost는 없으니깐 동기화 신경 안써도 됨
 	// -> Map에만 등록하고 설정은 나중에 해도 됨
-	CPlayer *loginPlayer = CPlayer::Alloc();
 
 	m_pChatServer->m_umapNonLoginPlayer.erase(sessionId);
+	AcquireSRWLockExclusive(&m_pChatServer->m_playerMapLock);
+	ReleaseSRWLockExclusive(&m_pChatServer->m_nonLoginplayerMapLock);
 	m_pChatServer->m_umapLoginPlayer.insert(std::make_pair(sessionId, loginPlayer));
 	ReleaseSRWLockExclusive(&m_pChatServer->m_playerMapLock);
 
@@ -59,17 +54,18 @@ bool CChatProcessPacket::PacketProcReqLogin(UINT64 sessionId, CSmartPtr<CSeriali
 bool CChatProcessPacket::PacketProcReqSectorMove(UINT64 sessionId, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept
 {
 	std::unordered_map<UINT64, CPlayer *> &umapPlayer = m_pChatServer->m_umapLoginPlayer;
-	AcquireSRWLockExclusive(&m_pChatServer->m_playerMapLock);
+	// 맵에서 찾기만 함 - Shared
+	AcquireSRWLockShared(&m_pChatServer->m_playerMapLock);
 	auto it = umapPlayer.find(sessionId);
 	if (it == umapPlayer.end())
 	{
-		ReleaseSRWLockExclusive(&m_pChatServer->m_playerMapLock);
+		ReleaseSRWLockShared(&m_pChatServer->m_playerMapLock);
 		return false;
 	}
 
 	CPlayer *player = it->second;
-	// it 접근 끝
-	ReleaseSRWLockExclusive(&m_pChatServer->m_playerMapLock);
+	ReleaseSRWLockShared(&m_pChatServer->m_playerMapLock);
+
 	player->m_dwPrevRecvTime = timeGetTime();
 
 	INT64 accountNo;
@@ -118,7 +114,7 @@ bool CChatProcessPacket::PacketProcReqSectorMove(UINT64 sessionId, CSmartPtr<CSe
 					lock1X = sectorX;
 					lock2X = player->m_usSectorX;
 				}
-
+		
 				lock1Y = sectorY;
 				lock2Y = sectorY;
 			}
@@ -128,7 +124,7 @@ bool CChatProcessPacket::PacketProcReqSectorMove(UINT64 sessionId, CSmartPtr<CSe
 				{
 					lock1Y = player->m_usSectorY;
 					lock1X = player->m_usSectorX;
-
+		
 					lock2Y = sectorY;
 					lock2X = sectorX;
 				}
@@ -136,18 +132,18 @@ bool CChatProcessPacket::PacketProcReqSectorMove(UINT64 sessionId, CSmartPtr<CSe
 				{
 					lock1Y = sectorY;
 					lock1X = sectorX;
-
+		
 					lock2Y = player->m_usSectorY;
 					lock2X = player->m_usSectorX;
 				}
 			}
-
+		
 			AcquireSRWLockExclusive(&m_pChatServer->m_arrCSector[lock1Y][lock1X].m_srwLock);
 			AcquireSRWLockExclusive(&m_pChatServer->m_arrCSector[lock2Y][lock2X].m_srwLock);
-
+		
 			m_pChatServer->m_arrCSector[player->m_usSectorY][player->m_usSectorX].m_players.erase(sessionId);
 			m_pChatServer->m_arrCSector[sectorY][sectorX].m_players.insert(std::make_pair(sessionId, player));
-
+		
 			ReleaseSRWLockExclusive(&m_pChatServer->m_arrCSector[lock2Y][lock2X].m_srwLock);
 			ReleaseSRWLockExclusive(&m_pChatServer->m_arrCSector[lock1Y][lock1X].m_srwLock);
 		}
@@ -174,16 +170,16 @@ bool CChatProcessPacket::PacketProcReqSectorMove(UINT64 sessionId, CSmartPtr<CSe
 bool CChatProcessPacket::PacketProcReqMessage(UINT64 sessionId, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept
 {
 	std::unordered_map<UINT64, CPlayer *> &umapPlayer = m_pChatServer->m_umapLoginPlayer;
-	AcquireSRWLockExclusive(&m_pChatServer->m_playerMapLock);
+	AcquireSRWLockShared(&m_pChatServer->m_playerMapLock);
 	auto it = umapPlayer.find(sessionId);
 	if (it == umapPlayer.end())
 	{
-		ReleaseSRWLockExclusive(&m_pChatServer->m_playerMapLock);
+		ReleaseSRWLockShared(&m_pChatServer->m_playerMapLock);
 		return false;
 	}
 
 	CPlayer *player = it->second;
-	ReleaseSRWLockExclusive(&m_pChatServer->m_playerMapLock);
+	ReleaseSRWLockShared(&m_pChatServer->m_playerMapLock);
 	player->m_dwPrevRecvTime = timeGetTime();
 
 	INT64 accountNo;
@@ -214,34 +210,29 @@ bool CChatProcessPacket::PacketProcReqMessage(UINT64 sessionId, CSmartPtr<CSeria
 	CSerializableBuffer<FALSE> *messageRes = CGenPacket::makePacketResMessage(accountNo, player->m_szID, player->m_szNickname, messageLen, chatMessage);
 	messageRes->IncreaseRef();
 	messageRes->SetSessionId(sessionId);
-	// 응답 패킷 자기 자신한텐 그 즉시
 	InterlockedIncrement(&g_monitor.m_chatMsgRes);
 	m_pChatServer->SendPacket(sessionId, messageRes);
-	// m_pChatServer->SendSector(sessionId, player->m_usSectorY, player->m_usSectorX, messageRes);
-	messageRes->IncreaseRef();
-	m_pChatServer->m_arrCSector[player->m_usSectorY][player->m_usSectorX].m_sendMsgLFQ.Enqueue(messageRes);
-
+	m_pChatServer->SendSector(sessionId, player->m_usSectorY, player->m_usSectorX, messageRes);
 	if (messageRes->DecreaseRef() == 0)
 		CSerializableBuffer<FALSE>::Free(messageRes);
+	// m_pChatServer->m_arrCSector[player->m_usSectorY][player->m_usSectorX].m_sendMsgLFQ.Enqueue(messageRes);
 
-	// if (messageRes->DecreaseRef() == 0)
-	// 	CSerializableBuffer<FALSE>::Free(messageRes);
 	return true;
 }
 
 bool CChatProcessPacket::PacketProcReqHeartBeat(UINT64 sessionId, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept
 {
 	std::unordered_map<UINT64, CPlayer *> &umapPlayer = m_pChatServer->m_umapLoginPlayer;
-	AcquireSRWLockExclusive(&m_pChatServer->m_playerMapLock);
+	AcquireSRWLockShared(&m_pChatServer->m_playerMapLock);
 	auto it = umapPlayer.find(sessionId);
 	if (it == umapPlayer.end())
 	{
-		ReleaseSRWLockExclusive(&m_pChatServer->m_playerMapLock);
+		ReleaseSRWLockShared(&m_pChatServer->m_playerMapLock);
 		return false;
 	}
 
 	CPlayer *player = it->second;
-	ReleaseSRWLockExclusive(&m_pChatServer->m_playerMapLock);
+	ReleaseSRWLockShared(&m_pChatServer->m_playerMapLock);
 
 	INT64 accountNo;
 	*message >> accountNo;

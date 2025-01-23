@@ -183,6 +183,7 @@ void CNetServer::Stop()
 	monitorThreadRunning = FALSE;
 }
 
+// SendPacket Enqueue만
 void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept
 {
 	CNetSession *pSession = m_arrPSessions[GetIndex(sessionID)];
@@ -222,10 +223,10 @@ void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *
 
 	pSession->SendPacket(sBuffer);
 
-	if (pSession->m_iSendFlag == FALSE)
-	{
-		PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)pSession, (LPOVERLAPPED)IOOperation::SENDPOST);
-	}
+	// if (pSession->m_iSendFlag == FALSE)
+	// {
+	// 	PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)pSession, (LPOVERLAPPED)IOOperation::SENDPOST);
+	// }
 
 	if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 	{
@@ -411,6 +412,23 @@ BOOL CNetServer::AcceptExCompleted(CNetSession *pSession) noexcept
 	return TRUE;
 }
 
+void CNetServer::PostSendAll()
+{
+	for (int i = 0; i < MAX_SESSION_COUNT; i++)
+	{
+		if (m_arrPSessions[i] != NULL)
+		{
+			if (m_arrPSessions[i]->m_iSendFlag == FALSE)
+				m_arrPSessions[i]->PostSend();
+		}
+	}
+}
+
+void CNetServer::PostSendAllPQCS()
+{
+	PostQueuedCompletionStatus(m_hIOCPHandle, 0, 0, (LPOVERLAPPED)IOOperation::SENDPOST_ALL);
+}
+
 int CNetServer::WorkerThread() noexcept
 {
 	int retVal;
@@ -427,12 +445,16 @@ int CNetServer::WorkerThread() noexcept
 
 		
 		IOOperation oper;
-		if (lpOverlapped != nullptr)
+		if ((UINT64)lpOverlapped >= 3)
 		{
-			if ((ULONG_PTR)lpOverlapped == 3)
-				oper = IOOperation::SENDPOST;
+			if ((UINT64)lpOverlapped < 0xFFFF)
+			{
+				oper = (IOOperation)(UINT64)lpOverlapped;
+			}
 			else
+			{
 				oper = g_OverlappedAlloc.CalOperation((ULONG_PTR)lpOverlapped);
+			}
 		}
 
 		if (lpOverlapped == nullptr)
@@ -451,7 +473,7 @@ int CNetServer::WorkerThread() noexcept
 			}
 		}
 		// 소켓 정상 종료
-		else if (dwTransferred == 0 && oper != IOOperation::ACCEPTEX && oper != IOOperation::SENDPOST)
+		else if (dwTransferred == 0 && oper != IOOperation::ACCEPTEX && (UINT)oper < 3)
 		{
 			Disconnect(pSession->m_uiSessionID);
 		}
@@ -506,12 +528,18 @@ int CNetServer::WorkerThread() noexcept
 			case IOOperation::SEND:
 			{
 				pSession->SendCompleted(dwTransferred);
-				pSession->PostSend();
+				// pSession->PostSend();
 			}
 			break;
 			case IOOperation::SENDPOST:
 			{
 				pSession->PostSend();
+				continue;
+			}
+			break;
+			case IOOperation::SENDPOST_ALL:
+			{
+				PostSendAll();
 				continue;
 			}
 			break;

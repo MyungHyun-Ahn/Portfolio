@@ -83,6 +83,7 @@ void CChatServer::SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX, CSeri
 				if (it.first == sessionId)
 					continue;
 
+				InterlockedIncrement(&g_monitor.m_chatMsgRes);
 				SendPacket(it.first, message);
 			}
 		}
@@ -156,7 +157,8 @@ DWORD CChatServer::OnUpdate() noexcept
 	// 진짜 Update
 	Update();
 	InterlockedIncrement(&g_monitor.m_lServerFrame);
-
+	
+	PostSendAll();
 	prevTick += FRAME_PER_TICK;
 	return 0;
 }
@@ -185,6 +187,8 @@ void CChatServer::OnHeartBeat() noexcept
 
 void CChatServer::DelaySendSector() noexcept
 {
+	int userTotal = 0;
+
 	for (int sectorY = 0; sectorY < MAX_SECTOR_Y; sectorY++)
 	{
 		for (int sectorX = 0; sectorX < MAX_SECTOR_X; sectorX++)
@@ -193,41 +197,57 @@ void CChatServer::DelaySendSector() noexcept
 			if (msgQ.empty())
 				continue;
 
-			// 섹터 순회
-			int startY = sectorY - SECTOR_VIEW_START;
-			int startX = sectorX - SECTOR_VIEW_START;
-			for (int y = 0; y < SECTOR_VIEW_COUNT; y++)
+			int userCount = 0;
+
+			for (auto msgIt = msgQ.begin(); msgIt != msgQ.end();)
 			{
-				for (int x = 0; x < SECTOR_VIEW_COUNT; x++)
+				UINT64 sessionId = (*msgIt)->GetSessionId();
+
+				InterlockedIncrement(&g_monitor.m_chatMsgRes);
+				SendPacket(sessionId, *msgIt);
+
+				// 섹터 순회
+				int startY = sectorY - SECTOR_VIEW_START;
+				int startX = sectorX - SECTOR_VIEW_START;
+				for (int y = 0; y < SECTOR_VIEW_COUNT; y++)
 				{
-					if (startY + y < 0 || startY + y >= MAX_SECTOR_Y || startX + x < 0 || startX + x >= MAX_SECTOR_X)
-						continue;
-
-					CSector &sector = m_arrCSector[y + startY][x + startX];
-					for (auto msgIt = msgQ.begin(); msgIt != msgQ.end();)
+					for (int x = 0; x < SECTOR_VIEW_COUNT; x++)
 					{
-						UINT64 sessionId = (*msgIt)->GetSessionId();
-						
-						InterlockedIncrement(&g_monitor.m_chatMsgRes);
-						SendPacket(sessionId, *msgIt);
+						if (startY + y < 0 || startY + y >= MAX_SECTOR_Y || startX + x < 0 || startX + x >= MAX_SECTOR_X)
+							continue;
 
-
-						for (auto &it : sector.m_players)
+						CSector &sector = m_arrCSector[y + startY][x + startX];
+						userCount += sector.m_players.size();
+						for (auto it = sector.m_players.begin(); it != sector.m_players.end(); ++it)
 						{
-							if (it.first == sessionId)
+							if (it->first == sessionId)
 								continue;
 
 							InterlockedIncrement(&g_monitor.m_chatMsgRes);
-							SendPacket(it.first, *msgIt);
+							SendPacket(it->first, *msgIt);
 						}
 
-						if ((*msgIt)->DecreaseRef() == 0)
-							CSerializableBuffer<FALSE>::Free(*msgIt);
+						// for (auto &it : sector.m_players)
+						// {
+						// 	if (it.first == sessionId)
+						// 		continue;
+						// 
+						// 	InterlockedIncrement(&g_monitor.m_chatMsgRes);
+						// 	SendPacket(it.first, *msgIt);
+						// }
 
-						msgIt = msgQ.erase(msgIt);
 					}
 				}
+
+				if ((*msgIt)->DecreaseRef() == 0)
+					CSerializableBuffer<FALSE>::Free(*msgIt);
+
+				msgIt = msgQ.erase(msgIt);
 			}
+			userTotal += userCount;
 		}
 	}
+
+	double userAvr = (double)userTotal / (MAX_SECTOR_X * MAX_SECTOR_Y);
+	int a = 0;
 }

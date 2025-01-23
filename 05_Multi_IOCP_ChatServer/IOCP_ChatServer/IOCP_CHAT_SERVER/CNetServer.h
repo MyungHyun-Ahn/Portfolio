@@ -12,7 +12,7 @@ public:
 	void SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept;
 	void SendPacketPQCS(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept;
 
-	BOOL Disconnect(const UINT64 sessionID) noexcept;
+	BOOL Disconnect(const UINT64 sessionID, BOOL isPQCS = FALSE) noexcept;
 	BOOL ReleaseSession(CNetSession *pSession, BOOL isPQCS = FALSE) noexcept;
 	BOOL ReleaseSessionPQCS(CNetSession *pSession) noexcept;
 

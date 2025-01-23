@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "ChatSetting.h"
 #include "ServerSetting.h"
 #include "CNetServer.h"
 #include "CNetSession.h"
@@ -128,16 +129,6 @@ BOOL CNetServer::Start(const CHAR *openIP, const USHORT port) noexcept
 
 	// AcceptEx 요청
 	FristPostAcceptEx();
-
-	// m_hServerFrameThread = (HANDLE)_beginthreadex(nullptr, 0, NetServerFrameThreadFunc, nullptr, 0, nullptr);
-	// if (m_hServerFrameThread == 0)
-	// {
-	// 	errVal = GetLastError();
-	// 	g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"ServerFrameThread running fail.. : %d", errVal);
-	// 	return FALSE;
-	// }
-	// 
-	// g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"[SYSTEM] ServerFrameThread running..");
 
 	PostQueuedCompletionStatus(m_hIOCPHandle, 0, 0, (LPOVERLAPPED)IOOperation::SECTOR_BROADCAST);
 
@@ -285,7 +276,7 @@ void CNetServer::SendPacketPQCS(const UINT64 sessionID, CSerializableBuffer<FALS
 	}
 }
 
-BOOL CNetServer::Disconnect(const UINT64 sessionID) noexcept
+BOOL CNetServer::Disconnect(const UINT64 sessionID, BOOL isPQCS) noexcept
 {
 	CNetSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 	if (pSession == nullptr)
@@ -297,7 +288,7 @@ BOOL CNetServer::Disconnect(const UINT64 sessionID) noexcept
 	{
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
-			ReleaseSession(pSession);
+			ReleaseSession(pSession, isPQCS);
 		}
 		return FALSE;
 	}
@@ -306,7 +297,7 @@ BOOL CNetServer::Disconnect(const UINT64 sessionID) noexcept
 	{
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
-			ReleaseSession(pSession);
+			ReleaseSession(pSession, isPQCS);
 		}
 		return FALSE;
 	}
@@ -315,7 +306,7 @@ BOOL CNetServer::Disconnect(const UINT64 sessionID) noexcept
 	{
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
-			ReleaseSession(pSession);
+			ReleaseSession(pSession, isPQCS);
 		}
 		return FALSE;
 	}
@@ -326,7 +317,7 @@ BOOL CNetServer::Disconnect(const UINT64 sessionID) noexcept
 	if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 	{
 		// IOCount == 0 이면 해제 시도
-		ReleaseSession(pSession);
+		ReleaseSession(pSession, isPQCS);
 	}
 
 	return TRUE;
@@ -422,6 +413,8 @@ BOOL CNetServer::PostAcceptEx(INT index) noexcept
 
 BOOL CNetServer::AcceptExCompleted(CNetSession *pSession) noexcept
 {
+	InterlockedIncrement(&g_monitor.m_lAcceptTPS);
+
 	int retVal;
 	int errVal;
 	retVal = setsockopt(pSession->m_sSessionSocket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
@@ -469,7 +462,6 @@ BOOL CNetServer::AcceptExCompleted(CNetSession *pSession) noexcept
 	pSession->Init(combineId);
 
 	InterlockedIncrement(&m_iSessionCount);
-	InterlockedIncrement(&g_monitor.m_lAcceptTPS);
 	InterlockedIncrement64(&g_monitor.m_lAcceptTotal);
 	m_arrPSessions[index] = pSession;
 
@@ -599,8 +591,9 @@ int CNetServer::WorkerThread() noexcept
 			break;
 			case IOOperation::SECTOR_BROADCAST:
 			{
-				OnSectorBroadcast();
-				PostQueuedCompletionStatus(m_hIOCPHandle, 0, 0, (LPOVERLAPPED)IOOperation::SECTOR_BROADCAST);
+				// OnSectorBroadcast();
+				// Sleep(FRAME_PER_TICK);
+				// PostQueuedCompletionStatus(m_hIOCPHandle, 0, 0, (LPOVERLAPPED)IOOperation::SECTOR_BROADCAST);
 				continue;
 			}
 			break;
@@ -616,6 +609,7 @@ int CNetServer::WorkerThread() noexcept
 	return 0;
 }
 
+// SendFrameThread로 활용
 int CNetServer::ServerFrameThread() noexcept
 {
 	// IOCP의 병행성 관리를 받기 위한 GQCS
@@ -627,8 +621,6 @@ int CNetServer::ServerFrameThread() noexcept
 		, (PULONG_PTR)&pSession, (LPOVERLAPPED *)&lpOverlapped
 		, 0);
 
-	// 등록한 수만큼 AcceptEx 예약
-	FristPostAcceptEx();
 
 	while (m_bIsServerFrameRun)
 	{

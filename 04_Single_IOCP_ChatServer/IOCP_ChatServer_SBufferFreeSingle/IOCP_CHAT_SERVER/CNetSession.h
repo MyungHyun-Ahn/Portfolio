@@ -44,7 +44,7 @@ public:
 	void SendCompleted(int size) noexcept;
 
 	bool PostRecv() noexcept;
-	bool PostSend(BOOL isCompleted = FALSE) noexcept;
+	bool PostSend() noexcept;
 
 public:
 	inline static CNetSession *Alloc() noexcept

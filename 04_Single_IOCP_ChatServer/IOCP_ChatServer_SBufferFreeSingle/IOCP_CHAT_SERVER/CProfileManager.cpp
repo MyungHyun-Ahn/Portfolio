@@ -70,16 +70,19 @@ void CProfileManager::DataOutToFile()
 			totalTime -= pProfile->iMinTime[0];
 			totalTime -= pProfile->iMinTime[1];
 
-			__int64 average = totalTime / (pProfile->iCall - 4);
+			if (pProfile->iCall - 4 > 0)
+			{
+				__int64 average = totalTime / (pProfile->iCall - 4);
 
-			fprintf_s(fp, "%-15d | %-100s | %-15lld | %-15lld | %-15lld | %-15lld | %-15lld |\n"
-				, pInfo->threadId
-				, pProfile->szName
-				, totalTime
-				, average
-				, pProfile->iMinTime[0]
-				, pProfile->iMaxTime[0]
-				, pProfile->iCall - 4);
+				fprintf_s(fp, "%-15d | %-100s | %-15lld | %-15lld | %-15lld | %-15lld | %-15lld |\n"
+					, pInfo->threadId
+					, pProfile->szName
+					, totalTime
+					, average
+					, pProfile->iMinTime[0]
+					, pProfile->iMaxTime[0]
+					, pProfile->iCall - 4);
+			}
 		}
 
 		fprintf_s(fp, "------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n");

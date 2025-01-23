@@ -83,9 +83,15 @@ bool CChatProcessPacket::PacketProcReqSectorMove(UINT64 sessionId, CSmartPtr<CSe
 		return false;
 
 	if (player->m_usSectorY != 0xFF && player->m_usSectorX != 0xFF)
+	{
 		m_pChatServer->m_arrCSector[player->m_usSectorY][player->m_usSectorX].m_players.erase(sessionId);
+		m_pChatServer->m_arrCSector[sectorY][sectorX].m_players.insert(std::make_pair(sessionId, player));
+	}
+	else
+	{
+		m_pChatServer->m_arrCSector[sectorY][sectorX].m_players.insert(std::make_pair(sessionId, player));
+	}
 
-	m_pChatServer->m_arrCSector[sectorY][sectorX].m_players.insert(std::make_pair(sessionId, player));
 	player->m_usSectorY = sectorY;
 	player->m_usSectorX = sectorX;
 
@@ -130,6 +136,11 @@ bool CChatProcessPacket::PacketProcReqMessage(UINT64 sessionId, CSmartPtr<CSeria
 
 	messageRes->IncreaseRef();
 	messageRes->SetSessionId(sessionId);
+
+	// m_pChatServer->SendSector(0, player->m_usSectorY, player->m_usSectorX, messageRes);
+
+	// if (messageRes->DecreaseRef() == 0)
+	// 	CSerializableBuffer<FALSE>::Free(messageRes);
 	m_pChatServer->m_arrCSector[player->m_usSectorY][player->m_usSectorX].m_sendMsgQ.push_back(messageRes);
 
 	return true;
