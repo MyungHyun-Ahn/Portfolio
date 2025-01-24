@@ -92,7 +92,7 @@ bool CChatServer::OnConnectionRequest(const WCHAR *ip, USHORT port) noexcept
 	return true;
 }
 
-// Apc 에서 수행됨
+
 void CChatServer::OnAccept(const UINT64 sessionID) noexcept
 {
 	InterlockedIncrement(&g_monitor.m_lUpdateTPS);
@@ -102,7 +102,6 @@ void CChatServer::OnAccept(const UINT64 sessionID) noexcept
 	ReleaseSRWLockExclusive(&m_nonLoginplayerMapLock);
 }
 
-// Apc 에서 수행됨
 void CChatServer::OnClientLeave(const UINT64 sessionID) noexcept
 {
 	InterlockedIncrement(&g_monitor.m_lUpdateTPS);
@@ -138,7 +137,6 @@ void CChatServer::OnClientLeave(const UINT64 sessionID) noexcept
 		return;
 	}
 
-	// 사실 위 둘에서 안걸리고 여기서 해제하면 버그임
 	__debugbreak();
 	ReleaseSRWLockExclusive(&m_playerMapLock);
 }

@@ -311,21 +311,25 @@ bool CNetSession::PostRecv() noexcept
 	return TRUE;
 }
 
-bool CNetSession::PostSend() noexcept
+bool CNetSession::PostSend(bool isPQCS) noexcept
 {
 	int errVal;
 	int retVal;
+	int sendUseSize;
 
-	int sendUseSize = m_lfSendBufferQueue.GetUseSize();
-	if (sendUseSize <= 0)
+	if (!isPQCS)
 	{
-		return FALSE;
-	}
+		sendUseSize = m_lfSendBufferQueue.GetUseSize();
+		if (sendUseSize <= 0)
+		{
+			return FALSE;
+		}
 
 
-	if (InterlockedExchange(&m_iSendFlag, TRUE) == TRUE)
-	{
-		return TRUE;
+		if (InterlockedExchange(&m_iSendFlag, TRUE) == TRUE)
+		{
+			return TRUE;
+		}
 	}
 
 	// 여기서 얻은 만큼 쓸 것

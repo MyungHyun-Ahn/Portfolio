@@ -263,12 +263,25 @@ void CNetServer::SendPacketPQCS(const UINT64 sessionID, CSerializableBuffer<FALS
 		CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetBufferSize() - 4, header.randKey);
 	}
 
-	pSession->SendPacket(sBuffer);
-
-	if (pSession->m_iSendFlag == FALSE)
 	{
-		PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)pSession, (LPOVERLAPPED)IOOperation::SENDPOST);
+		PROFILE_BEGIN(0, "WSASend");
+		pSession->SendPacket(sBuffer);
+		pSession->PostSend();
 	}
+
+	// {
+	// 	PROFILE_BEGIN(0, "PQCS");
+	// 
+	// 	if (InterlockedExchange(&pSession->m_iSendFlag, TRUE) == FALSE)
+	// 	{
+	// 		pSession->SendPacket(sBuffer);
+	// 		PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)pSession, (LPOVERLAPPED)IOOperation::SENDPOST);
+	// 	}
+	// 	else
+	// 	{
+	// 		pSession->SendPacket(sBuffer);
+	// 	}
+	// }
 
 	if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 	{
@@ -579,7 +592,7 @@ int CNetServer::WorkerThread() noexcept
 			break;
 			case IOOperation::SENDPOST:
 			{
-				pSession->PostSend();
+				pSession->PostSend(TRUE);
 				continue;
 			}
 			break;
@@ -591,9 +604,9 @@ int CNetServer::WorkerThread() noexcept
 			break;
 			case IOOperation::SECTOR_BROADCAST:
 			{
-				// OnSectorBroadcast();
-				// Sleep(FRAME_PER_TICK);
-				// PostQueuedCompletionStatus(m_hIOCPHandle, 0, 0, (LPOVERLAPPED)IOOperation::SECTOR_BROADCAST);
+				OnSectorBroadcast();
+				Sleep(FRAME_PER_TICK);
+				PostQueuedCompletionStatus(m_hIOCPHandle, 0, 0, (LPOVERLAPPED)IOOperation::SECTOR_BROADCAST);
 				continue;
 			}
 			break;

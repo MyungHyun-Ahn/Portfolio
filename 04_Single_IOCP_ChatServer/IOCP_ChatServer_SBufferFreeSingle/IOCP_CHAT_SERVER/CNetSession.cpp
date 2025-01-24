@@ -324,7 +324,10 @@ bool CNetSession::PostSend() noexcept
 	int errVal;
 	int retVal;
 
-	int sendUseSize = m_lfSendBufferQueue.GetUseSize();
+	int sendUseSize;
+
+
+	sendUseSize = m_lfSendBufferQueue.GetUseSize();
 	if (sendUseSize <= 0)
 	{
 		return FALSE;
