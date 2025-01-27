@@ -38,12 +38,14 @@
 #include <unordered_set>
 #include <map>
 #include <string>
+#include <queue>
 
 // 기타 - 언어설정 등
 #include <new>
 #include <locale>
 #include <DbgHelp.h>
 #include <chrono>
+#include <functional>
 
 #include "DefineSingleton.h"
 #include "CProfileManager.h"
@@ -80,3 +82,5 @@
 #include "CMyFileLoader.h"
 
 #include "CDeque.h"
+
+#include "BaseEvent.h"

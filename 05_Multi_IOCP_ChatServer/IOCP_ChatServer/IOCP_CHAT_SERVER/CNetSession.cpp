@@ -252,7 +252,8 @@ void CNetSession::SendCompleted(int size) noexcept
 
 	m_iSendCount = 0;
 
-	InterlockedExchange(&m_iSendFlag, FALSE);
+	// SendFlag를 풀지 않고 진행
+	PostSend(TRUE);
 }
 
 bool CNetSession::PostRecv() noexcept
@@ -328,11 +329,12 @@ bool CNetSession::PostSend(bool isPQCS) noexcept
 
 		if (InterlockedExchange(&m_iSendFlag, TRUE) == TRUE)
 		{
-			return TRUE;
+			return FALSE;
 		}
 	}
 
 	// 여기서 얻은 만큼 쓸 것
+	// 플래그 획득 이후의 실패는 플래그 풀어주기
 	sendUseSize = m_lfSendBufferQueue.GetUseSize();
 	if (sendUseSize <= 0)
 	{
@@ -344,6 +346,7 @@ bool CNetSession::PostSend(bool isPQCS) noexcept
 	if ((m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
 	{
 		InterlockedDecrement(&m_iIOCountAndRelease);
+		InterlockedExchange(&m_iSendFlag, FALSE);
 		return FALSE;
 	}
 
@@ -391,6 +394,7 @@ bool CNetSession::PostSend(bool isPQCS) noexcept
 			// 반환값을 사용안해도 됨
 			if (InterlockedDecrement(&m_iIOCountAndRelease) == 0)
 			{
+				InterlockedExchange(&m_iSendFlag, FALSE);
 				return FALSE;
 			}
 		}
@@ -399,6 +403,7 @@ bool CNetSession::PostSend(bool isPQCS) noexcept
 			if (m_iCacelIoCalled)
 			{
 				CancelIoEx((HANDLE)m_sSessionSocket, nullptr);
+				InterlockedExchange(&m_iSendFlag, FALSE);
 				return FALSE;
 			}
 		}

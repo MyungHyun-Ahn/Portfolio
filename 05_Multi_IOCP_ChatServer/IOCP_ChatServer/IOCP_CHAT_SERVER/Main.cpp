@@ -9,32 +9,6 @@
 
 #pragma warning(disable : 4101)
 
-unsigned int MonitorThreadFunc(LPVOID lpParam) noexcept
-{
-	DWORD mTime = timeGetTime();
-	while (monitorThreadRunning)
-	{
-		// 처음 실행 때문에 1초 늦게 시작
-		DWORD dTime = timeGetTime() - mTime;
-		if (dTime < 1000)
-			Sleep(1000 - dTime);
-
-		g_monitor.Update(g_NetServer->GetSessionCount(), ((CChatServer *)g_NetServer)->GetPlayerCount());
-
-		mTime += 1000;
-
-		// 프로파일러 저장
-		if (GetAsyncKeyState(VK_F2))
-			g_ProfileMgr->DataOutToFile();
-
-		if (GetAsyncKeyState(VK_F1))
-			g_NetServer->Stop();
-
-	}
-
-	return 0;
-}
-
 int main()
 {
 	CCrashDump crashDump;
@@ -72,8 +46,6 @@ int main()
 	g_NetServer = new CChatServer;
 
 	g_NetServer->Start(openIP.c_str(), openPort);
-
-	MonitorThreadFunc(nullptr);
 
 	return 0;
 }

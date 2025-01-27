@@ -10,7 +10,8 @@ public:
 	inline LONG GetSessionCount() const noexcept { return m_iSessionCount; }
 
 	void SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept;
-	void SendPacketPQCS(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept;
+	// Send 시도는 하지 않음
+	void EnqueuePacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept;
 
 	BOOL Disconnect(const UINT64 sessionID, BOOL isPQCS = FALSE) noexcept;
 	BOOL ReleaseSession(CNetSession *pSession, BOOL isPQCS = FALSE) noexcept;
@@ -22,11 +23,6 @@ public:
 	virtual void OnRecv(const UINT64 sessionID, CSerializableBufferView<FALSE> *message) noexcept = 0;
 	virtual void OnRecv(const UINT64 sessionID, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept = 0;
 	virtual void OnError(int errorcode, WCHAR *errMsg) noexcept = 0;
-
-	// 콘텐츠 프레임
-	virtual void OnHeartBeat() noexcept = 0;
-
-	virtual void OnSectorBroadcast() noexcept = 0;
 
 	// AcceptEx
 	void FristPostAcceptEx() noexcept;
@@ -58,7 +54,14 @@ public:
 	int WorkerThread() noexcept;
 
 	// 나중에 하트비트 용도로 사용
-	int ServerFrameThread() noexcept;
+	int EventSchedulerThread() noexcept;
+
+	void RegisterSystemEvent();
+	virtual void RegisterContentEvent() noexcept = 0;
+
+	void RegisterTimerEvent(BaseEvent *timerEvent) noexcept;
+	static void RegisterTimerEventAPCFunc(ULONG_PTR lpParam) noexcept;
+
 
 
 private:
@@ -77,15 +80,16 @@ private:
 	std::vector<HANDLE>		m_arrWorkerThreads;
 
 	// Accepter
-	LPFN_ACCEPTEX		m_lpfnAcceptEx = NULL;
-	GUID				m_guidAcceptEx = WSAID_ACCEPTEX;
+	LPFN_ACCEPTEX					m_lpfnAcceptEx = NULL;
+	GUID							m_guidAcceptEx = WSAID_ACCEPTEX;
+	CNetSession						**m_arrAcceptExSessions;
 
 	LPFN_GETACCEPTEXSOCKADDRS		m_lpfnGetAcceptExSockaddrs = NULL;
 	GUID							m_guidGetAcceptExSockaddrs = WSAID_GETACCEPTEXSOCKADDRS;
 
-	HANDLE				m_hServerFrameThread;
-	BOOL				m_bIsServerFrameRun = TRUE;
-	CNetSession			**m_arrAcceptExSessions;
+	HANDLE												m_hEventSchedulerThread;
+	BOOL												m_bIsEventSchedulerRun = TRUE;
+	std::priority_queue<BaseEvent *, std::vector<BaseEvent *>, EventComparator>	m_EventQueue;
 
 	// IOCP 핸들
 	HANDLE m_hIOCPHandle = INVALID_HANDLE_VALUE;

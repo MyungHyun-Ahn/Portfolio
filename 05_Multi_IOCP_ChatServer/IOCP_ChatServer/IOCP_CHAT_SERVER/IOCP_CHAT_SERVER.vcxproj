@@ -146,6 +146,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="BaseEvent.h" />
     <ClInclude Include="CChatServer.h" />
     <ClInclude Include="CCrashDump.h" />
     <ClInclude Include="CDeque.h" />
@@ -161,6 +162,7 @@
     <ClInclude Include="CNetServer.h" />
     <ClInclude Include="CNetSession.h" />
     <ClInclude Include="CommonProtocol.h" />
+    <ClInclude Include="ContentEvent.h" />
     <ClInclude Include="CPlayer.h" />
     <ClInclude Include="CProcessPacket.h" />
     <ClInclude Include="CProfileManager.h" />
@@ -181,8 +183,10 @@
     <ClInclude Include="COverlappedAllocator.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="ServerSetting.h" />
+    <ClInclude Include="SystemEvent.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="BaseEvent.cpp" />
     <ClCompile Include="CChatServer.cpp" />
     <ClCompile Include="CCrashDump.cpp" />
     <ClCompile Include="CDeque.cpp" />
@@ -197,6 +201,7 @@
     <ClCompile Include="CMyFileLoader.cpp" />
     <ClCompile Include="CNetServer.cpp" />
     <ClCompile Include="CNetSession.cpp" />
+    <ClCompile Include="ContentEvent.cpp" />
     <ClCompile Include="CPlayer.cpp" />
     <ClCompile Include="CProcessPacket.cpp" />
     <ClCompile Include="CProfileManager.cpp" />
@@ -220,6 +225,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="ServerSetting.cpp" />
+    <ClCompile Include="SystemEvent.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ServerConfig.conf" />

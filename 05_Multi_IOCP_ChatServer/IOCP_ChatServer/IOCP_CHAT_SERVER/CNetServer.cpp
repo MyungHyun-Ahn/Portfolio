@@ -1,8 +1,10 @@
 #include "pch.h"
 #include "ChatSetting.h"
 #include "ServerSetting.h"
+#include "BaseEvent.h"
 #include "CNetServer.h"
 #include "CNetSession.h"
+#include "SystemEvent.h"
 
 CNetServer *g_NetServer = nullptr;
 
@@ -11,9 +13,9 @@ unsigned int NetWorkerThreadFunc(LPVOID lpParam) noexcept
 	return g_NetServer->WorkerThread();
 }
 
-unsigned int NetServerFrameThreadFunc(LPVOID lpParam) noexcept
+unsigned int NetEventSchedulerThreadFunc(LPVOID lpParam) noexcept
 {
-	return g_NetServer->ServerFrameThread();
+	return g_NetServer->EventSchedulerThread();
 }
 
 BOOL CNetServer::Start(const CHAR *openIP, const USHORT port) noexcept
@@ -130,7 +132,20 @@ BOOL CNetServer::Start(const CHAR *openIP, const USHORT port) noexcept
 	// AcceptEx 요청
 	FristPostAcceptEx();
 
-	PostQueuedCompletionStatus(m_hIOCPHandle, 0, 0, (LPOVERLAPPED)IOOperation::SECTOR_BROADCAST);
+	// CreateTimerSchedulerThread
+	m_hEventSchedulerThread = (HANDLE)_beginthreadex(nullptr, 0, NetEventSchedulerThreadFunc, nullptr, 0, nullptr);
+	if (m_hEventSchedulerThread == 0)
+	{
+		errVal = GetLastError();
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"EventSchedulerThread running fail.. : %d", errVal);
+		return FALSE;
+	}
+
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"[SYSTEM] EventSchedulerThread running..");
+
+	
+	RegisterSystemEvent();
+	RegisterContentEvent();
 
 	// CreateWorkerThread
 	for (int i = 1; i <= IOCP_WORKER_THREAD; i++)
@@ -146,6 +161,9 @@ BOOL CNetServer::Start(const CHAR *openIP, const USHORT port) noexcept
 		m_arrWorkerThreads.push_back(hWorkerThread);
 		g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"[SYSTEM] WorkerThread[%d] running..", i);
 	}
+
+	WaitForMultipleObjects(m_arrWorkerThreads.size(), m_arrWorkerThreads.data(), TRUE, INFINITE);
+	WaitForSingleObject(m_hEventSchedulerThread, INFINITE);
 
 	return TRUE;
 }
@@ -171,12 +189,12 @@ void CNetServer::Stop()
 		if (m_iSessionCount == 0)
 		{
 			m_bIsWorkerRun = FALSE;
+			PostQueuedCompletionStatus(m_hIOCPHandle, 0, 0, 0);
 			break;
 		}
 	}
 
-	m_bIsServerFrameRun = FALSE;
-	monitorThreadRunning = FALSE;
+	m_bIsEventSchedulerRun = FALSE;
 }
 
 void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept
@@ -226,7 +244,7 @@ void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *
 }
 
 // Sector 락이 잡힌 경우에만 PQCS
-void CNetServer::SendPacketPQCS(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept
+void CNetServer::EnqueuePacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept
 {
 	CNetSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 
@@ -263,23 +281,19 @@ void CNetServer::SendPacketPQCS(const UINT64 sessionID, CSerializableBuffer<FALS
 		CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetBufferSize() - 4, header.randKey);
 	}
 
-	{
-		PROFILE_BEGIN(0, "WSASend");
-		pSession->SendPacket(sBuffer);
-		pSession->PostSend();
-	}
+	pSession->SendPacket(sBuffer);
 
 	// {
-	// 	PROFILE_BEGIN(0, "PQCS");
+	// 	// PROFILE_BEGIN(0, "WSASend");
+	// 	pSession->PostSend();
+	// }
+
+	// {
+	// 	// PROFILE_BEGIN(0, "PQCS");
 	// 
-	// 	if (InterlockedExchange(&pSession->m_iSendFlag, TRUE) == FALSE)
+	// 	if (pSession->m_iSendFlag == FALSE)
 	// 	{
-	// 		pSession->SendPacket(sBuffer);
 	// 		PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)pSession, (LPOVERLAPPED)IOOperation::SENDPOST);
-	// 	}
-	// 	else
-	// 	{
-	// 		pSession->SendPacket(sBuffer);
 	// 	}
 	// }
 
@@ -592,7 +606,7 @@ int CNetServer::WorkerThread() noexcept
 			break;
 			case IOOperation::SENDPOST:
 			{
-				pSession->PostSend(TRUE);
+				pSession->PostSend();
 				continue;
 			}
 			break;
@@ -602,11 +616,22 @@ int CNetServer::WorkerThread() noexcept
 				continue;
 			}
 			break;
-			case IOOperation::SECTOR_BROADCAST:
+			case IOOperation::TIMER_EVENT:
 			{
-				OnSectorBroadcast();
-				Sleep(FRAME_PER_TICK);
-				PostQueuedCompletionStatus(m_hIOCPHandle, 0, 0, (LPOVERLAPPED)IOOperation::SECTOR_BROADCAST);
+				BaseEvent *timerEvent = (BaseEvent *)pSession;
+				timerEvent->nextExecuteTime += timerEvent->timeMs;
+				timerEvent->execute();
+
+				// Event Apc Enqueue - PQ 동기화 피하기 위함
+				RegisterTimerEvent(timerEvent);
+				continue;
+			}
+			break;
+			case IOOperation::CONTENT_EVENT: // 일회성 이벤트
+			{
+				BaseEvent *contentEvent = (BaseEvent *)pSession;
+				contentEvent->execute();
+				delete contentEvent;
 				continue;
 			}
 			break;
@@ -623,7 +648,7 @@ int CNetServer::WorkerThread() noexcept
 }
 
 // SendFrameThread로 활용
-int CNetServer::ServerFrameThread() noexcept
+int CNetServer::EventSchedulerThread() noexcept
 {
 	// IOCP의 병행성 관리를 받기 위한 GQCS
 	DWORD dwTransferred = 0;
@@ -635,21 +660,55 @@ int CNetServer::ServerFrameThread() noexcept
 		, 0);
 
 
-	while (m_bIsServerFrameRun)
+	while (m_bIsEventSchedulerRun)
 	{
-		// Update
-		// -> 여기서 Update 로직 수행
-		// -> 반환값은 프레임 제어를 위해 
-		// DWORD sleepTime = OnUpdate();
+		if (m_EventQueue.empty())
+			SleepEx(INFINITE, TRUE); // APC 작업이 Enqueue 되면 깨어날 것
 
-		// Heartbeat
-		// -> OnHeartbeat로 Disconnect 수행
-		// OnHeartBeat();
+		// EventQueue에 무언가 있을 것
+		BaseEvent *timerEvent = m_EventQueue.top();
+		// 수행 가능 여부 판단
+		LONG dTime = timerEvent->nextExecuteTime - timeGetTime();
+		if (dTime <= 0) // 0보다 작으면 수행 가능
+		{
+			m_EventQueue.pop();
+			PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)timerEvent, (LPOVERLAPPED)IOOperation::TIMER_EVENT);
+			continue;
+		}
 
-		// Alertable Wait 상태로 전환
-		// + 프레임 제어
-		// SleepEx(sleepTime, TRUE);
+		// 남은 시간만큼 블록
+		SleepEx(dTime, TRUE);
 	}
 
 	return 0;
+}
+
+void CNetServer::RegisterSystemEvent()
+{
+	MonitorEvent *monitorEvent = new MonitorEvent;
+	monitorEvent->SetEvent();
+	RegisterTimerEvent((BaseEvent *)monitorEvent);
+
+	KeyBoardEvent *keyBoardEvent = new KeyBoardEvent;
+	keyBoardEvent->SetEvent();
+	RegisterTimerEvent((BaseEvent *)keyBoardEvent);
+}
+
+void CNetServer::RegisterTimerEvent(BaseEvent *timerEvent) noexcept
+{
+	int retVal;
+	int errVal;
+
+	retVal = QueueUserAPC(RegisterTimerEventAPCFunc, m_hEventSchedulerThread, (ULONG_PTR)timerEvent);
+	if (retVal == FALSE)
+	{
+		errVal = GetLastError();
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"QueueUserAPC() 실패 : %d", errVal);
+	}
+}
+
+// EventSchedulerThread에서 수행됨
+void CNetServer::RegisterTimerEventAPCFunc(ULONG_PTR lpParam) noexcept
+{
+	g_NetServer->m_EventQueue.push((BaseEvent *)lpParam);
 }

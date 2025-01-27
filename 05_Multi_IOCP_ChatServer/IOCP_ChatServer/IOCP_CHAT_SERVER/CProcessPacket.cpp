@@ -196,8 +196,6 @@ bool CChatProcessPacket::PacketProcReqMessage(UINT64 sessionId, CSmartPtr<CSeria
 		return false;
 	}
 	
-
-
 	WCHAR chatMessage[256];
 	message->Dequeue((char *)chatMessage, messageLen);
 
@@ -206,16 +204,18 @@ bool CChatProcessPacket::PacketProcReqMessage(UINT64 sessionId, CSmartPtr<CSeria
 		return false;
 	}
 
-
 	CSerializableBuffer<FALSE> *messageRes = CGenPacket::makePacketResMessage(accountNo, player->m_szID, player->m_szNickname, messageLen, chatMessage);
 	messageRes->IncreaseRef();
+	// 자기 자신 제외를 위해
 	messageRes->SetSessionId(sessionId);
 	InterlockedIncrement(&g_monitor.m_chatMsgRes);
-	// m_pChatServer->SendPacket(sessionId, messageRes);
+	m_pChatServer->SendPacket(sessionId, messageRes);
 	// m_pChatServer->SendSector(sessionId, player->m_usSectorY, player->m_usSectorX, messageRes);
-	// if (messageRes->DecreaseRef() == 0)
-	// 	CSerializableBuffer<FALSE>::Free(messageRes);
+	messageRes->IncreaseRef();
 	m_pChatServer->m_arrCSector[player->m_usSectorY][player->m_usSectorX].m_sendMsgLFQ.Enqueue(messageRes);
+
+	if (messageRes->DecreaseRef() == 0)
+		CSerializableBuffer<FALSE>::Free(messageRes);
 
 	return true;
 }

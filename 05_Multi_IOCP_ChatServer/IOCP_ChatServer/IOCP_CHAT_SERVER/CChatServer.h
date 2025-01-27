@@ -12,6 +12,7 @@ public:
 	void		NonLoginHeartBeat() noexcept;
 	void		LoginHeartBeat() noexcept;
 	void		SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX, CSerializableBuffer<FALSE> *message) noexcept;
+	void		SectorBroadcast() noexcept;
 
 	// CNetServer을(를) 통해 상속됨
 	bool		OnConnectionRequest(const WCHAR *ip, USHORT port) noexcept override;
@@ -20,8 +21,9 @@ public:
 	void		OnRecv(const UINT64 sessionID, CSerializableBufferView<FALSE> *message) noexcept override;
 	void		OnRecv(const UINT64 sessionID, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept override;
 	void		OnError(int errorcode, WCHAR *errMsg) noexcept override;
-	void		OnHeartBeat() noexcept override;
-	void		OnSectorBroadcast() noexcept override;
+
+	void		RegisterContentEvent() noexcept override; // 스케줄러 스레드가 생성된 이후 호출되어야 함
+
 
 	inline int GetPlayerCount() noexcept { return (int)m_umapLoginPlayer.size(); }
 	inline int GetJobQCount() noexcept { return m_RecvJobQ.GetUseSize(); }

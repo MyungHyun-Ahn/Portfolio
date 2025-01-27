@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "BaseEvent.h"
 #include "CNetServer.h"
 #include "CNetSession.h"
 #include "ChatSetting.h"
@@ -7,6 +8,7 @@
 #include "CChatServer.h"
 #include "CommonProtocol.h"
 #include "CProcessPacket.h"
+#include "ContentEvent.h"
 
 CChatServer::CChatServer() noexcept
 {
@@ -20,8 +22,6 @@ CChatServer::CChatServer() noexcept
 	m_umapLoginPlayer.reserve(20000);
 }
 
-
-// 하트비트 일단 보류
 void CChatServer::NonLoginHeartBeat() noexcept
 {
 	AcquireSRWLockShared(&m_nonLoginplayerMapLock);
@@ -77,7 +77,7 @@ void CChatServer::SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX, CSeri
 			if (message->GetSessionId() == it->first)
 				continue;
 
-			SendPacketPQCS(it->first, message);
+			EnqueuePacket(it->first, message);
 		}
 	}
 
@@ -166,30 +166,22 @@ void CChatServer::OnError(int errorcode, WCHAR *errMsg) noexcept
 {
 }
 
-// 일단 보류
-void CChatServer::OnHeartBeat() noexcept
+void CChatServer::RegisterContentEvent() noexcept
 {
-	// non-login Player 객체의 HeartBeat 검사
-	static DWORD nonLoginPrevTick = timeGetTime();
-	int dTime = timeGetTime() - nonLoginPrevTick;
-	if (dTime - nonLoginPrevTick > NON_LOGIN_TIME_OUT_CHECK)
-	{
-		NonLoginHeartBeat();
-		nonLoginPrevTick += NON_LOGIN_TIME_OUT_CHECK;
-	}
+	SectorBroadcastEvent *sectorBroadcastEvent = new SectorBroadcastEvent;
+	sectorBroadcastEvent->SetEvent();
+	RegisterTimerEvent((BaseEvent *)sectorBroadcastEvent);
 
-	// login Player 객체의 HeartBeat 검사
-	static DWORD loginPrevTick = timeGetTime();
-	dTime = timeGetTime() - loginPrevTick;
-	if (dTime - loginPrevTick > LOGIN_TIME_OUT_CHECK)
-	{
-		LoginHeartBeat();
-		loginPrevTick += LOGIN_TIME_OUT_CHECK;
-	}
+	// NonLoginHeartBeatEvent *nonLoginHeartBeatEvent = new NonLoginHeartBeatEvent;
+	// nonLoginHeartBeatEvent->SetEvent();
+	// RegisterTimerEvent((BaseEvent *)nonLoginHeartBeatEvent);
 
+	// LoginHeartBeatEvent *loginHeartBeatEvent = new LoginHeartBeatEvent;
+	// loginHeartBeatEvent->SetEvent();
+	// RegisterTimerEvent((BaseEvent *)loginHeartBeatEvent);
 }
 
-void CChatServer::OnSectorBroadcast() noexcept
+void CChatServer::SectorBroadcast() noexcept
 {
 	for (int sectorY = 0; sectorY < MAX_SECTOR_Y; sectorY++)
 	{
@@ -230,8 +222,6 @@ void CChatServer::OnSectorBroadcast() noexcept
 				if (!msgQ.Dequeue(&msg))
 					__debugbreak();
 
-				SendPacketPQCS(msg->GetSessionId(), msg);
-
 				for (int i = 0; i < sectorCount; i++)
 				{
 					auto playerMap = sectors[i]->m_players;
@@ -241,7 +231,7 @@ void CChatServer::OnSectorBroadcast() noexcept
 							continue;
 
 						InterlockedIncrement(&g_monitor.m_chatMsgRes);
-						SendPacketPQCS(it->first, msg);
+						EnqueuePacket(it->first, msg);
 					}
 				}
 
