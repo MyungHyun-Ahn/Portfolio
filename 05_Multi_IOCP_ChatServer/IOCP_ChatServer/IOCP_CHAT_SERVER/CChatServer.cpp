@@ -157,16 +157,11 @@ void CChatServer::OnRecv(const UINT64 sessionID, CSerializableBufferView<FALSE> 
 		CSerializableBufferView<FALSE>::Free(message);
 }
 
-void CChatServer::OnRecv(const UINT64 sessionID, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept
-{
-	
-}
-
 void CChatServer::OnError(int errorcode, WCHAR *errMsg) noexcept
 {
 }
 
-void CChatServer::RegisterContentEvent() noexcept
+void CChatServer::RegisterContentTimerEvent() noexcept
 {
 	SectorBroadcastEvent *sectorBroadcastEvent = new SectorBroadcastEvent;
 	sectorBroadcastEvent->SetEvent();

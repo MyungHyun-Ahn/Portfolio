@@ -19,15 +19,6 @@
     <Filter Include="Network\Net">
       <UniqueIdentifier>{4e57c8e9-a1ac-4ee3-bd3c-55aa07c48d30}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Network\Event">
-      <UniqueIdentifier>{d152ac90-36cc-4201-ab18-b21c2451c786}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Content\Object">
-      <UniqueIdentifier>{f296150a-5e4d-436e-9477-29a0d72fb7f9}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Content\Server">
-      <UniqueIdentifier>{46f2ce10-30b7-46fa-a8d9-3f8ee3b60e5f}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -96,6 +87,24 @@
     <ClInclude Include="CNetSession.h">
       <Filter>Network\Net</Filter>
     </ClInclude>
+    <ClInclude Include="CChatServer.h">
+      <Filter>Content</Filter>
+    </ClInclude>
+    <ClInclude Include="CPlayer.h">
+      <Filter>Content</Filter>
+    </ClInclude>
+    <ClInclude Include="CommonProtocol.h">
+      <Filter>Content</Filter>
+    </ClInclude>
+    <ClInclude Include="CProcessPacket.h">
+      <Filter>Content</Filter>
+    </ClInclude>
+    <ClInclude Include="CSector.h">
+      <Filter>Content</Filter>
+    </ClInclude>
+    <ClInclude Include="CGenPacket.h">
+      <Filter>Content</Filter>
+    </ClInclude>
     <ClInclude Include="ChatSetting.h">
       <Filter>Content</Filter>
     </ClInclude>
@@ -108,6 +117,9 @@
     <ClInclude Include="CTLSPagePool.h">
       <Filter>DataStructures</Filter>
     </ClInclude>
+    <ClInclude Include="COverlappedAllocator.h">
+      <Filter>Network</Filter>
+    </ClInclude>
     <ClInclude Include="CDeque.h">
       <Filter>DataStructures</Filter>
     </ClInclude>
@@ -115,34 +127,13 @@
       <Filter>DataStructures</Filter>
     </ClInclude>
     <ClInclude Include="BaseEvent.h">
-      <Filter>Network\Event</Filter>
+      <Filter>Network</Filter>
     </ClInclude>
     <ClInclude Include="SystemEvent.h">
-      <Filter>Network\Event</Filter>
-    </ClInclude>
-    <ClInclude Include="CSector.h">
-      <Filter>Content\Object</Filter>
-    </ClInclude>
-    <ClInclude Include="CPlayer.h">
-      <Filter>Content\Object</Filter>
-    </ClInclude>
-    <ClInclude Include="CGenPacket.h">
-      <Filter>Content\Server</Filter>
-    </ClInclude>
-    <ClInclude Include="CChatServer.h">
-      <Filter>Content\Server</Filter>
-    </ClInclude>
-    <ClInclude Include="CommonProtocol.h">
-      <Filter>Content\Server</Filter>
-    </ClInclude>
-    <ClInclude Include="CProcessPacket.h">
-      <Filter>Content\Server</Filter>
+      <Filter>Network</Filter>
     </ClInclude>
     <ClInclude Include="ContentEvent.h">
-      <Filter>Content\Object</Filter>
-    </ClInclude>
-    <ClInclude Include="COverlappedAllocator.h">
-      <Filter>Network\Net</Filter>
+      <Filter>Content</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -174,35 +165,35 @@
     <ClCompile Include="CNetSession.cpp">
       <Filter>Network\Net</Filter>
     </ClCompile>
+    <ClCompile Include="CChatServer.cpp">
+      <Filter>Content</Filter>
+    </ClCompile>
+    <ClCompile Include="CPlayer.cpp">
+      <Filter>Content</Filter>
+    </ClCompile>
+    <ClCompile Include="CProcessPacket.cpp">
+      <Filter>Content</Filter>
+    </ClCompile>
+    <ClCompile Include="CSector.cpp">
+      <Filter>Content</Filter>
+    </ClCompile>
+    <ClCompile Include="CGenPacket.cpp">
+      <Filter>Content</Filter>
+    </ClCompile>
     <ClCompile Include="ChatSetting.cpp">
       <Filter>Content</Filter>
     </ClCompile>
     <ClCompile Include="ServerSetting.cpp">
       <Filter>Network</Filter>
     </ClCompile>
+    <ClCompile Include="COverlappedAllocator.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
     <ClCompile Include="SystemEvent.cpp">
-      <Filter>Network\Event</Filter>
-    </ClCompile>
-    <ClCompile Include="CSector.cpp">
-      <Filter>Content\Object</Filter>
-    </ClCompile>
-    <ClCompile Include="CPlayer.cpp">
-      <Filter>Content\Object</Filter>
-    </ClCompile>
-    <ClCompile Include="CChatServer.cpp">
-      <Filter>Content\Server</Filter>
-    </ClCompile>
-    <ClCompile Include="CGenPacket.cpp">
-      <Filter>Content\Server</Filter>
-    </ClCompile>
-    <ClCompile Include="CProcessPacket.cpp">
-      <Filter>Content\Server</Filter>
+      <Filter>Network</Filter>
     </ClCompile>
     <ClCompile Include="ContentEvent.cpp">
-      <Filter>Content\Object</Filter>
-    </ClCompile>
-    <ClCompile Include="COverlappedAllocator.cpp">
-      <Filter>Network\Net</Filter>
+      <Filter>Content</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
