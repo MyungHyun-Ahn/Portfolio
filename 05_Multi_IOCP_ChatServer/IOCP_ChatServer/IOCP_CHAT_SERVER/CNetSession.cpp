@@ -394,7 +394,6 @@ bool CNetSession::PostSend(bool isPQCS) noexcept
 			// 반환값을 사용안해도 됨
 			if (InterlockedDecrement(&m_iIOCountAndRelease) == 0)
 			{
-				InterlockedExchange(&m_iSendFlag, FALSE);
 				return FALSE;
 			}
 		}
@@ -403,7 +402,6 @@ bool CNetSession::PostSend(bool isPQCS) noexcept
 			if (m_iCacelIoCalled)
 			{
 				CancelIoEx((HANDLE)m_sSessionSocket, nullptr);
-				InterlockedExchange(&m_iSendFlag, FALSE);
 				return FALSE;
 			}
 		}
