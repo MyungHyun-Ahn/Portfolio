@@ -333,6 +333,7 @@ BOOL CNetServer::Disconnect(const UINT64 sessionID) noexcept
 		return FALSE;
 	}
 
+	__debugbreak();
 	// Io 실패 유도
 	CancelIoEx((HANDLE)pSession->m_sSessionSocket, nullptr);
 
@@ -524,7 +525,7 @@ int CNetServer::WorkerThread() noexcept
 		// 소켓 정상 종료
 		else if (dwTransferred == 0 && oper != IOOperation::ACCEPTEX && (UINT)oper < 3)
 		{
-			Disconnect(pSession->m_uiSessionID);
+			// Disconnect(pSession->m_uiSessionID);
 		}
 		else
 		{
