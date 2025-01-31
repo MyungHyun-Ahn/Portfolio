@@ -199,12 +199,13 @@ void CNetServer::Stop()
 		if (m_iSessionCount == 0)
 		{
 			m_bIsWorkerRun = FALSE;
+			PostQueuedCompletionStatus(m_hIOCPHandle, 0, 0, 0); // 워커 스레드 정상 종료 유도
 			break;
 		}
 	}
 
 	m_bIsServerFrameRun = FALSE;
-	monitorThreadRunning = FALSE;
+	m_bIsTimerEventSchedulerRun = FALSE;
 }
 
 void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept
@@ -212,8 +213,7 @@ void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *
 	CNetSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 
 	InterlockedIncrement(&pSession->m_iIOCountAndRelease);
-	// ReleaseFlag가 이미 켜진 상황
-	if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
+	if (sessionID != pSession->m_uiSessionID)
 	{
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
@@ -222,7 +222,8 @@ void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *
 		return;
 	}
 
-	if (sessionID != pSession->m_uiSessionID)
+	// ReleaseFlag가 이미 켜진 상황
+	if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
 	{
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
@@ -258,8 +259,7 @@ void CNetServer::EnqueuePacket(const UINT64 sessionID, CSerializableBuffer<FALSE
 	CNetSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 
 	InterlockedIncrement(&pSession->m_iIOCountAndRelease);
-	// ReleaseFlag가 이미 켜진 상황
-	if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
+	if (sessionID != pSession->m_uiSessionID)
 	{
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
@@ -268,7 +268,8 @@ void CNetServer::EnqueuePacket(const UINT64 sessionID, CSerializableBuffer<FALSE
 		return;
 	}
 
-	if (sessionID != pSession->m_uiSessionID)
+	// ReleaseFlag가 이미 켜진 상황
+	if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
 	{
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
@@ -301,12 +302,9 @@ void CNetServer::EnqueuePacket(const UINT64 sessionID, CSerializableBuffer<FALSE
 BOOL CNetServer::Disconnect(const UINT64 sessionID) noexcept
 {
 	CNetSession *pSession = m_arrPSessions[GetIndex(sessionID)];
-	if (pSession == nullptr)
-		return FALSE;
-
 	// ReleaseFlag가 이미 켜진 상황
 	InterlockedIncrement(&pSession->m_iIOCountAndRelease);
-	if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
+	if (sessionID != pSession->m_uiSessionID)
 	{
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
@@ -315,7 +313,7 @@ BOOL CNetServer::Disconnect(const UINT64 sessionID) noexcept
 		return FALSE;
 	}
 
-	if (sessionID != pSession->m_uiSessionID)
+	if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
 	{
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
@@ -537,6 +535,7 @@ int CNetServer::WorkerThread() noexcept
 				INT index = g_OverlappedAlloc.GetAcceptExIndex((ULONG_PTR)lpOverlapped);
 				pSession = m_arrAcceptExSessions[index];
 
+				InterlockedIncrement(&pSession->m_iIOCountAndRelease);
 				// 이거 실패하면 연결 끊음
 				// * 실패 가능한 상황 - setsockopt, OnConnectionRequest
 				if (!AcceptExCompleted(pSession))
@@ -545,11 +544,12 @@ int CNetServer::WorkerThread() noexcept
 					if (!m_isStop)
 						PostAcceptEx(index);
 					else
+					{
+						InterlockedDecrement(&pSession->m_iIOCountAndRelease);
 						CNetSession::Free(pSession);
+					}
 					break;
 				}
-
-				InterlockedIncrement(&pSession->m_iIOCountAndRelease);
 
 				// OnAccept Event 생성
 				OnAcceptEvent *acceptEvent = new OnAcceptEvent;
