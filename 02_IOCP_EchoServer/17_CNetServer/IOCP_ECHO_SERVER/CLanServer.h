@@ -4,14 +4,17 @@ class CLanSession;
 class CLanServer
 {
 public:
-	BOOL Start(const CHAR *openIP, const USHORT port, USHORT createWorkerThreadCount, USHORT maxWorkerThreadCount, INT maxSessionCount) noexcept;
-	// void Stop() noexcept;
+	BOOL Start(const CHAR *openIP, const USHORT port) noexcept;
+	void Stop() noexcept;
 
 	inline LONG GetSessionCount() const noexcept { return m_iSessionCount; }
 
 	void SendPacket(const UINT64 sessionID, CSerializableBuffer<TRUE> *sBuffer) noexcept;
+	// Send 시도는 하지 않음
+	void EnqueuePacket(const UINT64 sessionID, CSerializableBuffer<TRUE> *sBuffer) noexcept;
 	BOOL Disconnect(const UINT64 sessionID) noexcept;
-	BOOL ReleaseSession(CLanSession *pSession) noexcept;
+	BOOL ReleaseSession(CLanSession *pSession, BOOL isPQCS = FALSE) noexcept;
+	BOOL ReleaseSessionPQCS(CLanSession *pSession) noexcept;
 
 	virtual bool OnConnectionRequest(const WCHAR *ip, USHORT port) noexcept = 0;
 	virtual void OnAccept(const UINT64 sessionID) noexcept = 0;
@@ -47,18 +50,21 @@ private:
 
 public:
 	int WorkerThread() noexcept;
-	int PostAcceptThread() noexcept;
+	int TimerEventSchedulerThread() noexcept;
 
-	void PostAcceptAPCEnqueue(INT index) noexcept;
-	static void PostAcceptAPCFunc(ULONG_PTR lpParam) noexcept;
+	void RegisterSystemTimerEvent();
+	virtual void RegisterContentTimerEvent() noexcept = 0;
+
+	void RegisterTimerEvent(BaseEvent *timerEvent) noexcept;
+	static void RegisterTimerEventAPCFunc(ULONG_PTR lpParam) noexcept;
 
 private:
 	// Session
 	LONG					m_iSessionCount = 0;
-	INT						m_iCurrentID = 0;
+	LONG64					m_iCurrentID = 0;
 
-	USHORT					m_usMaxSessionCount = 65535;
-	CLanSession				*m_arrPSessions[65535];
+	USHORT					m_usMaxSessionCount;
+	CLanSession **m_arrPSessions;
 	CLFStack<USHORT>		m_stackDisconnectIndex;
 
 	// Worker
@@ -68,19 +74,21 @@ private:
 	std::vector<HANDLE>		m_arrWorkerThreads;
 
 	// Accepter
-	LPFN_ACCEPTEX		m_lpfnAcceptEx = NULL;
-	GUID				m_guidAcceptEx = WSAID_ACCEPTEX;
+	LPFN_ACCEPTEX					m_lpfnAcceptEx = NULL;
+	GUID							m_guidAcceptEx = WSAID_ACCEPTEX;
+	CLanSession **m_arrAcceptExSessions;
 
 	LPFN_GETACCEPTEXSOCKADDRS		m_lpfnGetAcceptExSockaddrs = NULL;
 	GUID							m_guidGetAcceptExSockaddrs = WSAID_GETACCEPTEXSOCKADDRS;
 
-	HANDLE				m_hPostAcceptExThread;
-	BOOL				m_bIsPostAcceptExRun = TRUE;
-	CLanSession			*m_arrAcceptExSessions[ACCEPTEX_COUNT];
-	CLFStack<USHORT>    m_stackFreeAcceptExIndex;
+	HANDLE												m_hTimerEventSchedulerThread;
+	BOOL												m_bIsTimerEventSchedulerRun = TRUE;
+	std::priority_queue<TimerEvent *, std::vector<TimerEvent *>, TimerEventComparator>	m_TimerEventQueue;
 
 	// IOCP 핸들
 	HANDLE m_hIOCPHandle = INVALID_HANDLE_VALUE;
+
+	LONG m_isStop = FALSE;
 };
 
 extern CLanServer *g_LanServer;

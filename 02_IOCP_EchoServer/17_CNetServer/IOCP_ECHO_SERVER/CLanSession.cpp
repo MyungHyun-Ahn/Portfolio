@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "ServerSetting.h"
 #include "CLanSession.h"
 #include "CLanServer.h"
 
@@ -51,6 +52,8 @@ void CLanSession::RecvCompleted(int size) noexcept
             // 필요한만큼 쓸 수 있으면
             m_pDelayedBuffer->Copy(m_pRecvBuffer->GetFrontPtr(), requireSize);
             m_pRecvBuffer->MoveFront(requireSize);
+            InterlockedIncrement(&g_monitor.m_lRecvTPS);
+            m_pDelayedBuffer->m_uiSessionId = m_uiSessionID;
             g_LanServer->OnRecv(m_uiSessionID, CSmartPtr<CSerializableBufferView<TRUE>>(m_pDelayedBuffer));
             m_pDelayedBuffer = nullptr;
         }
@@ -104,6 +107,8 @@ void CLanSession::RecvCompleted(int size) noexcept
         view->Init(m_pRecvBuffer, offsetStart, offsetEnd);
 
         m_pRecvBuffer->MoveFront(PACKET_HEADER_SIZE + packetHeader);
+        InterlockedIncrement(&g_monitor.m_lRecvTPS);
+        view->m_uiSessionId = m_uiSessionID;
         g_LanServer->OnRecv(m_uiSessionID, view);
 
         currentUseSize = m_pRecvBuffer->GetUseSize();
@@ -131,7 +136,7 @@ bool CLanSession::SendPacket(CSerializableBuffer<TRUE> *message) noexcept
 
 void CLanSession::SendCompleted(int size) noexcept
 {
-    // m_SendBuffer.MoveFront(size);
+    InterlockedAdd(&g_monitor.m_lSendTPS, m_iSendCount);
 
     // m_iSendCount를 믿고 할당 해제를 진행
     // * 논블락킹 I/O일 때만 Send를 요청한 데이터보다 덜 보내는 상황이 발생 가능
@@ -146,11 +151,6 @@ void CLanSession::SendCompleted(int size) noexcept
         }
     }
 
-	if (count != m_iSendCount)
-	{
-		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"CSession::SendCompleted %d != %d", count + 1, m_iSendCount);
-	}
-
     m_iSendCount = 0;
 
 #ifdef POSTSEND_LOST_DEBUG
@@ -158,10 +158,7 @@ void CLanSession::SendCompleted(int size) noexcept
 	sendDebug[index % 65535] = { index, (USHORT)GetCurrentThreadId(), 0xff, TRUE, 0 };
 #endif
 
-    if (!PostSend(TRUE))
-    {
-		InterlockedExchange(&m_iSendFlag, FALSE);
-    }
+    PostSend(TRUE);
 }
 
 bool CLanSession::PostRecv() noexcept
@@ -171,24 +168,27 @@ bool CLanSession::PostRecv() noexcept
 
     // 여기서는 수동 Ref 버전이 필요
     // * WSARecv에서 Ref 관리가 불가능
-    m_pRecvBuffer = CRecvBuffer::Alloc();
-    m_pRecvBuffer->IncreaseRef();
-    WSABUF wsaBuf;
-    wsaBuf.buf = m_pRecvBuffer->GetPQueuePtr();
-    wsaBuf.len = m_pRecvBuffer->GetCapacity();
 
-    ZeroMemory(&m_RecvOverlapped, sizeof(OVERLAPPED));
-
-    InterlockedIncrement(&m_iIOCountAndRelease);
+	InterlockedIncrement(&m_iIOCountAndRelease);
 	if ((m_iIOCountAndRelease & CLanSession::RELEASE_FLAG) == CLanSession::RELEASE_FLAG)
 	{
 		InterlockedDecrement(&m_iIOCountAndRelease);
 		return FALSE;
 	}
 
+    m_pRecvBuffer = CRecvBuffer::Alloc();
+    m_pRecvBuffer->IncreaseRef();
+    WSABUF wsaBuf;
+    wsaBuf.buf = m_pRecvBuffer->GetPQueuePtr();
+    wsaBuf.len = m_pRecvBuffer->GetCapacity();
+
+    ZeroMemory((m_pMyOverlappedStartAddr + 1), sizeof(OVERLAPPED));
 
     DWORD flag = 0;
-    retVal = WSARecv(m_sSessionSocket, &wsaBuf, 1, nullptr, &flag, (LPWSAOVERLAPPED)&m_RecvOverlapped, NULL);
+    {
+        // PROFILE_BEGIN(0, "WSARecv");
+		retVal = WSARecv(m_sSessionSocket, &wsaBuf, 1, nullptr, &flag, (LPWSAOVERLAPPED)(m_pMyOverlappedStartAddr + 1), NULL);
+    }
     if (retVal == SOCKET_ERROR)
     {
         errVal = WSAGetLastError();
@@ -204,7 +204,15 @@ bool CLanSession::PostRecv() noexcept
                 return FALSE;
             }
         }
-    }
+		else
+		{
+			if (m_iCacelIoCalled)
+			{
+				CancelIoEx((HANDLE)m_sSessionSocket, nullptr);
+				return FALSE;
+			}
+		}
+	}
 
     return TRUE;
 }
@@ -213,22 +221,23 @@ bool CLanSession::PostSend(BOOL isCompleted) noexcept
 {
     int errVal;
     int retVal;
-
-	int sendUseSize = m_lfSendBufferQueue.GetUseSize();
-	if (sendUseSize <= 0)
-	{
-		return FALSE;
-	}
+    int sendUseSize;
 
     if (!isCompleted)
     {
+		sendUseSize = m_lfSendBufferQueue.GetUseSize();
+		if (sendUseSize <= 0)
+		{
+			return FALSE;
+	}
+
 		if (InterlockedExchange(&m_iSendFlag, TRUE) == TRUE)
 		{
 #ifdef POSTSEND_LOST_DEBUG
 			UINT64 index = InterlockedIncrement(&sendIndex);
 			sendDebug[index % 65535] = { index, (USHORT)GetCurrentThreadId(), wher, FALSE, 2 };
 #endif
-			return TRUE;
+			return FALSE;
 		}
     }
 
@@ -240,11 +249,22 @@ bool CLanSession::PostSend(BOOL isCompleted) noexcept
 		return FALSE;
 	}
 	
+	InterlockedIncrement(&m_iIOCountAndRelease);
+	if ((m_iIOCountAndRelease & CLanSession::RELEASE_FLAG) == CLanSession::RELEASE_FLAG)
+	{
+		InterlockedDecrement(&m_iIOCountAndRelease);
+        InterlockedExchange(&m_iSendFlag, FALSE);
+		return FALSE;
+	}
+
     WSABUF wsaBuf[WSASEND_MAX_BUFFER_COUNT];
 
     m_iSendCount = min(sendUseSize, WSASEND_MAX_BUFFER_COUNT);
 
-    InterlockedAdd(&g_monitor.m_lSendTPS, m_iSendCount);
+	// WSASEND_MAX_BUFFER_COUNT 만큼 1초에 몇번 보내는지 카운트
+	// 이 수치가 높다면 더 늘릴 것
+	if (m_iSendCount == WSASEND_MAX_BUFFER_COUNT)
+		InterlockedIncrement(&g_monitor.m_lMaxSendCount);
 
     int count;
     for (count = 0; count < m_iSendCount; count++)
@@ -264,21 +284,12 @@ bool CLanSession::PostSend(BOOL isCompleted) noexcept
         m_arrPSendBufs[count] = pBuffer;
     }
 
-    if (count != m_iSendCount)
-    {
-        g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"CSession::PostSend %d != %d", count + 1, m_iSendCount);
-    }
+    ZeroMemory((m_pMyOverlappedStartAddr + 2), sizeof(OVERLAPPED));
 
-    ZeroMemory(&m_SendOverlapped, sizeof(OVERLAPPED));
-    
-    InterlockedIncrement(&m_iIOCountAndRelease);
-	if ((m_iIOCountAndRelease & CLanSession::RELEASE_FLAG) == CLanSession::RELEASE_FLAG)
 	{
-		InterlockedDecrement(&m_iIOCountAndRelease);
-		return FALSE;
+		// PROFILE_BEGIN(0, "WSASend");
+		retVal = WSASend(m_sSessionSocket, wsaBuf, m_iSendCount, nullptr, 0, (LPOVERLAPPED)(m_pMyOverlappedStartAddr + 2), NULL);
 	}
-
-    retVal = WSASend(m_sSessionSocket, wsaBuf, m_iSendCount, nullptr, 0, (LPOVERLAPPED)&m_SendOverlapped, NULL);
     if (retVal == SOCKET_ERROR)
     {
         errVal = WSAGetLastError();
@@ -296,7 +307,66 @@ bool CLanSession::PostSend(BOOL isCompleted) noexcept
 				return FALSE;
 			}
 		}
+		else
+		{
+			if (m_iCacelIoCalled)
+			{
+				CancelIoEx((HANDLE)m_sSessionSocket, nullptr);
+				return FALSE;
+			}
+		}
     }
 
     return TRUE;
+}
+
+void CLanSession::Clear() noexcept
+{
+	// ReleaseSession 당시에 남아있는 send 링버퍼를 확인
+	// * 남아있는 경우가 확인됨
+	// * 남은 직렬화 버퍼를 할당 해제하고 세션 삭제
+
+
+	for (int count = 0; count < m_iSendCount; count++)
+	{
+		if (m_arrPSendBufs[count]->DecreaseRef() == 0)
+		{
+			CSerializableBuffer<TRUE>::Free(m_arrPSendBufs[count]);
+		}
+	}
+
+	LONG useBufferSize = m_lfSendBufferQueue.GetUseSize();
+	for (int i = 0; i < useBufferSize; i++)
+	{
+		CSerializableBuffer<TRUE> *pBuffer;
+		// 못꺼낸 것
+		if (!m_lfSendBufferQueue.Dequeue(&pBuffer))
+		{
+			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"LFQueue::Dequeue() Error");
+			// 말도 안되는 상황
+			CCrashDump::Crash();
+		}
+
+		// RefCount를 낮추고 0이라면 보낸 거 삭제
+		if (pBuffer->DecreaseRef() == 0)
+		{
+			CSerializableBuffer<TRUE>::Free(pBuffer);
+		}
+	}
+
+	useBufferSize = m_lfSendBufferQueue.GetUseSize();
+	if (useBufferSize != 0)
+	{
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"LFQueue is not empty Error");
+	}
+
+	if (m_pRecvBuffer != nullptr)
+	{
+		if (m_pRecvBuffer->DecreaseRef() == 0)
+			CRecvBuffer::Free(m_pRecvBuffer);
+	}
+
+	m_sSessionSocket = INVALID_SOCKET;
+	m_uiSessionID = 0;
+	m_pRecvBuffer = nullptr;
 }

@@ -471,9 +471,6 @@ BOOL CNetServer::AcceptExCompleted(CNetSession *pSession) noexcept
 	if (!OnConnectionRequest(pSession->m_ClientAddrBuffer, pSession->m_ClientPort))
 		return FALSE;
 
-
-	Sleep(0);
-
 	USHORT index;
 	// 연결 실패 : FALSE
 	if (!m_stackDisconnectIndex.Pop(&index))
@@ -546,7 +543,7 @@ int CNetServer::WorkerThread() noexcept
 		// 소켓 정상 종료
 		else if (dwTransferred == 0 && oper != IOOperation::ACCEPTEX && (UINT)oper < 3)
 		{
-			Disconnect(pSession->m_uiSessionID);
+			// Disconnect(pSession->m_uiSessionID);
 		}
 		else
 		{
@@ -563,17 +560,17 @@ int CNetServer::WorkerThread() noexcept
 				// * ioCount 무조건 1일 것임
 				// * 바로 끊어도 괜춘
 				// * 다른 I/O 요청을 안걸고 끝내기 때문에 아래의 ioCount 0이 됨으로 연결 끊김을 유도
+				InterlockedIncrement(&pSession->m_iIOCountAndRelease);
 				if (!AcceptExCompleted(pSession))
 				{
 					// 실패한 인덱스에 대한 예약은 다시 걸어줌
 					if (!m_isStop)
 						PostAcceptEx(index);
 					else
-						CNetSession::Free(pSession);
+						if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
+							CNetSession::Free(pSession);
 					break;
 				}
-
-				InterlockedIncrement(&pSession->m_iIOCountAndRelease);
 
 				// OnAccept 처리는 여기서
 				OnAccept(pSession->m_uiSessionID);
@@ -585,8 +582,7 @@ int CNetServer::WorkerThread() noexcept
 
 				if (!m_isStop)
 					PostAcceptEx(index);
-				else
-					CNetSession::Free(pSession);
+
 				continue;
 			}
 			break;
@@ -616,7 +612,7 @@ int CNetServer::WorkerThread() noexcept
 			break;
 			case IOOperation::TIMER_EVENT:
 			{
-				BaseEvent *timerEvent = (BaseEvent *)pSession;
+				TimerEvent *timerEvent = (TimerEvent *)pSession;
 				timerEvent->nextExecuteTime += timerEvent->timeMs;
 				timerEvent->execute();
 
@@ -664,7 +660,7 @@ int CNetServer::TimerEventSchedulerThread() noexcept
 			SleepEx(INFINITE, TRUE); // APC 작업이 Enqueue 되면 깨어날 것
 
 		// EventQueue에 무언가 있을 것
-		BaseEvent *timerEvent = m_TimerEventQueue.top();
+		TimerEvent *timerEvent = m_TimerEventQueue.top();
 		// 수행 가능 여부 판단
 		LONG dTime = timerEvent->nextExecuteTime - timeGetTime();
 		if (dTime <= 0) // 0보다 작으면 수행 가능
@@ -683,11 +679,11 @@ int CNetServer::TimerEventSchedulerThread() noexcept
 
 void CNetServer::RegisterSystemTimerEvent()
 {
-	MonitorEvent *monitorEvent = new MonitorEvent;
+	MonitorTimerEvent *monitorEvent = new MonitorTimerEvent;
 	monitorEvent->SetEvent();
 	RegisterTimerEvent((BaseEvent *)monitorEvent);
 
-	KeyBoardEvent *keyBoardEvent = new KeyBoardEvent;
+	KeyBoardTimerEvent *keyBoardEvent = new KeyBoardTimerEvent;
 	keyBoardEvent->SetEvent();
 	RegisterTimerEvent((BaseEvent *)keyBoardEvent);
 }
@@ -708,5 +704,5 @@ void CNetServer::RegisterTimerEvent(BaseEvent *timerEvent) noexcept
 // EventSchedulerThread에서 수행됨
 void CNetServer::RegisterTimerEventAPCFunc(ULONG_PTR lpParam) noexcept
 {
-	g_NetServer->m_TimerEventQueue.push((BaseEvent *)lpParam);
+	g_NetServer->m_TimerEventQueue.push((TimerEvent *)lpParam);
 }

@@ -12,6 +12,7 @@ public:
 private:
 	friend class CLanSession;
 	friend class CNetSession;
+	friend class CChatProcessPacket;
 
 	// 오프셋 시작과 끝을 받음
 	inline void Init(CSmartPtr<CRecvBuffer> spRecvBuffer, int offsetStart, int offsetEnd) noexcept
@@ -49,6 +50,8 @@ private:
 			// 직접 할당 받은 버퍼임
 			delete[] m_pBuffer;
 		}
+		m_pBuffer = nullptr;
+		m_uiSessionId = 0;
 	}
 	// 이걸 보고 헤더가 딜레이 된 것이라면 지연처리 작업
 	inline USHORT isReadHeaderSize() noexcept
@@ -82,6 +85,7 @@ private:
 	inline static CSerializableBufferView *Alloc() noexcept
 	{
 		CSerializableBufferView *pSBuffer = s_sbufferPool.Alloc();
+		pSBuffer->isFree = FALSE;
 		return pSBuffer;
 	}
 
@@ -89,10 +93,14 @@ public:
 	inline static void Free(CSerializableBufferView *delSBuffer) noexcept
 	{
 		// 직접 할당 받은 버퍼가 아니라면 recv 버퍼는 nullptr이 아님
+		if (delSBuffer->isFree)
+			__debugbreak();
+		delSBuffer->isFree = TRUE;
 		delSBuffer->Clear();
-
 		s_sbufferPool.Free(delSBuffer);
 	}
+
+	inline UINT64 GetSessionID() const noexcept { return m_uiSessionId; }
 
 	// operator
 public:
@@ -103,7 +111,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(char))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		chData = *(char *)(m_pBuffer + m_Front);
@@ -116,7 +124,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(unsigned char))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		byData = *(unsigned char *)(m_pBuffer + m_Front);
@@ -129,7 +137,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(short))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		shData = *(short *)(m_pBuffer + m_Front);
@@ -142,7 +150,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(char))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		wData = *(unsigned short *)(m_pBuffer + m_Front);
@@ -155,7 +163,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(int))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		iData = *(int *)(m_pBuffer + m_Front);
@@ -168,7 +176,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(long))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		lData = *(long *)(m_pBuffer + m_Front);
@@ -181,7 +189,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(unsigned long))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		ulData = *(unsigned long *)(m_pBuffer + m_Front);
@@ -194,7 +202,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(float))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		fData = *(float *)(m_pBuffer + m_Front);
@@ -208,7 +216,7 @@ public:
 		int size = GetDataSize();
 		if (size < sizeof(__int64))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		iData = *(__int64 *)(m_pBuffer + m_Front);
@@ -221,7 +229,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(unsigned __int64))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		uiData = *(unsigned __int64 *)(m_pBuffer + m_Front);
@@ -234,7 +242,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(double))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		dData = *(double *)(m_pBuffer + m_Front);
@@ -247,7 +255,13 @@ public:
 	inline static LONG GetPoolUsage() noexcept { return s_sbufferPool.GetUseCount(); }
 
 	inline LONG IncreaseRef() noexcept { return InterlockedIncrement(&m_iRefCount); }
-	inline LONG DecreaseRef() noexcept { return InterlockedDecrement(&m_iRefCount); }
+	inline LONG DecreaseRef() noexcept
+	{
+		LONG back = InterlockedDecrement(&m_iRefCount);
+		if (back == -1)
+			__debugbreak();
+		return back;
+	}
 
 
 private:
@@ -256,12 +270,14 @@ private:
 	int m_HeaderFront = 0;
 	int m_Front = 0;
 	int m_Rear = 0;
+	bool isFree = FALSE;
 	CSmartPtr<CRecvBuffer> m_spRecvBuffer;
 	// 사이즈 헤더 조차도 밀림을 방지하기 위한 버퍼
 	char m_delayedHeader[(int)CSerializableBuffer<isLanServer>::DEFINE::HEADER_SIZE];
 	USHORT m_iReadHeaderSize = 0;
 
 	LONG			m_iRefCount = 0;
+	UINT64			m_uiSessionId = 0;
 
 	// inline static CLFMemoryPool<CSerializableBufferView> s_sbufferPool = CLFMemoryPool<CSerializableBufferView>(5000, false);
 	inline static CTLSMemoryPoolManager<CSerializableBufferView, 8, 8> s_sbufferPool = CTLSMemoryPoolManager<CSerializableBufferView, 8, 8>();

@@ -1,27 +1,8 @@
 #include "pch.h"
+#include "ServerSetting.h"
 #include "CLanServer.h"
 #include "CLanSession.h"
 #include "CEchoServer.h"
-
-BOOL monitorThreadRunning = TRUE;
-
-unsigned int MonitorThreadFunc(LPVOID lpParam) noexcept
-{
-	DWORD mTime = timeGetTime();
-	while (monitorThreadRunning)
-	{
-		// 처음 실행 때문에 1초 늦게 시작
-		DWORD dTime = timeGetTime() - mTime;
-		if (dTime < 1000)
-			Sleep(1000 - dTime);
-
-		g_monitor.Update(g_LanServer->GetSessionCount(), NULL);
-
-		mTime += 1000;
-	}
-
-	return 0;
-}
 
 int main()
 {
@@ -35,6 +16,12 @@ int main()
 		serverConfigLoader.Load(L"Server", L"IP", &openIP);
 		serverConfigLoader.Load(L"Server", L"PORT", &openPort);
 		serverConfigLoader.Load(L"Server", L"FIXED_KEY", &CEncryption::FIXED_KEY);
+
+		serverConfigLoader.Load(L"Server", L"IOCP_WORKER_THREAD", &IOCP_WORKER_THREAD);
+		serverConfigLoader.Load(L"Server", L"IOCP_ACTIVE_THREAD", &IOCP_ACTIVE_THREAD);
+		serverConfigLoader.Load(L"Server", L"USE_ZERO_COPY", &USE_ZERO_COPY);
+		serverConfigLoader.Load(L"Server", L"MAX_SESSION_COUNT", &MAX_SESSION_COUNT);
+		serverConfigLoader.Load(L"Server", L"ACCEPTEX_COUNT", &ACCEPTEX_COUNT);
 	}
 	
 	g_Logger = CLogger::GetInstance();
@@ -45,9 +32,7 @@ int main()
 
 	CCrashDump crashDump;
 	g_LanServer = new CEchoServer;
-	g_LanServer->Start(openIP.c_str(), openPort, 16, 4, 65535);
-
-	MonitorThreadFunc(nullptr);
+	g_LanServer->Start(openIP.c_str(), openPort);
 
 	return 0;
 }

@@ -1,11 +1,7 @@
 #include "pch.h"
 #include "BaseEvent.h"
-#include "CNetServer.h"
-#include "CNetSession.h"
-#include "ChatSetting.h"
-#include "CPlayer.h"
-#include "CSector.h"
-#include "CChatServer.h"
+#include "CLanServer.h"
+#include "CLanSession.h"
 #include "SystemEvent.h"
 
 void MonitorTimerEvent::SetEvent() noexcept
@@ -17,7 +13,7 @@ void MonitorTimerEvent::SetEvent() noexcept
 
 void MonitorTimerEvent::Execute() noexcept
 {
-	g_monitor.Update(g_NetServer->GetSessionCount(), ((CChatServer *)g_NetServer)->GetPlayerCount());
+	g_monitor.Update(g_LanServer->GetSessionCount(), NULL);
 }
 
 void KeyBoardTimerEvent::SetEvent() noexcept
@@ -31,7 +27,7 @@ void KeyBoardTimerEvent::Execute() noexcept
 {
 	// 서버 종료
 	if (GetAsyncKeyState(VK_F1))
-		g_NetServer->Stop();
+		g_LanServer->Stop();
 
 	// 프로파일러 저장
 	if (GetAsyncKeyState(VK_F2))

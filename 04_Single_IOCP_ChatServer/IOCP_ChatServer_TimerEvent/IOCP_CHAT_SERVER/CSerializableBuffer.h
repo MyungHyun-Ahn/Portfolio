@@ -404,7 +404,7 @@ private:
 	UINT64			m_uiSessionId = 0;
 
 	inline static CSingleMemoryPool<CSerializableBuffer> s_sbufferPool = CSingleMemoryPool<CSerializableBuffer>();
-	inline static CTLSPagePoolManager<512, 2, false> s_sPagePool512 = CTLSPagePoolManager<512, 2, false>();
+	inline static CTLSPagePoolManager<512, 2, true> s_sPagePool512 = CTLSPagePoolManager<512, 2, true>();
 };
 
 template<bool isLanServer>

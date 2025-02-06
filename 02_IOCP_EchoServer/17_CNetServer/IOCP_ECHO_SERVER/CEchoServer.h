@@ -8,5 +8,6 @@ public:
 	void OnRecv(const UINT64 sessionID, CSerializableBufferView<TRUE> *message) noexcept; // 패킷 수신 완료 후
 	void OnRecv(const UINT64 sessionID, CSmartPtr<CSerializableBufferView<TRUE>> message) noexcept;
 	void OnError(int errorcode, WCHAR *errMsg) noexcept;
+	void RegisterContentTimerEvent() noexcept override;
 };
 

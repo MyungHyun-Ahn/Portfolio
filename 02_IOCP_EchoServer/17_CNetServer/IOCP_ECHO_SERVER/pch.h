@@ -36,11 +36,13 @@
 #include <unordered_map>
 #include <map>
 #include <string>
+#include <queue>
 
 // 기타 - 언어설정 등
 #include <new>
 #include <locale>
 #include <DbgHelp.h>
+#include <functional>
 
 #include "DefineSingleton.h"
 #include "CProfileManager.h"
@@ -57,6 +59,13 @@
 #include "CLFStack.h"
 #include "CLFQueue.h"
 
+#include "CTLSPagePool.h"
+#include "CTLSSharedPagePool.h"
+
+#include "COverlappedAllocator.h"
+
+#include "CSingleMemoryPool.h"
+
 // 직접 정의한 라이브러리
 #include "DefineServer.h"
 
@@ -68,3 +77,5 @@
 #include "CMonitor.h"
 #include "CCrashDump.h"
 #include "CMyFileLoader.h"
+
+#include "BaseEvent.h"

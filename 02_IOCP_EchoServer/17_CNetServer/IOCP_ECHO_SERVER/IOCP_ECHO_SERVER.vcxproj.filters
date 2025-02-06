@@ -19,9 +19,6 @@
     <Filter Include="Network\Lan">
       <UniqueIdentifier>{7e5a4e91-4634-417d-a868-d16991d32725}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Network\Net">
-      <UniqueIdentifier>{4e57c8e9-a1ac-4ee3-bd3c-55aa07c48d30}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -93,11 +90,26 @@
     <ClInclude Include="CLanServer.h">
       <Filter>Network\Lan</Filter>
     </ClInclude>
-    <ClInclude Include="CNetServer.h">
-      <Filter>Network\Net</Filter>
+    <ClInclude Include="CTLSPagePool.h">
+      <Filter>DataStructures</Filter>
     </ClInclude>
-    <ClInclude Include="CNetSession.h">
-      <Filter>Network\Net</Filter>
+    <ClInclude Include="CTLSSharedPagePool.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
+    <ClInclude Include="CSingleMemoryPool.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
+    <ClInclude Include="COverlappedAllocator.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="BaseEvent.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="SystemEvent.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="ServerSetting.h">
+      <Filter>Network</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -105,9 +117,6 @@
       <Filter>Define</Filter>
     </ClCompile>
     <ClCompile Include="CRingBuffer.cpp">
-      <Filter>DataStructures</Filter>
-    </ClCompile>
-    <ClCompile Include="CSerializableBuffer.cpp">
       <Filter>DataStructures</Filter>
     </ClCompile>
     <ClCompile Include="CLogger.cpp">
@@ -126,18 +135,6 @@
     <ClCompile Include="CMyFileLoader.cpp">
       <Filter>Tools</Filter>
     </ClCompile>
-    <ClCompile Include="CLFMemoryPool.cpp">
-      <Filter>DataStructures</Filter>
-    </ClCompile>
-    <ClCompile Include="CLFStack.cpp">
-      <Filter>DataStructures</Filter>
-    </ClCompile>
-    <ClCompile Include="CLFQueue.cpp">
-      <Filter>DataStructures</Filter>
-    </ClCompile>
-    <ClCompile Include="CSerializableBufferView.cpp">
-      <Filter>DataStructures</Filter>
-    </ClCompile>
     <ClCompile Include="CRecvBuffer.cpp">
       <Filter>DataStructures</Filter>
     </ClCompile>
@@ -146,12 +143,6 @@
     </ClCompile>
     <ClCompile Include="CProfileManager.cpp">
       <Filter>Tools</Filter>
-    </ClCompile>
-    <ClCompile Include="CTLSMemoryPool.cpp">
-      <Filter>DataStructures</Filter>
-    </ClCompile>
-    <ClCompile Include="CTLSSharedMemoryPool.cpp">
-      <Filter>DataStructures</Filter>
     </ClCompile>
     <ClCompile Include="CEncryption.cpp">
       <Filter>Tools</Filter>
@@ -162,11 +153,14 @@
     <ClCompile Include="CLanSession.cpp">
       <Filter>Network\Lan</Filter>
     </ClCompile>
-    <ClCompile Include="CNetServer.cpp">
-      <Filter>Network\Net</Filter>
+    <ClCompile Include="COverlappedAllocator.cpp">
+      <Filter>Network</Filter>
     </ClCompile>
-    <ClCompile Include="CNetSession.cpp">
-      <Filter>Network\Net</Filter>
+    <ClCompile Include="SystemEvent.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="ServerSetting.cpp">
+      <Filter>Network</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

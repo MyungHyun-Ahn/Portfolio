@@ -1,17 +1,17 @@
 #pragma once
-struct SectorBroadcastEvent : public BaseEvent
+struct SectorBroadcastEvent : public TimerEvent
 {
 	void SetEvent() noexcept;
 	void Execute() noexcept;
 };
 
-struct NonLoginHeartBeatEvent : public BaseEvent
+struct NonLoginHeartBeatEvent : public TimerEvent
 {
 	void SetEvent() noexcept;
 	void Execute() noexcept;
 };
 
-struct LoginHeartBeatEvent : public BaseEvent
+struct LoginHeartBeatEvent : public TimerEvent
 {
 	void SetEvent() noexcept;
 	void Execute() noexcept;

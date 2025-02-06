@@ -13,15 +13,8 @@ public:
 
 	CSerializableBuffer() noexcept
 	{
-		m_Buffer = new char[m_MaxSize];
-		m_HeaderFront = 0;
-		m_Front = (int)DEFINE::HEADER_SIZE;
-		m_Rear = (int)DEFINE::HEADER_SIZE;
-	}
-
-	CSerializableBuffer(int size) noexcept : m_MaxSize(size)
-	{
-		m_Buffer = new char[m_MaxSize];
+		m_Buffer = (char *)s_sPagePool512.Alloc();
+		m_MaxSize = 512;
 		m_HeaderFront = 0;
 		m_Front = (int)DEFINE::HEADER_SIZE;
 		m_Rear = (int)DEFINE::HEADER_SIZE;
@@ -29,7 +22,7 @@ public:
 
 	virtual ~CSerializableBuffer() noexcept
 	{
-		delete m_Buffer;
+		s_sPagePool512.Free(m_Buffer);
 	}
 
 
@@ -38,6 +31,7 @@ public:
 		m_HeaderFront = 0;
 		m_Front = (int)DEFINE::HEADER_SIZE;
 		m_Rear = (int)DEFINE::HEADER_SIZE;
+		m_isEnqueueHeader = FALSE;
 	}
 
 	bool EnqueueHeader(char *buffer, int size) noexcept;
@@ -48,6 +42,7 @@ public:
 	inline int GetDataSize() const noexcept { return m_Rear - m_Front; }
 	inline int GetHeaderSize() const noexcept { return  (int)DEFINE::HEADER_SIZE; }
 	inline int GetFullSize() const noexcept { return GetDataSize() + GetHeaderSize(); }
+	inline int GetIsEnqueueHeader() const noexcept { return m_isEnqueueHeader; }
 
 	// 외부에서 버퍼를 직접 조작하기 위한 용도
 	inline char *GetBufferPtr() const noexcept { return m_Buffer; }
@@ -380,8 +375,21 @@ public:
 	inline static LONG GetPoolCapacity() noexcept { return s_sbufferPool.GetCapacity(); }
 	inline static LONG GetPoolUsage() noexcept { return s_sbufferPool.GetUseCount(); }
 
-	inline LONG IncreaseRef() noexcept { return InterlockedIncrement(&m_iRefCount); }
-	inline LONG DecreaseRef() noexcept { return InterlockedDecrement(&m_iRefCount); }
+	inline LONG IncreaseRef() noexcept
+	{
+		return InterlockedIncrement(&m_iRefCount);
+	}
+	inline LONG DecreaseRef() noexcept
+	{
+		LONG back = InterlockedDecrement(&m_iRefCount);
+		if (back == -1)
+			__debugbreak();
+
+		return back;
+	}
+
+	inline void SetSessionId(UINT64 id) noexcept { m_uiSessionId = id; }
+	inline UINT64 GetSessionId() noexcept { return m_uiSessionId; }
 
 private:
 	char *m_Buffer;
@@ -391,14 +399,18 @@ private:
 	int m_MaxSize = (int)DEFINE::DEFAULT_SIZE;
 
 	LONG			m_iRefCount = 0;
+	BOOL			m_isEnqueueHeader = 0;
+	UINT64			m_uiSessionId = 0;
 
-	// inline static CLFMemoryPool<CSerializableBuffer> s_sbufferPool = CLFMemoryPool<CSerializableBuffer>(5000, false);
 	inline static CTLSMemoryPoolManager<CSerializableBuffer> s_sbufferPool = CTLSMemoryPoolManager<CSerializableBuffer>();
+	inline static CTLSPagePoolManager<512, 2, false> s_sPagePool512 = CTLSPagePoolManager<512, 2, false>();
 };
 
 template<bool isLanServer>
 bool CSerializableBuffer<isLanServer>::EnqueueHeader(char *buffer, int size) noexcept
 {
+	m_isEnqueueHeader = TRUE;
+
 	// 이 상황은 이미 헤더를 삽입한 것
 	//	* CGameServer::SendSector에서 발생 가능
 	//  * 싱글 스레드에서는 문제가 발생할 여지가 없으므로 그냥 return true
@@ -415,7 +427,7 @@ bool CSerializableBuffer<isLanServer>::EnqueueHeader(char *buffer, int size) noe
 template<bool isLanServer>
 bool CSerializableBuffer<isLanServer>::Enqueue(char *buffer, int size) noexcept
 {
-	if (m_MaxSize - m_Rear > size)
+	if (m_MaxSize - m_Rear < size)
 	{
 		// TODO: resize
 

@@ -200,8 +200,8 @@ void CNetSession::RecvCompleted(int size) noexcept
 			return;
 		}
 
-		view->m_uiSessionId = m_uiSessionID;
 		InterlockedIncrement(&g_monitor.m_lRecvTPS);
+		view->m_uiSessionId = m_uiSessionID;
 		g_NetServer->OnRecv(m_uiSessionID, view);
 
 		currentUseSize = m_pRecvBuffer->GetUseSize();
@@ -232,8 +232,6 @@ bool CNetSession::SendPacket(CSerializableBuffer<FALSE> *message) noexcept
 void CNetSession::SendCompleted(int size) noexcept
 {
 	InterlockedAdd(&g_monitor.m_lSendTPS, m_iSendCount);
-
-	// m_SendBuffer.MoveFront(size);
 
 	// m_iSendCount를 믿고 할당 해제를 진행
 	// * 논블락킹 I/O일 때만 Send를 요청한 데이터보다 덜 보내는 상황이 발생 가능

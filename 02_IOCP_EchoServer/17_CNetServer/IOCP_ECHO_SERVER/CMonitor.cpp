@@ -15,7 +15,7 @@ CMonitor::CMonitor(HANDLE hProcess) noexcept
 	HWND console = GetConsoleWindow();
 	RECT r;
 	GetWindowRect(console, &r);
-	MoveWindow(console, r.left, r.top, 500, 600, TRUE);
+	MoveWindow(console, r.left, r.top, 700, 900, TRUE);
 
 	// 프로세서 개수 확인
 	//  * 프로세스 실행률 계산시 cpu 개수로 나누어 실제 사용률을 구함
@@ -31,18 +31,19 @@ CMonitor::CMonitor(HANDLE hProcess) noexcept
 	m_ftProcess_LastUser.QuadPart = 0;
 	m_ftProcess_LastTime.QuadPart = 0;
 
-	PdhOpenQuery(NULL, NULL, &m_ProcessNPMemoryQuery);
-	PdhOpenQuery(NULL, NULL, &m_SystemNPMemoryQuery);
-	PdhOpenQuery(NULL, NULL, &m_SystemAvailableMemoryQuery);
+	PdhOpenQuery(NULL, NULL, &m_PDHQuery);
 
-	PdhAddCounter(m_ProcessNPMemoryQuery, L"\\Process(IOCP_ECHO_SERVER)\\Pool Nonpaged Bytes", NULL, &m_ProcessNPMemoryCounter);
-	PdhAddCounter(m_SystemNPMemoryQuery, L"\\Memory\\Pool Nonpaged Bytes", NULL, &m_SystemNPMemoryCounter);
-	PdhAddCounter(m_SystemAvailableMemoryQuery, L"\\Memory\\Available MBytes", NULL, &m_SystemAvailableMemoryCounter);
-	
+	PdhAddCounter(m_PDHQuery, L"\\Process(IOCP_ECHO_SERVER)\\Pool Nonpaged Bytes", NULL, &m_ProcessNPMemoryCounter);
+	PdhAddCounter(m_PDHQuery, L"\\Memory\\Pool Nonpaged Bytes", NULL, &m_SystemNPMemoryCounter);
+	PdhAddCounter(m_PDHQuery, L"\\Memory\\Available MBytes", NULL, &m_SystemAvailableMemoryCounter);
+	PdhAddCounter(m_PDHQuery, L"\\Network Interface(Realtek PCIe GBE Family Controller)\\Bytes Sent/sec", NULL, &m_NetworkSendKB1Counter);
+	PdhAddCounter(m_PDHQuery, L"\\Network Interface(Realtek PCIe GBE Family Controller _2)\\Bytes Sent/sec", NULL, &m_NetworkSendKB2Counter);
+	PdhAddCounter(m_PDHQuery, L"\\Network Interface(Realtek PCIe GBE Family Controller)\\Bytes Received/sec", NULL, &m_NetworkRecvKB1Counter);
+	PdhAddCounter(m_PDHQuery, L"\\Network Interface(Realtek PCIe GBE Family Controller _2)\\Bytes Received/sec", NULL, &m_NetworkRecvKB2Counter);
+	PdhAddCounter(m_PDHQuery, L"\\TCPv4\\Segments Retransmitted/sec", NULL, &m_NetworkRetransmissionCounter);
+
 	// 첫 갱신
-	PdhCollectQueryData(m_ProcessNPMemoryQuery);
-	PdhCollectQueryData(m_SystemNPMemoryQuery);
-	PdhCollectQueryData(m_SystemAvailableMemoryQuery);
+	PdhCollectQueryData(m_PDHQuery);
 
 	UpdateCpuTime();
 	UpdatePDH();
@@ -134,9 +135,17 @@ void CMonitor::UpdateCpuTime() noexcept
 
 void CMonitor::UpdateServer() noexcept
 {
+	m_LoopCount++;
+	m_AcceptTPSTotal += m_lAcceptTPS;
 	InterlockedExchange(&m_lAcceptTPS, 0);
+	m_RecvTPSTotal += m_lRecvTPS;
 	InterlockedExchange(&m_lRecvTPS, 0);
+	m_SendTPSTotal += m_lSendTPS;
 	InterlockedExchange(&m_lSendTPS, 0);
+	m_UpdateTPSTotal += m_lUpdateTPS;
+	InterlockedExchange(&m_lUpdateTPS, 0);
+
+	InterlockedExchange(&m_lMaxSendCount, 0);
 }
 
 void CMonitor::UpdateMemory() noexcept
@@ -146,13 +155,16 @@ void CMonitor::UpdateMemory() noexcept
 
 void CMonitor::UpdatePDH() noexcept
 {
-	PdhCollectQueryData(m_ProcessNPMemoryQuery);
-	PdhCollectQueryData(m_SystemNPMemoryQuery);
-	PdhCollectQueryData(m_SystemAvailableMemoryQuery);
+	PdhCollectQueryData(m_PDHQuery);
 
 	PdhGetFormattedCounterValue(m_ProcessNPMemoryCounter, PDH_FMT_LARGE, NULL, &m_ProcessNPMemoryVal);
 	PdhGetFormattedCounterValue(m_SystemNPMemoryCounter, PDH_FMT_LARGE, NULL, &m_SystemNPMemoryVal);
 	PdhGetFormattedCounterValue(m_SystemAvailableMemoryCounter, PDH_FMT_LARGE, NULL, &m_SystemAvailableMemoryVal);
+	PdhGetFormattedCounterValue(m_NetworkSendKB1Counter, PDH_FMT_LARGE, NULL, &m_NetworkSendKB1Val);
+	PdhGetFormattedCounterValue(m_NetworkSendKB2Counter, PDH_FMT_LARGE, NULL, &m_NetworkSendKB2Val);
+	PdhGetFormattedCounterValue(m_NetworkRecvKB1Counter, PDH_FMT_LARGE, NULL, &m_NetworkRecvKB1Val);
+	PdhGetFormattedCounterValue(m_NetworkRecvKB2Counter, PDH_FMT_LARGE, NULL, &m_NetworkRecvKB2Val);
+	PdhGetFormattedCounterValue(m_NetworkRetransmissionCounter, PDH_FMT_LARGE, NULL, &m_NetworkRetransmissionVal);
 }
 
 void CMonitor::MonitoringConsole(INT sessionCount, INT playerCount) noexcept
@@ -174,20 +186,30 @@ void CMonitor::MonitoringConsole(INT sessionCount, INT playerCount) noexcept
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tTotal \t: %f", m_fProcessTotal);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tUser \t: %f", m_fProcessUser);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tKernel \t: %f\n", m_fProcessKernel);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Network");
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSend1 \t: %u KB", m_NetworkSendKB1Val.largeValue / (1024));
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSend2 \t: %u KB", m_NetworkSendKB2Val.largeValue / (1024));
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRecv1 \t: %u KB", m_NetworkRecvKB1Val.largeValue / (1024));
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRecv2 \t: %u KB", m_NetworkRecvKB2Val.largeValue / (1024));
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRetransmission \t: %u\n", m_NetworkRetransmissionVal.largeValue);
+
 
 	// Server Monitor
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"        Server monitoring info");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Info");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tAccept total \t: %lld", m_lAcceptTotal);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSession count \t: %d", sessionCount);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tPlayer count \t: %d\n", playerCount);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Pool capacity");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSession pool capacity \t: %d, usage \t: %d", CLanSession::GetPoolCapacity(), CLanSession::GetPoolUsage());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tBuffer pool capacity \t: %d, usage \t: %d", CSerializableBuffer<TRUE>::GetPoolCapacity(), CSerializableBuffer<TRUE>::GetPoolUsage());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tView pool capacity \t: %d, usage \t: %d", CSerializableBufferView<TRUE>::GetPoolCapacity(), CSerializableBufferView<TRUE>::GetPoolUsage());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRecv pool capacity \t: %d, usage \t: %d", CRecvBuffer::GetPoolCapacity(), CRecvBuffer::GetPoolUsage());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"TPS");
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tAccept\t : %d", m_lAcceptTPS);
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRecv\t : %d", m_lRecvTPS);
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSend\t : %d", m_lSendTPS);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tAccept\t : %d \t Avr : %lf", m_lAcceptTPS, (DOUBLE)m_AcceptTPSTotal / m_LoopCount);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRecv\t : %d \t Avr : %lf", m_lRecvTPS, (DOUBLE)m_RecvTPSTotal / m_LoopCount);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSend\t : %d \t Avr : %lf", m_lSendTPS, (DOUBLE)m_SendTPSTotal / m_LoopCount);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tUpdate\t : %d \t Avr : %lf", m_lUpdateTPS, (DOUBLE)m_UpdateTPSTotal / m_LoopCount);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tMaxSend\t : %d", m_lMaxSendCount);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"----------------------------------------");
 }

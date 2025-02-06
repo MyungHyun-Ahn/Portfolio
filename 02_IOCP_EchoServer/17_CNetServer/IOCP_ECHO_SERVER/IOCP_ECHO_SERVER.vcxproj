@@ -146,6 +146,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="BaseEvent.h" />
     <ClInclude Include="CCrashDump.h" />
     <ClInclude Include="CEchoServer.h" />
     <ClInclude Include="CEncryption.h" />
@@ -156,44 +157,40 @@
     <ClInclude Include="CLogger.h" />
     <ClInclude Include="CMonitor.h" />
     <ClInclude Include="CMyFileLoader.h" />
-    <ClInclude Include="CNetServer.h" />
-    <ClInclude Include="CNetSession.h" />
+    <ClInclude Include="COverlappedAllocator.h" />
     <ClInclude Include="CProfileManager.h" />
     <ClInclude Include="CRecvBuffer.h" />
     <ClInclude Include="CRingBuffer.h" />
     <ClInclude Include="CSerializableBuffer.h" />
     <ClInclude Include="CSerializableBufferView.h" />
     <ClInclude Include="CLanSession.h" />
+    <ClInclude Include="CSingleMemoryPool.h" />
     <ClInclude Include="CSmartPtr.h" />
     <ClInclude Include="CTLSMemoryPool.h" />
+    <ClInclude Include="CTLSPagePool.h" />
     <ClInclude Include="CTLSSharedMemoryPool.h" />
+    <ClInclude Include="CTLSSharedPagePool.h" />
     <ClInclude Include="DefineServer.h" />
     <ClInclude Include="DefineSingleton.h" />
     <ClInclude Include="LFDefine.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="ServerSetting.h" />
+    <ClInclude Include="SystemEvent.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CCrashDump.cpp" />
     <ClCompile Include="CEchoServer.cpp" />
     <ClCompile Include="CEncryption.cpp" />
     <ClCompile Include="CLanServer.cpp" />
-    <ClCompile Include="CLFMemoryPool.cpp" />
-    <ClCompile Include="CLFQueue.cpp" />
-    <ClCompile Include="CLFStack.cpp" />
     <ClCompile Include="CLogger.cpp" />
     <ClCompile Include="CMonitor.cpp" />
     <ClCompile Include="CMyFileLoader.cpp" />
-    <ClCompile Include="CNetServer.cpp" />
-    <ClCompile Include="CNetSession.cpp" />
+    <ClCompile Include="COverlappedAllocator.cpp" />
     <ClCompile Include="CProfileManager.cpp" />
     <ClCompile Include="CRecvBuffer.cpp" />
     <ClCompile Include="CRingBuffer.cpp" />
-    <ClCompile Include="CSerializableBuffer.cpp" />
-    <ClCompile Include="CSerializableBufferView.cpp" />
     <ClCompile Include="CLanSession.cpp" />
     <ClCompile Include="CSmartPtr.cpp" />
-    <ClCompile Include="CTLSMemoryPool.cpp" />
-    <ClCompile Include="CTLSSharedMemoryPool.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -201,6 +198,8 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="ServerSetting.cpp" />
+    <ClCompile Include="SystemEvent.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ServerConfig.conf" />

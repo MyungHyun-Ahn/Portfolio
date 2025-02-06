@@ -6,11 +6,12 @@ class CRecvBuffer
 public:
 	CRecvBuffer() noexcept
 	{
-		m_PQueue = new char[m_iCapacity];
+		m_PQueue = (char *)s_PagePool4KB.Alloc();
+		m_iCapacity = 4096;
 	}
 	~CRecvBuffer() noexcept
 	{
-		delete m_PQueue;
+		s_PagePool4KB.Free(m_PQueue);
 	}
 
 	inline int GetCapacity() const noexcept { return m_iCapacity; }
@@ -76,7 +77,7 @@ public:
 	inline static LONG GetPoolUsage() noexcept { return s_sbufferPool.GetUseCount(); }
 
 private:
-	char			*m_PQueue = nullptr;
+	char *m_PQueue = nullptr;
 
 	int				m_iCapacity = 5000;
 
@@ -85,6 +86,6 @@ private:
 
 	LONG			m_iRefCount = 0;
 
-	// inline static CLFMemoryPool<CRecvBuffer> s_sbufferPool = CLFMemoryPool<CRecvBuffer>(5000, false);
 	inline static CTLSMemoryPoolManager<CRecvBuffer, 16, 4> s_sbufferPool = CTLSMemoryPoolManager<CRecvBuffer, 16, 4>();
+	inline static CTLSPagePoolManager<4096, 2, false> s_PagePool4KB = CTLSPagePoolManager<4096, 2, false>();
 };

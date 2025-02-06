@@ -331,7 +331,7 @@ BOOL CNetServer::Disconnect(const UINT64 sessionID) noexcept
 		return FALSE;
 	}
 
-	__debugbreak();
+	// __debugbreak();
 	// Io 실패 유도
 	CancelIoEx((HANDLE)pSession->m_sSessionSocket, nullptr);
 
@@ -447,9 +447,6 @@ BOOL CNetServer::AcceptExCompleted(CNetSession *pSession) noexcept
 	if (!OnConnectionRequest(pSession->m_ClientAddrBuffer, pSession->m_ClientPort))
 		return FALSE;
 
-
-	Sleep(0);
-
 	USHORT index;
 	// 연결 실패 : FALSE
 	if (!m_stackDisconnectIndex.Pop(&index))
@@ -545,8 +542,8 @@ int CNetServer::WorkerThread() noexcept
 						PostAcceptEx(index);
 					else
 					{
-						InterlockedDecrement(&pSession->m_iIOCountAndRelease);
-						CNetSession::Free(pSession);
+						if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
+							CNetSession::Free(pSession);
 					}
 					break;
 				}

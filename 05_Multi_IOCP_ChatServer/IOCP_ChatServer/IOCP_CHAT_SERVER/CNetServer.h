@@ -87,7 +87,7 @@ private:
 
 	HANDLE												m_hTimerEventSchedulerThread;
 	BOOL												m_bIsTimerEventSchedulerRun = TRUE;
-	std::priority_queue<BaseEvent *, std::vector<BaseEvent *>, EventComparator>	m_TimerEventQueue;
+	std::priority_queue<TimerEvent *, std::vector<TimerEvent *>, TimerEventComparator>	m_TimerEventQueue;
 
 	// IOCP วฺต้
 	HANDLE m_hIOCPHandle = INVALID_HANDLE_VALUE;

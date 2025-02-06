@@ -22,21 +22,13 @@ void CEchoServer::OnClientLeave(const UINT64 sessionID) noexcept
 
 void CEchoServer::OnRecv(const UINT64 sessionID, CSerializableBufferView<TRUE> *message) noexcept
 {
-
-    if (rand() % 2)
-        Disconnect(sessionID);
-
     __int64 num;
     *message >> num;
     CSerializableBufferView<TRUE>::Free(message);
 
-    // g_Logger->WriteLogConsole(LOG_LEVEL::DEBUG, L"%d", num);
-
     CSerializableBuffer<TRUE> *buffer = CSerializableBuffer<TRUE>::Alloc();
     *buffer << num;
     SendPacket(sessionID, buffer);
-
-    InterlockedIncrement(&g_monitor.m_lRecvTPS);
 }
  
 void CEchoServer::OnRecv(const UINT64 sessionID, CSmartPtr<CSerializableBufferView<TRUE>> message) noexcept
@@ -48,10 +40,12 @@ void CEchoServer::OnRecv(const UINT64 sessionID, CSmartPtr<CSerializableBufferVi
 	*buffer << num;
     // 네트워크 코드로 보낼 때는 진짜 PTR 버전으로 보냄
 	SendPacket(sessionID, buffer.GetRealPtr());
-
-    InterlockedIncrement(&g_monitor.m_lRecvTPS);
 }
 
 void CEchoServer::OnError(int errorcode, WCHAR *errMsg) noexcept
+{
+}
+
+void CEchoServer::RegisterContentTimerEvent() noexcept
 {
 }
