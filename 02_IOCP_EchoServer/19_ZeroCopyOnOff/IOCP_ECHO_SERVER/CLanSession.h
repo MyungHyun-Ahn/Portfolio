@@ -95,8 +95,9 @@ private:
 	USHORT		m_ClientPort;
 	char		m_dummy01[2]; // 패딩 계산용
 	// 최대 무조건 1개 -> 있거나 없거나
-	CSerializableBufferView<TRUE>			*m_pDelayedBuffer = nullptr;
-	CLFQueue<CSerializableBuffer<TRUE> *>	m_lfSendBufferQueue;
+	CSerializableBufferView<TRUE>				*m_pDelayedBuffer = nullptr;
+	CLFQueue<CSerializableBuffer<TRUE> *>		m_lfSendBufferQueue;
+	CRingBuffer									m_SendRingBuffer;
 	// m_pMyOverlappedStartAddr
 	//  + 0 : ACCEPTEX
 	//  + 1 : RECV
