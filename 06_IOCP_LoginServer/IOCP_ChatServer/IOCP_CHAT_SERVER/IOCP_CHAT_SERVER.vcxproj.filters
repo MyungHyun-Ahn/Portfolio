@@ -1,0 +1,211 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Network">
+      <UniqueIdentifier>{bab55af7-1566-43ab-97b1-412747273556}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Content">
+      <UniqueIdentifier>{6e494647-b9e7-4dfd-b609-eb53a9117045}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Tools">
+      <UniqueIdentifier>{0db06b59-5535-474b-9865-09dce295457b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DataStructures">
+      <UniqueIdentifier>{00d64862-3f29-474d-a3e1-61b77ae173ee}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Define">
+      <UniqueIdentifier>{daa4e531-6548-40e9-ae92-048eca81c220}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Network\Net">
+      <UniqueIdentifier>{4e57c8e9-a1ac-4ee3-bd3c-55aa07c48d30}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Network\Event">
+      <UniqueIdentifier>{d152ac90-36cc-4201-ab18-b21c2451c786}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Content\Object">
+      <UniqueIdentifier>{f296150a-5e4d-436e-9477-29a0d72fb7f9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Content\Server">
+      <UniqueIdentifier>{46f2ce10-30b7-46fa-a8d9-3f8ee3b60e5f}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pch.h">
+      <Filter>Define</Filter>
+    </ClInclude>
+    <ClInclude Include="CRingBuffer.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
+    <ClInclude Include="CSerializableBuffer.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
+    <ClInclude Include="DefineSingleton.h">
+      <Filter>Define</Filter>
+    </ClInclude>
+    <ClInclude Include="CLogger.h">
+      <Filter>Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="DefineServer.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="CMonitor.h">
+      <Filter>Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="CCrashDump.h">
+      <Filter>Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="CMyFileLoader.h">
+      <Filter>Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="LFDefine.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
+    <ClInclude Include="CLFStack.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
+    <ClInclude Include="CLFMemoryPool.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
+    <ClInclude Include="CLFQueue.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
+    <ClInclude Include="CSerializableBufferView.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
+    <ClInclude Include="CRecvBuffer.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
+    <ClInclude Include="CSmartPtr.h">
+      <Filter>Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="CProfileManager.h">
+      <Filter>Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="CTLSSharedMemoryPool.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
+    <ClInclude Include="CTLSMemoryPool.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
+    <ClInclude Include="CEncryption.h">
+      <Filter>Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="CNetServer.h">
+      <Filter>Network\Net</Filter>
+    </ClInclude>
+    <ClInclude Include="CNetSession.h">
+      <Filter>Network\Net</Filter>
+    </ClInclude>
+    <ClInclude Include="ChatSetting.h">
+      <Filter>Content</Filter>
+    </ClInclude>
+    <ClInclude Include="ServerSetting.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="CTLSSharedPagePool.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
+    <ClInclude Include="CTLSPagePool.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
+    <ClInclude Include="CDeque.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
+    <ClInclude Include="CSingleMemoryPool.h">
+      <Filter>DataStructures</Filter>
+    </ClInclude>
+    <ClInclude Include="BaseEvent.h">
+      <Filter>Network\Event</Filter>
+    </ClInclude>
+    <ClInclude Include="SystemEvent.h">
+      <Filter>Network\Event</Filter>
+    </ClInclude>
+    <ClInclude Include="CSector.h">
+      <Filter>Content\Object</Filter>
+    </ClInclude>
+    <ClInclude Include="CPlayer.h">
+      <Filter>Content\Object</Filter>
+    </ClInclude>
+    <ClInclude Include="CGenPacket.h">
+      <Filter>Content\Server</Filter>
+    </ClInclude>
+    <ClInclude Include="CChatServer.h">
+      <Filter>Content\Server</Filter>
+    </ClInclude>
+    <ClInclude Include="CommonProtocol.h">
+      <Filter>Content\Server</Filter>
+    </ClInclude>
+    <ClInclude Include="CProcessPacket.h">
+      <Filter>Content\Server</Filter>
+    </ClInclude>
+    <ClInclude Include="ContentEvent.h">
+      <Filter>Content\Object</Filter>
+    </ClInclude>
+    <ClInclude Include="COverlappedAllocator.h">
+      <Filter>Network\Net</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="pch.cpp">
+      <Filter>Define</Filter>
+    </ClCompile>
+    <ClCompile Include="CRingBuffer.cpp">
+      <Filter>DataStructures</Filter>
+    </ClCompile>
+    <ClCompile Include="CLogger.cpp">
+      <Filter>Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="Main.cpp" />
+    <ClCompile Include="CMonitor.cpp">
+      <Filter>Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="CMyFileLoader.cpp">
+      <Filter>Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="CRecvBuffer.cpp">
+      <Filter>DataStructures</Filter>
+    </ClCompile>
+    <ClCompile Include="CProfileManager.cpp">
+      <Filter>Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="CNetServer.cpp">
+      <Filter>Network\Net</Filter>
+    </ClCompile>
+    <ClCompile Include="CNetSession.cpp">
+      <Filter>Network\Net</Filter>
+    </ClCompile>
+    <ClCompile Include="ChatSetting.cpp">
+      <Filter>Content</Filter>
+    </ClCompile>
+    <ClCompile Include="ServerSetting.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="SystemEvent.cpp">
+      <Filter>Network\Event</Filter>
+    </ClCompile>
+    <ClCompile Include="CSector.cpp">
+      <Filter>Content\Object</Filter>
+    </ClCompile>
+    <ClCompile Include="CPlayer.cpp">
+      <Filter>Content\Object</Filter>
+    </ClCompile>
+    <ClCompile Include="CChatServer.cpp">
+      <Filter>Content\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="CGenPacket.cpp">
+      <Filter>Content\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="CProcessPacket.cpp">
+      <Filter>Content\Server</Filter>
+    </ClCompile>
+    <ClCompile Include="ContentEvent.cpp">
+      <Filter>Content\Object</Filter>
+    </ClCompile>
+    <ClCompile Include="COverlappedAllocator.cpp">
+      <Filter>Network\Net</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ServerConfig.conf" />
+  </ItemGroup>
+</Project>
