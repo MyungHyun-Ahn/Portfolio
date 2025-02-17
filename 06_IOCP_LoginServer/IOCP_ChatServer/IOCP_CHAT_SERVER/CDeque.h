@@ -128,8 +128,6 @@ private:
 	int			m_Size = 0;
 	DequeNode		m_Head;
 	DequeNode		m_Tail;
-
-	// inline static CSingleMemoryPool<DequeNode> s_NodePool = CSingleMemoryPool<DequeNode>();
 };
 
 template<typename T>

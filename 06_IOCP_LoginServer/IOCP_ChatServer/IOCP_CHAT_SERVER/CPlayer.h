@@ -42,7 +42,7 @@ private:
 	WCHAR	m_szID[20];
 	WCHAR	m_szNickname[20];
 
-	inline static CTLSMemoryPoolManager<CPlayer> s_PlayerPool = CTLSMemoryPoolManager<CPlayer>();
+	inline static CSingleMemoryPool<CPlayer> s_PlayerPool = CSingleMemoryPool<CPlayer>();
 	// char	m_sessionKey[64];
 };
 

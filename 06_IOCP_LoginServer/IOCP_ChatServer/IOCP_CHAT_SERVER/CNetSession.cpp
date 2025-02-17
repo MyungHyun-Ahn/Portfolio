@@ -2,6 +2,7 @@
 #include "ServerSetting.h"
 #include "CNetSession.h"
 #include "CNetServer.h"
+#include "SystemEvent.h"
 
 void CNetSession::RecvCompleted(int size) noexcept
 {
@@ -233,10 +234,13 @@ void CNetSession::SendCompleted(int size) noexcept
 {
 	InterlockedAdd(&g_monitor.m_lSendTPS, m_iSendCount);
 
+	// m_SendBuffer.MoveFront(size);
+
 	// m_iSendCount를 믿고 할당 해제를 진행
 	// * 논블락킹 I/O일 때만 Send를 요청한 데이터보다 덜 보내는 상황이 발생 가능
 	// * 비동기 I/O는 무조건 전부 보내고 완료 통지가 도착함
 
+	CDeque<CSerializableBuffer<FALSE> *> *freeQueue = new CDeque<CSerializableBuffer<FALSE> *>();
 
 	int count;
 	for (count = 0; count < m_iSendCount; count++)
@@ -244,11 +248,15 @@ void CNetSession::SendCompleted(int size) noexcept
 		// RefCount를 낮추고 0이라면 보낸 거 삭제
 		if (m_arrPSendBufs[count]->DecreaseRef() == 0)
 		{
-			CSerializableBuffer<FALSE>::Free(m_arrPSendBufs[count]);
+			freeQueue->push_back(m_arrPSendBufs[count]);
 		}
 	}
 
 	m_iSendCount = 0;
+
+	SerializableBufferFreeEvent *freeEvent = new SerializableBufferFreeEvent;
+	freeEvent->SetEvent(freeQueue);
+	g_NetServer->EventAPCEnqueue(freeEvent);
 
 	// SendFlag를 풀지 않고 진행
 	PostSend(TRUE);
@@ -420,11 +428,14 @@ void CNetSession::Clear() noexcept
 		m_pDelayedBuffer = nullptr;
 	}
 
+	// 싱글 Enqueue - 싱글 Dequeue
+	CDeque<CSerializableBuffer<FALSE> *> *freeQueue = new CDeque<CSerializableBuffer<FALSE> *>();
+
 	for (int count = 0; count < m_iSendCount; count++)
 	{
 		if (m_arrPSendBufs[count]->DecreaseRef() == 0)
 		{
-			CSerializableBuffer<FALSE>::Free(m_arrPSendBufs[count]);
+			freeQueue->push_back(m_arrPSendBufs[count]);
 		}
 	}
 
@@ -445,9 +456,14 @@ void CNetSession::Clear() noexcept
 		// RefCount를 낮추고 0이라면 보낸 거 삭제
 		if (pBuffer->DecreaseRef() == 0)
 		{
-			CSerializableBuffer<FALSE>::Free(pBuffer);
+			freeQueue->push_back(pBuffer);
 		}
 	}
+
+	// freeQueue를 APC 큐로 전송
+	SerializableBufferFreeEvent *freeEvent = new SerializableBufferFreeEvent;
+	freeEvent->SetEvent(freeQueue);
+	g_NetServer->EventAPCEnqueue(freeEvent);
 
 	useBufferSize = m_lfSendBufferQueue.GetUseSize();
 	if (useBufferSize != 0)

@@ -10,18 +10,19 @@ public:
 	inline LONG GetSessionCount() const noexcept { return m_iSessionCount; }
 
 	void SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept;
-	// Send 시도는 하지 않음
 	void EnqueuePacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept;
-
-	BOOL Disconnect(const UINT64 sessionID, BOOL isPQCS = FALSE) noexcept;
-	BOOL ReleaseSession(CNetSession *pSession, BOOL isPQCS = FALSE) noexcept;
-	BOOL ReleaseSessionPQCS(CNetSession *pSession) noexcept;
+	BOOL Disconnect(const UINT64 sessionID) noexcept;
+	BOOL ReleaseSession(CNetSession *pSession) noexcept;
 
 	virtual bool OnConnectionRequest(const WCHAR *ip, USHORT port) noexcept = 0;
 	virtual void OnAccept(const UINT64 sessionID) noexcept = 0;
 	virtual void OnClientLeave(const UINT64 sessionID) noexcept = 0;
 	virtual void OnRecv(const UINT64 sessionID, CSerializableBufferView<FALSE> *message) noexcept = 0;
+	virtual void OnRecv(const UINT64 sessionID, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept = 0;
 	virtual void OnError(int errorcode, WCHAR *errMsg) noexcept = 0;
+
+	// 콘텐츠 프레임
+	virtual DWORD OnUpdate() noexcept = 0;
 
 	// AcceptEx
 	void FristPostAcceptEx() noexcept;
@@ -51,16 +52,20 @@ private:
 
 public:
 	int WorkerThread() noexcept;
-
+	int ServerFrameThread() noexcept;
 	int TimerEventSchedulerThread() noexcept;
 
 	void RegisterSystemTimerEvent();
 	virtual void RegisterContentTimerEvent() noexcept = 0;
 
-	void RegisterTimerEvent(BaseEvent *timerEvent) noexcept;
+	void RegisterTimerEvent(TimerEvent *timerEvent) noexcept;
 	static void RegisterTimerEventAPCFunc(ULONG_PTR lpParam) noexcept;
 
+	void EventAPCEnqueue(BaseEvent *event) noexcept;
+	static void EventHandlerAPCFunc(ULONG_PTR lpParam) noexcept;
 
+	void TimerEventAPCEnqueue(TimerEvent *timerEvent) noexcept;
+	static void TimerEventHandlerAPCFunc(ULONG_PTR lpParam) noexcept;
 
 private:
 	// Session
@@ -78,12 +83,15 @@ private:
 	std::vector<HANDLE>		m_arrWorkerThreads;
 
 	// Accepter
-	LPFN_ACCEPTEX					m_lpfnAcceptEx = NULL;
-	GUID							m_guidAcceptEx = WSAID_ACCEPTEX;
-	CNetSession						**m_arrAcceptExSessions;
+	LPFN_ACCEPTEX			m_lpfnAcceptEx = NULL;
+	GUID					m_guidAcceptEx = WSAID_ACCEPTEX;
 
 	LPFN_GETACCEPTEXSOCKADDRS		m_lpfnGetAcceptExSockaddrs = NULL;
 	GUID							m_guidGetAcceptExSockaddrs = WSAID_GETACCEPTEXSOCKADDRS;
+
+	HANDLE							m_hServerFrameThread;
+	BOOL							m_bIsServerFrameRun = TRUE;
+	CNetSession						**m_arrAcceptExSessions;
 
 	HANDLE												m_hTimerEventSchedulerThread;
 	BOOL												m_bIsTimerEventSchedulerRun = TRUE;

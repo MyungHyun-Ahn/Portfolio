@@ -16,8 +16,6 @@ template<int sizeByte = 4 * 1024, int bucketCount = 2>
 struct PageBucket
 {
 	static_assert((64 * 1024) % sizeByte == 0);
-	// 64 보다 큰 값이 들어오면 컴파일 실패
-	static_assert(sizeByte > 64);
 
 	// 버킷 사이즈 계산
 	static constexpr int BUCKET_SIZE = (64 * 1024) / sizeByte;

@@ -255,7 +255,13 @@ public:
 	inline static LONG GetPoolUsage() noexcept { return s_sbufferPool.GetUseCount(); }
 
 	inline LONG IncreaseRef() noexcept { return InterlockedIncrement(&m_iRefCount); }
-	inline LONG DecreaseRef() noexcept { return InterlockedDecrement(&m_iRefCount); }
+	inline LONG DecreaseRef() noexcept 
+	{ 
+		LONG back = InterlockedDecrement(&m_iRefCount);
+		if (back == -1)
+			__debugbreak();
+		return back;
+	}
 
 
 private:

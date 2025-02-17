@@ -12,6 +12,8 @@
 #pragma comment(lib, "winmm")
 #pragma comment(lib, "DbgHelp.Lib")
 #pragma comment(lib, "Pdh.lib")
+#pragma comment (lib, "cpp_redis.lib")
+#pragma comment (lib, "tacopie.lib")
 
 // 소켓 관련
 #include <WinSock2.h>
@@ -35,7 +37,6 @@
 #include <deque>
 #include <vector>
 #include <unordered_map>
-#include <unordered_set>
 #include <map>
 #include <string>
 #include <queue>
@@ -46,6 +47,9 @@
 #include <DbgHelp.h>
 #include <chrono>
 #include <functional>
+
+// redis
+#include <cpp_redis/cpp_redis>
 
 #include "DefineSingleton.h"
 #include "CProfileManager.h"

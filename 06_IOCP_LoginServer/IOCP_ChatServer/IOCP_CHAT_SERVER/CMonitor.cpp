@@ -150,6 +150,7 @@ void CMonitor::UpdateServer() noexcept
 	InterlockedExchange(&m_sectorMoveReq, 0);
 	InterlockedExchange(&m_chatMsgReq, 0);
 	InterlockedExchange(&m_chatMsgRes, 0);
+	InterlockedExchange(&m_sendQEnqueueCount, 0);
 
 	InterlockedExchange(&m_lMaxSendCount, 0);
 	InterlockedExchange(&m_lServerFrame, 0);
@@ -204,6 +205,7 @@ void CMonitor::MonitoringConsole(INT sessionCount, INT playerCount) noexcept
 	// Server Monitor
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"        Server monitoring info");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Info");
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tServer FPS \t: %lld", m_lServerFrame);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tAccept total \t: %lld", m_lAcceptTotal);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSession count \t: %d", sessionCount);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tPlayer count \t: %d\n", playerCount);
@@ -221,5 +223,6 @@ void CMonitor::MonitoringConsole(INT sessionCount, INT playerCount) noexcept
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tMaxSend\t : %d", m_lMaxSendCount);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tLoginReq\t : %d\t\tSectorMoveReq\t : %d", m_loginReq, m_sectorMoveReq);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tChatMsgReq\t : %d\t\tChatMsgRes\t : %d", m_chatMsgReq, m_chatMsgRes);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSendQEnqueue\t : %d", m_sendQEnqueueCount);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"----------------------------------------");
 }

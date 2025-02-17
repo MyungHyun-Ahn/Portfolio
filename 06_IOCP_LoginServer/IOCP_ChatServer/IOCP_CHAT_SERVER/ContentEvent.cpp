@@ -8,40 +8,43 @@
 #include "CChatServer.h"
 #include "ContentEvent.h"
 
-void SectorBroadcastEvent::SetEvent() noexcept
+void SectorBroadcastTimerEvent::SetEvent() noexcept
 {
-	execute = std::bind(&SectorBroadcastEvent::Execute, this);
-	timeMs = FRAME_PER_TICK;
+	execute = std::bind(&SectorBroadcastTimerEvent::Execute, this);
+	isPQCS = false;
+	timeMs = SECTOR_BROATCAST_TIMER_TICK;
 	nextExecuteTime = timeGetTime(); // 현재 시각
 }
 
-void SectorBroadcastEvent::Execute() noexcept
+void SectorBroadcastTimerEvent::Execute() noexcept
 {
 	CChatServer *chatServer = (CChatServer *)g_NetServer;
 	chatServer->SectorBroadcast();
 }
 
-void NonLoginHeartBeatEvent::SetEvent() noexcept
+void NonLoginHeartBeatTimerEvent::SetEvent() noexcept
 {
-	execute = std::bind(&NonLoginHeartBeatEvent::Execute, this);
+	execute = std::bind(&NonLoginHeartBeatTimerEvent::Execute, this);
+	isPQCS = false;
 	timeMs = NON_LOGIN_TIME_OUT_CHECK;
 	nextExecuteTime = timeGetTime(); // 현재 시각
 }
 
-void NonLoginHeartBeatEvent::Execute() noexcept
+void NonLoginHeartBeatTimerEvent::Execute() noexcept
 {
 	CChatServer *chatServer = (CChatServer *)g_NetServer;
 	chatServer->NonLoginHeartBeat();
 }
 
-void LoginHeartBeatEvent::SetEvent() noexcept
+void LoginHeartBeatTimerEvent::SetEvent() noexcept
 {
-	execute = std::bind(&LoginHeartBeatEvent::Execute, this);
+	execute = std::bind(&LoginHeartBeatTimerEvent::Execute, this);
+	isPQCS = false;
 	timeMs = LOGIN_TIME_OUT_CHECK;
 	nextExecuteTime = timeGetTime(); // 현재 시각
 }
 
-void LoginHeartBeatEvent::Execute() noexcept
+void LoginHeartBeatTimerEvent::Execute() noexcept
 {
 	CChatServer *chatServer = (CChatServer *)g_NetServer;
 	chatServer->LoginHeartBeat();

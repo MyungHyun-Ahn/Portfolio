@@ -1,5 +1,4 @@
 #include "pch.h"
-#include "ChatSetting.h"
 #include "ServerSetting.h"
 #include "CNetServer.h"
 #include "CNetSession.h"
@@ -10,6 +9,11 @@ CNetServer *g_NetServer = nullptr;
 unsigned int NetWorkerThreadFunc(LPVOID lpParam) noexcept
 {
 	return g_NetServer->WorkerThread();
+}
+
+unsigned int NetServerFrameThreadFunc(LPVOID lpParam) noexcept
+{
+	return g_NetServer->ServerFrameThread();
 }
 
 unsigned int NetTimerEventSchedulerThreadFunc(LPVOID lpParam) noexcept
@@ -128,8 +132,15 @@ BOOL CNetServer::Start(const CHAR *openIP, const USHORT port) noexcept
 		return FALSE;
 	}
 
-	// AcceptEx 요청
-	FristPostAcceptEx();
+	m_hServerFrameThread = (HANDLE)_beginthreadex(nullptr, 0, NetServerFrameThreadFunc, nullptr, 0, nullptr);
+	if (m_hServerFrameThread == 0)
+	{
+		errVal = GetLastError();
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"ServerFrameThread running fail.. : %d", errVal);
+		return FALSE;
+	}
+
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"[SYSTEM] ServerFrameThread running..");
 
 	// CreateTimerSchedulerThread
 	m_hTimerEventSchedulerThread = (HANDLE)_beginthreadex(nullptr, 0, NetTimerEventSchedulerThreadFunc, nullptr, 0, nullptr);
@@ -162,6 +173,7 @@ BOOL CNetServer::Start(const CHAR *openIP, const USHORT port) noexcept
 
 	WaitForMultipleObjects(m_arrWorkerThreads.size(), m_arrWorkerThreads.data(), TRUE, INFINITE);
 	WaitForSingleObject(m_hTimerEventSchedulerThread, INFINITE);
+	WaitForSingleObject(m_hServerFrameThread, INFINITE);
 
 	return TRUE;
 }
@@ -187,11 +199,12 @@ void CNetServer::Stop()
 		if (m_iSessionCount == 0)
 		{
 			m_bIsWorkerRun = FALSE;
-			PostQueuedCompletionStatus(m_hIOCPHandle, 0, 0, 0);
+			PostQueuedCompletionStatus(m_hIOCPHandle, 0, 0, 0); // 워커 스레드 정상 종료 유도
 			break;
 		}
 	}
 
+	m_bIsServerFrameRun = FALSE;
 	m_bIsTimerEventSchedulerRun = FALSE;
 }
 
@@ -200,8 +213,7 @@ void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *
 	CNetSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 
 	InterlockedIncrement(&pSession->m_iIOCountAndRelease);
-	// ReleaseFlag가 이미 켜진 상황
-	if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
+	if (sessionID != pSession->m_uiSessionID)
 	{
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
@@ -210,7 +222,8 @@ void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *
 		return;
 	}
 
-	if (sessionID != pSession->m_uiSessionID)
+	// ReleaseFlag가 이미 켜진 상황
+	if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
 	{
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
@@ -241,27 +254,26 @@ void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *
 	}
 }
 
-// Sector 락이 잡힌 경우에만 PQCS
 void CNetServer::EnqueuePacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept
 {
 	CNetSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 
 	InterlockedIncrement(&pSession->m_iIOCountAndRelease);
+	if (sessionID != pSession->m_uiSessionID)
+	{
+		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
+		{
+			ReleaseSession(pSession);
+		}
+		return;
+	}
+
 	// ReleaseFlag가 이미 켜진 상황
 	if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
 	{
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
-			ReleaseSession(pSession, TRUE);
-		}
-		return;
-	}
-
-	if (sessionID != pSession->m_uiSessionID)
-	{
-		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
-		{
-			ReleaseSession(pSession, TRUE);
+			ReleaseSession(pSession);
 		}
 		return;
 	}
@@ -281,48 +293,31 @@ void CNetServer::EnqueuePacket(const UINT64 sessionID, CSerializableBuffer<FALSE
 
 	pSession->SendPacket(sBuffer);
 
-	// {
-	// 	// PROFILE_BEGIN(0, "WSASend");
-	// 	pSession->PostSend();
-	// }
-
-	// {
-	// 	// PROFILE_BEGIN(0, "PQCS");
-	// 
-	// 	if (pSession->m_iSendFlag == FALSE)
-	// 	{
-	// 		PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)pSession, (LPOVERLAPPED)IOOperation::SENDPOST);
-	// 	}
-	// }
-
 	if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 	{
-		ReleaseSession(pSession, TRUE);
+		ReleaseSession(pSession);
 	}
 }
 
-BOOL CNetServer::Disconnect(const UINT64 sessionID, BOOL isPQCS) noexcept
+BOOL CNetServer::Disconnect(const UINT64 sessionID) noexcept
 {
 	CNetSession *pSession = m_arrPSessions[GetIndex(sessionID)];
-	if (pSession == nullptr)
-		return FALSE;
-
 	// ReleaseFlag가 이미 켜진 상황
 	InterlockedIncrement(&pSession->m_iIOCountAndRelease);
-	if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
-	{
-		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
-		{
-			ReleaseSession(pSession, isPQCS);
-		}
-		return FALSE;
-	}
-
 	if (sessionID != pSession->m_uiSessionID)
 	{
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
-			ReleaseSession(pSession, isPQCS);
+			ReleaseSession(pSession);
+		}
+		return FALSE;
+	}
+
+	if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
+	{
+		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
+		{
+			ReleaseSession(pSession);
 		}
 		return FALSE;
 	}
@@ -331,24 +326,25 @@ BOOL CNetServer::Disconnect(const UINT64 sessionID, BOOL isPQCS) noexcept
 	{
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
-			ReleaseSession(pSession, isPQCS);
+			ReleaseSession(pSession);
 		}
 		return FALSE;
 	}
 
+	// __debugbreak();
 	// Io 실패 유도
 	CancelIoEx((HANDLE)pSession->m_sSessionSocket, nullptr);
 
 	if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 	{
 		// IOCount == 0 이면 해제 시도
-		ReleaseSession(pSession, isPQCS);
+		ReleaseSession(pSession);
 	}
 
 	return TRUE;
 }
 
-BOOL CNetServer::ReleaseSession(CNetSession *pSession, BOOL isPQCS) noexcept
+BOOL CNetServer::ReleaseSession(CNetSession *pSession) noexcept
 {
 	// IoCount 체크와 ReleaseFlag 변경을 동시에
 	if (InterlockedCompareExchange(&pSession->m_iIOCountAndRelease, CNetSession::RELEASE_FLAG, 0) != 0)
@@ -357,11 +353,6 @@ BOOL CNetServer::ReleaseSession(CNetSession *pSession, BOOL isPQCS) noexcept
 		return FALSE;
 	}
 
-	if (isPQCS)
-	{
-		PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)pSession, (LPOVERLAPPED)IOOperation::RELEASE_SESSION);
-		return TRUE;
-	}
 
 	USHORT index = GetIndex(pSession->m_uiSessionID);
 	closesocket(pSession->m_sSessionSocket);
@@ -369,22 +360,9 @@ BOOL CNetServer::ReleaseSession(CNetSession *pSession, BOOL isPQCS) noexcept
 	CNetSession::Free(pSession);
 	InterlockedDecrement(&m_iSessionCount);
 
-	OnClientLeave(freeSessionId);
-
-	m_stackDisconnectIndex.Push(index);
-
-	return TRUE;
-}
-
-BOOL CNetServer::ReleaseSessionPQCS(CNetSession *pSession) noexcept
-{
-	USHORT index = GetIndex(pSession->m_uiSessionID);
-	closesocket(pSession->m_sSessionSocket);
-	UINT64 freeSessionId = pSession->m_uiSessionID;
-	CNetSession::Free(pSession);
-	InterlockedDecrement(&m_iSessionCount);
-
-	OnClientLeave(freeSessionId);
+	OnClientLeaveEvent *clientLeaveEvent = new OnClientLeaveEvent;
+	clientLeaveEvent->SetEvent(freeSessionId);
+	EventAPCEnqueue((BaseEvent *)clientLeaveEvent);
 
 	m_stackDisconnectIndex.Push(index);
 
@@ -438,8 +416,6 @@ BOOL CNetServer::PostAcceptEx(INT index) noexcept
 
 BOOL CNetServer::AcceptExCompleted(CNetSession *pSession) noexcept
 {
-	InterlockedIncrement(&g_monitor.m_lAcceptTPS);
-
 	int retVal;
 	int errVal;
 	retVal = setsockopt(pSession->m_sSessionSocket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
@@ -484,6 +460,7 @@ BOOL CNetServer::AcceptExCompleted(CNetSession *pSession) noexcept
 	pSession->Init(combineId);
 
 	InterlockedIncrement(&m_iSessionCount);
+	InterlockedIncrement(&g_monitor.m_lAcceptTPS);
 	InterlockedIncrement64(&g_monitor.m_lAcceptTotal);
 	m_arrPSessions[index] = pSession;
 
@@ -555,25 +532,27 @@ int CNetServer::WorkerThread() noexcept
 				INT index = g_OverlappedAlloc.GetAcceptExIndex((ULONG_PTR)lpOverlapped);
 				pSession = m_arrAcceptExSessions[index];
 
+				InterlockedIncrement(&pSession->m_iIOCountAndRelease);
 				// 이거 실패하면 연결 끊음
 				// * 실패 가능한 상황 - setsockopt, OnConnectionRequest
-				// * ioCount 무조건 1일 것임
-				// * 바로 끊어도 괜춘
-				// * 다른 I/O 요청을 안걸고 끝내기 때문에 아래의 ioCount 0이 됨으로 연결 끊김을 유도
-				InterlockedIncrement(&pSession->m_iIOCountAndRelease);
 				if (!AcceptExCompleted(pSession))
 				{
 					// 실패한 인덱스에 대한 예약은 다시 걸어줌
 					if (!m_isStop)
 						PostAcceptEx(index);
 					else
+					{
 						if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 							CNetSession::Free(pSession);
+					}
 					break;
 				}
 
-				// OnAccept 처리는 여기서
-				OnAccept(pSession->m_uiSessionID);
+				// OnAccept Event 생성
+				OnAcceptEvent *acceptEvent = new OnAcceptEvent;
+				acceptEvent->SetEvent(pSession->m_uiSessionID);
+				EventAPCEnqueue((BaseEvent *)acceptEvent);
+
 				// 해당 세션에 대해 Recv 예약
 				pSession->PostRecv();
 
@@ -582,7 +561,8 @@ int CNetServer::WorkerThread() noexcept
 
 				if (!m_isStop)
 					PostAcceptEx(index);
-
+				else
+					CNetSession::Free(pSession);
 				continue;
 			}
 			break;
@@ -595,19 +575,6 @@ int CNetServer::WorkerThread() noexcept
 			case IOOperation::SEND:
 			{
 				pSession->SendCompleted(dwTransferred);
-				pSession->PostSend();
-			}
-			break;
-			case IOOperation::SENDPOST:
-			{
-				pSession->PostSend();
-				continue;
-			}
-			break;
-			case IOOperation::RELEASE_SESSION:
-			{
-				ReleaseSessionPQCS(pSession);
-				continue;
 			}
 			break;
 			case IOOperation::TIMER_EVENT:
@@ -641,7 +608,35 @@ int CNetServer::WorkerThread() noexcept
 	return 0;
 }
 
-// SendFrameThread로 활용
+int CNetServer::ServerFrameThread() noexcept
+{
+	// IOCP의 병행성 관리를 받기 위한 GQCS
+	DWORD dwTransferred = 0;
+	CNetSession *pSession = nullptr;
+	OVERLAPPED *lpOverlapped = nullptr;
+
+	GetQueuedCompletionStatus(m_hIOCPHandle, &dwTransferred
+		, (PULONG_PTR)&pSession, (LPOVERLAPPED *)&lpOverlapped
+		, 0);
+
+	// 등록한 수만큼 AcceptEx 예약
+	FristPostAcceptEx();
+
+	while (m_bIsServerFrameRun)
+	{
+		// Update
+		// -> 여기서 Update 로직 수행
+		// -> 반환값은 프레임 제어를 위해 
+		DWORD sleepTime = OnUpdate();
+
+		// Alertable Wait 상태로 전환
+		// + 프레임 제어
+		SleepEx(sleepTime, TRUE);
+	}
+
+	return 0;
+}
+
 int CNetServer::TimerEventSchedulerThread() noexcept
 {
 	// IOCP의 병행성 관리를 받기 위한 GQCS
@@ -666,7 +661,14 @@ int CNetServer::TimerEventSchedulerThread() noexcept
 		if (dTime <= 0) // 0보다 작으면 수행 가능
 		{
 			m_TimerEventQueue.pop();
-			PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)timerEvent, (LPOVERLAPPED)IOOperation::TIMER_EVENT);
+			if (timerEvent->isPQCS) // PQCS 타이머 이벤트
+			{
+				PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)timerEvent, (LPOVERLAPPED)IOOperation::TIMER_EVENT);
+			}
+			else // 서버 프레임 APC 이벤트
+			{
+				TimerEventAPCEnqueue(timerEvent);
+			}
 			continue;
 		}
 
@@ -681,14 +683,14 @@ void CNetServer::RegisterSystemTimerEvent()
 {
 	MonitorTimerEvent *monitorEvent = new MonitorTimerEvent;
 	monitorEvent->SetEvent();
-	RegisterTimerEvent((BaseEvent *)monitorEvent);
+	RegisterTimerEvent(monitorEvent);
 
 	KeyBoardTimerEvent *keyBoardEvent = new KeyBoardTimerEvent;
 	keyBoardEvent->SetEvent();
-	RegisterTimerEvent((BaseEvent *)keyBoardEvent);
+	RegisterTimerEvent(keyBoardEvent);
 }
 
-void CNetServer::RegisterTimerEvent(BaseEvent *timerEvent) noexcept
+void CNetServer::RegisterTimerEvent(TimerEvent *timerEvent) noexcept
 {
 	int retVal;
 	int errVal;
@@ -701,8 +703,50 @@ void CNetServer::RegisterTimerEvent(BaseEvent *timerEvent) noexcept
 	}
 }
 
-// EventSchedulerThread에서 수행됨
 void CNetServer::RegisterTimerEventAPCFunc(ULONG_PTR lpParam) noexcept
 {
 	g_NetServer->m_TimerEventQueue.push((TimerEvent *)lpParam);
+}
+
+void CNetServer::EventAPCEnqueue(BaseEvent *event) noexcept
+{
+	int retVal;
+	int errVal;
+
+	retVal = QueueUserAPC(EventHandlerAPCFunc, m_hServerFrameThread, (ULONG_PTR)event);
+	if (retVal == FALSE)
+	{
+		errVal = GetLastError();
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"QueueUserAPC() 실패 : %d", errVal);
+	}
+}
+
+void CNetServer::EventHandlerAPCFunc(ULONG_PTR lpParam) noexcept
+{
+	BaseEvent *contentEvent = (BaseEvent *)lpParam;
+	contentEvent->execute();
+	delete contentEvent;
+}
+
+void CNetServer::TimerEventAPCEnqueue(TimerEvent *timerEvent) noexcept
+{
+	int retVal;
+	int errVal;
+
+	retVal = QueueUserAPC(TimerEventHandlerAPCFunc, m_hServerFrameThread, (ULONG_PTR)timerEvent);
+	if (retVal == FALSE)
+	{
+		errVal = GetLastError();
+		g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"QueueUserAPC() 실패 : %d", errVal);
+	}
+}
+
+void CNetServer::TimerEventHandlerAPCFunc(ULONG_PTR lpParam) noexcept
+{
+	TimerEvent *timerEvent = (TimerEvent *)lpParam;
+	timerEvent->nextExecuteTime += timerEvent->timeMs;
+	timerEvent->execute();
+
+	// Event Apc Enqueue - PQ 동기화 피하기 위함
+	g_NetServer->RegisterTimerEvent(timerEvent);
 }
