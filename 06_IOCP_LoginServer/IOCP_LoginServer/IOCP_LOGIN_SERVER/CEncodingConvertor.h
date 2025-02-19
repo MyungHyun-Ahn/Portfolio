@@ -2,6 +2,7 @@
 class CEncodingConvertor
 {
 public:
+	// 두 번째 인자에 -1을 전달하면 알아서 널 문자 찾아서
 	inline static bool Utf16ToUtf8(const WCHAR *utf16String, const int utf16StringLen, char *utf8String, const int utf8StringLen)
 	{
 		int result = WideCharToMultiByte(CP_UTF8, 0, utf16String, utf16StringLen, utf8String, utf8StringLen, nullptr, nullptr);
