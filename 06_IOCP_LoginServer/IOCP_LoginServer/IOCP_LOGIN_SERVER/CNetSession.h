@@ -9,7 +9,7 @@ public:
 		: m_sSessionSocket(INVALID_SOCKET)
 		, m_uiSessionID(0)
 	{
-		// + 0 : AcceptEx
+		// + 0 : ConnectEx
 		// + 1 : Recv
 		// + 2 : Send
 		m_pMyOverlappedStartAddr = g_OverlappedAlloc.Alloc();

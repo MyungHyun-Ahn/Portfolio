@@ -43,6 +43,7 @@ bool CChatProcessPacket::PacketProcReqLogin(UINT64 sessionId, CSmartPtr<CSeriali
 	char getKey[64];
 	CRedisConnector *redisConnector = CRedisConnector::GetRedisConnector();
 	redisConnector->Get(accountNo, getKey, 64);
+	redisConnector->Del(accountNo);
 
 	for (int i = 0; i < 64; i++)
 	{

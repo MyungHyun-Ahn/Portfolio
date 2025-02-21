@@ -1,17 +1,9 @@
 #pragma once
 
-#pragma warning(disable : 26495) // 변수 초기화 경고
-#pragma warning(disable : 26110) // 락 잠금 해제 경고
-#pragma warning(disable : 6387) // AcceptEx 인자전달
-#pragma warning(disable : 4244) // xutility
-
 #pragma comment(lib, "ws2_32")
 #pragma comment(lib, "winmm")
 #pragma comment(lib, "DbgHelp.Lib")
 #pragma comment(lib, "Pdh.lib")
-#pragma comment(lib, "libmysql.lib")
-#pragma comment (lib, "cpp_redis.lib")
-#pragma comment (lib, "tacopie.lib")
 
 // 소켓 관련
 #include <WinSock2.h>
@@ -46,13 +38,6 @@
 #include <DbgHelp.h>
 #include <chrono>
 #include <functional>
-
-// mysql
-#include "include/mysql.h"
-#include "include/errmsg.h"
-
-// redis
-#include <cpp_redis/cpp_redis>
 
 #include "DefineSingleton.h"
 #include "CProfileManager.h"
@@ -91,5 +76,3 @@
 #include "CDeque.h"
 
 #include "BaseEvent.h"
-
-#include "CEncodingConvertor.h"

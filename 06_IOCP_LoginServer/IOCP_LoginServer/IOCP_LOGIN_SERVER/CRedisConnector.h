@@ -34,6 +34,13 @@ public:
 		}
 	}
 
+	// ºñµ¿±â Get
+	void Get(const INT64 key, cpp_redis::reply_callback_t &reply_callback)
+	{
+		m_redisClient.get(std::to_string(key), reply_callback);
+		m_redisClient.commit();
+	}
+
 	void Del(const INT64 key) noexcept
 	{
 		m_redisClient.del({ std::to_string(key) });
