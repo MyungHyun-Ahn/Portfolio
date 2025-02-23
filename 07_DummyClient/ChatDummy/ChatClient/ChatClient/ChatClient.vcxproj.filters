@@ -35,14 +35,14 @@
     <ClCompile Include="CGenPacket.cpp">
       <Filter>Content</Filter>
     </ClCompile>
-    <ClCompile Include="CLoginClient.cpp">
-      <Filter>Content</Filter>
-    </ClCompile>
     <ClCompile Include="ContentEvent.cpp">
       <Filter>Content</Filter>
     </ClCompile>
+    <ClCompile Include="CLoginClient.cpp">
+      <Filter>Content\Login</Filter>
+    </ClCompile>
     <ClCompile Include="LoginSetting.cpp">
-      <Filter>Content</Filter>
+      <Filter>Content\Login</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -136,14 +136,14 @@
     <ClInclude Include="BaseEvent.h">
       <Filter>Network</Filter>
     </ClInclude>
-    <ClInclude Include="CLoginClient.h">
-      <Filter>Content</Filter>
-    </ClInclude>
     <ClInclude Include="ContentEvent.h">
       <Filter>Content</Filter>
     </ClInclude>
+    <ClInclude Include="CLoginClient.h">
+      <Filter>Content\Login</Filter>
+    </ClInclude>
     <ClInclude Include="LoginSetting.h">
-      <Filter>Content</Filter>
+      <Filter>Content\Login</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -161,6 +161,12 @@
     </Filter>
     <Filter Include="Content">
       <UniqueIdentifier>{7099e4f5-9f6c-4ed5-bf32-aec7ed8ae433}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Content\Login">
+      <UniqueIdentifier>{dbd17973-6faf-472e-8da8-ba194c600ee0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Content\Chat">
+      <UniqueIdentifier>{a8f6a221-1d35-46bd-8970-24ff18a34cbf}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

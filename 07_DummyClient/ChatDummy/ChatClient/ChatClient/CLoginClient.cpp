@@ -50,6 +50,7 @@ void LOGIN_CLIENT::CLoginClient::OnConnect(const UINT64 sessionID) noexcept
 	m_umapUsers.insert(std::make_pair(sessionID, newUser));
 	ReleaseSRWLockExclusive(&m_srwLockUserMap);
 
+	// 로그인 대기 -> 몇초후 수행
 	LoginEvent *event = new LoginEvent;
 	event->SetEvent(sessionID);
 	NETWORK_CLIENT::g_netClientMgr->ContentEventEnqueue(event);
