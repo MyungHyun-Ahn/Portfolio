@@ -13,6 +13,6 @@ void TestEvent::SetEvent(DWORD ms, INT num)
 
 void TestEvent::Execute(INT num, INT delayFrame)
 {
-	Sleep(18);
+	Sleep(19);
 	// printf("%d\n", num);
 }
