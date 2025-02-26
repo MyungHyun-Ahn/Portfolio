@@ -617,7 +617,6 @@ namespace NETWORK_SERVER
 		RegisterContentTimerEvent();
 
 		WaitForMultipleObjects(m_arrWorkerThreads.size(), m_arrWorkerThreads.data(), TRUE, INFINITE);
-		WaitForSingleObject(m_hTimerEventSchedulerThread, INFINITE);
 
 		return TRUE;
 	}
@@ -647,8 +646,6 @@ namespace NETWORK_SERVER
 				break;
 			}
 		}
-
-		m_bIsTimerEventSchedulerRun = FALSE;
 	}
 
 	void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept

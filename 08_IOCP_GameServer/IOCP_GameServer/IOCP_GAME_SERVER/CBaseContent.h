@@ -30,6 +30,7 @@ class CBaseContent
 {
 public:
 	friend class NETWORK_SERVER::CNetServer;
+	friend struct ContentFrameEvent;
 
 	CBaseContent() noexcept
 	{
@@ -37,7 +38,7 @@ public:
 		m_ContentID = InterlockedIncrement(&s_CurrentContentID);
 	}
 
-	virtual void OnEnter(const UINT64 sessionID) noexcept = 0;
+	virtual void OnEnter(const UINT64 sessionID, void *pObject) noexcept = 0;
 
 	// OnLeave에서 유저 수 0 되면 TimerEvent flag = 0 만들기
 	virtual void OnLeave(const UINT64 sessionID) noexcept = 0;
@@ -50,7 +51,9 @@ protected:
 	// 이 컨텐츠 루프를 끝내고 싶으면 m_pTimerEvent의 flag 를 끄면 루프를 돌고 파괴
 	TimerEvent *m_pTimerEvent;
 
+	// Player 생성 요청, 삭제 요청 등이 넘어옴
 	CLFQueue<MOVE_JOB *> m_MoveJobQ; // Move Job Queue
+	CLFQueue<UINT64> m_LeaveJobQ; // Leave Job Queue
 
 	// Key : SessionId
 	// Value : 알아서 Player 객체 등의 오브젝트 포인터

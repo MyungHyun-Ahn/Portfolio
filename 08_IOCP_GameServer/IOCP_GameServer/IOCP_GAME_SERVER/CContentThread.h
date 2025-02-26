@@ -95,7 +95,7 @@ private:
 				else
 				{
 					// 일회성 이벤트는 바로 실행하고
-					pEvent->execute(0);
+					pEvent->execute(1);
 					delete pEvent;
 				}
 			}
