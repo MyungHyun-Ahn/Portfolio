@@ -1,5 +1,5 @@
 #pragma once
-// class CChatProcessPacketInterface
+// class CAuthProcessPacketInterface
 // {
 // public:
 // 	virtual bool	ConsumPacket(en_PACKET_TYPE type, UINT64 sessionId, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept = 0;
@@ -7,30 +7,21 @@
 // 	virtual bool 	PacketProcReqSectorMove(UINT64 sessionId, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept = 0;
 // 	virtual bool 	PacketProcReqMessage(UINT64 sessionId, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept = 0;
 // 	virtual bool 	PacketProcReqHeartBeat(UINT64 sessionId, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept = 0;
-// 	void			SetChatServer(CChatServer *chatServer) noexcept { m_pChatServer = chatServer; }
+// 	void			SetChatServer(CAuthContent *authContent) noexcept { m_pAuthContent = authContent; }
 // 
 // protected:
-// 	CChatServer *m_pChatServer = nullptr;
+// 	CAuthContent *m_pAuthContent= nullptr;
 // };
 // 
-// class CChatProcessPacket : public CChatProcessPacketInterface
+// class CAuthProcessPacket : public CAuthProcessPacket
 // {
-// 	
+// public:
 // 	bool ConsumPacket(en_PACKET_TYPE type, UINT64 sessionId, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept override
 // 	{
 // 		switch (type)
 // 		{
-// 		case en_PACKET_CS_CHAT_REQ_LOGIN:
-// 			InterlockedIncrement(&g_monitor.m_loginReq);
+// 		case en_PACKET_CS_GAME_REQ_LOGIN:
 // 			return PacketProcReqLogin(sessionId, message);
-// 		case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE:
-// 			InterlockedIncrement(&g_monitor.m_sectorMoveReq);
-// 			return PacketProcReqSectorMove(sessionId, message);
-// 		case en_PACKET_CS_CHAT_REQ_MESSAGE:
-// 			InterlockedIncrement(&g_monitor.m_chatMsgReq);
-// 			return PacketProcReqMessage(sessionId, message);
-// 		case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
-// 			return PacketProcReqHeartBeat(sessionId, message);
 // 		default:
 // 			break;
 // 		}

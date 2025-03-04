@@ -129,9 +129,6 @@
     <ClInclude Include="CProcessPacket.h">
       <Filter>Contents\Server</Filter>
     </ClInclude>
-    <ClInclude Include="ContentEvent.h">
-      <Filter>Contents\Object</Filter>
-    </ClInclude>
     <ClInclude Include="COverlappedAllocator.h">
       <Filter>Network\Net</Filter>
     </ClInclude>
@@ -146,6 +143,15 @@
     </ClInclude>
     <ClInclude Include="CContentThread.h">
       <Filter>Network\Content</Filter>
+    </ClInclude>
+    <ClInclude Include="ContentEvent.h">
+      <Filter>Contents\Content</Filter>
+    </ClInclude>
+    <ClInclude Include="CGameContent.h">
+      <Filter>Contents\Content</Filter>
+    </ClInclude>
+    <ClInclude Include="CPlayer.h">
+      <Filter>Contents\Object</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -186,9 +192,6 @@
     <ClCompile Include="CProcessPacket.cpp">
       <Filter>Contents\Server</Filter>
     </ClCompile>
-    <ClCompile Include="ContentEvent.cpp">
-      <Filter>Contents\Object</Filter>
-    </ClCompile>
     <ClCompile Include="COverlappedAllocator.cpp">
       <Filter>Network\Net</Filter>
     </ClCompile>
@@ -203,6 +206,15 @@
     </ClCompile>
     <ClCompile Include="CContentThread.cpp">
       <Filter>Network\Content</Filter>
+    </ClCompile>
+    <ClCompile Include="CGameContent.cpp">
+      <Filter>Contents\Content</Filter>
+    </ClCompile>
+    <ClCompile Include="ContentEvent.cpp">
+      <Filter>Contents\Content</Filter>
+    </ClCompile>
+    <ClCompile Include="CPlayer.cpp">
+      <Filter>Contents\Object</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

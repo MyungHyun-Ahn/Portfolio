@@ -1,6 +1,7 @@
 #pragma once
 
 struct ContentFrameEvent;
+class CBaseContent;
 
 namespace NETWORK_SERVER
 {
@@ -8,6 +9,7 @@ namespace NETWORK_SERVER
 	{
 	public:
 		friend class CNetServer;
+		friend class CBaseContent;
 		friend struct ContentFrameEvent;
 
 		CNetSession() noexcept
@@ -97,6 +99,10 @@ namespace NETWORK_SERVER
 
 		LONG m_iCacelIoCalled = FALSE;
 
+		// Recv ≈•
+		CLFQueue<CSerializableBufferView<FALSE> *> m_RecvMsgQueue;
+		// LONG m_ContentStatus = FALSE;
+
 		// √— 460πŸ¿Ã∆Æ
 
 		inline static CTLSMemoryPoolManager<CNetSession, 16, 4> s_sSessionPool = CTLSMemoryPoolManager<CNetSession, 16, 4>();
@@ -107,6 +113,7 @@ namespace NETWORK_SERVER
 	class CNetServer
 	{
 	public:
+		friend class CBaseContent;
 		friend struct ContentFrameEvent;
 
 		BOOL Start(const CHAR *openIP, const USHORT port) noexcept;

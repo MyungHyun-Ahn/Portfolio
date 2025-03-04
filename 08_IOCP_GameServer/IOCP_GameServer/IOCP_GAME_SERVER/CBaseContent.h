@@ -11,18 +11,25 @@ struct MOVE_JOB
 	// nullptr 넘어오면 해당 컨텐츠에서 알아서 만들어야 함
 	void *objectPtr;
 
-	inline MOVE_JOB *Alloc() noexcept
+	inline static MOVE_JOB *Alloc() noexcept
 	{
 		MOVE_JOB *pMoveJob = s_MoveJobPool.Alloc();
 		return pMoveJob;
 	}
 
-	inline void Free(MOVE_JOB *freeJob) noexcept
+	inline static void Free(MOVE_JOB *freeJob) noexcept
 	{
 		s_MoveJobPool.Free(freeJob);
 	}
 
 	inline static CTLSMemoryPoolManager<MOVE_JOB> s_MoveJobPool = CTLSMemoryPoolManager<MOVE_JOB>();
+};
+
+enum class RECV_RET
+{
+	RECV_TRUE = 0,
+	RECV_MOVE,
+	RECV_FALSE
 };
 
 // 모든 콘텐츠는 BaseContent를 상속받아 구현
@@ -38,11 +45,21 @@ public:
 		m_ContentID = InterlockedIncrement(&s_CurrentContentID);
 	}
 
-	virtual void OnEnter(const UINT64 sessionID, void *pObject) noexcept = 0;
+	// 컨텐츠가 삭제되는 것 -> 한 프레임이 끝나고 락걸고 삭제
+	~CBaseContent() noexcept
+	{
+		ConsumeMoveJob();
+		ConsumeLeaveJob();
+	}
 
-	// OnLeave에서 유저 수 0 되면 TimerEvent flag = 0 만들기
+	void MoveJobEnqueue(UINT64 sessionID, void *pObject) noexcept;
+	void ConsumeMoveJob() noexcept;
+	void ConsumeLeaveJob() noexcept;
+	void ConsumeRecvMsg() noexcept;
+
+	virtual void OnEnter(const UINT64 sessionID, void *pObject) noexcept = 0;
 	virtual void OnLeave(const UINT64 sessionID) noexcept = 0;
-	virtual void OnRecv(const UINT64 sessionID, CSerializableBufferView<FALSE> *message) noexcept = 0;
+	virtual RECV_RET OnRecv(const UINT64 sessionID, CSerializableBufferView<FALSE> *message) noexcept = 0;
 
 protected:
 	LONG m_ContentID;

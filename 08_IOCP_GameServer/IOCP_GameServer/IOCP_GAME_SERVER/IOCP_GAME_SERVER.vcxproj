@@ -152,6 +152,7 @@
     <ClInclude Include="CCrashDump.h" />
     <ClInclude Include="CDeque.h" />
     <ClInclude Include="CEncryption.h" />
+    <ClInclude Include="CGameContent.h" />
     <ClInclude Include="CGameServer.h" />
     <ClInclude Include="CGenPacket.h" />
     <ClInclude Include="CLFMemoryPool.h" />
@@ -163,6 +164,7 @@
     <ClInclude Include="CNetServer.h" />
     <ClInclude Include="CommonProtocol.h" />
     <ClInclude Include="ContentEvent.h" />
+    <ClInclude Include="CPlayer.h" />
     <ClInclude Include="CProcessPacket.h" />
     <ClInclude Include="CProfileManager.h" />
     <ClInclude Include="CRecvBuffer.h" />
@@ -187,6 +189,7 @@
   <ItemGroup>
     <ClCompile Include="CBaseContent.cpp" />
     <ClCompile Include="CContentThread.cpp" />
+    <ClCompile Include="CGameContent.cpp" />
     <ClCompile Include="CGameServer.cpp" />
     <ClCompile Include="CGenPacket.cpp" />
     <ClCompile Include="CLogger.cpp" />
@@ -195,6 +198,7 @@
     <ClCompile Include="CNetServer.cpp" />
     <ClCompile Include="ContentEvent.cpp" />
     <ClCompile Include="COverlappedAllocator.cpp" />
+    <ClCompile Include="CPlayer.cpp" />
     <ClCompile Include="CProcessPacket.cpp" />
     <ClCompile Include="CProfileManager.cpp" />
     <ClCompile Include="CRecvBuffer.cpp" />

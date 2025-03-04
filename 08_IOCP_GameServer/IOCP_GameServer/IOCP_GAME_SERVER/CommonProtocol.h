@@ -293,7 +293,7 @@ enum en_PACKET_TYPE
 	//	{
 	//		WORD		Type
 	//
-	//		INT64		AccountoNo
+	//		INT64		AccountNo
 	//		LONGLONG	SendTick
 	//	}
 	//
@@ -306,7 +306,7 @@ enum en_PACKET_TYPE
 	//	{
 	//		WORD		Type
 	//
-	//		INT64		AccountoNo
+	//		INT64		AccountNo
 	//		LONGLONG	SendTick
 	//	}
 	//

@@ -2,6 +2,7 @@
 #include "ServerSetting.h"
 #include "CNetServer.h"
 #include "CGameServer.h"
+#include "CBaseContent.h"
 #include "ContentEvent.h"
 #include "CContentThread.h"
 
