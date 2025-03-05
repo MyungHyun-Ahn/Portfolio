@@ -71,7 +71,6 @@ private:
 
 	bool GetHeader(char *buffer, int size) noexcept;
 
-	inline int GetDataSize() const noexcept { return m_Rear - m_Front; }
 	inline int GetHeaderSize() const noexcept { return  (int)CSerializableBuffer<isLanServer>::DEFINE::HEADER_SIZE; }
 	inline int GetFullSize() const noexcept { return GetDataSize() + GetHeaderSize(); }
 
@@ -93,6 +92,8 @@ private:
 	}
 
 public:
+	inline int GetDataSize() const noexcept { return m_Rear - m_Front; }
+
 	inline static void Free(CSerializableBufferView *delSBuffer) noexcept
 	{
 		// 직접 할당 받은 버퍼가 아니라면 recv 버퍼는 nullptr이 아님

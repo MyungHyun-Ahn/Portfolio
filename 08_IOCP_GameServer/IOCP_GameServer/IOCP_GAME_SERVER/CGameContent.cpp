@@ -42,8 +42,11 @@ RECV_RET CAuthContent::OnRecv(const UINT64 sessionID, CSerializableBufferView<FA
 
 		// 인증 통과
 
+		// Player 생성
+		 
 		// Echo 모드 전환
 		// g_NetServer -> EchoContent -> EnqueueMoveJob
+
 
 		return RECV_RET::RECV_MOVE;
 	}
@@ -57,10 +60,12 @@ RECV_RET CAuthContent::OnRecv(const UINT64 sessionID, CSerializableBufferView<FA
 
 void CEchoContent::OnEnter(const UINT64 sessionID, void *pObject) noexcept
 {
+	m_umapSessions.insert(std::make_pair(sessionID, pObject));
 }
 
 void CEchoContent::OnLeave(const UINT64 sessionID) noexcept
 {
+	m_umapSessions.erase(sessionID);
 }
 
 RECV_RET CEchoContent::OnRecv(const UINT64 sessionID, CSerializableBufferView<FALSE> *message) noexcept
@@ -72,9 +77,24 @@ RECV_RET CEchoContent::OnRecv(const UINT64 sessionID, CSerializableBufferView<FA
 	{
 	case en_PACKET_CS_GAME_REQ_ECHO:
 	{
+		auto it = m_umapSessions.find(sessionID);
+		if (it == m_umapSessions.end())
+		{
+			// Player 찾기 실패
+			return RECV_RET::RECV_FALSE;
+		}
+
+		CPlayer *pPlayer = (CPlayer *)it->second;
+
 		INT64 accountNo;
 		LONGLONG sendTick;
 		*message >> accountNo >> sendTick;
+
+		if (accountNo != pPlayer->m_iAccountNo)
+			return RECV_RET::RECV_FALSE;
+
+		if (message->GetDataSize() != 0)
+			return RECV_RET::RECV_FALSE;
 
 		CSerializableBuffer<FALSE> *pEchoRes = CGenPacket::makePacketResEcho(accountNo, sendTick);
 		pEchoRes->IncreaseRef();
@@ -88,7 +108,19 @@ RECV_RET CEchoContent::OnRecv(const UINT64 sessionID, CSerializableBufferView<FA
 
 	case en_PACKET_CS_GAME_REQ_HEARTBEAT:
 	{
-		
+		// 하트비트 type만 있음
+		if (message->GetDataSize() != 0)
+			return RECV_RET::RECV_FALSE;
+
+		auto it = m_umapSessions.find(sessionID);
+		if (it == m_umapSessions.end())
+		{
+			// Player 찾기 실패
+			return RECV_RET::RECV_FALSE;
+		}
+
+		CPlayer *pPlayer = (CPlayer *)it->second;
+		pPlayer->m_dwPrevRecvTime = timeGetTime();
 	}
 	return RECV_RET::RECV_TRUE;
 	default:

@@ -11,6 +11,7 @@ class CPlayer
 public:
 	friend class CGameServer;
 	friend class CGameProcessPacket;
+	friend class CEchoContent;
 
 	inline static CPlayer *Alloc() noexcept
 	{
