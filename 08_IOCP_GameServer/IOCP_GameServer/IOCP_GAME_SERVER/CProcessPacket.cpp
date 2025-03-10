@@ -1,7 +1,0 @@
-#include "pch.h"
-#include "CNetServer.h"
-#include "CommonProtocol.h"
-#include "CBaseContent.h"
-#include "CGameContent.h"
-#include "CProcessPacket.h"
-#include "CGenPacket.h"

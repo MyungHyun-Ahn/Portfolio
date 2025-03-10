@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "MyInclude.h"
 #include "CNetServer.h"
 #include "ContentEvent.h"
 
@@ -6,7 +7,7 @@ void TestEvent::SetEvent(DWORD ms, INT num)
 {
 	isTimerEvent = true;
 
-	execute = std::bind(&TestEvent::Execute, this, num, std::placeholders::_1);
+	// execute = std::bind(&TestEvent::Execute, this, num, std::placeholders::_1);
 	timeMs = ms; // 1초
 	nextExecuteTime = timeGetTime(); // 현재 시각
 }

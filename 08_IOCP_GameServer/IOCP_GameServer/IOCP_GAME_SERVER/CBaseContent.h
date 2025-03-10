@@ -38,6 +38,7 @@ class CBaseContent
 public:
 	friend class NETWORK_SERVER::CNetServer;
 	friend struct ContentFrameEvent;
+	friend class CMonitor;
 
 	CBaseContent() noexcept
 	{
@@ -53,6 +54,7 @@ public:
 	}
 
 	void MoveJobEnqueue(UINT64 sessionID, void *pObject) noexcept;
+	void LeaveJobEnqueue(UINT64 sessionID);
 	void ConsumeMoveJob() noexcept;
 	void ConsumeLeaveJob() noexcept;
 	void ConsumeRecvMsg() noexcept;
@@ -60,6 +62,7 @@ public:
 	virtual void OnEnter(const UINT64 sessionID, void *pObject) noexcept = 0;
 	virtual void OnLeave(const UINT64 sessionID) noexcept = 0;
 	virtual RECV_RET OnRecv(const UINT64 sessionID, CSerializableBufferView<FALSE> *message) noexcept = 0;
+	virtual void OnLoopEnd() noexcept = 0;
 
 protected:
 	LONG m_ContentID;
@@ -71,6 +74,8 @@ protected:
 	// Player 생성 요청, 삭제 요청 등이 넘어옴
 	CLFQueue<MOVE_JOB *> m_MoveJobQ; // Move Job Queue
 	CLFQueue<UINT64> m_LeaveJobQ; // Leave Job Queue
+
+	LONG m_FPS = 0;
 
 	// Key : SessionId
 	// Value : 알아서 Player 객체 등의 오브젝트 포인터

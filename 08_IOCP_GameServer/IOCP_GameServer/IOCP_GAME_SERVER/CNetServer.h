@@ -105,6 +105,9 @@ namespace NETWORK_SERVER
 
 		// 총 460바이트
 
+		// ContentPtr
+		CBaseContent *m_pCurrentContent = nullptr;
+
 		inline static CTLSMemoryPoolManager<CNetSession, 16, 4> s_sSessionPool = CTLSMemoryPoolManager<CNetSession, 16, 4>();
 		inline static LONG RELEASE_FLAG = 0x80000000;
 	};
@@ -124,6 +127,10 @@ namespace NETWORK_SERVER
 		void SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept;
 		// Send 시도는 하지 않음
 		void EnqueuePacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept;
+		void EnqueuePacketPQCS(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept;
+		void SendPQCS(const CNetSession *pSession);
+		void SendAll();
+		void SendAllPQCS();
 
 		BOOL Disconnect(const UINT64 sessionID, BOOL isPQCS = FALSE) noexcept;
 		BOOL ReleaseSession(CNetSession *pSession, BOOL isPQCS = FALSE) noexcept;
@@ -164,6 +171,7 @@ namespace NETWORK_SERVER
 	public:
 		int WorkerThread() noexcept;
 
+		void RegisterSystemTimerEvent();
 		virtual void RegisterContentTimerEvent() noexcept = 0;
 
 	private:
@@ -172,7 +180,7 @@ namespace NETWORK_SERVER
 		LONG64					m_iCurrentID = 0;
 
 		USHORT					m_usMaxSessionCount;
-		CNetSession **m_arrPSessions;
+		CNetSession				**m_arrPSessions;
 		CLFStack<USHORT>		m_stackDisconnectIndex;
 
 		// Worker
@@ -184,13 +192,15 @@ namespace NETWORK_SERVER
 		// Accepter
 		LPFN_ACCEPTEX					m_lpfnAcceptEx = NULL;
 		GUID							m_guidAcceptEx = WSAID_ACCEPTEX;
-		CNetSession **m_arrAcceptExSessions;
+		CNetSession						**m_arrAcceptExSessions;
 
 		LPFN_GETACCEPTEXSOCKADDRS		m_lpfnGetAcceptExSockaddrs = NULL;
 		GUID							m_guidGetAcceptExSockaddrs = WSAID_GETACCEPTEXSOCKADDRS;
 
 		// IOCP 핸들
 		HANDLE m_hIOCPHandle = INVALID_HANDLE_VALUE;
+
+		LONG m_SendAllFlag = FALSE;
 
 		LONG m_isStop = FALSE;
 	};

@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "MyInclude.h"
 #include "CNetServer.h"
 #include "CBaseContent.h"
 
@@ -35,6 +36,11 @@ void CBaseContent::MoveJobEnqueue(UINT64 sessionID, void *pObject) noexcept
 	m_MoveJobQ.Enqueue(pMoveJob);
 }
 
+void CBaseContent::LeaveJobEnqueue(UINT64 sessionID)
+{
+	m_LeaveJobQ.Enqueue(sessionID);
+}
+
 void CBaseContent::ConsumeMoveJob() noexcept
 {
 	// 이동 처리
@@ -58,6 +64,8 @@ void CBaseContent::ConsumeMoveJob() noexcept
 
 		MOVE_JOB::s_MoveJobPool.Free(moveJob);
 
+		pSession->m_pCurrentContent = this;
+
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
 			NETWORK_SERVER::g_NetServer->ReleaseSession(pSession);
@@ -79,16 +87,42 @@ void CBaseContent::ConsumeLeaveJob() noexcept
 void CBaseContent::ConsumeRecvMsg() noexcept
 {
 	// 세션 메시지 처리
-	for (auto &[key, value] : m_umapSessions)
+	// 이 사이에 Session 유지 되어야 함
+
+	// CDeque<NETWORK_SERVER::CNetSession *> *pSessionQ = new CDeque<NETWORK_SERVER::CNetSession *>;
+
+	for (auto &[sessionId, value] : m_umapSessions)
 	{
-		NETWORK_SERVER::CNetSession *pSession = NETWORK_SERVER::g_NetServer->m_arrPSessions[NETWORK_SERVER::CNetServer::GetIndex(key)];
+		int sessionIdx = NETWORK_SERVER::CNetServer::GetIndex(sessionId);
+		NETWORK_SERVER::CNetSession *pSession = NETWORK_SERVER::g_NetServer->m_arrPSessions[sessionIdx];
+		
+		InterlockedIncrement(&pSession->m_iIOCountAndRelease);
+		// ReleaseFlag가 이미 켜진 상황
+		if ((pSession->m_iIOCountAndRelease & NETWORK_SERVER::CNetSession::RELEASE_FLAG) == NETWORK_SERVER::CNetSession::RELEASE_FLAG)
+		{
+			if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
+			{
+				NETWORK_SERVER::g_NetServer->ReleaseSession(pSession);
+			}
+			continue;
+		}
+		
+		if (sessionId != pSession->m_uiSessionID)
+		{
+			if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
+			{
+				NETWORK_SERVER::g_NetServer->ReleaseSession(pSession);
+			}
+			continue;
+		}
+
 		LONG recvMsgCount = pSession->m_RecvMsgQueue.GetUseSize();
 		for (int i = 0; i < recvMsgCount; i++)
 		{
 			CSerializableBufferView<FALSE> *pMsg;
 			pSession->m_RecvMsgQueue.Dequeue(&pMsg);
 
-			RECV_RET ret = OnRecv(key, pMsg);
+			RECV_RET ret = OnRecv(sessionId, pMsg);
 			// 이동 메시지 처리
 			if (ret == RECV_RET::RECV_MOVE)
 			{
@@ -100,7 +134,7 @@ void CBaseContent::ConsumeRecvMsg() noexcept
 			// 잘못된 메시지 수신
 			if (ret == RECV_RET::RECV_FALSE)
 			{
-				NETWORK_SERVER::g_NetServer->Disconnect(key);
+				NETWORK_SERVER::g_NetServer->Disconnect(sessionId);
 
 				if (pMsg->DecreaseRef() == 0)
 					CSerializableBufferView<FALSE>::Free(pMsg);
@@ -112,5 +146,19 @@ void CBaseContent::ConsumeRecvMsg() noexcept
 			if (pMsg->DecreaseRef() == 0)
 				CSerializableBufferView<FALSE>::Free(pMsg);
 		}
+
+		if (recvMsgCount != 0)
+			NETWORK_SERVER::g_NetServer->SendPQCS(pSession);
+
+			// pSession->PostSend();
+
+		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
+		{
+			NETWORK_SERVER::g_NetServer->ReleaseSession(pSession);
+		}
 	}
+
+	// NETWORK_SERVER::g_NetServer->SendAllPQCS(pSessionQ);
+
+	// OnLoopEnd();
 }

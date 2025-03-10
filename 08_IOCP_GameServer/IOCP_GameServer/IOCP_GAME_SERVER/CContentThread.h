@@ -102,19 +102,21 @@ private:
 		}
 	}
 
-	bool CheckTimerEventQ() noexcept
+	inline inline bool CheckTimerEventQ() noexcept
 	{
 		if (m_TimerEventQueue.empty())
 		{
 			InterlockedExchange(&m_EnqueueFlag, FALSE); // 먼저 바꿔놓고
-			// 일감 얻어오기에 실패하면
-			if (!WorkStealing())
-			{
-				// 중간에 다른 Event가 들어와서 m_EnqueueFlag가 TRUE로 바뀌면 블락 안됨
-				// 블락될 상황
-				WaitOnAddress(&m_EnqueueFlag, &m_EnqueueComparand, sizeof(LONG), INFINITE); // 값이 같으면 블락
-			}
+			WaitOnAddress(&m_EnqueueFlag, &m_EnqueueComparand, sizeof(LONG), INFINITE); // 값이 같으면 블락
 
+			// 일감 얻어오기에 실패하면
+			// if (!WorkStealing())
+			// {
+			// 	// 중간에 다른 Event가 들어와서 m_EnqueueFlag가 TRUE로 바뀌면 블락 안됨
+			// 	// 블락될 상황
+			// 	WaitOnAddress(&m_EnqueueFlag, &m_EnqueueComparand, sizeof(LONG), INFINITE); // 값이 같으면 블락
+			// }
+			
 			// 일관성 있는 처리를 위해 continue;
 			// WorkStealing 성공과 Event Enqueue와 구분하지 않기 위해
 			return false;
@@ -172,7 +174,7 @@ private:
 		return true;
 	}
 
-	bool ConsumeTimerEvent() noexcept
+	inline bool ConsumeTimerEvent() noexcept
 	{
 		TimerEvent *pTimerEvent;
 		AcquireSRWLockExclusive(&m_lockTimerEventQ);
@@ -186,8 +188,8 @@ private:
 		LONG dTime = pTimerEvent->nextExecuteTime - timeGetTime();
 		if (dTime > 0) // 0보다 작으면 수행 가능
 		{
-			ReleaseSRWLockExclusive(&m_lockTimerEventQ);
 			m_PrevSleepTime = dTime;
+			ReleaseSRWLockExclusive(&m_lockTimerEventQ);
 			Sleep(dTime);
 			return false;
 		}
@@ -197,18 +199,19 @@ private:
 
 		// dTime이 음수거나 0
 		// 얼마나 프레임이 밀렸는지 판단
-		if ((dTime * -1) > ((1000 / SERVER_SETTING::MAX_CONTENT_FPS) * SERVER_SETTING::DELAY_FRAME))
-		{
-			// 자기 자신이 가지고 있는 일감 중 하나를 다른 스레드로 넘겨줌
-			DelegateWork();
-		}
+		// if ((dTime * -1) > ((1000 / SERVER_SETTING::MAX_CONTENT_FPS) * SERVER_SETTING::DELAY_FRAME))
+		// {
+		// 	// 자기 자신이 가지고 있는 일감 중 하나를 다른 스레드로 넘겨줌
+		// 	// DelegateWork();
+		// }
 
 		// 종료해야할 이벤트면
-		if (!pTimerEvent->isRunning)
-		{
-			delete pTimerEvent;
-			return false;
-		}
+		// - 종료는 없음
+		// if (!pTimerEvent->isRunning)
+		// {
+		// 	delete pTimerEvent;
+		// 	return false;
+		// }
 
 		INT delayFrame = ((dTime * -1) / pTimerEvent->timeMs) + 1;
 
@@ -227,6 +230,8 @@ private:
 
 	void Run() noexcept
 	{
+		// SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+
 		while (m_RunningFlag)
 		{
 			CheckEnqueueEventQ();
@@ -253,6 +258,7 @@ private:
 	// SleepTime이 모자르면 다른 스레드에 일감 넘김
 	DWORD					m_PrevSleepTime = INFINITE;
 
+public:
 	inline static std::vector<CContentThread *> s_arrContentThreads;
 };
 

@@ -10,6 +10,8 @@ enum class IOOperation
 	SEND,
 	// System Event - 3 ~
 	SENDPOST,
+	SEND_ALL,
+	ENQUEUE_PACKET,
 	RELEASE_SESSION,
 	NONE = 400
 };
