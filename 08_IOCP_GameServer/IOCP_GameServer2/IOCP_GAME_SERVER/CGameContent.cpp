@@ -68,7 +68,7 @@ RECV_RET CAuthContent::OnRecv(const UINT64 sessionID, CSerializableBuffer<FALSE>
 		pEchoContent->MoveJobEnqueue(sessionID, pPlayer);
 
 		CSerializableBuffer<FALSE> *pLoginRes = CGenPacket::makePacketResLogin(1, accountNo);
-		NETWORK_SERVER::g_NetServer->EnqueuePacket(sessionID, pLoginRes);
+		NETWORK_SERVER::g_NetServer->SendPacket(sessionID, pLoginRes);
 
 
 		return RECV_RET::RECV_MOVE;

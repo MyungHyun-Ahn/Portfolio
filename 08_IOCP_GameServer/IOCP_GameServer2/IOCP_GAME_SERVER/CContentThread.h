@@ -212,7 +212,11 @@ private:
 		// 	return false;
 		// }
 
-		INT delayFrame = ((dTime * -1) / pTimerEvent->timeMs) + 1;
+		INT delayFrame;
+		if (pTimerEvent->timeMs == 0)
+			delayFrame = 0;
+		else
+			delayFrame = ((dTime * -1) / pTimerEvent->timeMs) + 1;
 
 		pTimerEvent->execute(delayFrame);
 		pTimerEvent->nextExecuteTime += pTimerEvent->timeMs * delayFrame;

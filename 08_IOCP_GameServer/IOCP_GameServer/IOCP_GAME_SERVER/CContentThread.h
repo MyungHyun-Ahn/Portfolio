@@ -102,7 +102,7 @@ private:
 		}
 	}
 
-	inline inline bool CheckTimerEventQ() noexcept
+	inline bool CheckTimerEventQ() noexcept
 	{
 		if (m_TimerEventQueue.empty())
 		{

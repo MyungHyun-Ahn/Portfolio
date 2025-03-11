@@ -196,70 +196,32 @@ namespace NETWORK_SERVER
 		int count;
 		for (count = 0; count < m_iSendCount; count++)
 		{
-			CSerializableBuffer<FALSE> *pBuffer;
+			CSerializableBuffer<FALSE> *sBuffer;
 			// 못꺼낸 것
-			if (!m_lfSendBufferQueue.Dequeue(&pBuffer))
+			if (!m_lfSendBufferQueue.Dequeue(&sBuffer))
 			{
 				g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"LFQueue::Dequeue() Error");
 				// 말도 안되는 상황
 				CCrashDump::Crash();
 			}
 
-			// 헤더를 여기서 세팅
-			if (!pBuffer->GetIsEnqueueHeader())
+			if (!sBuffer->GetIsEnqueueHeader())
 			{
-				NetHeader header;
-				header.code = SERVER_SETTING::PACKET_CODE; // 코드
-				header.len = pBuffer->GetDataSize();
-				header.randKey = 0; // rand() % 256;
-				header.checkSum = CEncryption::CalCheckSum(pBuffer->GetContentBufferPtr(), pBuffer->GetDataSize());
-				pBuffer->EnqueueHeader((char *)&header, sizeof(NetHeader));
-
+				sBuffer->m_isEnqueueHeader = true;
+				NetHeader *header = (NetHeader *)sBuffer->GetBufferPtr();
+				header->code = SERVER_SETTING::PACKET_CODE; // 코드
+				header->len = sBuffer->GetDataSize();
+				header->randKey = 0;
+				header->checkSum = CEncryption::CalCheckSum(sBuffer->GetContentBufferPtr(), sBuffer->GetDataSize());
+			
 				// CheckSum 부터 암호화하기 위해
-				CEncryption::Encoding(pBuffer->GetBufferPtr() + 4, pBuffer->GetBufferSize() - 4, header.randKey);
-
-				// NetHeader header;
-				// header.code = SERVER_SETTING::PACKET_CODE; // 코드
-				// header.len = pBuffer->GetDataSize();
-				// header.randKey = 0;
-				// header.checkSum = 0;
-				// pBuffer->EnqueueHeader((char *)&header, sizeof(NetHeader));
-
-				// char *headerPtr = pBuffer->GetBufferPtr();
-				// NetHeader *header = (NetHeader *)headerPtr;
-				// header->code = SERVER_SETTING::PACKET_CODE;
-				// USHORT len = header->len = pBuffer->GetDataSize();
-				// BYTE randKey = header->randKey = 0;
-				// header->checkSum = 0;
-				// 
-				// 
-				// char *data = headerPtr + 3; // headerPtr + offsetof(NetHeader, checkSum);
-				// 
-				// for (int i = 1; i <= len; i++)
-				// {
-				// 	data[0] += data[i];
-				// }
-				// 
-				// char p, e;
-				// p = data[0] ^ (randKey + 1);
-				// e = p ^ (SERVER_SETTING::PACKET_KEY + 1);
-				// data[0] = e;
-				// 
-				// for (int i = 1; i <= len; i++)
-				// {
-				// 	p = data[i] ^ (randKey + i + 1 + p);
-				// 	e = p ^ (SERVER_SETTING::PACKET_KEY + i + 1 + data[i - 1]);
-				// 	data[i] = e;
-				// }
-				
-				// CheckSum 부터 암호화하기 위해
-				// CEncryption::Encoding(pBuffer->GetBufferPtr() + 4, pBuffer->GetBufferSize() - 4, header.randKey);
+				CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetBufferSize() - 4, header->randKey);
 			}
 
-			wsaBuf[count].buf = pBuffer->GetBufferPtr();
-			wsaBuf[count].len = pBuffer->GetFullSize();
+			wsaBuf[count].buf = sBuffer->GetBufferPtr();
+			wsaBuf[count].len = sBuffer->GetFullSize();
 
-			m_arrPSendBufs[count] = pBuffer;
+			m_arrPSendBufs[count] = sBuffer;
 		}
 
 		ZeroMemory((m_pMyOverlappedStartAddr + 2), sizeof(OVERLAPPED));
@@ -514,7 +476,7 @@ namespace NETWORK_SERVER
 		RegisterSystemTimerEvent();
 		RegisterContentTimerEvent();
 
-		WaitForMultipleObjects(m_arrWorkerThreads.size(), m_arrWorkerThreads.data(), TRUE, INFINITE);
+		WaitForMultipleObjects((DWORD)m_arrWorkerThreads.size(), m_arrWorkerThreads.data(), TRUE, INFINITE);
 
 		return TRUE;
 	}
@@ -572,15 +534,15 @@ namespace NETWORK_SERVER
 
 		// if (!sBuffer->GetIsEnqueueHeader())
 		// {
-		// 	NetHeader header;
-		// 	header.code = SERVER_SETTING::PACKET_CODE; // 코드
-		// 	header.len = sBuffer->GetDataSize();
-		// 	header.randKey = rand() % 256;
-		// 	header.checkSum = CEncryption::CalCheckSum(sBuffer->GetContentBufferPtr(), sBuffer->GetDataSize());
-		// 	sBuffer->EnqueueHeader((char *)&header, sizeof(NetHeader));
+		// 	sBuffer->m_isEnqueueHeader = true;
+		// 	NetHeader *header = (NetHeader *)sBuffer->GetBufferPtr();
+		// 	header->code = SERVER_SETTING::PACKET_CODE; // 코드
+		// 	header->len = sBuffer->GetDataSize();
+		// 	header->randKey = 0;
+		// 	header->checkSum = CEncryption::CalCheckSum(sBuffer->GetContentBufferPtr(), sBuffer->GetDataSize());
 		// 
 		// 	// CheckSum 부터 암호화하기 위해
-		// 	CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetBufferSize() - 4, header.randKey);
+		// 	CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetBufferSize() - 4, header->randKey);
 		// }
 
 		pSession->SendPacket(sBuffer);
@@ -619,15 +581,15 @@ namespace NETWORK_SERVER
 
 		// if (!sBuffer->GetIsEnqueueHeader())
 		// {
-		// 	NetHeader header;
-		// 	header.code = SERVER_SETTING::PACKET_CODE; // 코드
-		// 	header.len = sBuffer->GetDataSize();
-		// 	header.randKey = rand() % 256;
-		// 	header.checkSum = CEncryption::CalCheckSum(sBuffer->GetContentBufferPtr(), sBuffer->GetDataSize());
-		// 	sBuffer->EnqueueHeader((char *)&header, sizeof(NetHeader));
+		// 	sBuffer->m_isEnqueueHeader = true;
+		// 	NetHeader *header = (NetHeader *)sBuffer->GetBufferPtr();
+		// 	header->code = SERVER_SETTING::PACKET_CODE; // 코드
+		// 	header->len = sBuffer->GetDataSize();
+		// 	header->randKey = 0;
+		// 	header->checkSum = CEncryption::CalCheckSum(sBuffer->GetContentBufferPtr(), sBuffer->GetDataSize());
 		// 
 		// 	// CheckSum 부터 암호화하기 위해
-		// 	CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetBufferSize() - 4, header.randKey);
+		// 	CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetBufferSize() - 4, header->randKey);
 		// }
 
 		// Broadcast 패킷만 여기서할 것

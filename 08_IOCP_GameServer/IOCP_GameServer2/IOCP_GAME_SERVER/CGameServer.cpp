@@ -51,7 +51,7 @@ void CGameServer::RegisterContentTimerEvent() noexcept
 
 	m_pEchoContent = new CEchoContent;
 	ContentFrameEvent *pEchoEvent = new ContentFrameEvent;
-	pEchoEvent->SetEvent(m_pEchoContent, 10);
+	pEchoEvent->SetEvent(m_pEchoContent, 25);
 	CContentThread::s_arrContentThreads[1]->EnqueueEventMy(pEchoEvent);
 	// CContentThread::EnqueueEvent(pEchoEvent);
 }

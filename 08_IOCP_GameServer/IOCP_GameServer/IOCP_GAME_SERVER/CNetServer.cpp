@@ -377,15 +377,15 @@ namespace NETWORK_SERVER
 			// // // 헤더를 여기서 세팅
 			if (!pBuffer->GetIsEnqueueHeader())
 			{
-				NetHeader header;
-				header.code = SERVER_SETTING::PACKET_CODE; // 코드
-				header.len = pBuffer->GetDataSize();
-				header.randKey = 0; // rand() % 256;
-				header.checkSum = CEncryption::CalCheckSum(pBuffer->GetContentBufferPtr(), pBuffer->GetDataSize());
-				pBuffer->EnqueueHeader((char *)&header, sizeof(NetHeader));
-			
+				pBuffer->m_isEnqueueHeader = true;
+				NetHeader *header = (NetHeader *)pBuffer->GetBufferPtr();
+				header->code = SERVER_SETTING::PACKET_CODE; // 코드
+				header->len = pBuffer->GetDataSize();
+				header->randKey = 0;
+				header->checkSum = CEncryption::CalCheckSum(pBuffer->GetContentBufferPtr(), pBuffer->GetDataSize());
+
 				// CheckSum 부터 암호화하기 위해
-				CEncryption::Encoding(pBuffer->GetBufferPtr() + 4, pBuffer->GetBufferSize() - 4, header.randKey);
+				CEncryption::Encoding(pBuffer->GetBufferPtr() + 4, pBuffer->GetBufferSize() - 4, header->randKey);
 			}
 		}
 

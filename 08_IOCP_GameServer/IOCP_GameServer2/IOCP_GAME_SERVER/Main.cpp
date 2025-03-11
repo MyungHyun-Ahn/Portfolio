@@ -10,6 +10,11 @@ int main()
 {
 	timeBeginPeriod(1);
 
+	g_Logger = CLogger::GetInstance();
+	g_Logger->SetMainDirectory(L"LogFile");
+	g_Logger->SetLogLevel(LOG_LEVEL::DEBUG);
+	g_ProfileMgr = CProfileManager::GetInstance();
+
 	CCrashDump crashDump;
 
 	{
@@ -30,12 +35,6 @@ int main()
 		serverConfigLoader.Load(L"Server", L"MAX_CONTENT_FPS", &SERVER_SETTING::MAX_CONTENT_FPS);
 		serverConfigLoader.Load(L"Server", L"DELAY_FRAME", &SERVER_SETTING::DELAY_FRAME);
 	}
-	
-	g_Logger = CLogger::GetInstance();
-	g_Logger->SetMainDirectory(L"LogFile");
-	g_Logger->SetLogLevel(LOG_LEVEL::DEBUG);
-
-	g_ProfileMgr = CProfileManager::GetInstance();
 
 	NETWORK_SERVER::g_NetServer = new CGameServer;
 	// 

@@ -88,8 +88,9 @@ void CBaseContent::ConsumeRecvMsg() noexcept
 	// 세션 메시지 처리
 	// 이 사이에 Session 유지 되어야 함
 
-	for (auto &[sessionId, value] : m_umapSessions)
+	for (auto &it : m_umapSessions)
 	{
+		UINT64 sessionId = it.first;
 		int sessionIdx = NETWORK_SERVER::CNetServer::GetIndex(sessionId);
 		NETWORK_SERVER::CNetSession *pSession = NETWORK_SERVER::g_NetServer->m_arrPSessions[sessionIdx];
 		

@@ -14,7 +14,7 @@ public:
 	CSerializableBuffer() noexcept
 	{
 		m_Buffer = (char *)s_sPagePool512.Alloc();
-		m_MaxSize = 512;
+		m_MaxSize = 128;
 		m_HeaderFront = 0;
 		m_Front = (int)DEFINE::HEADER_SIZE;
 		m_Rear = (int)DEFINE::HEADER_SIZE;
@@ -219,7 +219,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(char))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		chData = *(char *)(m_Buffer + m_Front);
@@ -232,7 +232,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(unsigned char))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		byData = *(unsigned char *)(m_Buffer + m_Front);
@@ -245,7 +245,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(short))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		shData = *(short *)(m_Buffer + m_Front);
@@ -258,7 +258,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(char))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		wData = *(unsigned short *)(m_Buffer + m_Front);
@@ -271,7 +271,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(int))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		iData = *(int *)(m_Buffer + m_Front);
@@ -284,7 +284,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(long))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		lData = *(long *)(m_Buffer + m_Front);
@@ -297,7 +297,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(unsigned long))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		ulData = *(unsigned long *)(m_Buffer + m_Front);
@@ -310,7 +310,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(float))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		fData = *(float *)(m_Buffer + m_Front);
@@ -323,7 +323,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(__int64))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		iData = *(__int64 *)(m_Buffer + m_Front);
@@ -336,7 +336,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(unsigned __int64))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		uiData = *(unsigned __int64 *)(m_Buffer + m_Front);
@@ -349,7 +349,7 @@ public:
 	{
 		if (GetDataSize() < sizeof(double))
 		{
-			throw;
+			__debugbreak();
 		}
 
 		dData = *(double *)(m_Buffer + m_Front);
@@ -399,11 +399,14 @@ private:
 	int m_MaxSize = (int)DEFINE::DEFAULT_SIZE;
 
 	LONG			m_iRefCount = 0;
+
+
+public:
 	BOOL			m_isEnqueueHeader = 0;
 	UINT64			m_uiSessionId = 0;
 
 	inline static CTLSMemoryPoolManager<CSerializableBuffer> s_sbufferPool = CTLSMemoryPoolManager<CSerializableBuffer>();
-	inline static CTLSPagePoolManager<512, 2, false> s_sPagePool512 = CTLSPagePoolManager<512, 2, false>();
+	inline static CTLSPagePoolManager<128, 16, false> s_sPagePool512 = CTLSPagePoolManager<128, 16, false>();
 };
 
 template<bool isLanServer>

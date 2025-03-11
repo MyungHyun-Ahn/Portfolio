@@ -8,27 +8,27 @@ public:
 		char E = 0;
 		int randKeyPlusOne = randKey + 1;
 		int packetKeyPlusOne = PACKET_KEY + 1;
-
+	
 		int i = 0;
 		for (; i <= len - 4; i += 4)
 		{
 			P = msg[i] ^ (P + randKeyPlusOne + i);
 			E = P ^ (E + packetKeyPlusOne + i);
 			msg[i] = E;
-
+	
 			P = msg[i + 1] ^ (P + randKeyPlusOne + i + 1);
 			E = P ^ (E + packetKeyPlusOne + i + 1);
 			msg[i + 1] = E;
-
+	
 			P = msg[i + 2] ^ (P + randKeyPlusOne + i + 2);
 			E = P ^ (E + packetKeyPlusOne + i + 2);
 			msg[i + 2] = E;
-
+	
 			P = msg[i + 3] ^ (P + randKeyPlusOne + i + 3);
 			E = P ^ (E + packetKeyPlusOne + i + 3);
 			msg[i + 3] = E;
 		}
-
+	
 		for (; i < len; i++)
 		{
 			P = msg[i] ^ (P + randKeyPlusOne + i);

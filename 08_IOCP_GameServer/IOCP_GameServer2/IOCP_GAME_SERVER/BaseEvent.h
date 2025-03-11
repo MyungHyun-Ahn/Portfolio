@@ -5,7 +5,8 @@
 struct BaseEvent
 {
 	bool isTimerEvent = false;
-	std::function<void(int)> execute;		// 이벤트 함수를 정의하고 여기에 함수 포인터를 저장
+	virtual void execute(int delayFrame) = 0;
+	// std::function<void(int)> execute;		// 이벤트 함수를 정의하고 여기에 함수 포인터를 저장
 };
 
 struct TimerEvent : public BaseEvent
