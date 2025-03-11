@@ -68,7 +68,10 @@ RECV_RET CAuthContent::OnRecv(const UINT64 sessionID, CSerializableBuffer<FALSE>
 		pEchoContent->MoveJobEnqueue(sessionID, pPlayer);
 
 		CSerializableBuffer<FALSE> *pLoginRes = CGenPacket::makePacketResLogin(1, accountNo);
+		pLoginRes->IncreaseRef();
 		NETWORK_SERVER::g_NetServer->SendPacket(sessionID, pLoginRes);
+		if (pLoginRes->DecreaseRef() == 0)
+			CSerializableBuffer<FALSE>::Free(pLoginRes);
 
 
 		return RECV_RET::RECV_MOVE;
@@ -133,12 +136,14 @@ RECV_RET CEchoContent::OnRecv(const UINT64 sessionID, CSerializableBuffer<FALSE>
 			return RECV_RET::RECV_FALSE;
 
 		CSerializableBuffer<FALSE> *pEchoRes = CGenPacket::makePacketResEcho(accountNo, sendTick);
-		// pEchoRes->IncreaseRef();
+		pEchoRes->IncreaseRef();
 		// EnqueuePacketEvent *pEnqueueEvent = new EnqueuePacketEvent;
 		// pEnqueueEvent->SetEvent(sessionID, pEchoRes);
 		// CContentThread::EnqueueEvent(pEnqueueEvent);
 
 		NETWORK_SERVER::g_NetServer->EnqueuePacket(sessionID, pEchoRes);
+		if (pEchoRes->DecreaseRef() == 0)
+			CSerializableBuffer<FALSE>::Free(pEchoRes);
 	}
 	return RECV_RET::RECV_TRUE;
 

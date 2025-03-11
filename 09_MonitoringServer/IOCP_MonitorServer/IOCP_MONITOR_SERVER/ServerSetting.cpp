@@ -1,0 +1,30 @@
+#include "pch.h"
+#include "ServerSetting.h"
+
+namespace NET_SETTING
+{
+	BYTE PACKET_CODE = 0x77;
+
+	std::string openIP;
+	USHORT openPort;
+
+	INT IOCP_WORKER_THREAD = 16;
+	INT IOCP_ACTIVE_THREAD = 4;
+
+	INT USE_ZERO_COPY = 0;
+
+	INT MAX_SESSION_COUNT = 20000;
+
+	INT ACCEPTEX_COUNT = 100;
+}
+
+namespace LAN_SETTING
+{
+	std::string openIP;
+	USHORT openPort;
+	INT IOCP_WORKER_THREAD;
+	INT IOCP_ACTIVE_THREAD;
+	INT USE_ZERO_COPY;
+	INT MAX_SESSION_COUNT;
+	INT ACCEPTEX_COUNT;
+}

@@ -1,59 +1,226 @@
-#include "pch.h" 
-#include "MyInclude.h"
+#include "pch.h"
 #include "ServerSetting.h"
 #include "CNetServer.h"
 #include "SystemEvent.h"
-#include "CContentThread.h"
-#include "CBaseContent.h"
 
-namespace NETWORK_SERVER
+namespace NET_SERVER
 {
 	CNetServer *g_NetServer = nullptr;
 
 	void CNetSession::RecvCompleted(int size) noexcept
 	{
-		m_RecvBuffer.MoveRear(size);
-		int currentUseSize = m_RecvBuffer.GetUseSize();
+		m_pRecvBuffer->MoveRear(size);
 
-		while (currentUseSize > 0)
+		bool delayFlag = false;
+
+		// 이전에서 딜레이 된게 있는 경우
+		if (m_pDelayedBuffer != nullptr)
 		{
-			if (currentUseSize < sizeof(NetHeader))
-				break;
-
-			NetHeader packetHeader;
-			m_RecvBuffer.Peek((char *)&packetHeader, sizeof(NetHeader));
-
-			if (packetHeader.code != SERVER_SETTING::PACKET_CODE)
+			// 딜레이 된걸 처리해야함
+			USHORT delayedHeaderSize = m_pDelayedBuffer->isReadHeaderSize();
+			// 헤더 사이즈 부족
+			if (delayedHeaderSize < (int)CSerializableBuffer<FALSE>::DEFINE::HEADER_SIZE)
 			{
+				// 헤더가 딜레이 됐나?
+				// 딜레이 됐다면 여기에 모자른 만큼써줌
+				int requireHeaderSize = (int)CSerializableBuffer<FALSE>::DEFINE::HEADER_SIZE - delayedHeaderSize;
+				// 헤더가 2번씩 밀릴일은 없을 것임
+				// 짤린 헤더를 써주고
+				m_pDelayedBuffer->WriteDelayedHeader(m_pRecvBuffer->GetFrontPtr(), requireHeaderSize);
+				m_pRecvBuffer->MoveFront(requireHeaderSize);
+				// 네트워크 헤더 파악
+				// - 지금은 USHORT 나중에 헤더로 정의하면 여기를 변경
+				NetHeader header;
+				m_pDelayedBuffer->GetDelayedHeader((char *)&header, sizeof(NetHeader));
+
+				// 여기서 버퍼를 할당
+				// - 헤더 사이즈 포함
+				m_pDelayedBuffer->InitAndAlloc(header.len + sizeof(NetHeader));
+				m_pDelayedBuffer->Copy((char *)&header, 0, sizeof(NetHeader));
+			}
+
+			// header는 다 읽힌 것
+			NetHeader header;
+			m_pDelayedBuffer->GetHeader((char *)&header, sizeof(NetHeader));
+			// code 다른게 오면 끊음
+			if (header.code != NET_SETTING::PACKET_CODE)
+			{
+				CSerializableBufferView<FALSE>::Free(m_pDelayedBuffer);
+				m_pDelayedBuffer = nullptr;
+
+				if (m_pRecvBuffer->DecreaseRef() == 0)
+					CRecvBuffer::Free(m_pRecvBuffer);
+
+				m_pRecvBuffer = nullptr;
+
 				g_NetServer->Disconnect(m_uiSessionID);
 				return;
 			}
 
-			if (packetHeader.len >= 65535 || packetHeader.len >= m_RecvBuffer.GetCapacity())
+			if (header.len >= 65535 || header.len >= m_pRecvBuffer->GetCapacity())
 			{
+				CSerializableBufferView<FALSE>::Free(m_pDelayedBuffer);
+				m_pDelayedBuffer = nullptr;
+
+				if (m_pRecvBuffer->DecreaseRef() == 0)
+					CRecvBuffer::Free(m_pRecvBuffer);
+
+				m_pRecvBuffer = nullptr;
+
 				g_NetServer->Disconnect(m_uiSessionID);
 				return;
 			}
 
-			if (m_RecvBuffer.GetUseSize() < sizeof(NetHeader) + packetHeader.len)
-				break;
+			int requireSize = header.len - m_pDelayedBuffer->GetDataSize();
+			// 데이터 모자름
+			int recvBufferUseSize = m_pRecvBuffer->GetUseSize();
+			if (recvBufferUseSize < requireSize)
+			{
+				delayFlag = true;
+				m_pDelayedBuffer->Copy(m_pRecvBuffer->GetPQueuePtr(), recvBufferUseSize);
+				m_pRecvBuffer->MoveFront(recvBufferUseSize);
+			}
+			else
+			{
+				// 필요한만큼 쓸 수 있으면
+				m_pDelayedBuffer->Copy(m_pRecvBuffer->GetFrontPtr(), requireSize);
+				m_pRecvBuffer->MoveFront(requireSize);
 
-			CSerializableBuffer<FALSE> *view = CSerializableBuffer<FALSE>::Alloc();
-			m_RecvBuffer.MoveFront(sizeof(NetHeader));
-			view->EnqueueHeader((char *)&packetHeader, sizeof(NetHeader));
 
-			m_RecvBuffer.Dequeue(view->GetContentBufferPtr(), packetHeader.len);
-			view->MoveWritePos(packetHeader.len);
+				// OnRecv 호출 전 패킷 검증
+				CEncryption::Decoding(m_pDelayedBuffer->GetBufferPtr() + 4, m_pDelayedBuffer->GetFullSize() - 4, header.randKey);
+				BYTE dataCheckSum = CEncryption::CalCheckSum(m_pDelayedBuffer->GetContentBufferPtr(), m_pDelayedBuffer->GetDataSize());
+				m_pDelayedBuffer->GetHeader((char *)&header, (int)CSerializableBuffer<FALSE>::DEFINE::HEADER_SIZE);
+				if (dataCheckSum != header.checkSum) // code 다른 것도 걸러낼 것임
+				{
+					CSerializableBufferView<FALSE>::Free(m_pDelayedBuffer);
+					m_pDelayedBuffer = nullptr;
 
-			CEncryption::Decoding(view->GetBufferPtr() + 4, view->GetFullSize() - 4, packetHeader.randKey);
+					if (m_pRecvBuffer->DecreaseRef() == 0)
+						CRecvBuffer::Free(m_pRecvBuffer);
 
-			view->IncreaseRef();
-			InterlockedIncrement(&g_monitor.m_lRecvTPS);
-			m_RecvMsgQueue.Enqueue(view);
+					m_pRecvBuffer = nullptr;
 
-			currentUseSize = m_RecvBuffer.GetUseSize();
+					g_NetServer->Disconnect(m_uiSessionID);
+					return;
+				}
+
+				InterlockedIncrement(&g_monitor.m_lRecvTPS);
+				m_pDelayedBuffer->m_uiSessionId = m_uiSessionID;
+				g_NetServer->OnRecv(m_uiSessionID, m_pDelayedBuffer);
+				m_pDelayedBuffer = nullptr;
+			}
 		}
 
+		DWORD currentUseSize = m_pRecvBuffer->GetUseSize();
+		while (currentUseSize > 0)
+		{
+			NetHeader packetHeader;
+			CSerializableBufferView<FALSE> *view = CSerializableBufferView<FALSE>::Alloc();
+
+			if (currentUseSize < (int)CSerializableBuffer<FALSE>::DEFINE::HEADER_SIZE)
+			{
+				// Peek 실패 delayedBuffer로
+				delayFlag = true;
+
+				int remainSize = m_pRecvBuffer->GetUseSize();
+				// 남은 사이즈 만큼 씀
+				view->WriteDelayedHeader(m_pRecvBuffer->GetFrontPtr(), remainSize);
+				m_pRecvBuffer->MoveFront(remainSize);
+				m_pDelayedBuffer = view;
+
+				// g_Logger->WriteLog(L"RecvBuffer", LOG_LEVEL::DEBUG, L"HeaderDelay");
+				break;
+			}
+
+			int useSize = m_pRecvBuffer->GetUseSize();
+			m_pRecvBuffer->Peek((char *)&packetHeader, (int)CSerializableBuffer<FALSE>::DEFINE::HEADER_SIZE);
+			// code 다른게 오면 끊음
+			if (packetHeader.code != NET_SETTING::PACKET_CODE)
+			{
+				CSerializableBufferView<FALSE>::Free(view);
+
+				if (m_pRecvBuffer->DecreaseRef() == 0)
+					CRecvBuffer::Free(m_pRecvBuffer);
+
+				m_pRecvBuffer = nullptr;
+
+				g_NetServer->Disconnect(m_uiSessionID);
+				return;
+			}
+
+			if (packetHeader.len >= 65535 || packetHeader.len >= m_pRecvBuffer->GetCapacity())
+			{
+				CSerializableBufferView<FALSE>::Free(view);
+
+				if (m_pRecvBuffer->DecreaseRef() == 0)
+					CRecvBuffer::Free(m_pRecvBuffer);
+
+				m_pRecvBuffer = nullptr;
+
+				g_NetServer->Disconnect(m_uiSessionID);
+				return;
+			}
+
+			if (useSize < (int)CSerializableBuffer<FALSE>::DEFINE::HEADER_SIZE + packetHeader.len)
+			{
+				// 직접 할당해서 뒤로 밀기 Delayed
+				delayFlag = true;
+				// 헤더는 읽은 것임
+				// front 부터 끝까지 복사
+				view->InitAndAlloc(packetHeader.len + sizeof(NetHeader));
+				view->Copy(m_pRecvBuffer->GetFrontPtr(), 0, useSize);
+				m_pRecvBuffer->MoveFront(useSize);
+				m_pDelayedBuffer = view;
+
+				// g_Logger->WriteLog(L"RecvBuffer", LOG_LEVEL::DEBUG, L"PacketDelay");
+				break;
+			}
+
+			// 실질적으로 Recv 버퍼 입장에서는 읽은 것
+			// - 하나의 메시지가 완전히 완성된 상태
+			int offsetStart = m_pRecvBuffer->GetFrontOffset();
+			int offsetEnd = offsetStart + packetHeader.len + (int)CSerializableBuffer<FALSE>::DEFINE::HEADER_SIZE;
+
+			// 이 view를 그냥 써도 됨
+			// Init 에서 RecvBuffer의 Ref가 증가
+			view->Init(m_pRecvBuffer, offsetStart, offsetEnd);
+			m_pRecvBuffer->MoveFront((int)CSerializableBuffer<FALSE>::DEFINE::HEADER_SIZE + packetHeader.len);
+
+			// OnRecv 호출 전 패킷 검증
+			CEncryption::Decoding(view->GetBufferPtr() + 4, view->GetFullSize() - 4, packetHeader.randKey);
+			BYTE dataCheckSum = CEncryption::CalCheckSum(view->GetContentBufferPtr(), view->GetDataSize());
+			view->GetHeader((char *)&packetHeader, (int)CSerializableBuffer<FALSE>::DEFINE::HEADER_SIZE);
+			if (dataCheckSum != packetHeader.checkSum) // code 다른 것도 걸러낼 것임
+			{
+				CSerializableBufferView<FALSE>::Free(view);
+
+				if (m_pRecvBuffer->DecreaseRef() == 0)
+					CRecvBuffer::Free(m_pRecvBuffer);
+
+				m_pRecvBuffer = nullptr;
+
+				g_NetServer->Disconnect(m_uiSessionID);
+				return;
+			}
+
+			InterlockedIncrement(&g_monitor.m_lRecvTPS);
+			view->m_uiSessionId = m_uiSessionID;
+			g_NetServer->OnRecv(m_uiSessionID, view);
+
+			currentUseSize = m_pRecvBuffer->GetUseSize();
+		}
+
+		if (!delayFlag)
+		{
+			m_pDelayedBuffer = nullptr;
+		}
+
+		// Ref 감소
+		if (m_pRecvBuffer->DecreaseRef() == 0)
+			CRecvBuffer::Free(m_pRecvBuffer);
+
+		m_pRecvBuffer = nullptr;
 	}
 
 	// 인큐할 때 직렬화 버퍼의 포인터를 인큐
@@ -106,18 +273,18 @@ namespace NETWORK_SERVER
 			return FALSE;
 		}
 
-		WSABUF wsaBuf[2];
-		wsaBuf[0].buf = m_RecvBuffer.GetRearPtr();
-		wsaBuf[0].len = m_RecvBuffer.DirectEnqueueSize();
-		wsaBuf[1].buf = m_RecvBuffer.GetPQueuePtr();
-		wsaBuf[1].len = m_RecvBuffer.GetFreeSize() - wsaBuf[0].len;
+		m_pRecvBuffer = CRecvBuffer::Alloc();
+		m_pRecvBuffer->IncreaseRef();
+		WSABUF wsaBuf;
+		wsaBuf.buf = m_pRecvBuffer->GetPQueuePtr();
+		wsaBuf.len = m_pRecvBuffer->GetCapacity();
 
 		ZeroMemory((m_pMyOverlappedStartAddr + 1), sizeof(OVERLAPPED));
 
 		DWORD flag = 0;
 		{
 			// PROFILE_BEGIN(0, "WSARecv");
-			retVal = WSARecv(m_sSessionSocket, wsaBuf, 2, nullptr, &flag, (LPWSAOVERLAPPED)(m_pMyOverlappedStartAddr + 1), NULL);
+			retVal = WSARecv(m_sSessionSocket, &wsaBuf, 1, nullptr, &flag, (LPWSAOVERLAPPED)(m_pMyOverlappedStartAddr + 1), NULL);
 		}
 		if (retVal == SOCKET_ERROR)
 		{
@@ -196,32 +363,19 @@ namespace NETWORK_SERVER
 		int count;
 		for (count = 0; count < m_iSendCount; count++)
 		{
-			CSerializableBuffer<FALSE> *sBuffer;
+			CSerializableBuffer<FALSE> *pBuffer;
 			// 못꺼낸 것
-			if (!m_lfSendBufferQueue.Dequeue(&sBuffer))
+			if (!m_lfSendBufferQueue.Dequeue(&pBuffer))
 			{
 				g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"LFQueue::Dequeue() Error");
 				// 말도 안되는 상황
 				CCrashDump::Crash();
 			}
 
-			if (!sBuffer->GetIsEnqueueHeader())
-			{
-				sBuffer->m_isEnqueueHeader = true;
-				NetHeader *header = (NetHeader *)sBuffer->GetBufferPtr();
-				header->code = SERVER_SETTING::PACKET_CODE; // 코드
-				header->len = sBuffer->GetDataSize();
-				header->randKey = 0;
-				header->checkSum = CEncryption::CalCheckSum(sBuffer->GetContentBufferPtr(), sBuffer->GetDataSize());
-			
-				// CheckSum 부터 암호화하기 위해
-				CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetBufferSize() - 4, header->randKey);
-			}
+			wsaBuf[count].buf = pBuffer->GetBufferPtr();
+			wsaBuf[count].len = pBuffer->GetFullSize();
 
-			wsaBuf[count].buf = sBuffer->GetBufferPtr();
-			wsaBuf[count].len = sBuffer->GetFullSize();
-
-			m_arrPSendBufs[count] = sBuffer;
+			m_arrPSendBufs[count] = pBuffer;
 		}
 
 		ZeroMemory((m_pMyOverlappedStartAddr + 2), sizeof(OVERLAPPED));
@@ -264,11 +418,11 @@ namespace NETWORK_SERVER
 		// * 남아있는 경우가 확인됨
 		// * 남은 직렬화 버퍼를 할당 해제하고 세션 삭제
 
-		// if (m_pDelayedBuffer != nullptr)
-		// {
-		// 	CSerializableBufferView<FALSE>::Free(m_pDelayedBuffer);
-		// 	m_pDelayedBuffer = nullptr;
-		// }
+		if (m_pDelayedBuffer != nullptr)
+		{
+			CSerializableBufferView<FALSE>::Free(m_pDelayedBuffer);
+			m_pDelayedBuffer = nullptr;
+		}
 
 		for (int count = 0; count < m_iSendCount; count++)
 		{
@@ -305,35 +459,25 @@ namespace NETWORK_SERVER
 			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"LFQueue is not empty Error");
 		}
 
-		useBufferSize = m_RecvMsgQueue.GetUseSize();
-		for (int i = 0; i < useBufferSize; i++)
+		if (m_pRecvBuffer != nullptr)
 		{
-			CSerializableBuffer<FALSE> *pBuffer;
-			if (!m_RecvMsgQueue.Dequeue(&pBuffer))
-			{
-				CCrashDump::Crash();
-			}
-
-			if (pBuffer->DecreaseRef() == 0)
-				CSerializableBuffer<FALSE>::Free(pBuffer);
+			if (m_pRecvBuffer->DecreaseRef() == 0)
+				CRecvBuffer::Free(m_pRecvBuffer);
 		}
-
-		// if (m_pRecvBuffer != nullptr)
-		// {
-		// 	if (m_pRecvBuffer->DecreaseRef() == 0)
-		// 		CRecvBuffer::Free(m_pRecvBuffer);
-		// }
 
 		m_sSessionSocket = INVALID_SOCKET;
 		m_uiSessionID = 0;
-		// m_pRecvBuffer = nullptr;
-		m_pCurrentContent = nullptr;
-		m_RecvBuffer.Clear();
+		m_pRecvBuffer = nullptr;
 	}
 
 	unsigned int NetWorkerThreadFunc(LPVOID lpParam) noexcept
 	{
 		return g_NetServer->WorkerThread();
+	}
+
+	unsigned int NetTimerEventSchedulerThreadFunc(LPVOID lpParam) noexcept
+	{
+		return g_NetServer->TimerEventSchedulerThread();
 	}
 
 	BOOL CNetServer::Start(const CHAR *openIP, const USHORT port) noexcept
@@ -342,17 +486,17 @@ namespace NETWORK_SERVER
 		int errVal;
 		WSAData wsaData;
 
-		m_usMaxSessionCount = SERVER_SETTING::MAX_SESSION_COUNT;
+		m_usMaxSessionCount = NET_SETTING::MAX_SESSION_COUNT;
 
-		m_arrPSessions = new CNetSession * [SERVER_SETTING::MAX_SESSION_COUNT];
+		m_arrPSessions = new CNetSession * [NET_SETTING::MAX_SESSION_COUNT];
 
-		ZeroMemory((char *)m_arrPSessions, sizeof(CNetSession *) * SERVER_SETTING::MAX_SESSION_COUNT);
+		ZeroMemory((char *)m_arrPSessions, sizeof(CNetSession *) * NET_SETTING::MAX_SESSION_COUNT);
 
-		m_arrAcceptExSessions = new CNetSession * [SERVER_SETTING::ACCEPTEX_COUNT];
+		m_arrAcceptExSessions = new CNetSession * [NET_SETTING::ACCEPTEX_COUNT];
 
 		// 디스커넥트 스택 채우기
-		USHORT val = SERVER_SETTING::MAX_SESSION_COUNT - 1;
-		for (int i = 0; i < SERVER_SETTING::MAX_SESSION_COUNT; i++)
+		USHORT val = NET_SETTING::MAX_SESSION_COUNT - 1;
+		for (int i = 0; i < NET_SETTING::MAX_SESSION_COUNT; i++)
 		{
 			m_stackDisconnectIndex.Push(val--);
 		}
@@ -388,7 +532,7 @@ namespace NETWORK_SERVER
 		}
 
 		// 송신 버퍼를 0으로 만들어서 실직적인 I/O를 우리의 버퍼를 이용하도록 만듬
-		if (SERVER_SETTING::USE_ZERO_COPY)
+		if (NET_SETTING::USE_ZERO_COPY)
 		{
 			DWORD sendBufferSize = 0;
 			retVal = setsockopt(m_sListenSocket, SOL_SOCKET, SO_SNDBUF, (char *)&sendBufferSize, sizeof(DWORD));
@@ -420,7 +564,7 @@ namespace NETWORK_SERVER
 		}
 
 		// CP 핸들 생성
-		m_hIOCPHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, SERVER_SETTING::IOCP_ACTIVE_THREAD);
+		m_hIOCPHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, NET_SETTING::IOCP_ACTIVE_THREAD);
 		if (m_hIOCPHandle == NULL)
 		{
 			errVal = WSAGetLastError();
@@ -450,17 +594,19 @@ namespace NETWORK_SERVER
 		// AcceptEx 요청
 		FristPostAcceptEx();
 
-		// CreateContentThread
-		for (int i = 0; i < SERVER_SETTING::CONTENT_THREAD_COUNT; i++)
+		// CreateTimerSchedulerThread
+		m_hTimerEventSchedulerThread = (HANDLE)_beginthreadex(nullptr, 0, NetTimerEventSchedulerThreadFunc, nullptr, 0, nullptr);
+		if (m_hTimerEventSchedulerThread == 0)
 		{
-			CContentThread *pContentThread = new CContentThread;
-			pContentThread->Start();
+			errVal = GetLastError();
+			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"TimerEventSchedulerThread running fail.. : %d", errVal);
+			return FALSE;
 		}
 
-		CContentThread::RunAll();
+		g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"[SYSTEM] TimerEventSchedulerThread running..");
 
 		// CreateWorkerThread
-		for (int i = 1; i <= SERVER_SETTING::IOCP_WORKER_THREAD; i++)
+		for (int i = 1; i <= NET_SETTING::IOCP_WORKER_THREAD; i++)
 		{
 			HANDLE hWorkerThread = (HANDLE)_beginthreadex(nullptr, 0, NetWorkerThreadFunc, nullptr, 0, nullptr);
 			if (hWorkerThread == 0)
@@ -477,8 +623,6 @@ namespace NETWORK_SERVER
 		RegisterSystemTimerEvent();
 		RegisterContentTimerEvent();
 
-		WaitForMultipleObjects((DWORD)m_arrWorkerThreads.size(), m_arrWorkerThreads.data(), TRUE, INFINITE);
-
 		return TRUE;
 	}
 
@@ -488,7 +632,7 @@ namespace NETWORK_SERVER
 		InterlockedExchange(&m_isStop, TRUE);
 		closesocket(m_sListenSocket);
 
-		for (int i = 0; i < SERVER_SETTING::MAX_SESSION_COUNT; i++)
+		for (int i = 0; i < NET_SETTING::MAX_SESSION_COUNT; i++)
 		{
 			if (m_arrPSessions[i] != NULL)
 			{
@@ -507,6 +651,14 @@ namespace NETWORK_SERVER
 				break;
 			}
 		}
+
+		m_bIsTimerEventSchedulerRun = FALSE;
+	}
+
+	void CNetServer::WaitNetServerStop()
+	{
+		WaitForMultipleObjects(m_arrWorkerThreads.size(), m_arrWorkerThreads.data(), TRUE, INFINITE);
+		WaitForSingleObject(m_hTimerEventSchedulerThread, INFINITE);
 	}
 
 	void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept
@@ -533,18 +685,18 @@ namespace NETWORK_SERVER
 			return;
 		}
 
-		// if (!sBuffer->GetIsEnqueueHeader())
-		// {
-		// 	sBuffer->m_isEnqueueHeader = true;
-		// 	NetHeader *header = (NetHeader *)sBuffer->GetBufferPtr();
-		// 	header->code = SERVER_SETTING::PACKET_CODE; // 코드
-		// 	header->len = sBuffer->GetDataSize();
-		// 	header->randKey = 0;
-		// 	header->checkSum = CEncryption::CalCheckSum(sBuffer->GetContentBufferPtr(), sBuffer->GetDataSize());
-		// 
-		// 	// CheckSum 부터 암호화하기 위해
-		// 	CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetBufferSize() - 4, header->randKey);
-		// }
+		if (!sBuffer->GetIsEnqueueHeader())
+		{
+			NetHeader header;
+			header.code = NET_SETTING::PACKET_CODE;
+			header.len = sBuffer->GetDataSize();
+			header.randKey = rand() % 256;
+			header.checkSum = CEncryption::CalCheckSum(sBuffer->GetContentBufferPtr(), sBuffer->GetDataSize());
+			sBuffer->EnqueueHeader((char *)&header, sizeof(NetHeader));
+
+			// CheckSum 부터 암호화하기 위해
+			CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetBufferSize() - 4, header.randKey);
+		}
 
 		pSession->SendPacket(sBuffer);
 		pSession->PostSend();
@@ -580,20 +732,18 @@ namespace NETWORK_SERVER
 			return;
 		}
 
-		// if (!sBuffer->GetIsEnqueueHeader())
-		// {
-		// 	sBuffer->m_isEnqueueHeader = true;
-		// 	NetHeader *header = (NetHeader *)sBuffer->GetBufferPtr();
-		// 	header->code = SERVER_SETTING::PACKET_CODE; // 코드
-		// 	header->len = sBuffer->GetDataSize();
-		// 	header->randKey = 0;
-		// 	header->checkSum = CEncryption::CalCheckSum(sBuffer->GetContentBufferPtr(), sBuffer->GetDataSize());
-		// 
-		// 	// CheckSum 부터 암호화하기 위해
-		// 	CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetBufferSize() - 4, header->randKey);
-		// }
+		if (!sBuffer->GetIsEnqueueHeader())
+		{
+			NetHeader header;
+			header.code = NET_SETTING::PACKET_CODE; // 코드
+			header.len = sBuffer->GetDataSize();
+			header.randKey = rand() % 256;
+			header.checkSum = CEncryption::CalCheckSum(sBuffer->GetContentBufferPtr(), sBuffer->GetDataSize());
+			sBuffer->EnqueueHeader((char *)&header, sizeof(NetHeader));
 
-		// Broadcast 패킷만 여기서할 것
+			// CheckSum 부터 암호화하기 위해
+			CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetBufferSize() - 4, header.randKey);
+		}
 
 		pSession->SendPacket(sBuffer);
 
@@ -615,28 +765,6 @@ namespace NETWORK_SERVER
 		{
 			ReleaseSession(pSession, TRUE);
 		}
-	}
-
-	void CNetServer::SendPQCS(const CNetSession *pSession)
-	{
-		PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)pSession, (LPOVERLAPPED)IOOperation::SENDPOST);
-	}
-
-	void CNetServer::SendAll()
-	{
-		for (int i = 0; i < SERVER_SETTING::MAX_SESSION_COUNT; i++)
-		{
-			if (m_arrPSessions[i] != nullptr)
-				m_arrPSessions[i]->PostSend();
-		}
-
-		InterlockedExchange(&m_SendAllFlag, FALSE);
-	}
-
-	void CNetServer::SendAllPQCS()
-	{
-		if (InterlockedExchange(&m_SendAllFlag, TRUE) == FALSE)
-			PostQueuedCompletionStatus(m_hIOCPHandle, 0, 0, (LPOVERLAPPED)IOOperation::SEND_ALL);
 	}
 
 	BOOL CNetServer::Disconnect(const UINT64 sessionID, BOOL isPQCS) noexcept
@@ -674,8 +802,6 @@ namespace NETWORK_SERVER
 			return FALSE;
 		}
 
-		__debugbreak();
-
 		// Io 실패 유도
 		CancelIoEx((HANDLE)pSession->m_sSessionSocket, nullptr);
 
@@ -706,14 +832,11 @@ namespace NETWORK_SERVER
 		USHORT index = GetIndex(pSession->m_uiSessionID);
 		closesocket(pSession->m_sSessionSocket);
 		UINT64 freeSessionId = pSession->m_uiSessionID;
-		
-
-		OnClientLeave(freeSessionId);
-		if (pSession->m_pCurrentContent != nullptr)
-			pSession->m_pCurrentContent->LeaveJobEnqueue(freeSessionId);
-
 		CNetSession::Free(pSession);
 		InterlockedDecrement(&m_iSessionCount);
+
+		OnClientLeave(freeSessionId);
+
 		m_stackDisconnectIndex.Push(index);
 
 		return TRUE;
@@ -724,14 +847,11 @@ namespace NETWORK_SERVER
 		USHORT index = GetIndex(pSession->m_uiSessionID);
 		closesocket(pSession->m_sSessionSocket);
 		UINT64 freeSessionId = pSession->m_uiSessionID;
+		CNetSession::Free(pSession);
+		InterlockedDecrement(&m_iSessionCount);
 
 		OnClientLeave(freeSessionId);
 
-		if (pSession->m_pCurrentContent != nullptr)
-			pSession->m_pCurrentContent->LeaveJobEnqueue(freeSessionId);
-
-		CNetSession::Free(pSession);
-		InterlockedDecrement(&m_iSessionCount);
 		m_stackDisconnectIndex.Push(index);
 
 		return TRUE;
@@ -740,7 +860,7 @@ namespace NETWORK_SERVER
 	void CNetServer::FristPostAcceptEx() noexcept
 	{
 		// 처음에 AcceptEx를 걸어두고 시작
-		for (int i = 0; i < SERVER_SETTING::ACCEPTEX_COUNT; i++)
+		for (int i = 0; i < NET_SETTING::ACCEPTEX_COUNT; i++)
 		{
 			PostAcceptEx(i);
 		}
@@ -826,9 +946,6 @@ namespace NETWORK_SERVER
 		}
 
 		UINT64 combineId = CNetServer::CombineIndex(index, InterlockedIncrement64(&m_iCurrentID));
-
-		if (combineId == 0)
-			__debugbreak();
 
 		pSession->Init(combineId);
 
@@ -944,7 +1061,7 @@ namespace NETWORK_SERVER
 				case IOOperation::SEND:
 				{
 					pSession->SendCompleted(dwTransferred);
-					// pSession->PostSend();
+					pSession->PostSend();
 				}
 				break;
 				case IOOperation::SENDPOST:
@@ -953,14 +1070,28 @@ namespace NETWORK_SERVER
 					continue;
 				}
 				break;
-				case IOOperation::SEND_ALL:
-				{
-					SendAll();
-					continue;
-				}
 				case IOOperation::RELEASE_SESSION:
 				{
 					ReleaseSessionPQCS(pSession);
+					continue;
+				}
+				break;
+				case IOOperation::TIMER_EVENT:
+				{
+					TimerEvent *timerEvent = (TimerEvent *)pSession;
+					timerEvent->nextExecuteTime += timerEvent->timeMs;
+					timerEvent->execute();
+
+					// Event Apc Enqueue - PQ 동기화 피하기 위함
+					RegisterTimerEvent(timerEvent);
+					continue;
+				}
+				break;
+				case IOOperation::CONTENT_EVENT: // 일회성 이벤트
+				{
+					BaseEvent *contentEvent = (BaseEvent *)pSession;
+					contentEvent->execute();
+					delete contentEvent;
 					continue;
 				}
 				break;
@@ -976,15 +1107,69 @@ namespace NETWORK_SERVER
 		return 0;
 	}
 
+	// SendFrameThread로 활용
+	int CNetServer::TimerEventSchedulerThread() noexcept
+	{
+		// IOCP의 병행성 관리를 받기 위한 GQCS
+		DWORD dwTransferred = 0;
+		CNetSession *pSession = nullptr;
+		OVERLAPPED *lpOverlapped = nullptr;
+
+		GetQueuedCompletionStatus(m_hIOCPHandle, &dwTransferred
+			, (PULONG_PTR)&pSession, (LPOVERLAPPED *)&lpOverlapped
+			, 0);
+
+
+		while (m_bIsTimerEventSchedulerRun)
+		{
+			if (m_TimerEventQueue.empty())
+				SleepEx(INFINITE, TRUE); // APC 작업이 Enqueue 되면 깨어날 것
+
+			// EventQueue에 무언가 있을 것
+			TimerEvent *timerEvent = m_TimerEventQueue.top();
+			// 수행 가능 여부 판단
+			LONG dTime = timerEvent->nextExecuteTime - timeGetTime();
+			if (dTime <= 0) // 0보다 작으면 수행 가능
+			{
+				m_TimerEventQueue.pop();
+				PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)timerEvent, (LPOVERLAPPED)IOOperation::TIMER_EVENT);
+				continue;
+			}
+
+			// 남은 시간만큼 블록
+			SleepEx(dTime, TRUE);
+		}
+
+		return 0;
+	}
+
 	void CNetServer::RegisterSystemTimerEvent()
 	{
-		MonitorTimerEvent *pMonitorEvent = new MonitorTimerEvent;
-		pMonitorEvent->SetEvent();
-		// CContentThread::EnqueueEvent(pMonitorEvent);
-		CContentThread::s_arrContentThreads[2]->EnqueueEventMy(pMonitorEvent);
+		MonitorTimerEvent *monitorEvent = new MonitorTimerEvent;
+		monitorEvent->SetEvent();
+		RegisterTimerEvent((BaseEvent *)monitorEvent);
 
-		// SendAllTimerEvent *pSendAllEvent = new SendAllTimerEvent;
-		// pSendAllEvent->SetEvent();
-		// CContentThread::s_arrContentThreads[3]->EnqueueEventMy(pSendAllEvent);
+		KeyBoardTimerEvent *keyBoardEvent = new KeyBoardTimerEvent;
+		keyBoardEvent->SetEvent();
+		RegisterTimerEvent((BaseEvent *)keyBoardEvent);
 	}
-}
+
+	void CNetServer::RegisterTimerEvent(BaseEvent *timerEvent) noexcept
+	{
+		int retVal;
+		int errVal;
+
+		retVal = QueueUserAPC(RegisterTimerEventAPCFunc, m_hTimerEventSchedulerThread, (ULONG_PTR)timerEvent);
+		if (retVal == FALSE)
+		{
+			errVal = GetLastError();
+			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"QueueUserAPC() 실패 : %d", errVal);
+		}
+	}
+
+	// EventSchedulerThread에서 수행됨
+	void CNetServer::RegisterTimerEventAPCFunc(ULONG_PTR lpParam) noexcept
+	{
+		g_NetServer->m_TimerEventQueue.push((TimerEvent *)lpParam);
+	}
+};
