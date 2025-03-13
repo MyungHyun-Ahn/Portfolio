@@ -1,10 +1,11 @@
 #include "pch.h"
-#include "CLanServer.h"
 #include "CommonProtocol.h"
+#include "CLanServer.h"
 #include "CLanMonitoringServer.h"
 #include "CNetServer.h"
 #include "CNetMonitoringServer.h"
 #include "MonitoringServerSetting.h"
+#include "ContentEvent.h"
 
 CLanMonitoringServer::CLanMonitoringServer()
 {
@@ -43,7 +44,7 @@ void CLanMonitoringServer::OnRecv(const UINT64 sessionID, CSerializableBufferVie
 		int serverNo;
 		*message >> serverNo;
 
-		if (serverNo != MONITOR_SETTING::CHAT_SERVER_NO || serverNo != MONITOR_SETTING::GAME_SERVER_NO || serverNo != MONITOR_SETTING::LOGIN_SERVER_NO)
+		if (serverNo != MONITOR_SETTING::CHAT_SERVER_NO && serverNo != MONITOR_SETTING::GAME_SERVER_NO && serverNo != MONITOR_SETTING::LOGIN_SERVER_NO)
 		{
 			isSuccessRecv = FALSE;
 			break;
@@ -85,6 +86,10 @@ void CLanMonitoringServer::OnRecv(const UINT64 sessionID, CSerializableBufferVie
 		INT timeStamp;
 		*message >> dataType >> dataValue >> timeStamp;
 
+		m_arrMonitorInfo[dataType].serverNo = serverNo;
+		m_arrMonitorInfo[dataType].dataValue = dataValue;
+		m_arrMonitorInfo[dataType].timeStamp = timeStamp;	
+
 		((CNetMonitoringServer *)NET_SERVER::g_NetServer)->SendMonitoringData(serverNo, dataType, dataValue, timeStamp);
 	}
 	break;
@@ -107,4 +112,7 @@ void CLanMonitoringServer::OnError(int errorcode, WCHAR *errMsg) noexcept
 
 void CLanMonitoringServer::RegisterContentTimerEvent() noexcept
 {
+	DBTimerEvent *pDBEvent = new DBTimerEvent;
+	pDBEvent->SetEvent();
+	RegisterTimerEvent(pDBEvent);
 }

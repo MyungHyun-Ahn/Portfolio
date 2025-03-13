@@ -1,11 +1,69 @@
 #include "pch.h"
-#include "ServerSetting.h"
-#include "CLanServer.h"
-#include "SystemEvent.h"
+#include "DefineServer.h"
+#include "ClientSetting.h"
+#include "CLanClient.h"
 
-namespace LAN_SERVER
+namespace LAN_CLIENT
 {
-	CLanServer *g_LanServer = nullptr;
+	CLanClientManager *g_netClientMgr;
+
+	void CLanSession::Clear() noexcept
+	{
+		// ReleaseSession 당시에 남아있는 send 링버퍼를 확인
+		// * 남아있는 경우가 확인됨
+		// * 남은 직렬화 버퍼를 할당 해제하고 세션 삭제
+
+		if (m_pDelayedBuffer != nullptr)
+		{
+			CSerializableBufferView<TRUE>::Free(m_pDelayedBuffer);
+			m_pDelayedBuffer = nullptr;
+		}
+
+		for (int count = 0; count < m_iSendCount; count++)
+		{
+			if (m_arrPSendBufs[count]->DecreaseRef() == 0)
+			{
+				CSerializableBuffer<TRUE>::Free(m_arrPSendBufs[count]);
+			}
+		}
+
+		m_iSendCount = 0;
+
+		LONG useBufferSize = m_lfSendBufferQueue.GetUseSize();
+		for (int i = 0; i < useBufferSize; i++)
+		{
+			CSerializableBuffer<TRUE> *pBuffer;
+			// 못꺼낸 것
+			if (!m_lfSendBufferQueue.Dequeue(&pBuffer))
+			{
+				g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"LFQueue::Dequeue() Error");
+				// 말도 안되는 상황
+				CCrashDump::Crash();
+			}
+
+			// RefCount를 낮추고 0이라면 보낸 거 삭제
+			if (pBuffer->DecreaseRef() == 0)
+			{
+				CSerializableBuffer<TRUE>::Free(pBuffer);
+			}
+		}
+
+		useBufferSize = m_lfSendBufferQueue.GetUseSize();
+		if (useBufferSize != 0)
+		{
+			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"LFQueue is not empty Error");
+		}
+
+		if (m_pRecvBuffer != nullptr)
+		{
+			if (m_pRecvBuffer->DecreaseRef() == 0)
+				CRecvBuffer::Free(m_pRecvBuffer);
+		}
+
+		m_sSessionSocket = INVALID_SOCKET;
+		m_uiSessionID = 0;
+		m_pRecvBuffer = nullptr;
+	}
 
 	void CLanSession::RecvCompleted(int size) noexcept
 	{
@@ -30,18 +88,18 @@ namespace LAN_SERVER
 				m_pRecvBuffer->MoveFront(requireHeaderSize);
 				// 네트워크 헤더 파악
 				// - 지금은 USHORT 나중에 헤더로 정의하면 여기를 변경
-				LAN_SERVER::LanHeader header;
-				m_pDelayedBuffer->GetDelayedHeader((char *)&header, sizeof(LAN_SERVER::LanHeader));
+				LanHeader header;
+				m_pDelayedBuffer->GetDelayedHeader((char *)&header, sizeof(LanHeader));
 
 				// 여기서 버퍼를 할당
 				// - 헤더 사이즈 포함
-				m_pDelayedBuffer->InitAndAlloc(header.len + sizeof(LAN_SERVER::LanHeader));
-				m_pDelayedBuffer->Copy((char *)&header, 0, sizeof(LAN_SERVER::LanHeader));
+				m_pDelayedBuffer->InitAndAlloc(header.len + sizeof(LanHeader));
+				m_pDelayedBuffer->Copy((char *)&header, 0, sizeof(LanHeader));
 			}
 
 			// header는 다 읽힌 것
-			LAN_SERVER::LanHeader header;
-			m_pDelayedBuffer->GetHeader((char *)&header, sizeof(LAN_SERVER::LanHeader));
+			LanHeader header;
+			m_pDelayedBuffer->GetHeader((char *)&header, sizeof(LanHeader));
 
 			if (header.len >= 65535 || header.len >= m_pRecvBuffer->GetCapacity())
 			{
@@ -53,7 +111,7 @@ namespace LAN_SERVER
 
 				m_pRecvBuffer = nullptr;
 
-				g_LanServer->Disconnect(m_uiSessionID);
+				g_netClientMgr->m_arrNetClients[m_ClientMgrIndex]->Disconnect(m_uiSessionID);
 				return;
 			}
 
@@ -74,7 +132,7 @@ namespace LAN_SERVER
 
 				InterlockedIncrement(&g_monitor.m_lRecvTPS);
 				m_pDelayedBuffer->m_uiSessionId = m_uiSessionID;
-				g_LanServer->OnRecv(m_uiSessionID, m_pDelayedBuffer);
+				g_netClientMgr->m_arrNetClients[m_ClientMgrIndex]->OnRecv(m_uiSessionID, m_pDelayedBuffer);
 				m_pDelayedBuffer = nullptr;
 			}
 		}
@@ -82,7 +140,7 @@ namespace LAN_SERVER
 		DWORD currentUseSize = m_pRecvBuffer->GetUseSize();
 		while (currentUseSize > 0)
 		{
-			LAN_SERVER::LanHeader packetHeader;
+			LanHeader packetHeader;
 			CSerializableBufferView<TRUE> *view = CSerializableBufferView<TRUE>::Alloc();
 
 			if (currentUseSize < (int)CSerializableBuffer<TRUE>::DEFINE::HEADER_SIZE)
@@ -112,7 +170,7 @@ namespace LAN_SERVER
 
 				m_pRecvBuffer = nullptr;
 
-				g_LanServer->Disconnect(m_uiSessionID);
+				g_netClientMgr->m_arrNetClients[m_ClientMgrIndex]->Disconnect(m_uiSessionID);
 				return;
 			}
 
@@ -122,7 +180,7 @@ namespace LAN_SERVER
 				delayFlag = true;
 				// 헤더는 읽은 것임
 				// front 부터 끝까지 복사
-				view->InitAndAlloc(packetHeader.len + sizeof(LAN_SERVER::LanHeader));
+				view->InitAndAlloc(packetHeader.len + sizeof(LanHeader));
 				view->Copy(m_pRecvBuffer->GetFrontPtr(), 0, useSize);
 				m_pRecvBuffer->MoveFront(useSize);
 				m_pDelayedBuffer = view;
@@ -143,7 +201,7 @@ namespace LAN_SERVER
 
 			InterlockedIncrement(&g_monitor.m_lRecvTPS);
 			view->m_uiSessionId = m_uiSessionID;
-			g_LanServer->OnRecv(m_uiSessionID, view);
+			g_netClientMgr->m_arrNetClients[m_ClientMgrIndex]->OnRecv(m_uiSessionID, view);
 
 			currentUseSize = m_pRecvBuffer->GetUseSize();
 		}
@@ -160,7 +218,6 @@ namespace LAN_SERVER
 		m_pRecvBuffer = nullptr;
 	}
 
-	// 인큐할 때 직렬화 버퍼의 포인터를 인큐
 	bool CLanSession::SendPacket(CSerializableBuffer<TRUE> *message) noexcept
 	{
 		// 여기서 올라간 RefCount는 SendCompleted에서 내려감
@@ -349,256 +406,24 @@ namespace LAN_SERVER
 		return TRUE;
 	}
 
-	void CLanSession::Clear() noexcept
+	// NetClient
+	// 서버 연결 준비 작업
+	BOOL CLanClient::Init(INT maxSessionCount) noexcept
 	{
-		// ReleaseSession 당시에 남아있는 send 링버퍼를 확인
-		// * 남아있는 경우가 확인됨
-		// * 남은 직렬화 버퍼를 할당 해제하고 세션 삭제
-
-		if (m_pDelayedBuffer != nullptr)
-		{
-			CSerializableBufferView<TRUE>::Free(m_pDelayedBuffer);
-			m_pDelayedBuffer = nullptr;
-		}
-
-		for (int count = 0; count < m_iSendCount; count++)
-		{
-			if (m_arrPSendBufs[count]->DecreaseRef() == 0)
-			{
-				CSerializableBuffer<TRUE>::Free(m_arrPSendBufs[count]);
-			}
-		}
-
-		m_iSendCount = 0;
-
-		LONG useBufferSize = m_lfSendBufferQueue.GetUseSize();
-		for (int i = 0; i < useBufferSize; i++)
-		{
-			CSerializableBuffer<TRUE> *pBuffer;
-			// 못꺼낸 것
-			if (!m_lfSendBufferQueue.Dequeue(&pBuffer))
-			{
-				g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"LFQueue::Dequeue() Error");
-				// 말도 안되는 상황
-				CCrashDump::Crash();
-			}
-
-			// RefCount를 낮추고 0이라면 보낸 거 삭제
-			if (pBuffer->DecreaseRef() == 0)
-			{
-				CSerializableBuffer<TRUE>::Free(pBuffer);
-			}
-		}
-
-		useBufferSize = m_lfSendBufferQueue.GetUseSize();
-		if (useBufferSize != 0)
-		{
-			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"LFQueue is not empty Error");
-		}
-
-		if (m_pRecvBuffer != nullptr)
-		{
-			if (m_pRecvBuffer->DecreaseRef() == 0)
-				CRecvBuffer::Free(m_pRecvBuffer);
-		}
-
-		m_sSessionSocket = INVALID_SOCKET;
-		m_uiSessionID = 0;
-		m_pRecvBuffer = nullptr;
-	}
-
-	unsigned int NetWorkerThreadFunc(LPVOID lpParam) noexcept
-	{
-		return g_LanServer->WorkerThread();
-	}
-
-	unsigned int NetTimerEventSchedulerThreadFunc(LPVOID lpParam) noexcept
-	{
-		return g_LanServer->TimerEventSchedulerThread();
-	}
-
-	BOOL CLanServer::Start(const CHAR *openIP, const USHORT port) noexcept
-	{
-		int retVal;
-		int errVal;
-		WSAData wsaData;
-
-		m_usMaxSessionCount = LAN_SETTING::MAX_SESSION_COUNT;
-
-		m_arrPSessions = new CLanSession * [LAN_SETTING::MAX_SESSION_COUNT];
-
-		ZeroMemory((char *)m_arrPSessions, sizeof(CLanSession *) * LAN_SETTING::MAX_SESSION_COUNT);
-
-		m_arrAcceptExSessions = new CLanSession * [LAN_SETTING::ACCEPTEX_COUNT];
-
+		m_iMaxSessionCount = maxSessionCount;
 		// 디스커넥트 스택 채우기
-		USHORT val = LAN_SETTING::MAX_SESSION_COUNT - 1;
-		for (int i = 0; i < LAN_SETTING::MAX_SESSION_COUNT; i++)
+		USHORT val = m_iMaxSessionCount - 1;
+		for (int i = 0; i < m_iMaxSessionCount; i++)
 		{
 			m_stackDisconnectIndex.Push(val--);
 		}
 
-		retVal = WSAStartup(MAKEWORD(2, 2), &wsaData);
-		if (retVal != 0)
-		{
-			errVal = WSAGetLastError();
-			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"WSAStartup() 실패 : %d", errVal);
-			return FALSE;
-		}
-
-		m_sListenSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, NULL, WSA_FLAG_OVERLAPPED);
-		if (m_sListenSocket == INVALID_SOCKET)
-		{
-			errVal = WSAGetLastError();
-			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"WSASocket() 실패 : %d", errVal);
-			return FALSE;
-		}
-
-		SOCKADDR_IN serverAddr;
-		ZeroMemory(&serverAddr, sizeof(serverAddr));
-		serverAddr.sin_family = AF_INET;
-		InetPtonA(AF_INET, openIP, &serverAddr.sin_addr);
-		serverAddr.sin_port = htons(port);
-
-		retVal = bind(m_sListenSocket, (SOCKADDR *)&serverAddr, sizeof(serverAddr));
-		if (retVal == SOCKET_ERROR)
-		{
-			errVal = WSAGetLastError();
-			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"bind() 실패 : %d", errVal);
-			return FALSE;
-		}
-
-		// 송신 버퍼를 0으로 만들어서 실직적인 I/O를 우리의 버퍼를 이용하도록 만듬
-		if (LAN_SETTING::USE_ZERO_COPY)
-		{
-			DWORD sendBufferSize = 0;
-			retVal = setsockopt(m_sListenSocket, SOL_SOCKET, SO_SNDBUF, (char *)&sendBufferSize, sizeof(DWORD));
-			if (retVal == SOCKET_ERROR)
-			{
-				errVal = WSAGetLastError();
-				g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"setsockopt(SO_SNDBUF) 실패 : %d", errVal);
-				return FALSE;
-			}
-		}
-
-		// LINGER option 설정
-		LINGER ling{ 1, 0 };
-		retVal = setsockopt(m_sListenSocket, SOL_SOCKET, SO_LINGER, (char *)&ling, sizeof(ling));
-		if (retVal == SOCKET_ERROR)
-		{
-			errVal = WSAGetLastError();
-			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"setsockopt(SO_LINGER) 실패 : %d", errVal);
-			return FALSE;
-		}
-
-		// listen
-		retVal = listen(m_sListenSocket, SOMAXCONN_HINT(65535));
-		if (retVal == SOCKET_ERROR)
-		{
-			errVal = WSAGetLastError();
-			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"listen() 실패 : %d", errVal);
-			return FALSE;
-		}
-
-		// CP 핸들 생성
-		m_hIOCPHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, NET_SETTING::IOCP_ACTIVE_THREAD);
-		if (m_hIOCPHandle == NULL)
-		{
-			errVal = WSAGetLastError();
-			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"CreateIoCompletionPort(생성) 실패 : %d", errVal);
-			return FALSE;
-		}
-
-		CreateIoCompletionPort((HANDLE)m_sListenSocket, m_hIOCPHandle, (ULONG_PTR)0, 0);
-
-		DWORD dwBytes;
-		retVal = WSAIoctl(m_sListenSocket, SIO_GET_EXTENSION_FUNCTION_POINTER, &m_guidAcceptEx, sizeof(m_guidAcceptEx), &m_lpfnAcceptEx, sizeof(m_lpfnAcceptEx), &dwBytes, NULL, NULL);
-		if (retVal == SOCKET_ERROR)
-		{
-			errVal = WSAGetLastError();
-			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"WSAIoctl(lpfnAcceptEx) 실패 : %d", errVal);
-			return FALSE;
-		}
-
-		retVal = WSAIoctl(m_sListenSocket, SIO_GET_EXTENSION_FUNCTION_POINTER, &m_guidGetAcceptExSockaddrs, sizeof(m_guidGetAcceptExSockaddrs), &m_lpfnGetAcceptExSockaddrs, sizeof(m_lpfnGetAcceptExSockaddrs), &dwBytes, NULL, NULL);
-		if (retVal == SOCKET_ERROR)
-		{
-			errVal = WSAGetLastError();
-			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"WSAIoctl(lpfnGetAcceptExSockaddrs) 실패 : %d", errVal);
-			return FALSE;
-		}
-
-		// AcceptEx 요청
-		FristPostAcceptEx();
-
-		// CreateTimerSchedulerThread
-		m_hTimerEventSchedulerThread = (HANDLE)_beginthreadex(nullptr, 0, NetTimerEventSchedulerThreadFunc, nullptr, 0, nullptr);
-		if (m_hTimerEventSchedulerThread == 0)
-		{
-			errVal = GetLastError();
-			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"TimerEventSchedulerThread running fail.. : %d", errVal);
-			return FALSE;
-		}
-
-		g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"[SYSTEM] TimerEventSchedulerThread running..");
-
-		// CreateWorkerThread
-		for (int i = 1; i <= LAN_SETTING::IOCP_WORKER_THREAD; i++)
-		{
-			HANDLE hWorkerThread = (HANDLE)_beginthreadex(nullptr, 0, NetWorkerThreadFunc, nullptr, 0, nullptr);
-			if (hWorkerThread == 0)
-			{
-				errVal = GetLastError();
-				g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"WorkerThread[%d] running fail.. : %d", i, errVal);
-				return FALSE;
-			}
-
-			m_arrWorkerThreads.push_back(hWorkerThread);
-			g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"[SYSTEM] WorkerThread[%d] running..", i);
-		}
-
-		RegisterSystemTimerEvent();
-		RegisterContentTimerEvent();
+		m_arrPSessions = new CLanSession * [maxSessionCount];
 
 		return TRUE;
 	}
 
-	void CLanServer::Stop()
-	{
-		// listen 소켓 닫기
-		InterlockedExchange(&m_isStop, TRUE);
-		closesocket(m_sListenSocket);
-
-		for (int i = 0; i < NET_SETTING::MAX_SESSION_COUNT; i++)
-		{
-			if (m_arrPSessions[i] != NULL)
-			{
-				Disconnect(m_arrPSessions[i]->m_uiSessionID);
-			}
-		}
-
-		// while SessionCount 0일 때까지
-		while (true)
-		{
-			// 세션 전부 끊고
-			if (m_iSessionCount == 0)
-			{
-				m_bIsWorkerRun = FALSE;
-				PostQueuedCompletionStatus(m_hIOCPHandle, 0, 0, 0);
-				break;
-			}
-		}
-
-		m_bIsTimerEventSchedulerRun = FALSE;
-	}
-
-	void CLanServer::WaitLanServerStop()
-	{
-		WaitForMultipleObjects(m_arrWorkerThreads.size(), m_arrWorkerThreads.data(), TRUE, INFINITE);
-		WaitForSingleObject(m_hTimerEventSchedulerThread, INFINITE);
-	}
-
-	void CLanServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<TRUE> *sBuffer) noexcept
+	void CLanClient::SendPacket(const UINT64 sessionID, CSerializableBuffer<TRUE> *sBuffer) noexcept
 	{
 		CLanSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 
@@ -638,8 +463,7 @@ namespace LAN_SERVER
 		}
 	}
 
-	// Sector 락이 잡힌 경우에만 PQCS
-	void CLanServer::EnqueuePacket(const UINT64 sessionID, CSerializableBuffer<TRUE> *sBuffer) noexcept
+	void CLanClient::EnqueuePacket(const UINT64 sessionID, CSerializableBuffer<TRUE> *sBuffer) noexcept
 	{
 		CLanSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 
@@ -692,7 +516,7 @@ namespace LAN_SERVER
 		}
 	}
 
-	BOOL CLanServer::Disconnect(const UINT64 sessionID, BOOL isPQCS) noexcept
+	BOOL CLanClient::Disconnect(const UINT64 sessionID, BOOL isPQCS) noexcept
 	{
 		CLanSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 		if (pSession == nullptr)
@@ -739,7 +563,7 @@ namespace LAN_SERVER
 		return TRUE;
 	}
 
-	BOOL CLanServer::ReleaseSession(CLanSession *pSession, BOOL isPQCS) noexcept
+	BOOL CLanClient::ReleaseSession(CLanSession *pSession, BOOL isPQCS) noexcept
 	{
 		// IoCount 체크와 ReleaseFlag 변경을 동시에
 		if (InterlockedCompareExchange(&pSession->m_iIOCountAndRelease, CLanSession::RELEASE_FLAG, 0) != 0)
@@ -750,7 +574,7 @@ namespace LAN_SERVER
 
 		if (isPQCS)
 		{
-			PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)pSession, (LPOVERLAPPED)IOOperation::RELEASE_SESSION);
+			PostQueuedCompletionStatus(g_netClientMgr->m_hIOCPHandle, 0, (ULONG_PTR)pSession, (LPOVERLAPPED)IOOperation::RELEASE_SESSION);
 			return TRUE;
 		}
 
@@ -760,14 +584,14 @@ namespace LAN_SERVER
 		CLanSession::Free(pSession);
 		InterlockedDecrement(&m_iSessionCount);
 
-		OnClientLeave(freeSessionId);
+		OnDisconnect(freeSessionId);
 
 		m_stackDisconnectIndex.Push(index);
 
 		return TRUE;
 	}
 
-	BOOL CLanServer::ReleaseSessionPQCS(CLanSession *pSession) noexcept
+	BOOL CLanClient::ReleaseSessionPQCS(CLanSession *pSession) noexcept
 	{
 		USHORT index = GetIndex(pSession->m_uiSessionID);
 		closesocket(pSession->m_sSessionSocket);
@@ -775,47 +599,92 @@ namespace LAN_SERVER
 		CLanSession::Free(pSession);
 		InterlockedDecrement(&m_iSessionCount);
 
-		OnClientLeave(freeSessionId);
+		OnDisconnect(freeSessionId);
 
 		m_stackDisconnectIndex.Push(index);
 
 		return TRUE;
 	}
 
-	void CLanServer::FristPostAcceptEx() noexcept
-	{
-		// 처음에 AcceptEx를 걸어두고 시작
-		for (int i = 0; i < NET_SETTING::ACCEPTEX_COUNT; i++)
-		{
-			PostAcceptEx(i);
-		}
-	}
-
-	BOOL CLanServer::PostAcceptEx(INT index) noexcept
+	BOOL CLanClient::PostConnectEx(const CHAR *ip, const USHORT port) noexcept
 	{
 		int retVal;
 		int errVal;
 
-		CLanSession *newAcceptEx = CLanSession::Alloc();
-		m_arrAcceptExSessions[index] = newAcceptEx;
-
-		newAcceptEx->m_sSessionSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-		if (newAcceptEx->m_sSessionSocket == INVALID_SOCKET)
+		CLanSession *pConnectSession = CLanSession::Alloc();
+		pConnectSession->m_sSessionSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		if (pConnectSession->m_sSessionSocket == INVALID_SOCKET)
 		{
 			errVal = WSAGetLastError();
 			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"PostAcceptEx socket() 실패 : %d", errVal);
 			return FALSE;
 		}
 
-		ZeroMemory(newAcceptEx->m_pMyOverlappedStartAddr, sizeof(OVERLAPPED));
-		g_OverlappedAlloc.SetAcceptExIndex((ULONG_PTR)newAcceptEx->m_pMyOverlappedStartAddr, index);
+		// 송신 버퍼를 0으로 만들어서 실직적인 I/O를 우리의 버퍼를 이용하도록 만듬
+		if (CLIENT_SETTING::USE_ZERO_COPY)
+		{
+			DWORD sendBufferSize = 0;
+			retVal = setsockopt(pConnectSession->m_sSessionSocket, SOL_SOCKET, SO_SNDBUF, (char *)&sendBufferSize, sizeof(DWORD));
+			if (retVal == SOCKET_ERROR)
+			{
+				errVal = WSAGetLastError();
+				g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"setsockopt(SO_SNDBUF) 실패 : %d", errVal);
+				return FALSE;
+			}
+		}
 
-		retVal = m_lpfnAcceptEx(m_sListenSocket, newAcceptEx->m_sSessionSocket
-			, newAcceptEx->m_AcceptBuffer, 0, sizeof(SOCKADDR_IN) + 16, sizeof(SOCKADDR_IN) + 16, NULL, newAcceptEx->m_pMyOverlappedStartAddr);
-		if (retVal == FALSE)
+		// LINGER option 설정
+		LINGER ling{ 1, 0 };
+		retVal = setsockopt(pConnectSession->m_sSessionSocket, SOL_SOCKET, SO_LINGER, (char *)&ling, sizeof(ling));
+		if (retVal == SOCKET_ERROR)
 		{
 			errVal = WSAGetLastError();
-			if (errVal != WSA_IO_PENDING)
+			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"setsockopt(SO_LINGER) 실패 : %d", errVal);
+			return FALSE;
+		}
+
+		SOCKADDR_IN clientAddr;
+		ZeroMemory(&clientAddr, sizeof(clientAddr));
+		clientAddr.sin_family = AF_INET;
+		clientAddr.sin_addr.s_addr = INADDR_ANY;
+		clientAddr.sin_port = 0;
+
+		retVal = bind(pConnectSession->m_sSessionSocket, (SOCKADDR *)&clientAddr, sizeof(clientAddr));
+		if (retVal == SOCKET_ERROR)
+		{
+			errVal = WSAGetLastError();
+			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"bind() 실패 : %d", errVal);
+			return FALSE;
+		}
+
+		// 세션 ID 생성
+		USHORT index;
+		// 연결 실패 : FALSE
+		if (!m_stackDisconnectIndex.Pop(&index))
+		{
+			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"m_stackDisconnectIndex.Pop(&index) failed");
+			return FALSE;
+		}
+
+		UINT64 combineId = CombineIndex(index, InterlockedIncrement64(&m_iCurrentID));
+		pConnectSession->Init(combineId, m_ClientMgrIndex);
+
+		m_arrPSessions[index] = pConnectSession;
+
+		g_netClientMgr->RegisterIoCompletionPort(pConnectSession->m_sSessionSocket, (ULONG_PTR)pConnectSession);
+
+		ZeroMemory(pConnectSession->m_pMyOverlappedStartAddr, sizeof(OVERLAPPED));
+
+		SOCKADDR_IN serverAddr;
+		ZeroMemory(&serverAddr, sizeof(serverAddr));
+		serverAddr.sin_family = AF_INET;
+		InetPtonA(AF_INET, ip, &serverAddr.sin_addr);
+		serverAddr.sin_port = htons(port);
+
+		if (!g_netClientMgr->ConnectEx(pConnectSession->m_sSessionSocket, (sockaddr *)&serverAddr, sizeof(serverAddr), pConnectSession->m_pMyOverlappedStartAddr))
+		{
+			errVal = WSAGetLastError();
+			if (errVal != ERROR_IO_PENDING)
 			{
 				if (errVal != WSAECONNABORTED && errVal != WSAECONNRESET)
 					g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"AcceptEx() Error : %d", errVal);
@@ -827,68 +696,125 @@ namespace LAN_SERVER
 		return TRUE;
 	}
 
-	BOOL CLanServer::AcceptExCompleted(CLanSession *pSession) noexcept
+	BOOL CLanClient::ConnectExCompleted(CLanSession *pSession) noexcept
 	{
-		InterlockedIncrement(&g_monitor.m_lAcceptTPS);
-
 		int retVal;
 		int errVal;
-		retVal = setsockopt(pSession->m_sSessionSocket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
-			(char *)&m_sListenSocket, sizeof(SOCKET));
+
+		// SO_UPDATE_CONNECT_CONTEXT 옵션 설정
+		retVal = setsockopt(pSession->m_sSessionSocket, SOL_SOCKET, SO_UPDATE_CONNECT_CONTEXT, NULL, 0);
 		if (retVal == SOCKET_ERROR)
 		{
 			errVal = WSAGetLastError();
-
-			if (!m_isStop)
-				g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"setsockopt(SO_UPDATE_ACCEPT_CONTEXT) 실패 : %d", errVal);
-			return FALSE;
-		}
-
-		// 성공한 소켓에 대해 IOCP 등록
-		CreateIoCompletionPort((HANDLE)pSession->m_sSessionSocket, m_hIOCPHandle, (ULONG_PTR)pSession, 0);
-
-		SOCKADDR_IN *localAddr = nullptr;
-		INT localAddrLen;
-
-		SOCKADDR_IN *remoteAddr = nullptr;
-		INT remoteAddrLen;
-		m_lpfnGetAcceptExSockaddrs(pSession->m_AcceptBuffer, 0, sizeof(SOCKADDR_IN) + 16, sizeof(SOCKADDR_IN) + 16, (SOCKADDR **)&localAddr, &localAddrLen, (SOCKADDR **)&remoteAddr, &remoteAddrLen);
-
-		InetNtop(AF_INET, &remoteAddr->sin_addr, pSession->m_ClientAddrBuffer, 16);
-
-		pSession->m_ClientPort = remoteAddr->sin_port;
-
-		// TODO - 끊어줄 방법 고민
-		if (!OnConnectionRequest(pSession->m_ClientAddrBuffer, pSession->m_ClientPort))
-			return FALSE;
-
-		USHORT index;
-		// 연결 실패 : FALSE
-		if (!m_stackDisconnectIndex.Pop(&index))
-		{
-			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"m_stackDisconnectIndex.Pop(&index) failed");
-			return FALSE;
-		}
-
-		UINT64 combineId = CLanServer::CombineIndex(index, InterlockedIncrement64(&m_iCurrentID));
-
-		pSession->Init(combineId);
-
-		InterlockedIncrement(&m_iSessionCount);
-		InterlockedIncrement64(&g_monitor.m_lAcceptTotal);
-		m_arrPSessions[index] = pSession;
-
-		// 서버 중단 상태면 연결 끊기
-		if (m_isStop)
-		{
-			Disconnect(combineId);
+			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"setsockopt(SO_UPDATE_CONNECT_CONTEXT) 실패 : %d", errVal);
 			return FALSE;
 		}
 
 		return TRUE;
 	}
 
-	int CLanServer::WorkerThread() noexcept
+	unsigned int NetWorkerThreadFunc(LPVOID lpParam) noexcept
+	{
+		return g_netClientMgr->WorkerThread();
+	}
+
+	unsigned int NetTimerEventSchedulerThreadFunc(LPVOID lpParam) noexcept
+	{
+		return g_netClientMgr->TimerEventSchedulerThread();
+	}
+
+	BOOL CLanClientManager::Init() noexcept
+	{
+		int retVal;
+		int errVal;
+		WSAData wsaData;
+
+		retVal = WSAStartup(MAKEWORD(2, 2), &wsaData);
+		if (retVal != 0)
+		{
+			errVal = WSAGetLastError();
+			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"WSAStartup() 실패 : %d", errVal);
+			return FALSE;
+		}
+
+		m_hIOCPHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, CLIENT_SETTING::IOCP_ACTIVE_THREAD);
+		if (m_hIOCPHandle == NULL)
+		{
+			errVal = WSAGetLastError();
+			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"CreateIoCompletionPort(생성) 실패 : %d", errVal);
+			return FALSE;
+		}
+
+		// 더미 소켓
+		SOCKET dummySocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, NULL, WSA_FLAG_OVERLAPPED);
+		if (dummySocket == INVALID_SOCKET)
+		{
+			errVal = WSAGetLastError();
+			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"WSASocket() 실패 : %d", errVal);
+			return FALSE;
+		}
+
+		DWORD dwBytes;
+		retVal = WSAIoctl(dummySocket, SIO_GET_EXTENSION_FUNCTION_POINTER, &m_guidConnectEx, sizeof(m_guidConnectEx), &m_lpfnConnectEx, sizeof(m_lpfnConnectEx), &dwBytes, NULL, NULL);
+		if (retVal == SOCKET_ERROR)
+		{
+			errVal = WSAGetLastError();
+			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"WSAIoctl(lpfnConnectEx) 실패 : %d", errVal);
+			return FALSE;
+		}
+
+		closesocket(dummySocket);
+
+		return TRUE;
+	}
+
+	BOOL CLanClientManager::Start() noexcept
+	{
+		int retVal;
+		int errVal;
+
+		// CreateTimerSchedulerThread
+		m_hTimerEventSchedulerThread = (HANDLE)_beginthreadex(nullptr, 0, NetTimerEventSchedulerThreadFunc, nullptr, 0, nullptr);
+		if (m_hTimerEventSchedulerThread == 0)
+		{
+			errVal = GetLastError();
+			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"TimerEventSchedulerThread running fail.. : %d", errVal);
+			return FALSE;
+		}
+
+		g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"[SYSTEM] TimerEventSchedulerThread running..");
+
+		// CreateWorkerThread
+		for (int i = 1; i <= CLIENT_SETTING::IOCP_WORKER_THREAD; i++)
+		{
+			HANDLE hWorkerThread = (HANDLE)_beginthreadex(nullptr, 0, NetWorkerThreadFunc, nullptr, 0, nullptr);
+			if (hWorkerThread == 0)
+			{
+				errVal = GetLastError();
+				g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"WorkerThread[%d] running fail.. : %d", i, errVal);
+				return FALSE;
+			}
+
+			m_arrWorkerThreads.push_back(hWorkerThread);
+			g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"[SYSTEM] WorkerThread[%d] running..", i);
+		}
+
+		return TRUE;
+	}
+
+	BOOL CLanClientManager::Wait() noexcept
+	{
+		WaitForMultipleObjects(m_arrWorkerThreads.size(), m_arrWorkerThreads.data(), TRUE, INFINITE);
+		WaitForSingleObject(m_hTimerEventSchedulerThread, INFINITE);
+		return TRUE;
+	}
+
+	void CLanClientManager::RegisterIoCompletionPort(SOCKET sock, ULONG_PTR sessionID)
+	{
+		CreateIoCompletionPort((HANDLE)sock, m_hIOCPHandle, sessionID, 0);
+	}
+
+	int CLanClientManager::WorkerThread() noexcept
 	{
 		int retVal;
 		DWORD flag = 0;
@@ -901,7 +827,6 @@ namespace LAN_SERVER
 			retVal = GetQueuedCompletionStatus(m_hIOCPHandle, &dwTransferred
 				, (PULONG_PTR)&pSession, (LPOVERLAPPED *)&lpOverlapped
 				, INFINITE);
-
 
 			IOOperation oper;
 			if ((UINT64)lpOverlapped >= 3)
@@ -942,38 +867,20 @@ namespace LAN_SERVER
 				{
 				case IOOperation::ACCEPTEX:
 				{
-					// Accept가 성공한 세션 포인터를 얻어옴
-					INT index = g_OverlappedAlloc.GetAcceptExIndex((ULONG_PTR)lpOverlapped);
-					pSession = m_arrAcceptExSessions[index];
-
-					// 이거 실패하면 연결 끊음
-					// * 실패 가능한 상황 - setsockopt, OnConnectionRequest
-					// * ioCount 무조건 1일 것임
-					// * 바로 끊어도 괜춘
-					// * 다른 I/O 요청을 안걸고 끝내기 때문에 아래의 ioCount 0이 됨으로 연결 끊김을 유도
 					InterlockedIncrement(&pSession->m_iIOCountAndRelease);
-					if (!AcceptExCompleted(pSession))
+					if (!m_arrNetClients[pSession->m_ClientMgrIndex]->ConnectExCompleted(pSession))
 					{
-						// 실패한 인덱스에 대한 예약은 다시 걸어줌
-						if (!m_isStop)
-							PostAcceptEx(index);
-
 						InterlockedDecrement(&pSession->m_iIOCountAndRelease);
 						closesocket(pSession->m_sSessionSocket);
 						CLanSession::Free(pSession);
-						continue;
+						break;
 					}
 
-					// OnAccept 처리는 여기서
-					OnAccept(pSession->m_uiSessionID);
-					// 해당 세션에 대해 Recv 예약
+					m_arrNetClients[pSession->m_ClientMgrIndex]->OnConnect(pSession->m_uiSessionID);
 					pSession->PostRecv();
 
 					if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
-						ReleaseSession(pSession);
-
-					if (!m_isStop)
-						PostAcceptEx(index);
+						m_arrNetClients[pSession->m_ClientMgrIndex]->ReleaseSession(pSession);
 
 					continue;
 				}
@@ -998,7 +905,7 @@ namespace LAN_SERVER
 				break;
 				case IOOperation::RELEASE_SESSION:
 				{
-					ReleaseSessionPQCS(pSession);
+					m_arrNetClients[pSession->m_ClientMgrIndex]->ReleaseSessionPQCS(pSession);
 					continue;
 				}
 				break;
@@ -1026,15 +933,14 @@ namespace LAN_SERVER
 
 			if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 			{
-				ReleaseSession(pSession);
+				m_arrNetClients[pSession->m_ClientMgrIndex]->ReleaseSession(pSession);
 			}
 		}
 
 		return 0;
 	}
 
-	// SendFrameThread로 활용
-	int CLanServer::TimerEventSchedulerThread() noexcept
+	int CLanClientManager::TimerEventSchedulerThread() noexcept
 	{
 		// IOCP의 병행성 관리를 받기 위한 GQCS
 		DWORD dwTransferred = 0;
@@ -1069,18 +975,7 @@ namespace LAN_SERVER
 		return 0;
 	}
 
-	void CLanServer::RegisterSystemTimerEvent()
-	{
-		// MonitorTimerEvent *monitorEvent = new MonitorTimerEvent;
-		// monitorEvent->SetEvent();
-		// RegisterTimerEvent((BaseEvent *)monitorEvent);
-		// 
-		// KeyBoardTimerEvent *keyBoardEvent = new KeyBoardTimerEvent;
-		// keyBoardEvent->SetEvent();
-		// RegisterTimerEvent((BaseEvent *)keyBoardEvent);
-	}
-
-	void CLanServer::RegisterTimerEvent(BaseEvent *timerEvent) noexcept
+	void CLanClientManager::RegisterTimerEvent(BaseEvent *timerEvent) noexcept
 	{
 		int retVal;
 		int errVal;
@@ -1094,8 +989,12 @@ namespace LAN_SERVER
 	}
 
 	// EventSchedulerThread에서 수행됨
-	void CLanServer::RegisterTimerEventAPCFunc(ULONG_PTR lpParam) noexcept
+	void CLanClientManager::RegisterTimerEventAPCFunc(ULONG_PTR lpParam) noexcept
 	{
-		g_LanServer->m_TimerEventQueue.push((TimerEvent *)lpParam);
+		g_netClientMgr->m_TimerEventQueue.push((TimerEvent *)lpParam);
 	}
-}
+	void CLanClientManager::ContentEventEnqueue(BaseEvent *event) noexcept
+	{
+		PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)event, (LPOVERLAPPED)IOOperation::CONTENT_EVENT);
+	}
+};

@@ -2,10 +2,11 @@
 
 class CChatProcessPacketInterface;
 
-class CChatServer : public CNetServer
+class CChatServer : public NET_SERVER::CNetServer
 {
 public:
 	friend class CChatProcessPacket;
+	friend class CMonitor;
 
 	CChatServer() noexcept;
 

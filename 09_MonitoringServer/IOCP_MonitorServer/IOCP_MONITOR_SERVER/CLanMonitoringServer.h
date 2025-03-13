@@ -1,7 +1,17 @@
 #pragma once
+
+struct MonitoringInfo
+{
+	INT serverNo = 0;
+	INT dataValue = 0;
+	INT timeStamp = 0;
+};
+
 class CLanMonitoringServer : public LAN_SERVER::CLanServer
 {
 public:
+	friend struct DBTimerEvent;
+
 	CLanMonitoringServer();
 
 	// CLanServer을(를) 통해 상속됨
@@ -16,5 +26,8 @@ private:
 	// INT가 0이면 아직 로그인되지 않은 서버
 	std::unordered_map<UINT64, INT> m_umapServers;
 	SRWLOCK m_umapLock;
+
+	// MonitorInfo
+	MonitoringInfo m_arrMonitorInfo[dfMONITOR_DATA_TYPE_END];
 };
 

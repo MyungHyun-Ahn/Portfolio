@@ -45,6 +45,7 @@
 #include <DbgHelp.h>
 #include <chrono>
 #include <functional>
+#include <ctime>
 
 #include "DefineSingleton.h"
 #include "CProfileManager.h"

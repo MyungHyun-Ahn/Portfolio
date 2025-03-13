@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "CommonProtocol.h"
 #include "ServerSetting.h"
 #include "CNetServer.h"
 #include "CLanServer.h"
@@ -32,11 +33,13 @@ int main()
 
 		serverConfigLoader.Load(L"LanMonitorServer", L"IP", &LAN_SETTING::openIP);
 		serverConfigLoader.Load(L"LanMonitorServer", L"PORT", &LAN_SETTING::openPort);
-		serverConfigLoader.Load(L"LanMonitorServer", L"IOCP_WORKER_THREAD", &NET_SETTING::IOCP_WORKER_THREAD);
-		serverConfigLoader.Load(L"LanMonitorServer", L"IOCP_ACTIVE_THREAD", &NET_SETTING::IOCP_ACTIVE_THREAD);
-		serverConfigLoader.Load(L"LanMonitorServer", L"USE_ZERO_COPY", &NET_SETTING::USE_ZERO_COPY);
-		serverConfigLoader.Load(L"LanMonitorServer", L"MAX_SESSION_COUNT", &NET_SETTING::MAX_SESSION_COUNT);
-		serverConfigLoader.Load(L"LanMonitorServer", L"ACCEPTEX_COUNT", &NET_SETTING::ACCEPTEX_COUNT);
+		serverConfigLoader.Load(L"LanMonitorServer", L"IOCP_WORKER_THREAD", &LAN_SETTING::IOCP_WORKER_THREAD);
+		serverConfigLoader.Load(L"LanMonitorServer", L"IOCP_ACTIVE_THREAD", &LAN_SETTING::IOCP_ACTIVE_THREAD);
+		serverConfigLoader.Load(L"LanMonitorServer", L"USE_ZERO_COPY", &LAN_SETTING::USE_ZERO_COPY);
+		serverConfigLoader.Load(L"LanMonitorServer", L"MAX_SESSION_COUNT", &LAN_SETTING::MAX_SESSION_COUNT);
+		serverConfigLoader.Load(L"LanMonitorServer", L"ACCEPTEX_COUNT", &LAN_SETTING::ACCEPTEX_COUNT);
+
+
 		serverConfigLoader.Load(L"LanMonitorServer", L"CHAT_SERVER_NO", &MONITOR_SETTING::CHAT_SERVER_NO);
 		serverConfigLoader.Load(L"LanMonitorServer", L"GAME_SERVER_NO", &MONITOR_SETTING::GAME_SERVER_NO);
 		serverConfigLoader.Load(L"LanMonitorServer", L"LOGIN_SERVER_NO", &MONITOR_SETTING::LOGIN_SERVER_NO);

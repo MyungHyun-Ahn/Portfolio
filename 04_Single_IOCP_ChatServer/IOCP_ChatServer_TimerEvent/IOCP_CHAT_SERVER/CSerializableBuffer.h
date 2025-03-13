@@ -6,7 +6,7 @@ class CSerializableBuffer
 public:
 	enum class DEFINE
 	{
-		HEADER_SIZE = isLanServer ? 2 : 5,
+		HEADER_SIZE = isLanServer ? sizeof(LanHeader) : sizeof(NetHeader),
 		DEFAULT_SIZE = 1400
 	};
 
@@ -404,7 +404,7 @@ private:
 	UINT64			m_uiSessionId = 0;
 
 	inline static CSingleMemoryPool<CSerializableBuffer> s_sbufferPool = CSingleMemoryPool<CSerializableBuffer>();
-	inline static CTLSPagePoolManager<512, 2, true> s_sPagePool512 = CTLSPagePoolManager<512, 2, true>();
+	inline static CTLSPagePoolManager<512, 4, false> s_sPagePool512 = CTLSPagePoolManager<512, 4, false>();
 };
 
 template<bool isLanServer>

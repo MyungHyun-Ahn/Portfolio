@@ -1032,10 +1032,11 @@ namespace NET_SERVER
 						// 실패한 인덱스에 대한 예약은 다시 걸어줌
 						if (!m_isStop)
 							PostAcceptEx(index);
-						else
-							if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
-								CNetSession::Free(pSession);
-						break;
+
+						InterlockedDecrement(&pSession->m_iIOCountAndRelease);
+						closesocket(pSession->m_sSessionSocket);
+						CNetSession::Free(pSession);
+						continue;
 					}
 
 					// OnAccept 처리는 여기서
