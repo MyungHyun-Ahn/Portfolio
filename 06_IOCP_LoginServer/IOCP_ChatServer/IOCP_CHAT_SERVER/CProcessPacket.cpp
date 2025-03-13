@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "CNetServer.h"
-#include "CNetSession.h"
 #include "ChatSetting.h"
 #include "CPlayer.h"
 #include "CSector.h"
@@ -39,6 +38,9 @@ bool CChatProcessPacket::PacketProcReqLogin(UINT64 sessionId, CSmartPtr<CSeriali
 	char sessionKey[64];
 	message->Dequeue(sessionKey, sizeof(char) * 64);
 
+	if (message->GetDataSize() != 0)
+		return false;
+
 	// Redis 토큰 비교
 	char getKey[64];
 	CRedisConnector *redisConnector = CRedisConnector::GetRedisConnector();
@@ -51,9 +53,6 @@ bool CChatProcessPacket::PacketProcReqLogin(UINT64 sessionId, CSmartPtr<CSeriali
 		if (sessionKey[i] != getKey[i])
 			return false;
 	}
-
-	if (message->GetDataSize() != 0)
-		return false;
 
 	m_pChatServer->m_umapNonLoginPlayer.erase(sessionId);
 	m_pChatServer->m_umapLoginPlayer.insert(std::make_pair(sessionId, loginPlayer));

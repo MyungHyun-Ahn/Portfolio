@@ -1,5 +1,15 @@
 #pragma once
 
+namespace NET_SERVER
+{
+	class CNetSession;
+}
+
+namespace LAN_CLIENT
+{
+	class CLanSession;
+}
+
 // CRecvBuffer로 받은 데이터를 직렬화 버퍼처럼 볼 수 있게 함
 template<bool isLanServer>
 class CSerializableBufferView
@@ -10,8 +20,8 @@ public:
 
 
 private:
-	friend class CLanSession;
-	friend class CNetSession;
+	friend class NET_SERVER::CNetSession;
+	friend class LAN_CLIENT::CLanSession;
 	friend class CChatProcessPacket;
 
 	// 오프셋 시작과 끝을 받음

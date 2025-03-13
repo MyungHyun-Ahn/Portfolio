@@ -1,7 +1,6 @@
 #include "pch.h"
 #include "BaseEvent.h"
 #include "CNetServer.h"
-#include "CNetSession.h"
 #include "CUser.h"
 #include "CLoginServer.h"
 #include "ContentEvent.h"
@@ -16,6 +15,6 @@ void HeartBeatEvent::SetEvent() noexcept
 
 void HeartBeatEvent::Execute() noexcept
 {
-	CLoginServer *chatServer = (CLoginServer *)g_NetServer;
+	CLoginServer *chatServer = (CLoginServer *)NET_SERVER::g_NetServer;
 	chatServer->HeartBeat();
 }

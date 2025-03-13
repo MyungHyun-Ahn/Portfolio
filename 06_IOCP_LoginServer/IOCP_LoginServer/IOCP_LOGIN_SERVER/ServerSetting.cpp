@@ -16,6 +16,4 @@ namespace SERVER_SETTING
 	INT MAX_SESSION_COUNT = 20000;
 
 	INT ACCEPTEX_COUNT = 100;
-
-	BOOL monitorThreadRunning = TRUE;
 }

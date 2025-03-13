@@ -2,7 +2,7 @@
 
 class CLoginProcessPacketInterface;
 
-class CLoginServer : public CNetServer
+class CLoginServer : public NET_SERVER::CNetServer
 {
 public:
 	friend class CLoginProcessPacket;

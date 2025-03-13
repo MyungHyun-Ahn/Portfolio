@@ -1,7 +1,6 @@
 #include "pch.h"
 #include "BaseEvent.h"
 #include "CNetServer.h"
-#include "CNetSession.h"
 #include "SystemEvent.h"
 
 void MonitorTimerEvent::SetEvent() noexcept
@@ -13,7 +12,7 @@ void MonitorTimerEvent::SetEvent() noexcept
 
 void MonitorTimerEvent::Execute() noexcept
 {
-	g_monitor.Update(g_NetServer->GetSessionCount());
+	g_monitor.Update(NET_SERVER::g_NetServer->GetSessionCount());
 }
 
 void KeyBoardTimerEvent::SetEvent() noexcept
@@ -27,7 +26,7 @@ void KeyBoardTimerEvent::Execute() noexcept
 {
 	// 서버 종료
 	if (GetAsyncKeyState(VK_F1))
-		g_NetServer->Stop();
+		NET_SERVER::g_NetServer->Stop();
 
 	// 프로파일러 저장
 	if (GetAsyncKeyState(VK_F2))

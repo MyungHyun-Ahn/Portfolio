@@ -1,7 +1,6 @@
 #include "pch.h"
 #include "BaseEvent.h"
 #include "CNetServer.h"
-#include "CNetSession.h"
 #include "ChatSetting.h"
 #include "CPlayer.h"
 #include "CSector.h"
@@ -18,7 +17,7 @@ void SectorBroadcastTimerEvent::SetEvent() noexcept
 
 void SectorBroadcastTimerEvent::Execute() noexcept
 {
-	CChatServer *chatServer = (CChatServer *)g_NetServer;
+	CChatServer *chatServer = (CChatServer *)NET_SERVER::g_NetServer;
 	chatServer->SectorBroadcast();
 }
 
@@ -32,7 +31,7 @@ void NonLoginHeartBeatTimerEvent::SetEvent() noexcept
 
 void NonLoginHeartBeatTimerEvent::Execute() noexcept
 {
-	CChatServer *chatServer = (CChatServer *)g_NetServer;
+	CChatServer *chatServer = (CChatServer *)NET_SERVER::g_NetServer;
 	chatServer->NonLoginHeartBeat();
 }
 
@@ -46,6 +45,6 @@ void LoginHeartBeatTimerEvent::SetEvent() noexcept
 
 void LoginHeartBeatTimerEvent::Execute() noexcept
 {
-	CChatServer *chatServer = (CChatServer *)g_NetServer;
+	CChatServer *chatServer = (CChatServer *)NET_SERVER::g_NetServer;
 	chatServer->LoginHeartBeat();
 }

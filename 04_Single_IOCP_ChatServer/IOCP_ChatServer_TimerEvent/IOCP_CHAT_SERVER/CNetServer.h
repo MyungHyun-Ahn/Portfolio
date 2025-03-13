@@ -1,5 +1,4 @@
 #pragma once
-class CNetSession;
 
 namespace NET_SERVER
 {

@@ -1,12 +1,15 @@
 #include "pch.h"
 #include "ServerSetting.h"
 #include "CNetServer.h"
-#include "CNetSession.h"
 #include "DBSetting.h"
 #include "CDBConnector.h"
 #include "CUser.h"
 #include "LoginServerSetting.h"
 #include "CLoginServer.h"
+#include "ClientSetting.h"
+#include "MonitorSetting.h"
+#include "CLanClient.h"
+#include "CMonitorClient.h"
 
 #pragma warning(disable : 4101)
 
@@ -33,6 +36,13 @@ int main()
 		serverConfigLoader.Load(L"LoginServer", L"CHAT_SERVER_IP_1", &LOGIN_SERVER_SETTING::CHAT_SERVER_IP_1);
 		serverConfigLoader.Load(L"LoginServer", L"CHAT_SERVER_PORT_1", &LOGIN_SERVER_SETTING::CHAT_SERVER_PORT_1);
 
+		serverConfigLoader.Load(L"Monitoring", L"USE_ZERO_COPY", &CLIENT_SETTING::USE_ZERO_COPY);
+		serverConfigLoader.Load(L"Monitoring", L"IOCP_WORKER_THREAD", &CLIENT_SETTING::IOCP_WORKER_THREAD);
+		serverConfigLoader.Load(L"Monitoring", L"IOCP_ACTIVE_THREAD", &CLIENT_SETTING::IOCP_ACTIVE_THREAD);
+		serverConfigLoader.Load(L"Monitoring", L"SERVER_NO", &MONITOR_SETTING::SERVER_NO);
+		serverConfigLoader.Load(L"Monitoring", L"IP", &MONITOR_SETTING::IP);
+		serverConfigLoader.Load(L"Monitoring", L"PORT", &MONITOR_SETTING::PORT);
+
 		// DB Setting Parse
 		serverConfigLoader.Load(L"MySQL", L"IP", &MYSQL_SETTING::IP);
 		serverConfigLoader.Load(L"MySQL", L"PORT", &MYSQL_SETTING::PORT);
@@ -53,9 +63,20 @@ int main()
 
 	g_ProfileMgr = CProfileManager::GetInstance();
 
-	g_NetServer = new CLoginServer;
+	LAN_CLIENT::g_netClientMgr = new LAN_CLIENT::CLanClientManager;
+	LAN_CLIENT::g_netClientMgr->Init();
 
-	g_NetServer->Start(SERVER_SETTING::openIP.c_str(), SERVER_SETTING::openPort);
+	g_MonitorClient = new CMonitorClient;
+	g_MonitorClient->Init(1); // 1°³ ¿¬°á
+	LAN_CLIENT::g_netClientMgr->RegisterClient(g_MonitorClient);
+	LAN_CLIENT::g_netClientMgr->Start();
+
+	g_MonitorClient->PostConnectEx(MONITOR_SETTING::IP.c_str(), MONITOR_SETTING::PORT);
+
+	NET_SERVER::g_NetServer = new CLoginServer;
+
+	NET_SERVER::g_NetServer->Start(SERVER_SETTING::openIP.c_str(), SERVER_SETTING::openPort);
+	LAN_CLIENT::g_netClientMgr->Wait();
 
 	return 0;
 }

@@ -10,7 +10,4 @@ namespace SERVER_SETTING
 	extern INT USE_ZERO_COPY;
 	extern INT MAX_SESSION_COUNT;
 	extern INT ACCEPTEX_COUNT;
-
-
-	extern BOOL monitorThreadRunning;
 }

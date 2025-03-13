@@ -1,7 +1,6 @@
 #include "pch.h"
 #include "BaseEvent.h"
 #include "CNetServer.h"
-#include "CNetSession.h"
 #include "ChatSetting.h"
 #include "CPlayer.h"
 #include "CSector.h"
@@ -18,7 +17,7 @@ void MonitorTimerEvent::SetEvent() noexcept
 
 void MonitorTimerEvent::Execute() noexcept
 {
-	g_monitor.Update(g_NetServer->GetSessionCount(), ((CChatServer *)g_NetServer)->GetPlayerCount());
+	g_monitor.Update(NET_SERVER::g_NetServer->GetSessionCount(), ((CChatServer *)NET_SERVER::g_NetServer)->GetPlayerCount());
 }
 
 void KeyBoardTimerEvent::SetEvent() noexcept
@@ -33,7 +32,7 @@ void KeyBoardTimerEvent::Execute() noexcept
 {
 	// 서버 종료
 	if (GetAsyncKeyState(VK_F1))
-		g_NetServer->Stop();
+		NET_SERVER::g_NetServer->Stop();
 
 	// 프로파일러 저장
 	if (GetAsyncKeyState(VK_F2))
@@ -47,7 +46,7 @@ void OnAcceptEvent::SetEvent(const UINT64 sessionID) noexcept
 
 void OnAcceptEvent::Execute(const UINT64 sessionID) noexcept
 {
-	g_NetServer->OnAccept(sessionID);
+	NET_SERVER::g_NetServer->OnAccept(sessionID);
 }
 
 void OnClientLeaveEvent::SetEvent(const UINT64 sessionID) noexcept
@@ -57,7 +56,7 @@ void OnClientLeaveEvent::SetEvent(const UINT64 sessionID) noexcept
 
 void OnClientLeaveEvent::Execute(const UINT64 sessionID) noexcept
 {
-	g_NetServer->OnClientLeave(sessionID);
+	NET_SERVER::g_NetServer->OnClientLeave(sessionID);
 }
 
 void SerializableBufferFreeEvent::SetEvent(CDeque<CSerializableBuffer<FALSE> *> *freeQueue) noexcept

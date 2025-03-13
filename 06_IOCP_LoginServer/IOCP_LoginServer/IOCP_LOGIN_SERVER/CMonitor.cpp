@@ -1,6 +1,10 @@
 #include "pch.h"
 #include "CMonitor.h"
-#include "CNetSession.h"
+#include "CNetServer.h"
+#include "CLanClient.h"
+#include "CMonitorClient.h"
+#include "CGenPacket.h"
+#include "CommonProtocol.h"
 
 CMonitor g_monitor;
 
@@ -57,6 +61,7 @@ void CMonitor::Update(INT sessionCount) noexcept
 
 	// 모니터링 콘솔
 	MonitoringConsole(sessionCount);
+	SendMonitoringServer(sessionCount);
 
 	UpdateServer();
 }
@@ -190,7 +195,7 @@ void CMonitor::MonitoringConsole(INT sessionCount) noexcept
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tAccept total \t: %lld", m_lAcceptTotal);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSession count \t: %d", sessionCount);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Pool capacity");
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSession pool capacity \t: %d, usage \t: %d", CNetSession::GetPoolCapacity(), CNetSession::GetPoolUsage());
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSession pool capacity \t: %d, usage \t: %d", NET_SERVER::CNetSession::GetPoolCapacity(), NET_SERVER::CNetSession::GetPoolUsage());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tBuffer pool capacity \t: %d, usage \t: %d", CSerializableBuffer<FALSE>::GetPoolCapacity(), CSerializableBuffer<FALSE>::GetPoolUsage());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tView pool capacity \t: %d, usage \t: %d", CSerializableBufferView<FALSE>::GetPoolCapacity(), CSerializableBufferView<FALSE>::GetPoolUsage());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRecv pool capacity \t: %d, usage \t: %d", CRecvBuffer::GetPoolCapacity(), CRecvBuffer::GetPoolUsage());
@@ -202,4 +207,38 @@ void CMonitor::MonitoringConsole(INT sessionCount) noexcept
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tAuth\t : %d \t Avr : %lf", m_lAuthTPS, (DOUBLE)m_AuthTPSTotal / m_LoopCount);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tMaxSend\t : %d", m_lMaxSendCount);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"----------------------------------------");
+}
+
+void CMonitor::SendMonitoringServer(INT sessionCount) noexcept
+{
+	int currentTime = time(NULL);
+	CSerializableBuffer<TRUE> *pLoginServerRunBuffer
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_LOGIN_SERVER_RUN
+			, TRUE, currentTime);
+	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pLoginServerRunBuffer);
+
+	CSerializableBuffer<TRUE> *pLoginServerCpuBuffer
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_LOGIN_SERVER_CPU
+			, m_fProcessTotal, currentTime);
+	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pLoginServerCpuBuffer);
+
+	CSerializableBuffer<TRUE> *pLoginServerMemBuffer
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_LOGIN_SERVER_MEM
+			, m_stPmc.PrivateUsage / (1024 * 1024), currentTime);
+	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pLoginServerMemBuffer);
+
+	CSerializableBuffer<TRUE> *pLoginServerSessionBuffer
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_LOGIN_SESSION
+			, sessionCount, currentTime);
+	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pLoginServerSessionBuffer);
+
+	CSerializableBuffer<TRUE> *pLoginServerAuthTpsBuffer
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_LOGIN_AUTH_TPS
+			, m_lAuthTPS, currentTime);
+	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pLoginServerAuthTpsBuffer);
+
+	CSerializableBuffer<TRUE> *pLoginServerPacketPoolBuffer
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_LOGIN_PACKET_POOL
+			, CSerializableBuffer<FALSE>::GetPoolCapacity(), currentTime);
+	g_MonitorClient->SendPacket(m_MonitorClientSessionId, pLoginServerPacketPoolBuffer);
 }

@@ -16,11 +16,29 @@
     <Filter Include="Define">
       <UniqueIdentifier>{daa4e531-6548-40e9-ae92-048eca81c220}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Network\Net">
+    <Filter Include="Network\Server">
+      <UniqueIdentifier>{c1f0ccdc-3ccc-4f2e-b4ee-8a32d82693c9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Network\Server\Net">
       <UniqueIdentifier>{4e57c8e9-a1ac-4ee3-bd3c-55aa07c48d30}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Network\Event">
+      <UniqueIdentifier>{e021c496-aa3c-47d7-b08b-67ddec799c0f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Network\Client">
+      <UniqueIdentifier>{683159c3-a682-4663-b497-3b85bb6450e8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Network\Client\Lan">
+      <UniqueIdentifier>{5f85677b-bb68-48e2-a162-0d966942f5fd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="MonitoringClient">
+      <UniqueIdentifier>{1846f5f6-e60e-474f-9909-0726f4c780e2}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Database">
-      <UniqueIdentifier>{6713bb17-0b2d-4c31-b8c6-123980c04d44}</UniqueIdentifier>
+      <UniqueIdentifier>{7687903c-74ad-4588-a82e-4ea785800ab6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Network\Tool">
+      <UniqueIdentifier>{23146a71-7b42-4ae1-9f16-ccafdc61acd6}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -38,9 +56,6 @@
     </ClInclude>
     <ClInclude Include="CLogger.h">
       <Filter>Tools</Filter>
-    </ClInclude>
-    <ClInclude Include="DefineServer.h">
-      <Filter>Network</Filter>
     </ClInclude>
     <ClInclude Include="CMonitor.h">
       <Filter>Tools</Filter>
@@ -84,12 +99,6 @@
     <ClInclude Include="CEncryption.h">
       <Filter>Tools</Filter>
     </ClInclude>
-    <ClInclude Include="CNetServer.h">
-      <Filter>Network\Net</Filter>
-    </ClInclude>
-    <ClInclude Include="CNetSession.h">
-      <Filter>Network\Net</Filter>
-    </ClInclude>
     <ClInclude Include="CChatServer.h">
       <Filter>Content</Filter>
     </ClInclude>
@@ -111,17 +120,11 @@
     <ClInclude Include="ChatSetting.h">
       <Filter>Content</Filter>
     </ClInclude>
-    <ClInclude Include="ServerSetting.h">
-      <Filter>Network</Filter>
-    </ClInclude>
     <ClInclude Include="CTLSSharedPagePool.h">
       <Filter>DataStructures</Filter>
     </ClInclude>
     <ClInclude Include="CTLSPagePool.h">
       <Filter>DataStructures</Filter>
-    </ClInclude>
-    <ClInclude Include="COverlappedAllocator.h">
-      <Filter>Network</Filter>
     </ClInclude>
     <ClInclude Include="CDeque.h">
       <Filter>DataStructures</Filter>
@@ -129,20 +132,44 @@
     <ClInclude Include="CSingleMemoryPool.h">
       <Filter>DataStructures</Filter>
     </ClInclude>
-    <ClInclude Include="BaseEvent.h">
-      <Filter>Network</Filter>
-    </ClInclude>
-    <ClInclude Include="SystemEvent.h">
-      <Filter>Network</Filter>
-    </ClInclude>
     <ClInclude Include="ContentEvent.h">
       <Filter>Content</Filter>
+    </ClInclude>
+    <ClInclude Include="CNetServer.h">
+      <Filter>Network\Server\Net</Filter>
+    </ClInclude>
+    <ClInclude Include="SystemEvent.h">
+      <Filter>Network\Event</Filter>
+    </ClInclude>
+    <ClInclude Include="BaseEvent.h">
+      <Filter>Network\Event</Filter>
+    </ClInclude>
+    <ClInclude Include="COverlappedAllocator.h">
+      <Filter>Network\Tool</Filter>
+    </ClInclude>
+    <ClInclude Include="CLanClient.h">
+      <Filter>Network\Client\Lan</Filter>
+    </ClInclude>
+    <ClInclude Include="ClientSetting.h">
+      <Filter>Network\Client</Filter>
+    </ClInclude>
+    <ClInclude Include="CMonitorClient.h">
+      <Filter>MonitoringClient</Filter>
+    </ClInclude>
+    <ClInclude Include="MonitorSetting.h">
+      <Filter>MonitoringClient</Filter>
+    </ClInclude>
+    <ClInclude Include="CRedisConnector.h">
+      <Filter>Database</Filter>
     </ClInclude>
     <ClInclude Include="DBSetting.h">
       <Filter>Database</Filter>
     </ClInclude>
-    <ClInclude Include="CRedisConnector.h">
-      <Filter>Database</Filter>
+    <ClInclude Include="ServerSetting.h">
+      <Filter>Network\Server</Filter>
+    </ClInclude>
+    <ClInclude Include="DefineServer.h">
+      <Filter>Network\Server</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -168,12 +195,6 @@
     <ClCompile Include="CProfileManager.cpp">
       <Filter>Tools</Filter>
     </ClCompile>
-    <ClCompile Include="CNetServer.cpp">
-      <Filter>Network\Net</Filter>
-    </ClCompile>
-    <ClCompile Include="CNetSession.cpp">
-      <Filter>Network\Net</Filter>
-    </ClCompile>
     <ClCompile Include="CChatServer.cpp">
       <Filter>Content</Filter>
     </ClCompile>
@@ -192,20 +213,35 @@
     <ClCompile Include="ChatSetting.cpp">
       <Filter>Content</Filter>
     </ClCompile>
-    <ClCompile Include="ServerSetting.cpp">
-      <Filter>Network</Filter>
-    </ClCompile>
-    <ClCompile Include="COverlappedAllocator.cpp">
-      <Filter>Network</Filter>
-    </ClCompile>
-    <ClCompile Include="SystemEvent.cpp">
-      <Filter>Network</Filter>
-    </ClCompile>
     <ClCompile Include="ContentEvent.cpp">
       <Filter>Content</Filter>
     </ClCompile>
+    <ClCompile Include="CNetServer.cpp">
+      <Filter>Network\Server\Net</Filter>
+    </ClCompile>
+    <ClCompile Include="SystemEvent.cpp">
+      <Filter>Network\Event</Filter>
+    </ClCompile>
+    <ClCompile Include="COverlappedAllocator.cpp">
+      <Filter>Network\Tool</Filter>
+    </ClCompile>
+    <ClCompile Include="CLanClient.cpp">
+      <Filter>Network\Client\Lan</Filter>
+    </ClCompile>
+    <ClCompile Include="ClientSetting.cpp">
+      <Filter>Network\Client</Filter>
+    </ClCompile>
+    <ClCompile Include="CMonitorClient.cpp">
+      <Filter>MonitoringClient</Filter>
+    </ClCompile>
+    <ClCompile Include="MonitorSetting.cpp">
+      <Filter>MonitoringClient</Filter>
+    </ClCompile>
     <ClCompile Include="DBSetting.cpp">
       <Filter>Database</Filter>
+    </ClCompile>
+    <ClCompile Include="ServerSetting.cpp">
+      <Filter>Network\Server</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

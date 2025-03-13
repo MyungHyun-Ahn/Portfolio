@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "CNetServer.h"
-#include "CNetSession.h"
 #include "DBSetting.h"
 #include "CDBConnector.h"
 #include "CRedisConnector.h"
@@ -62,6 +61,7 @@ bool CLoginProcessPacket::PacketProcReqLogin(UINT64 sessionId, CSmartPtr<CSerial
 		}
 	}
 
+	// 인증 성공 TPS
 	InterlockedIncrement(&g_monitor.m_lAuthTPS);
 
 	CSerializableBuffer<FALSE> *loginRes = CGenPacket::makePacketResLogin(accountNo, (BYTE)dfLOGIN_STATUS_OK, ID, Nickname, L"0.0.0.0", 0, LOGIN_SERVER_SETTING::CHAT_SERVER_IP_1.c_str(), LOGIN_SERVER_SETTING::CHAT_SERVER_PORT_1);

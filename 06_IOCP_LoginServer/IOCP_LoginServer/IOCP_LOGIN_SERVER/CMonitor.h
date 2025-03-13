@@ -11,6 +11,9 @@ public:
 	void UpdatePDH() noexcept;
 
 	void MonitoringConsole(INT sessionCount) noexcept;
+	void SendMonitoringServer(INT sessionCount) noexcept;
+
+	inline void SetMonitorClient(UINT64 sessionId) { m_MonitorClientSessionId = sessionId; }
 
 public:
 	// Interlocked 사용 변수들 띄워놓음
@@ -94,6 +97,8 @@ public:
 
 	// 초당 메시지 발생 빈도 체크
 	LONG m_lAuthTPS = 0;
+
+	UINT64 m_MonitorClientSessionId = 0;
 };
 
 extern CMonitor g_monitor;
