@@ -32,7 +32,7 @@ CMonitor::CMonitor(HANDLE hProcess) noexcept
 
 	PdhOpenQuery(NULL, NULL, &m_PDHQuery);
 
-	PdhAddCounter(m_PDHQuery, L"\\Process(IOCP_CHAT_SERVER)\\Pool Nonpaged Bytes", NULL, &m_ProcessNPMemoryCounter);
+	PdhAddCounter(m_PDHQuery, L"\\Process(IOCP_MONITOR_SERVER)\\Pool Nonpaged Bytes", NULL, &m_ProcessNPMemoryCounter);
 	PdhAddCounter(m_PDHQuery, L"\\Memory\\Pool Nonpaged Bytes", NULL, &m_SystemNPMemoryCounter);
 	PdhAddCounter(m_PDHQuery, L"\\Memory\\Available MBytes", NULL, &m_SystemAvailableMemoryCounter);
 	PdhAddCounter(m_PDHQuery, L"\\Network Interface(Realtek PCIe GBE Family Controller)\\Bytes Sent/sec", NULL, &m_NetworkSendKB1Counter);
@@ -177,22 +177,16 @@ void CMonitor::MonitoringConsole(INT sessionCount) noexcept
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Process memory usage");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\ttotal \t: %u MB", m_stPmc.PrivateUsage / (1024 * 1024));
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tnon-paged pool \t: %u KB\n", m_ProcessNPMemoryVal.largeValue / (1024));
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"System memory usage");
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tavailable \t: %u MB", m_SystemAvailableMemoryVal.largeValue);
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tnon-paged pool \t: %u MB\n", m_SystemNPMemoryVal.largeValue / (1024 * 1024));
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Processor CPU usage");
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tTotal \t: %f", m_fProcessorTotal);
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tUser \t: %f", m_fProcessorUser);
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tKernel \t: %f\n", m_fProcessorKernel);
+
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Process CPU usage");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tTotal \t: %f", m_fProcessTotal);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tUser \t: %f", m_fProcessUser);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tKernel \t: %f\n", m_fProcessKernel);
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Network");
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSend1 \t: %u KB", m_NetworkSendKB1Val.largeValue / (1024));
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSend2 \t: %u KB", m_NetworkSendKB2Val.largeValue / (1024));
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRecv1 \t: %u KB", m_NetworkRecvKB1Val.largeValue / (1024));
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRecv2 \t: %u KB", m_NetworkRecvKB2Val.largeValue / (1024));
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRetransmission \t: %u", m_NetworkRetransmissionVal.largeValue);
+
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Pool");
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tLanSBuffer \t: %d", CSerializableBuffer<TRUE>::GetPoolCapacity());
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tNetSBuffer \t: %d", CSerializableBuffer<FALSE>::GetPoolCapacity());
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tLanView \t: %d", CSerializableBufferView<TRUE>::GetPoolCapacity());
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tNetView \t: %d", CSerializableBufferView<FALSE>::GetPoolCapacity());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"----------------------------------------");
 }

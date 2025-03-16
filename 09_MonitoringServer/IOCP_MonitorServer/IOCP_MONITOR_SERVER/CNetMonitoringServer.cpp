@@ -31,6 +31,7 @@ void CNetMonitoringServer::OnClientLeave(const UINT64 sessionID) noexcept
 
 void CNetMonitoringServer::OnRecv(const UINT64 sessionID, CSerializableBufferView<FALSE> *message) noexcept
 {
+	message->IncreaseRef();
 	BOOL isSuccessRecv = TRUE;
 	WORD type;
 	*message >> type;

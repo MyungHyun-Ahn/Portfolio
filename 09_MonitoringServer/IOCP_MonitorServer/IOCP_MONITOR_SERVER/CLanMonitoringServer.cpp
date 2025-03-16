@@ -33,6 +33,7 @@ void CLanMonitoringServer::OnClientLeave(const UINT64 sessionID) noexcept
 
 void CLanMonitoringServer::OnRecv(const UINT64 sessionID, CSerializableBufferView<TRUE> *message) noexcept
 {
+	message->IncreaseRef();
 	BOOL isSuccessRecv = TRUE;
 	WORD type;
 	*message >> type;
