@@ -14,6 +14,9 @@ CMonitor g_monitor;
 
 CMonitor::CMonitor(HANDLE hProcess) noexcept
 {
+	time_t startTime = time(nullptr);
+	localtime_s(&m_startTime, &startTime);
+
 	if (hProcess == INVALID_HANDLE_VALUE)
 	{
 		m_hProcess = GetCurrentProcess();
@@ -185,8 +188,19 @@ void CMonitor::UpdatePDH() noexcept
 
 void CMonitor::MonitoringConsole(INT sessionCount, INT playerCount) noexcept
 {
+	time_t currentTime = time(nullptr);
+	localtime_s(&m_currentTime, &currentTime);
+
 	// Cpu Usage
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"----------------------------------------");
+	// 년 월 일 시 분 초
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tstart \t: %04d.%02d.%02d.%02d.%02d.%02d",
+		m_startTime.tm_year + 1900, m_startTime.tm_mon + 1, m_startTime.tm_mday,
+		m_startTime.tm_hour, m_startTime.tm_min, m_startTime.tm_sec);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tnow \t: %04d.%02d.%02d.%02d.%02d.%02d",
+		m_currentTime.tm_year + 1900, m_currentTime.tm_mon + 1, m_currentTime.tm_mday,
+		m_currentTime.tm_hour, m_currentTime.tm_min, m_currentTime.tm_sec);
+
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"              System info");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Process memory usage");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\ttotal \t: %u MB", m_stPmc.PrivateUsage / (1024 * 1024));
@@ -216,7 +230,7 @@ void CMonitor::MonitoringConsole(INT sessionCount, INT playerCount) noexcept
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tServer FPS \t: %lld", m_lServerFrame);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tAccept total \t: %lld", m_lAcceptTotal);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSession count \t: %d", sessionCount);
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tPlayer count \t: %d\n", playerCount);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tPlayer count \t: %d", playerCount);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tMsg queue \t: %d\n", ((CChatServer *)NET_SERVER::g_NetServer)->m_RecvJobQ.GetUseSize());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Pool capacity");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSession pool capacity \t: %d, usage \t: %d", NET_SERVER::CNetSession::GetPoolCapacity(), NET_SERVER::CNetSession::GetPoolUsage());
@@ -229,10 +243,7 @@ void CMonitor::MonitoringConsole(INT sessionCount, INT playerCount) noexcept
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRecv\t : %d \t Avr : %lf", m_lRecvTPS, (DOUBLE)m_RecvTPSTotal / m_LoopCount);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSend\t : %d \t Avr : %lf", m_lSendTPS, (DOUBLE)m_SendTPSTotal / m_LoopCount);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tUpdate\t : %d \t Avr : %lf", m_lUpdateTPS, (DOUBLE)m_UpdateTPSTotal / m_LoopCount);
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tMaxSend\t : %d", m_lMaxSendCount);
-	// g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tLoginReq\t : %d\t\tSectorMoveReq\t : %d", m_loginReq, m_sectorMoveReq);
-	// g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tChatMsgReq\t : %d\t\tChatMsgRes\t : %d", m_chatMsgReq, m_chatMsgRes);
-	// g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSendQEnqueue\t : %d", m_sendQEnqueueCount);
+	// g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tMaxSend\t : %d", m_lMaxSendCount);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"----------------------------------------");
 }
 
