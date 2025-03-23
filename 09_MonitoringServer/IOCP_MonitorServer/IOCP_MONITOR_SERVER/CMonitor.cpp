@@ -1,5 +1,7 @@
 #include "pch.h"
 #include "CMonitor.h"
+#include "CNetServer.h"
+#include "CLanServer.h"
 
 CMonitor g_monitor;
 
@@ -182,7 +184,10 @@ void CMonitor::MonitoringConsole(INT sessionCount) noexcept
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tTotal \t: %f", m_fProcessTotal);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tUser \t: %f", m_fProcessUser);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tKernel \t: %f\n", m_fProcessKernel);
-
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"              Server info");
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Session");
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tLanServer \t: %d", LAN_SERVER::g_LanServer->GetSessionCount());
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tNetServer \t: %d\n", NET_SERVER::g_NetServer->GetSessionCount());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Pool");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tLanSBuffer \t: %d", CSerializableBuffer<TRUE>::GetPoolCapacity());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tNetSBuffer \t: %d", CSerializableBuffer<FALSE>::GetPoolCapacity());

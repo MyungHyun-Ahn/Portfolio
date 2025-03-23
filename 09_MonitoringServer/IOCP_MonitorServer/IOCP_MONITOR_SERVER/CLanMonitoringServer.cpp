@@ -10,6 +10,11 @@
 CLanMonitoringServer::CLanMonitoringServer()
 {
 	InitializeSRWLock(&m_umapLock);
+
+	for (int i = 0; i < dfMONITOR_DATA_TYPE_END; i++)
+	{
+		InitializeSRWLock(&m_arrMonitorInfo[i].srwLock);
+	}
 }
 
 bool CLanMonitoringServer::OnConnectionRequest(const WCHAR *ip, USHORT port) noexcept
@@ -87,9 +92,13 @@ void CLanMonitoringServer::OnRecv(const UINT64 sessionID, CSerializableBufferVie
 		INT timeStamp;
 		*message >> dataType >> dataValue >> timeStamp;
 
+		AcquireSRWLockExclusive(&m_arrMonitorInfo[dataType].srwLock);
 		m_arrMonitorInfo[dataType].serverNo = serverNo;
-		m_arrMonitorInfo[dataType].dataValue = dataValue;
-		m_arrMonitorInfo[dataType].timeStamp = timeStamp;	
+		m_arrMonitorInfo[dataType].dataSum += dataValue;
+		m_arrMonitorInfo[dataType].dataMin = min(m_arrMonitorInfo[dataType].dataMin, dataValue);
+		m_arrMonitorInfo[dataType].dataMax = max(m_arrMonitorInfo[dataType].dataMax, dataValue);
+		m_arrMonitorInfo[dataType].timeStamp = timeStamp;
+		ReleaseSRWLockExclusive(&m_arrMonitorInfo[dataType].srwLock);
 
 		((CNetMonitoringServer *)NET_SERVER::g_NetServer)->SendMonitoringData(serverNo, dataType, dataValue, timeStamp);
 	}

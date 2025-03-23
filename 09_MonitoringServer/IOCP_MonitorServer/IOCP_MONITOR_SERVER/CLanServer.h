@@ -160,7 +160,7 @@ namespace LAN_SERVER
 		void RegisterTimerEvent(BaseEvent *timerEvent) noexcept;
 		static void RegisterTimerEventAPCFunc(ULONG_PTR lpParam) noexcept;
 
-
+		inline LONG GetSessionCount() noexcept { return m_iSessionCount; };
 
 	private:
 		// Session

@@ -105,6 +105,9 @@ public:
 	LONG m_chatMsgRes = 0;
 
 	UINT64 m_MonitorClientSessionId = 0;
+
+	tm m_startTime;
+	tm m_currentTime;
 };
 
 extern CMonitor g_monitor;

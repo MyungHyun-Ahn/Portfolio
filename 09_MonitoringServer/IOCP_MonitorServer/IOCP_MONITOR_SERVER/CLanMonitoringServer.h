@@ -2,8 +2,11 @@
 
 struct MonitoringInfo
 {
+	SRWLOCK srwLock;
 	INT serverNo = 0;
-	INT dataValue = 0;
+	INT dataSum = 0;
+	INT dataMax = INT_MIN;
+	INT dataMin = INT_MAX;
 	INT timeStamp = 0;
 };
 

@@ -39,6 +39,22 @@ void DBTimerEvent::Excute() noexcept
 		if(pArrMonitorInfo[i].timeStamp == 0)
 			continue;
 
-		pConnector->Query(L"INSERT INTO monitorlog_%04d%02d (serverno, type, value) VALUES (%d, %d, %d);", t.tm_year + 1900, t.tm_mon + 1, pArrMonitorInfo[i].serverNo, i, pArrMonitorInfo[i].dataValue);
+		INT avg;
+		INT min;
+		INT max;
+
+		AcquireSRWLockExclusive(&pArrMonitorInfo[i].srwLock);
+
+		avg = pArrMonitorInfo[i].dataSum / 60;
+		min = pArrMonitorInfo[i].dataMin;
+		max = pArrMonitorInfo[i].dataMax;
+
+		pArrMonitorInfo[i].dataSum = 0;
+		pArrMonitorInfo[i].dataMin = INT_MAX;
+		pArrMonitorInfo[i].dataMax = INT_MIN;
+
+		ReleaseSRWLockExclusive(&pArrMonitorInfo[i].srwLock);
+
+		pConnector->Query(L"INSERT INTO monitorlog_%04d%02d (serverno, type, avg, min, max) VALUES (%d, %d, %d, %d, %d);", t.tm_year + 1900, t.tm_mon + 1, pArrMonitorInfo[i].serverNo, i, avg, min, max);
 	}
 }
