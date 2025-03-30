@@ -1,5 +1,4 @@
 #include "pch.h"
-#include "MyInclude.h"
 #include "ServerSetting.h"
 #include "CNetServer.h"
 #include "CGameServer.h"

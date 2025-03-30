@@ -1,6 +1,6 @@
 #pragma once
 
-namespace NETWORK_SERVER
+namespace NET_SERVER
 {
 	class CNetServer;
 }
@@ -36,7 +36,7 @@ enum class RECV_RET
 class CBaseContent
 {
 public:
-	friend class NETWORK_SERVER::CNetServer;
+	friend class NET_SERVER::CNetServer;
 	friend struct ContentFrameEvent;
 	friend class CMonitor;
 

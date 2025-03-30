@@ -1,5 +1,4 @@
 #include "pch.h"
-#include "MyInclude.h"
 #include "ServerSetting.h"
 #include "CNetServer.h"
 #include "CommonProtocol.h"
@@ -62,14 +61,14 @@ RECV_RET CAuthContent::OnRecv(const UINT64 sessionID, CSerializableBuffer<FALSE>
 		LeaveJobEnqueue(sessionID);
 
 		// EchoContent¿¡ MoveJob Enqueue
-		CEchoContent *pEchoContent = ((CGameServer *)NETWORK_SERVER::g_NetServer)->m_pEchoContent;
+		CEchoContent *pEchoContent = ((CGameServer *)NET_SERVER::g_NetServer)->m_pEchoContent;
 		CPlayer *pPlayer = CPlayer::Alloc();
 		pPlayer->m_iAccountNo = accountNo;
 		pEchoContent->MoveJobEnqueue(sessionID, pPlayer);
 
 		CSerializableBuffer<FALSE> *pLoginRes = CGenPacket::makePacketResLogin(1, accountNo);
 		pLoginRes->IncreaseRef();
-		NETWORK_SERVER::g_NetServer->SendPacket(sessionID, pLoginRes);
+		NET_SERVER::g_NetServer->SendPacket(sessionID, pLoginRes);
 		if (pLoginRes->DecreaseRef() == 0)
 			CSerializableBuffer<FALSE>::Free(pLoginRes);
 
@@ -141,7 +140,7 @@ RECV_RET CEchoContent::OnRecv(const UINT64 sessionID, CSerializableBuffer<FALSE>
 		// pEnqueueEvent->SetEvent(sessionID, pEchoRes);
 		// CContentThread::EnqueueEvent(pEnqueueEvent);
 
-		NETWORK_SERVER::g_NetServer->EnqueuePacket(sessionID, pEchoRes);
+		NET_SERVER::g_NetServer->EnqueuePacket(sessionID, pEchoRes);
 		if (pEchoRes->DecreaseRef() == 0)
 			CSerializableBuffer<FALSE>::Free(pEchoRes);
 	}
@@ -173,5 +172,5 @@ RECV_RET CEchoContent::OnRecv(const UINT64 sessionID, CSerializableBuffer<FALSE>
 
 void CEchoContent::OnLoopEnd() noexcept
 {
-	NETWORK_SERVER::g_NetServer->SendAllPQCS();
+	NET_SERVER::g_NetServer->SendAllPQCS();
 }

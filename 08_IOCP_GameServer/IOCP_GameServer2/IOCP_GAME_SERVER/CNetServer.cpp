@@ -1,12 +1,11 @@
 #include "pch.h" 
-#include "MyInclude.h"
 #include "ServerSetting.h"
 #include "CNetServer.h"
 #include "SystemEvent.h"
 #include "CContentThread.h"
 #include "CBaseContent.h"
 
-namespace NETWORK_SERVER
+namespace NET_SERVER
 {
 	CNetServer *g_NetServer = nullptr;
 

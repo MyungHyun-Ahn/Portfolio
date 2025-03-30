@@ -1,8 +1,11 @@
 #include "pch.h"
-#include "MyInclude.h"
 #include "CMonitor.h"
 #include "ServerSetting.h"
 #include "CNetServer.h"
+#include "CLanClient.h"
+#include "CMonitorClient.h"
+#include "CGenPacket.h"
+#include "CommonProtocol.h"
 #include "CGameServer.h"
 #include "CBaseContent.h"
 #include "CGameContent.h"
@@ -12,6 +15,9 @@ CMonitor g_monitor;
 
 CMonitor::CMonitor(HANDLE hProcess) noexcept
 {
+	time_t startTime = time(nullptr);
+	localtime_s(&m_startTime, &startTime);
+
 	if (hProcess == INVALID_HANDLE_VALUE)
 	{
 		m_hProcess = GetCurrentProcess();
@@ -39,7 +45,7 @@ CMonitor::CMonitor(HANDLE hProcess) noexcept
 
 	PdhOpenQuery(NULL, NULL, &m_PDHQuery);
 
-	PdhAddCounter(m_PDHQuery, L"\\Process(IOCP_CHAT_SERVER)\\Pool Nonpaged Bytes", NULL, &m_ProcessNPMemoryCounter);
+	PdhAddCounter(m_PDHQuery, L"\\Process(IOCP_GAME_SERVER)\\Pool Nonpaged Bytes", NULL, &m_ProcessNPMemoryCounter);
 	PdhAddCounter(m_PDHQuery, L"\\Memory\\Pool Nonpaged Bytes", NULL, &m_SystemNPMemoryCounter);
 	PdhAddCounter(m_PDHQuery, L"\\Memory\\Available MBytes", NULL, &m_SystemAvailableMemoryCounter);
 	PdhAddCounter(m_PDHQuery, L"\\Network Interface(Realtek PCIe GBE Family Controller)\\Bytes Sent/sec", NULL, &m_NetworkSendKB1Counter);
@@ -63,6 +69,7 @@ void CMonitor::Update() noexcept
 
 	// 모니터링 콘솔
 	MonitoringConsole();
+	SendMonitoringServer();
 
 	UpdateServer();
 }
@@ -151,15 +158,10 @@ void CMonitor::UpdateServer() noexcept
 	m_UpdateTPSTotal += m_lUpdateTPS;
 	InterlockedExchange(&m_lUpdateTPS, 0);
 
-	InterlockedExchange(&m_loginReq, 0);
-	InterlockedExchange(&m_sectorMoveReq, 0);
-	InterlockedExchange(&m_chatMsgReq, 0);
-	InterlockedExchange(&m_chatMsgRes, 0);
-
 	InterlockedExchange(&m_lMaxSendCount, 0);
 
-	InterlockedExchange(&((CGameServer *)NETWORK_SERVER::g_NetServer)->m_pAuthContent->m_FPS, 0);
-	InterlockedExchange(&((CGameServer *)NETWORK_SERVER::g_NetServer)->m_pEchoContent->m_FPS, 0);
+	InterlockedExchange(&((CGameServer *)NET_SERVER::g_NetServer)->m_pAuthContent->m_FPS, 0);
+	InterlockedExchange(&((CGameServer *)NET_SERVER::g_NetServer)->m_pEchoContent->m_FPS, 0);
 }
 
 void CMonitor::UpdateMemory() noexcept
@@ -183,8 +185,18 @@ void CMonitor::UpdatePDH() noexcept
 
 void CMonitor::MonitoringConsole() noexcept
 {
+	time_t currentTime = time(nullptr);
+	localtime_s(&m_currentTime, &currentTime);
+
 	// Cpu Usage
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"----------------------------------------");
+	// 년 월 일 시 분 초
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tstart \t: %04d.%02d.%02d.%02d.%02d.%02d",
+		m_startTime.tm_year + 1900, m_startTime.tm_mon + 1, m_startTime.tm_mday,
+		m_startTime.tm_hour, m_startTime.tm_min, m_startTime.tm_sec);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tnow \t: %04d.%02d.%02d.%02d.%02d.%02d",
+		m_currentTime.tm_year + 1900, m_currentTime.tm_mon + 1, m_currentTime.tm_mday,
+		m_currentTime.tm_hour, m_currentTime.tm_min, m_currentTime.tm_sec);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"              System info");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Process memory usage");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\ttotal \t: %u MB", m_stPmc.PrivateUsage / (1024 * 1024));
@@ -207,19 +219,18 @@ void CMonitor::MonitoringConsole() noexcept
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRecv2 \t: %u KB", m_NetworkRecvKB2Val.largeValue / (1024));
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRetransmission \t: %u\n", m_NetworkRetransmissionVal.largeValue);
 	
-
 	// Server Monitor
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"        Server monitoring info");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Info");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tAccept total \t: %lld", m_lAcceptTotal);
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSession count \t: %d", NETWORK_SERVER::g_NetServer->GetSessionCount());
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tNonLoginPlayer count \t: %d", ((CGameServer *)NETWORK_SERVER::g_NetServer)->m_pAuthContent->m_umapSessions.size());
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tLoginPlayer count \t: %d\n", ((CGameServer *)NETWORK_SERVER::g_NetServer)->m_pEchoContent->m_umapSessions.size());
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSession count \t: %d", NET_SERVER::g_NetServer->GetSessionCount());
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tNonLoginPlayer count \t: %d", ((CGameServer *)NET_SERVER::g_NetServer)->m_pAuthContent->m_umapSessions.size());
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tLoginPlayer count \t: %d\n", ((CGameServer *)NET_SERVER::g_NetServer)->m_pEchoContent->m_umapSessions.size());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Frame");
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tAuthContent \t: %d", ((CGameServer *)NETWORK_SERVER::g_NetServer)->m_pAuthContent->m_FPS);
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tEchoContent \t: %d\n", ((CGameServer *)NETWORK_SERVER::g_NetServer)->m_pEchoContent->m_FPS);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tAuthContent \t: %d", ((CGameServer *)NET_SERVER::g_NetServer)->m_pAuthContent->m_FPS);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tEchoContent \t: %d\n", ((CGameServer *)NET_SERVER::g_NetServer)->m_pEchoContent->m_FPS);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Pool capacity");
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSession pool capacity \t: %d, usage \t: %d", NETWORK_SERVER::CNetSession::GetPoolCapacity(), NETWORK_SERVER::CNetSession::GetPoolUsage());
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSession pool capacity \t: %d, usage \t: %d", NET_SERVER::CNetSession::GetPoolCapacity(), NET_SERVER::CNetSession::GetPoolUsage());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tBuffer pool capacity \t: %d, usage \t: %d", CSerializableBuffer<FALSE>::GetPoolCapacity(), CSerializableBuffer<FALSE>::GetPoolUsage());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tView pool capacity \t: %d, usage \t: %d", CSerializableBufferView<FALSE>::GetPoolCapacity(), CSerializableBufferView<FALSE>::GetPoolUsage());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRecv pool capacity \t: %d, usage \t: %d", CRecvBuffer::GetPoolCapacity(), CRecvBuffer::GetPoolUsage());
@@ -231,4 +242,93 @@ void CMonitor::MonitoringConsole() noexcept
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tUpdate\t : %d \t Avr : %lf", m_lUpdateTPS, (DOUBLE)m_UpdateTPSTotal / m_LoopCount);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tMaxSend\t : %d", m_lMaxSendCount);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"----------------------------------------");
+}
+
+void CMonitor::SendMonitoringServer() noexcept
+{
+	int currentTime = time(NULL);
+	CSerializableBuffer<TRUE> *pGameServerRunBuffer
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_GAME_SERVER_RUN
+			, TRUE, currentTime);
+	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pGameServerRunBuffer);
+
+	CSerializableBuffer<TRUE> *pCpuTotalBuffer
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_MONITOR_CPU_TOTAL
+			, m_fProcessorTotal, currentTime);
+	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pCpuTotalBuffer);
+
+	CSerializableBuffer<TRUE> *pNonpagedMemBuffer
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_MONITOR_NONPAGED_MEMORY
+			, m_SystemNPMemoryVal.largeValue / (1024 * 1024), currentTime);
+	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pNonpagedMemBuffer);
+
+	CSerializableBuffer<TRUE> *pNetworkRecvBuffer
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_MONITOR_NETWORK_RECV
+			, m_NetworkRecvKB1Val.largeValue / (1024) + m_NetworkRecvKB2Val.largeValue / (1024), currentTime);
+	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pNetworkRecvBuffer);
+
+	CSerializableBuffer<TRUE> *pNetworkSendBuffer
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_MONITOR_NETWORK_SEND
+			, m_NetworkSendKB1Val.largeValue / (1024) + m_NetworkSendKB2Val.largeValue / (1024), currentTime);
+	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pNetworkSendBuffer);
+
+	CSerializableBuffer<TRUE> *pAvailableMemBuffer
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_MONITOR_AVAILABLE_MEMORY
+			, m_SystemAvailableMemoryVal.largeValue, currentTime);
+	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pAvailableMemBuffer);
+
+	CSerializableBuffer<TRUE> *pGameServerCpuBuffer
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_GAME_SERVER_CPU
+			, m_fProcessTotal, currentTime);
+	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pGameServerCpuBuffer);
+
+	CSerializableBuffer<TRUE> *pGameServerMemBuffer
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_GAME_SERVER_MEM
+			, m_stPmc.PrivateUsage / (1024 * 1024), currentTime);
+	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pGameServerMemBuffer);
+
+	CSerializableBuffer<TRUE> *pGameServerSession
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_GAME_SESSION
+			, NET_SERVER::g_NetServer->GetSessionCount(), currentTime);
+	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pGameServerSession);
+
+	CSerializableBuffer<TRUE> *pGameServerAuthPlayer
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_GAME_AUTH_PLAYER
+			, ((CGameServer *)NET_SERVER::g_NetServer)->m_pAuthContent->m_umapSessions.size(), currentTime);
+	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pGameServerAuthPlayer);
+
+	CSerializableBuffer<TRUE> *pGameServerGamePlayer
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_GAME_GAME_PLAYER
+			, ((CGameServer *)NET_SERVER::g_NetServer)->m_pEchoContent->m_umapSessions.size(), currentTime);
+	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pGameServerGamePlayer);
+
+	CSerializableBuffer<TRUE> *pGameAcceptTPS
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_GAME_ACCEPT_TPS
+			, m_lAcceptTPS, currentTime);
+	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pGameAcceptTPS);
+
+	CSerializableBuffer<TRUE> *pGamePacketRecvTPS
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_GAME_PACKET_RECV_TPS
+			, m_lRecvTPS, currentTime);
+	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pGamePacketRecvTPS);
+
+	CSerializableBuffer<TRUE> *pGamePacketSendTPS
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_GAME_PACKET_SEND_TPS
+			, m_lSendTPS, currentTime);
+	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pGamePacketSendTPS);
+
+	CSerializableBuffer<TRUE> *pGamePacketAuthFPS
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_GAME_AUTH_THREAD_FPS
+			, ((CGameServer *)NET_SERVER::g_NetServer)->m_pAuthContent->m_FPS, currentTime);
+	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pGamePacketAuthFPS);
+
+	CSerializableBuffer<TRUE> *pGamePacketGameFPS
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_GAME_GAME_THREAD_FPS
+			, ((CGameServer *)NET_SERVER::g_NetServer)->m_pEchoContent->m_FPS, currentTime);
+	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pGamePacketGameFPS);
+
+	CSerializableBuffer<TRUE> *pGamePacketPacketPool
+		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_GAME_PACKET_POOL
+			, CSerializableBuffer<FALSE>::GetPoolCapacity(), currentTime);
+	g_MonitorClient->SendPacket(m_MonitorClientSessionId, pGamePacketPacketPool);
 }

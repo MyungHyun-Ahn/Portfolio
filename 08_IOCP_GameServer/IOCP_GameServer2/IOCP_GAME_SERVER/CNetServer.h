@@ -3,7 +3,7 @@
 struct ContentFrameEvent;
 class CBaseContent;
 
-namespace NETWORK_SERVER
+namespace NET_SERVER
 {
 	class CNetSession
 	{

@@ -1,9 +1,15 @@
 #pragma once
 
-namespace NETWORK_SERVER
+namespace NET_SERVER
 {
 	class CNetSession;
 }
+
+namespace LAN_CLIENT
+{
+	class CLanSession;
+}
+
 
 // CRecvBuffer로 받은 데이터를 직렬화 버퍼처럼 볼 수 있게 함
 template<bool isLanServer>
@@ -15,7 +21,8 @@ public:
 
 
 private:
-	friend class NETWORK_SERVER::CNetSession;
+	friend class NET_SERVER::CNetSession;
+	friend class LAN_CLIENT::CLanSession;
 
 	// 오프셋 시작과 끝을 받음
 	inline void Init(CSmartPtr<CRecvBuffer> spRecvBuffer, int offsetStart, int offsetEnd) noexcept
@@ -54,6 +61,7 @@ private:
 			delete[] m_pBuffer;
 		}
 		m_pBuffer = nullptr;
+		m_uiSessionId = 0;
 	}
 	// 이걸 보고 헤더가 딜레이 된 것이라면 지연처리 작업
 	inline USHORT isReadHeaderSize() noexcept
@@ -268,6 +276,7 @@ private:
 	USHORT m_iReadHeaderSize = 0;
 
 	LONG			m_iRefCount = 0;
+	UINT64			m_uiSessionId = 0;
 
 	// inline static CLFMemoryPool<CSerializableBufferView> s_sbufferPool = CLFMemoryPool<CSerializableBufferView>(5000, false);
 	inline static CTLSMemoryPoolManager <CSerializableBufferView, 8, 8, false> s_sbufferPool = CTLSMemoryPoolManager <CSerializableBufferView, 8, 8, false>();

@@ -1,5 +1,5 @@
 #pragma once
-class CGameServer : public NETWORK_SERVER::CNetServer
+class CGameServer : public NET_SERVER::CNetServer
 {
 public:
 	friend class CAuthContent;

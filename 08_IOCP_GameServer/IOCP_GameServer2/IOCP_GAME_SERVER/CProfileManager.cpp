@@ -1,5 +1,4 @@
 #include "pch.h"
-#include "MyInclude.h"
 #include "CProfileManager.h"
 
 CProfileManager *g_ProfileMgr;

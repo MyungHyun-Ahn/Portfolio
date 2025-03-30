@@ -124,5 +124,5 @@ void CLanMonitoringServer::RegisterContentTimerEvent() noexcept
 {
 	DBTimerEvent *pDBEvent = new DBTimerEvent;
 	pDBEvent->SetEvent();
-	RegisterTimerEvent(pDBEvent);
+	// RegisterTimerEvent(pDBEvent);
 }

@@ -1,5 +1,4 @@
 #include "pch.h"
-#include "MyInclude.h"
 #include "ServerSetting.h"
 #include "BaseEvent.h"
 #include "CNetServer.h"
@@ -32,7 +31,7 @@ void KeyBoardTimerEvent::execute(int delayFrame) noexcept
 {
 	// 서버 종료
 	if (GetAsyncKeyState(VK_F1))
-		NETWORK_SERVER::g_NetServer->Stop();
+		NET_SERVER::g_NetServer->Stop();
 
 	// 프로파일러 저장
 	if (GetAsyncKeyState(VK_F2))
@@ -79,7 +78,7 @@ void SendAllTimerEvent::SetEvent() noexcept
 
 void SendAllTimerEvent::execute(int delayFrame) noexcept
 {
-	NETWORK_SERVER::g_NetServer->SendAll();
+	NET_SERVER::g_NetServer->SendAll();
 }
 
 void EnqueuePacketEvent::SetEvent(UINT64 sessionId, CSerializableBuffer<FALSE> *sBuffer) noexcept
@@ -91,7 +90,7 @@ void EnqueuePacketEvent::SetEvent(UINT64 sessionId, CSerializableBuffer<FALSE> *
 
 void EnqueuePacketEvent::execute(int delayFrame) noexcept
 {
-	NETWORK_SERVER::g_NetServer->EnqueuePacket(SessionId, SBuffer);
+	NET_SERVER::g_NetServer->EnqueuePacket(SessionId, SBuffer);
 	if (SBuffer->DecreaseRef() == 0)
 		CSerializableBuffer<FALSE>::Free(SBuffer);
 }

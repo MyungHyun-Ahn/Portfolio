@@ -110,7 +110,7 @@ public:
 	inline char *GetRearPtr() const noexcept { return m_PQueue + m_iRear; }
 
 private:
-	int				m_iCapacity = 15000 + 1; // 디폴트 1만 바이트 크기, + 1
+	int				m_iCapacity = 4096; // 디폴트 1만 바이트 크기, + 1
 
 	int				m_iFront = 0;
 	int				m_iRear = 0;

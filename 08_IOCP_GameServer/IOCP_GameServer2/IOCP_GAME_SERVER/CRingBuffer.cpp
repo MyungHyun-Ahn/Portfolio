@@ -1,5 +1,4 @@
 #include "pch.h"
-#include "MyInclude.h"
 #include "CRingBuffer.h"
 
 // 디폴트 생성자 10000 바이트 크기 생성

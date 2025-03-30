@@ -1,5 +1,4 @@
 #include "pch.h"
-#include "MyInclude.h"
 #include "CRecvBuffer.h"
 
 int CRecvBuffer::Peek(char *buffer, int size) noexcept

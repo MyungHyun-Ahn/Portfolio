@@ -1,5 +1,4 @@
 #include "pch.h"
-#include "MyInclude.h"
 #include "CLogger.h"
 
 CLogger *g_Logger;

@@ -1,19 +1,18 @@
 #include "pch.h"
-#include "MyInclude.h"
 #include "CNetServer.h"
 #include "CBaseContent.h"
 
 void CBaseContent::MoveJobEnqueue(UINT64 sessionID, void *pObject) noexcept
 {
-	NETWORK_SERVER::CNetSession *pSession = NETWORK_SERVER::g_NetServer->m_arrPSessions[NETWORK_SERVER::CNetServer::GetIndex(sessionID)];
+	NET_SERVER::CNetSession *pSession = NET_SERVER::g_NetServer->m_arrPSessions[NET_SERVER::CNetServer::GetIndex(sessionID)];
 
 	InterlockedIncrement(&pSession->m_iIOCountAndRelease);
 	// ReleaseFlag가 이미 켜진 상황
-	if ((pSession->m_iIOCountAndRelease & NETWORK_SERVER::CNetSession::RELEASE_FLAG) == NETWORK_SERVER::CNetSession::RELEASE_FLAG)
+	if ((pSession->m_iIOCountAndRelease & NET_SERVER::CNetSession::RELEASE_FLAG) == NET_SERVER::CNetSession::RELEASE_FLAG)
 	{
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
-			NETWORK_SERVER::g_NetServer->ReleaseSession(pSession);
+			NET_SERVER::g_NetServer->ReleaseSession(pSession);
 		}
 		return;
 	}
@@ -22,7 +21,7 @@ void CBaseContent::MoveJobEnqueue(UINT64 sessionID, void *pObject) noexcept
 	{
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
-			NETWORK_SERVER::g_NetServer->ReleaseSession(pSession);
+			NET_SERVER::g_NetServer->ReleaseSession(pSession);
 		}
 		return;
 	}
@@ -53,7 +52,7 @@ void CBaseContent::ConsumeMoveJob() noexcept
 		m_MoveJobQ.Dequeue(&moveJob);
 
 		// 세션 찾기
-		NETWORK_SERVER::CNetSession *pSession = NETWORK_SERVER::g_NetServer->m_arrPSessions[NETWORK_SERVER::CNetServer::GetIndex(moveJob->sessionID)];
+		NET_SERVER::CNetSession *pSession = NET_SERVER::g_NetServer->m_arrPSessions[NET_SERVER::CNetServer::GetIndex(moveJob->sessionID)];
 
 		// 여기까진 유효한 세션일 것
 		// objectPtr == nullptr이면 OnEnter 받은 쪽에서 생성
@@ -67,7 +66,7 @@ void CBaseContent::ConsumeMoveJob() noexcept
 
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
-			NETWORK_SERVER::g_NetServer->ReleaseSession(pSession);
+			NET_SERVER::g_NetServer->ReleaseSession(pSession);
 		}
 	}
 }
@@ -91,16 +90,16 @@ void CBaseContent::ConsumeRecvMsg() noexcept
 	for (auto &it : m_umapSessions)
 	{
 		UINT64 sessionId = it.first;
-		int sessionIdx = NETWORK_SERVER::CNetServer::GetIndex(sessionId);
-		NETWORK_SERVER::CNetSession *pSession = NETWORK_SERVER::g_NetServer->m_arrPSessions[sessionIdx];
+		int sessionIdx = NET_SERVER::CNetServer::GetIndex(sessionId);
+		NET_SERVER::CNetSession *pSession = NET_SERVER::g_NetServer->m_arrPSessions[sessionIdx];
 		
 		InterlockedIncrement(&pSession->m_iIOCountAndRelease);
 		// ReleaseFlag가 이미 켜진 상황
-		if ((pSession->m_iIOCountAndRelease & NETWORK_SERVER::CNetSession::RELEASE_FLAG) == NETWORK_SERVER::CNetSession::RELEASE_FLAG)
+		if ((pSession->m_iIOCountAndRelease & NET_SERVER::CNetSession::RELEASE_FLAG) == NET_SERVER::CNetSession::RELEASE_FLAG)
 		{
 			if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 			{
-				NETWORK_SERVER::g_NetServer->ReleaseSession(pSession);
+				NET_SERVER::g_NetServer->ReleaseSession(pSession);
 			}
 			continue;
 		}
@@ -109,7 +108,7 @@ void CBaseContent::ConsumeRecvMsg() noexcept
 		{
 			if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 			{
-				NETWORK_SERVER::g_NetServer->ReleaseSession(pSession);
+				NET_SERVER::g_NetServer->ReleaseSession(pSession);
 			}
 			continue;
 		}
@@ -132,7 +131,7 @@ void CBaseContent::ConsumeRecvMsg() noexcept
 			// 잘못된 메시지 수신
 			if (ret == RECV_RET::RECV_FALSE)
 			{
-				NETWORK_SERVER::g_NetServer->Disconnect(sessionId);
+				NET_SERVER::g_NetServer->Disconnect(sessionId);
 
 				if (pMsg->DecreaseRef() == 0)
 					CSerializableBuffer<FALSE>::Free(pMsg);
@@ -146,11 +145,11 @@ void CBaseContent::ConsumeRecvMsg() noexcept
 		}
 
 		if (recvMsgCount != 0)
-			NETWORK_SERVER::g_NetServer->SendPQCS(pSession);
+			NET_SERVER::g_NetServer->SendPQCS(pSession);
 
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
-			NETWORK_SERVER::g_NetServer->ReleaseSession(pSession);
+			NET_SERVER::g_NetServer->ReleaseSession(pSession);
 		}
 	}
 

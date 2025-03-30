@@ -13,3 +13,10 @@ struct NetHeader
 	BYTE checkSum;
 };
 #pragma pack(pop)
+
+#pragma pack(push, 1)
+struct LanHeader
+{
+	USHORT len;
+};
+#pragma pack(pop)

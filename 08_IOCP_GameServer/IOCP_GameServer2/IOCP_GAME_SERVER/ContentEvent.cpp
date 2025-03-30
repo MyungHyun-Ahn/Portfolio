@@ -1,5 +1,4 @@
 #include "pch.h"
-#include "MyInclude.h"
 #include "CNetServer.h"
 #include "ContentEvent.h"
 

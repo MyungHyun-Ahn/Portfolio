@@ -1,6 +1,6 @@
 #pragma once
 
-namespace NETWORK_SERVER
+namespace NET_SERVER
 {
 	class CNetServer;
 }
@@ -8,7 +8,7 @@ namespace NETWORK_SERVER
 class CContentThread
 {
 public:
-	friend class NETWORK_SERVER::CNetServer;
+	friend class NET_SERVER::CNetServer;
 	CContentThread() { InitializeSRWLock(&m_lockTimerEventQ); }
 	~CContentThread() { CloseHandle(m_ThreadHandle); }
 

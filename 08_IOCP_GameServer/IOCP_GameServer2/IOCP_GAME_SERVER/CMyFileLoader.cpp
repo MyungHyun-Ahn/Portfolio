@@ -1,5 +1,4 @@
 #include "pch.h"
-#include "MyInclude.h"
 #include "CMyFileLoader.h"
 
 VOID CMyFileLoader::Parse(const WCHAR *fileName) noexcept

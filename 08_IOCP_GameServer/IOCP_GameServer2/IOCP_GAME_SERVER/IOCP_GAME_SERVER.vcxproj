@@ -163,11 +163,14 @@
     <ClInclude Include="CGameContent.h" />
     <ClInclude Include="CGameServer.h" />
     <ClInclude Include="CGenPacket.h" />
+    <ClInclude Include="CLanClient.h" />
     <ClInclude Include="CLFMemoryPool.h" />
     <ClInclude Include="CLFQueue.h" />
     <ClInclude Include="CLFStack.h" />
+    <ClInclude Include="ClientSetting.h" />
     <ClInclude Include="CLogger.h" />
     <ClInclude Include="CMonitor.h" />
+    <ClInclude Include="CMonitorClient.h" />
     <ClInclude Include="CMyFileLoader.h" />
     <ClInclude Include="CNetServer.h" />
     <ClInclude Include="CommonProtocol.h" />
@@ -189,7 +192,7 @@
     <ClInclude Include="GameSetting.h" />
     <ClInclude Include="LFDefine.h" />
     <ClInclude Include="COverlappedAllocator.h" />
-    <ClInclude Include="MyInclude.h" />
+    <ClInclude Include="MonitorSetting.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="ServerSetting.h" />
     <ClInclude Include="SystemEvent.h" />
@@ -200,8 +203,11 @@
     <ClCompile Include="CGameContent.cpp" />
     <ClCompile Include="CGameServer.cpp" />
     <ClCompile Include="CGenPacket.cpp" />
+    <ClCompile Include="CLanClient.cpp" />
+    <ClCompile Include="ClientSetting.cpp" />
     <ClCompile Include="CLogger.cpp" />
     <ClCompile Include="CMonitor.cpp" />
+    <ClCompile Include="CMonitorClient.cpp" />
     <ClCompile Include="CMyFileLoader.cpp" />
     <ClCompile Include="CNetServer.cpp" />
     <ClCompile Include="ContentEvent.cpp" />
@@ -212,12 +218,7 @@
     <ClCompile Include="CRingBuffer.cpp" />
     <ClCompile Include="GameSetting.cpp" />
     <ClCompile Include="Main.cpp" />
-    <ClCompile Include="MyInclude.cpp">
-      <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Disabled</Optimization>
-      <Optimization Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Disabled</Optimization>
-      <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Disabled</Optimization>
-      <Optimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Disabled</Optimization>
-    </ClCompile>
+    <ClCompile Include="MonitorSetting.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>

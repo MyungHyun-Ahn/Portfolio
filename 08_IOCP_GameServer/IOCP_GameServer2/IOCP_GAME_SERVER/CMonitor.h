@@ -11,6 +11,9 @@ public:
 	void UpdatePDH() noexcept;
 
 	void MonitoringConsole() noexcept;
+	void SendMonitoringServer() noexcept;
+
+	inline void SetMonitorClient(UINT64 sessionId) { m_MonitorClientSessionId = sessionId; }
 
 public:
 	// Interlocked 사용 변수들 띄워놓음
@@ -84,20 +87,16 @@ public:
 
 	LONG m_lServerFrame = 0;
 
-	//
 	UINT64 m_LoopCount = 0;
 	UINT64 m_AcceptTPSTotal = 0;
 	UINT64 m_RecvTPSTotal = 0;
 	UINT64 m_SendTPSTotal = 0;
 	UINT64 m_UpdateTPSTotal = 0;
 
-	// 초당 메시지 발생 빈도 체크
-	LONG m_loginReq = 0;
-	LONG m_sectorMoveReq = 0;
-	LONG m_chatMsgReq = 0;
+	UINT64 m_MonitorClientSessionId = 0;
 
-	// SendPacket 호출 횟수
-	LONG m_chatMsgRes = 0;
+	tm m_startTime;
+	tm m_currentTime;
 };
 
 extern CMonitor g_monitor;
