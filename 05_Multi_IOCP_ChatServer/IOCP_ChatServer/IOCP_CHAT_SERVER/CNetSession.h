@@ -50,6 +50,10 @@ public:
 	inline static CNetSession *Alloc() noexcept
 	{
 		CNetSession *pSession = s_sSessionPool.Alloc();
+
+		if (pSession->m_lfSendBufferQueue.GetUseSize() != 0)
+			__debugbreak();
+
 		return pSession;
 	}
 

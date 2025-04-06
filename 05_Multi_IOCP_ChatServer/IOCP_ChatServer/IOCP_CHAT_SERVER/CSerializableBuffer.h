@@ -369,6 +369,9 @@ public:
 
 	inline static void Free(CSerializableBuffer *delSBuffer) noexcept
 	{
+		if (delSBuffer->m_iRefCount != 0)
+			__debugbreak();
+
 		s_sbufferPool.Free(delSBuffer);
 	}
 

@@ -68,7 +68,7 @@ private:
 	// 64KB를 1개의 버킷으로 간주
 	// 처음 할당할 때 연결된 메모리 영역을 할당 받을 것임
 	// MAX_BUCKET_SIZE * 64KB의 영역을 할당
-	static constexpr int MAX_BUCKET_SIZE = 30;
+	static constexpr int MAX_BUCKET_SIZE = 60;
 
 	LONG m_lSessionIndex = -1;
 	char *m_pOverlappeds = nullptr;

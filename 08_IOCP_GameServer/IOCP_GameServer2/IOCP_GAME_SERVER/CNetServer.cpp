@@ -673,8 +673,6 @@ namespace NET_SERVER
 			return FALSE;
 		}
 
-		__debugbreak();
-
 		// Io 실패 유도
 		CancelIoEx((HANDLE)pSession->m_sSessionSocket, nullptr);
 

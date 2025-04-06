@@ -163,9 +163,9 @@ void CChatServer::OnError(int errorcode, WCHAR *errMsg) noexcept
 
 void CChatServer::RegisterContentTimerEvent() noexcept
 {
-	SectorBroadcastEvent *sectorBroadcastEvent = new SectorBroadcastEvent;
-	sectorBroadcastEvent->SetEvent();
-	RegisterTimerEvent((BaseEvent *)sectorBroadcastEvent);
+	// SectorBroadcastEvent *sectorBroadcastEvent = new SectorBroadcastEvent;
+	// sectorBroadcastEvent->SetEvent();
+	// RegisterTimerEvent((BaseEvent *)sectorBroadcastEvent);
 
 	// NonLoginHeartBeatEvent *nonLoginHeartBeatEvent = new NonLoginHeartBeatEvent;
 	// nonLoginHeartBeatEvent->SetEvent();

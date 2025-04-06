@@ -60,32 +60,31 @@ public:
 	{
 		Node *node;
 
-		// nullptr을 보고 들어오면 그냥 할당하고 반환
-		// - 이 시점에 Free 노드가 생겨도 그냥 할당해도 됨
-		if (m_pTop == NULL)
+		LONG size = InterlockedDecrement(&m_iUseCount);
+		if (size < 0)
 		{
+			InterlockedIncrement(&m_iUseCount);
 			node = NewAlloc();
+			return &node->data;
 		}
-		else
+
+		ULONG_PTR readTop;
+		ULONG_PTR newTop;
+
+		do
 		{
-			ULONG_PTR readTop;
-			ULONG_PTR newTop;
-
-			do
+			readTop = m_pTop;
+			if (readTop == NULL)
 			{
-				readTop = m_pTop;
-				if (readTop == NULL)
-				{
-					node = NewAlloc();
-					break;
-				}
+				node = NewAlloc();
+				break;
+			}
 
-				node = (Node *)GetAddress(readTop);
-				newTop = node->next;
-			} while (InterlockedCompareExchange(&m_pTop, newTop, readTop) != readTop);
-		}
+			node = (Node *)GetAddress(readTop);
+			newTop = node->next;
+		} while (InterlockedCompareExchange(&m_pTop, newTop, readTop) != readTop);
 
-		InterlockedIncrement(&m_iUseCount);
+		// InterlockedIncrement(&m_iUseCount);
 
 		// data의 주소를 반환
 		return &node->data;
@@ -119,7 +118,7 @@ public:
 		} while (InterlockedCompareExchange(&m_pTop, combinedNewTop, readTop) != readTop);
 
 		// Push 성공
-		InterlockedDecrement(&m_iUseCount);
+		InterlockedIncrement(&m_iUseCount);
 	}
 
 private:

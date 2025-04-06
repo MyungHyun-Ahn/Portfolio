@@ -16,6 +16,7 @@ public:
 	{
 		m_usSectorY = 0xFF;
 		m_usSectorX = 0xFF; 
+		m_iAccountNo = 0;
 	}
 
 	inline static CPlayer *Alloc() noexcept

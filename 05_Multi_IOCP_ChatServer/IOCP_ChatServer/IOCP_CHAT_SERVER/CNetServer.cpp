@@ -200,8 +200,7 @@ void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *
 	CNetSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 
 	InterlockedIncrement(&pSession->m_iIOCountAndRelease);
-	// ReleaseFlag가 이미 켜진 상황
-	if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
+	if (sessionID != pSession->m_uiSessionID)
 	{
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
@@ -210,7 +209,8 @@ void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *
 		return;
 	}
 
-	if (sessionID != pSession->m_uiSessionID)
+	// ReleaseFlag가 이미 켜진 상황
+	if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
 	{
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
@@ -247,8 +247,7 @@ void CNetServer::EnqueuePacket(const UINT64 sessionID, CSerializableBuffer<FALSE
 	CNetSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 
 	InterlockedIncrement(&pSession->m_iIOCountAndRelease);
-	// ReleaseFlag가 이미 켜진 상황
-	if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
+	if (sessionID != pSession->m_uiSessionID)
 	{
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
@@ -257,7 +256,8 @@ void CNetServer::EnqueuePacket(const UINT64 sessionID, CSerializableBuffer<FALSE
 		return;
 	}
 
-	if (sessionID != pSession->m_uiSessionID)
+	// ReleaseFlag가 이미 켜진 상황
+	if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
 	{
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
@@ -307,9 +307,8 @@ BOOL CNetServer::Disconnect(const UINT64 sessionID, BOOL isPQCS) noexcept
 	if (pSession == nullptr)
 		return FALSE;
 
-	// ReleaseFlag가 이미 켜진 상황
 	InterlockedIncrement(&pSession->m_iIOCountAndRelease);
-	if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
+	if (sessionID != pSession->m_uiSessionID)
 	{
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
@@ -318,7 +317,7 @@ BOOL CNetServer::Disconnect(const UINT64 sessionID, BOOL isPQCS) noexcept
 		return FALSE;
 	}
 
-	if (sessionID != pSession->m_uiSessionID)
+	if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
 	{
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
@@ -365,11 +364,11 @@ BOOL CNetServer::ReleaseSession(CNetSession *pSession, BOOL isPQCS) noexcept
 
 	USHORT index = GetIndex(pSession->m_uiSessionID);
 	closesocket(pSession->m_sSessionSocket);
+
 	UINT64 freeSessionId = pSession->m_uiSessionID;
+	OnClientLeave(freeSessionId);
 	CNetSession::Free(pSession);
 	InterlockedDecrement(&m_iSessionCount);
-
-	OnClientLeave(freeSessionId);
 
 	m_stackDisconnectIndex.Push(index);
 
@@ -381,10 +380,9 @@ BOOL CNetServer::ReleaseSessionPQCS(CNetSession *pSession) noexcept
 	USHORT index = GetIndex(pSession->m_uiSessionID);
 	closesocket(pSession->m_sSessionSocket);
 	UINT64 freeSessionId = pSession->m_uiSessionID;
+	OnClientLeave(freeSessionId);
 	CNetSession::Free(pSession);
 	InterlockedDecrement(&m_iSessionCount);
-
-	OnClientLeave(freeSessionId);
 
 	m_stackDisconnectIndex.Push(index);
 

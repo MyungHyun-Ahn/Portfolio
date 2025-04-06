@@ -52,6 +52,9 @@ RECV_RET CAuthContent::OnRecv(const UINT64 sessionID, CSerializableBuffer<FALSE>
 		message->Dequeue(sessionKey, sizeof(char) * 64);
 		*message >> version;
 
+		if (message->GetDataSize() != 0)
+			return RECV_RET::RECV_FALSE;
+
 		// 버전 검사, 세션 키 인증
 
 		// 인증 통과

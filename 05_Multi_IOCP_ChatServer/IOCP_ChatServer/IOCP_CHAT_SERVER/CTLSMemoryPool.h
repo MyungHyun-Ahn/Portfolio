@@ -167,7 +167,7 @@ public:
 
 
 private:
-	static constexpr int m_iThreadCount = 50;
+	static constexpr int m_iThreadCount = 100;
 
 	DWORD			m_dwTLSMemoryPoolIdx;
 
