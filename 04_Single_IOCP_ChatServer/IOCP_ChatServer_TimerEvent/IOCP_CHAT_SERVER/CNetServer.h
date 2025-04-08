@@ -121,6 +121,8 @@ namespace NET_SERVER
 
 		// ƒ‹≈Ÿ√˜ «¡∑π¿”
 		virtual DWORD OnUpdate() noexcept = 0;
+		virtual void RegisterContentTimerEvent() noexcept = 0;
+
 
 		// AcceptEx
 		void FristPostAcceptEx() noexcept;
