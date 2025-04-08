@@ -1027,7 +1027,7 @@ namespace NET_SERVER
 						closesocket(pSession->m_sSessionSocket);
 						CNetSession::Free(pSession);
 						
-						break;
+						continue;
 					}
 
 					// OnAccept Event 생성
@@ -1038,14 +1038,11 @@ namespace NET_SERVER
 					// 해당 세션에 대해 Recv 예약
 					pSession->PostRecv();
 
-					if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
-						ReleaseSession(pSession);
-
 					if (!m_isStop)
 						PostAcceptEx(index);
 					else
 						CNetSession::Free(pSession);
-					continue;
+					break;
 				}
 				break;
 				case IOOperation::RECV:

@@ -119,9 +119,9 @@ namespace NET_SERVER
 		virtual void OnRecv(const UINT64 sessionID, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept = 0;
 		virtual void OnError(int errorcode, WCHAR *errMsg) noexcept = 0;
 
-		// ƒ‹≈Ÿ√˜ «¡∑π¿”
 		virtual DWORD OnUpdate() noexcept = 0;
 		virtual void RegisterContentTimerEvent() noexcept = 0;
+
 
 
 		// AcceptEx
@@ -156,7 +156,6 @@ namespace NET_SERVER
 		int TimerEventSchedulerThread() noexcept;
 
 		void RegisterSystemTimerEvent();
-		virtual void RegisterContentTimerEvent() noexcept = 0;
 
 		void RegisterTimerEvent(TimerEvent *timerEvent) noexcept;
 		static void RegisterTimerEventAPCFunc(ULONG_PTR lpParam) noexcept;
