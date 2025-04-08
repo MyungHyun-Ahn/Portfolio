@@ -47,7 +47,20 @@ namespace NET_SERVER
 
 		void RecvCompleted(int size) noexcept;
 
-		bool SendPacket(CSerializableBuffer<FALSE> *message) noexcept;
+		// 인큐할 때 직렬화 버퍼의 포인터를 인큐
+		inline bool SendPacket(CSerializableBuffer<FALSE> *message) noexcept
+		{
+			// 여기서 올라간 RefCount는 SendCompleted에서 내려감
+			// 혹은 ReleaseSession
+			message->IncreaseRef();
+			m_lfSendBufferQueue.Enqueue(message);
+			if (m_lfSendBufferQueue.GetUseSize() > WSASEND_MAX_BUFFER_COUNT)
+				return FALSE;
+
+
+			return TRUE;
+		}
+
 		void SendCompleted(int size) noexcept;
 
 		bool PostRecv() noexcept;

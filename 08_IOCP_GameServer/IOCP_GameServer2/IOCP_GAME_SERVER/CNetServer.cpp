@@ -45,6 +45,15 @@ namespace NET_SERVER
 			view->MoveWritePos(packetHeader.len);
 
 			CEncryption::Decoding(view->GetBufferPtr() + 4, view->GetFullSize() - 4, packetHeader.randKey);
+			BYTE dataCheckSum = CEncryption::CalCheckSum(view->GetContentBufferPtr(), view->GetDataSize());
+			BYTE headerCheckSum = *(view->GetBufferPtr() + offsetof(NetHeader, checkSum));
+
+			if (dataCheckSum != headerCheckSum)
+			{
+				CSerializableBuffer<FALSE>::Free(view);
+				g_NetServer->Disconnect(m_uiSessionID);
+				return;
+			}
 
 			view->IncreaseRef();
 			InterlockedIncrement(&g_monitor.m_lRecvTPS);
@@ -53,16 +62,6 @@ namespace NET_SERVER
 			currentUseSize = m_RecvBuffer.GetUseSize();
 		}
 
-	}
-
-	// 인큐할 때 직렬화 버퍼의 포인터를 인큐
-	bool CNetSession::SendPacket(CSerializableBuffer<FALSE> *message) noexcept
-	{
-		// 여기서 올라간 RefCount는 SendCompleted에서 내려감
-		// 혹은 ReleaseSession
-		message->IncreaseRef();
-		m_lfSendBufferQueue.Enqueue(message);
-		return TRUE;
 	}
 
 	void CNetSession::SendCompleted(int size) noexcept
@@ -545,8 +544,10 @@ namespace NET_SERVER
 		// 	CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetBufferSize() - 4, header->randKey);
 		// }
 
-		pSession->SendPacket(sBuffer);
-		pSession->PostSend();
+		if (pSession->SendPacket(sBuffer))
+			pSession->PostSend();
+		else
+			Disconnect(sessionID);
 
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
@@ -592,23 +593,8 @@ namespace NET_SERVER
 		// 	CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetBufferSize() - 4, header->randKey);
 		// }
 
-		// Broadcast 패킷만 여기서할 것
-
-		pSession->SendPacket(sBuffer);
-
-		// {
-		// 	// PROFILE_BEGIN(0, "WSASend");
-		// 	pSession->PostSend();
-		// }
-
-		// {
-		// 	// PROFILE_BEGIN(0, "PQCS");
-		// 
-		// 	if (pSession->m_iSendFlag == FALSE)
-		// 	{
-		// 		PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)pSession, (LPOVERLAPPED)IOOperation::SENDPOST);
-		// 	}
-		// }
+		if (!pSession->SendPacket(sBuffer))
+			Disconnect(sessionID);
 
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 		{
@@ -824,9 +810,6 @@ namespace NET_SERVER
 
 		UINT64 combineId = CNetServer::CombineIndex(index, InterlockedIncrement64(&m_iCurrentID));
 
-		if (combineId == 0)
-			__debugbreak();
-
 		pSession->Init(combineId);
 
 		InterlockedIncrement(&m_iSessionCount);
@@ -912,10 +895,11 @@ namespace NET_SERVER
 						// 실패한 인덱스에 대한 예약은 다시 걸어줌
 						if (!m_isStop)
 							PostAcceptEx(index);
-						else
-							if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
-								CNetSession::Free(pSession);
-						break;
+						
+						InterlockedDecrement(&pSession->m_iIOCountAndRelease);
+						closesocket(pSession->m_sSessionSocket);
+						CNetSession::Free(pSession);
+						continue;
 					}
 
 					// OnAccept 처리는 여기서
@@ -923,13 +907,10 @@ namespace NET_SERVER
 					// 해당 세션에 대해 Recv 예약
 					pSession->PostRecv();
 
-					if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
-						ReleaseSession(pSession);
-
 					if (!m_isStop)
 						PostAcceptEx(index);
 
-					continue;
+					break;
 				}
 				break;
 				case IOOperation::RECV:
@@ -941,7 +922,6 @@ namespace NET_SERVER
 				case IOOperation::SEND:
 				{
 					pSession->SendCompleted(dwTransferred);
-					// pSession->PostSend();
 				}
 				break;
 				case IOOperation::SENDPOST:

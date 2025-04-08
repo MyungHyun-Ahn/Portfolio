@@ -47,6 +47,8 @@ RECV_RET CAuthContent::OnRecv(const UINT64 sessionID, CSerializableBuffer<FALSE>
 		INT64 accountNo;
 		char sessionKey[64];
 		int version;
+		if (message->GetDataSize() != sizeof(INT64) + 64 * sizeof(char) + sizeof(int))
+			return RECV_RET::RECV_FALSE;
 
 		*message >> accountNo;
 		message->Dequeue(sessionKey, sizeof(char) * 64);
@@ -129,6 +131,10 @@ RECV_RET CEchoContent::OnRecv(const UINT64 sessionID, CSerializableBuffer<FALSE>
 
 		INT64 accountNo;
 		LONGLONG sendTick;
+
+		if (message->GetDataSize() != sizeof(INT64) + sizeof(LONGLONG))
+			return RECV_RET::RECV_FALSE;
+
 		*message >> accountNo >> sendTick;
 
 		if (accountNo != pPlayer->m_iAccountNo)
@@ -139,10 +145,6 @@ RECV_RET CEchoContent::OnRecv(const UINT64 sessionID, CSerializableBuffer<FALSE>
 
 		CSerializableBuffer<FALSE> *pEchoRes = CGenPacket::makePacketResEcho(accountNo, sendTick);
 		pEchoRes->IncreaseRef();
-		// EnqueuePacketEvent *pEnqueueEvent = new EnqueuePacketEvent;
-		// pEnqueueEvent->SetEvent(sessionID, pEchoRes);
-		// CContentThread::EnqueueEvent(pEnqueueEvent);
-
 		NET_SERVER::g_NetServer->EnqueuePacket(sessionID, pEchoRes);
 		if (pEchoRes->DecreaseRef() == 0)
 			CSerializableBuffer<FALSE>::Free(pEchoRes);
