@@ -6,7 +6,7 @@
 
 // 오브젝트 풀 사용 여부
 // #define USE_OBJECT_POOL
-#define POSTSEND_LOST_DEBUG
+// #define POSTSEND_LOST_DEBUG
 
 #pragma comment(lib, "ws2_32")
 #pragma comment(lib, "winmm")

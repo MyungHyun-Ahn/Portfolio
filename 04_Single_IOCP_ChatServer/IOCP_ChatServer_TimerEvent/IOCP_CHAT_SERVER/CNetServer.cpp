@@ -233,36 +233,41 @@ namespace NET_SERVER
 		return TRUE;
 	}
 
+	// m_SendBuffer.MoveFront(size);
+
+	// m_iSendCount를 믿고 할당 해제를 진행
+	// * 논블락킹 I/O일 때만 Send를 요청한 데이터보다 덜 보내는 상황이 발생 가능
+	// * 비동기 I/O는 무조건 전부 보내고 완료 통지가 도착함
+
 	void CNetSession::SendCompleted(int size) noexcept
 	{
 		InterlockedAdd(&g_monitor.m_lSendTPS, m_iSendCount);
 
-		// m_SendBuffer.MoveFront(size);
-
-		// m_iSendCount를 믿고 할당 해제를 진행
-		// * 논블락킹 I/O일 때만 Send를 요청한 데이터보다 덜 보내는 상황이 발생 가능
-		// * 비동기 I/O는 무조건 전부 보내고 완료 통지가 도착함
-
-		CDeque<CSerializableBuffer<FALSE> *> *freeQueue = new CDeque<CSerializableBuffer<FALSE> *>();
-
-		int count;
-		for (count = 0; count < m_iSendCount; count++)
+		// 전송한 직렬화 버퍼 해제 작업
 		{
-			// RefCount를 낮추고 0이라면 보낸 거 삭제
-			if (m_arrPSendBufs[count]->DecreaseRef() == 0)
+			CDeque<CSerializableBuffer<FALSE> *> *freeQueue = new CDeque<CSerializableBuffer<FALSE> *>();
+
+			int count;
+			for (count = 0; count < m_iSendCount; count++)
 			{
-				freeQueue->push_back(m_arrPSendBufs[count]);
+				// RefCount를 낮추고 0이라면 보낸 거 삭제
+				if (m_arrPSendBufs[count]->DecreaseRef() == 0)
+				{
+					freeQueue->push_back(m_arrPSendBufs[count]);
+				}
 			}
+
+			m_iSendCount = 0;
+
+			SerializableBufferFreeEvent *freeEvent = new SerializableBufferFreeEvent;
+			freeEvent->SetEvent(freeQueue);
+			g_NetServer->EventAPCEnqueue(freeEvent);
 		}
 
-		m_iSendCount = 0;
-
-		SerializableBufferFreeEvent *freeEvent = new SerializableBufferFreeEvent;
-		freeEvent->SetEvent(freeQueue);
-		g_NetServer->EventAPCEnqueue(freeEvent);
+		InterlockedExchange(&m_iSendFlag, FALSE);
 
 		// SendFlag를 풀지 않고 진행
-		PostSend(TRUE);
+		PostSend();
 	}
 
 	bool CNetSession::PostRecv() noexcept
@@ -335,6 +340,7 @@ namespace NET_SERVER
 				return FALSE;
 			}
 
+			Sleep(0);
 
 			if (InterlockedExchange(&m_iSendFlag, TRUE) == TRUE)
 			{
@@ -347,6 +353,7 @@ namespace NET_SERVER
 		sendUseSize = m_lfSendBufferQueue.GetUseSize();
 		if (sendUseSize <= 0)
 		{
+			Sleep(0);
 			InterlockedExchange(&m_iSendFlag, FALSE);
 			return FALSE;
 		}
@@ -724,7 +731,7 @@ namespace NET_SERVER
 			CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetBufferSize() - 4, header.randKey);
 		}
 
-		pSession->SendPacket(sBuffer);
+		pSession->SendPacket(sBuffer); // Session Send Msg Q Enqueue
 		pSession->PostSend();
 
 		if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
@@ -850,7 +857,6 @@ namespace NET_SERVER
 
 	void CNetServer::FristPostAcceptEx() noexcept
 	{
-		// 처음에 AcceptEx를 걸어두고 시작
 		for (int i = 0; i < SERVER_SETTING::ACCEPTEX_COUNT; i++)
 		{
 			PostAcceptEx(i);
@@ -1014,34 +1020,26 @@ namespace NET_SERVER
 					pSession = m_arrAcceptExSessions[index];
 
 					InterlockedIncrement(&pSession->m_iIOCountAndRelease);
-					// 이거 실패하면 연결 끊음
-					// * 실패 가능한 상황 - setsockopt, OnConnectionRequest
 					if (!AcceptExCompleted(pSession))
 					{
-						// 실패한 인덱스에 대한 예약은 다시 걸어줌
 						if (!m_isStop)
 							PostAcceptEx(index);
-						
-						
+
 						InterlockedDecrement(&pSession->m_iIOCountAndRelease);
 						closesocket(pSession->m_sSessionSocket);
 						CNetSession::Free(pSession);
-						
 						continue;
 					}
 
-					// OnAccept Event 생성
 					OnAcceptEvent *acceptEvent = new OnAcceptEvent;
 					acceptEvent->SetEvent(pSession->m_uiSessionID);
 					EventAPCEnqueue((BaseEvent *)acceptEvent);
 
-					// 해당 세션에 대해 Recv 예약
 					pSession->PostRecv();
 
 					if (!m_isStop)
 						PostAcceptEx(index);
-					else
-						CNetSession::Free(pSession);
+
 					break;
 				}
 				break;

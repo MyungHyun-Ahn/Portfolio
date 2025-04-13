@@ -66,6 +66,7 @@ public:
 		m_uiSessionID = 0;
 		m_iIOCount = 0;
 		m_iSendCount = 0;
+		m_iSendFlag = FALSE;
 		m_RecvBuffer.Clear();
 	}
 
@@ -76,6 +77,7 @@ public:
 
 	bool PostRecv();
 	bool PostSend(BOOL isCompleted = FALSE);
+	bool PostSend2(BOOL isCompleted = FALSE);
 
 public:
 	inline static CSession *Alloc()

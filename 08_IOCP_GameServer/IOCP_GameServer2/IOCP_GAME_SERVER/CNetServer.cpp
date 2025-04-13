@@ -28,7 +28,7 @@ namespace NET_SERVER
 				return;
 			}
 
-			if (packetHeader.len >= 65535 || packetHeader.len >= m_RecvBuffer.GetCapacity())
+			if (packetHeader.len > (int)CSerializableBuffer<FALSE>::DEFINE::PACKET_MAX_SIZE - sizeof(NetHeader) || packetHeader.len >= 65535 || packetHeader.len >= m_RecvBuffer.GetCapacity())
 			{
 				g_NetServer->Disconnect(m_uiSessionID);
 				return;
@@ -84,9 +84,9 @@ namespace NET_SERVER
 		}
 
 		m_iSendCount = 0;
-
 		// SendFlag를 풀지 않고 진행
-		PostSend(TRUE);
+		if (!PostSend(TRUE))
+			PostSend(TRUE);
 	}
 
 	bool CNetSession::PostRecv() noexcept
@@ -145,24 +145,23 @@ namespace NET_SERVER
 		return TRUE;
 	}
 
-	bool CNetSession::PostSend(bool isPQCS) noexcept
+	bool CNetSession::PostSend(bool isSendFlag) noexcept
 	{
 		int errVal;
 		int retVal;
 		int sendUseSize;
 
-		if (!isPQCS)
+		if (!isSendFlag)
 		{
 			sendUseSize = m_lfSendBufferQueue.GetUseSize();
 			if (sendUseSize <= 0)
 			{
-				return FALSE;
+				return TRUE;
 			}
 
-
-			if (InterlockedExchange(&m_iSendFlag, TRUE) == TRUE)
+			if ((InterlockedExchange(&m_iSendFlag, TRUE) & ~(ENQUEUE_FLAG)) == TRUE)
 			{
-				return FALSE;
+				return TRUE;
 			}
 		}
 
@@ -171,8 +170,13 @@ namespace NET_SERVER
 		sendUseSize = m_lfSendBufferQueue.GetUseSize();
 		if (sendUseSize <= 0)
 		{
-			InterlockedExchange(&m_iSendFlag, FALSE);
-			return FALSE;
+			LONG beforeSendFlag = InterlockedCompareExchange(&m_iSendFlag, FALSE, TRUE);
+			if ((beforeSendFlag & ENQUEUE_FLAG) == ENQUEUE_FLAG) // 최상위 비트 켜졌으면
+			{
+				// PostSend(TRUE);
+				return FALSE;
+			}
+			return TRUE;
 		}
 
 		InterlockedIncrement(&m_iIOCountAndRelease);
@@ -213,7 +217,7 @@ namespace NET_SERVER
 				header->checkSum = CEncryption::CalCheckSum(sBuffer->GetContentBufferPtr(), sBuffer->GetDataSize());
 			
 				// CheckSum 부터 암호화하기 위해
-				CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetBufferSize() - 4, header->randKey);
+				CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetDataSize() + 1, header->randKey);
 			}
 
 			wsaBuf[count].buf = sBuffer->GetBufferPtr();
@@ -258,16 +262,6 @@ namespace NET_SERVER
 
 	void CNetSession::Clear() noexcept
 	{
-		// ReleaseSession 당시에 남아있는 send 링버퍼를 확인
-		// * 남아있는 경우가 확인됨
-		// * 남은 직렬화 버퍼를 할당 해제하고 세션 삭제
-
-		// if (m_pDelayedBuffer != nullptr)
-		// {
-		// 	CSerializableBufferView<FALSE>::Free(m_pDelayedBuffer);
-		// 	m_pDelayedBuffer = nullptr;
-		// }
-
 		for (int count = 0; count < m_iSendCount; count++)
 		{
 			if (m_arrPSendBufs[count]->DecreaseRef() == 0)
@@ -316,17 +310,12 @@ namespace NET_SERVER
 				CSerializableBuffer<FALSE>::Free(pBuffer);
 		}
 
-		// if (m_pRecvBuffer != nullptr)
-		// {
-		// 	if (m_pRecvBuffer->DecreaseRef() == 0)
-		// 		CRecvBuffer::Free(m_pRecvBuffer);
-		// }
-
 		m_sSessionSocket = INVALID_SOCKET;
 		m_uiSessionID = 0;
 		// m_pRecvBuffer = nullptr;
 		m_pCurrentContent = nullptr;
 		m_RecvBuffer.Clear();
+		InterlockedExchange(&m_iSendFlag, FALSE);
 	}
 
 	unsigned int NetWorkerThreadFunc(LPVOID lpParam) noexcept
@@ -541,7 +530,7 @@ namespace NET_SERVER
 		// 	header->checkSum = CEncryption::CalCheckSum(sBuffer->GetContentBufferPtr(), sBuffer->GetDataSize());
 		// 
 		// 	// CheckSum 부터 암호화하기 위해
-		// 	CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetBufferSize() - 4, header->randKey);
+		// 	CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetDataSize() + 1, header->randKey);
 		// }
 
 		if (pSession->SendPacket(sBuffer))
@@ -590,7 +579,7 @@ namespace NET_SERVER
 		// 	header->checkSum = CEncryption::CalCheckSum(sBuffer->GetContentBufferPtr(), sBuffer->GetDataSize());
 		// 
 		// 	// CheckSum 부터 암호화하기 위해
-		// 	CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetBufferSize() - 4, header->randKey);
+		// 	CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetDataSize() + 1, header->randKey);
 		// }
 
 		if (!pSession->SendPacket(sBuffer))
@@ -627,8 +616,6 @@ namespace NET_SERVER
 	BOOL CNetServer::Disconnect(const UINT64 sessionID, BOOL isPQCS) noexcept
 	{
 		CNetSession *pSession = m_arrPSessions[GetIndex(sessionID)];
-		if (pSession == nullptr)
-			return FALSE;
 
 		// ReleaseFlag가 이미 켜진 상황
 		InterlockedIncrement(&pSession->m_iIOCountAndRelease);

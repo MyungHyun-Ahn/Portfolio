@@ -72,6 +72,8 @@ void CSession::SendCompleted(int size)
 	sendDebug[index % 65535] = { index, (USHORT)GetCurrentThreadId(), 0xff, TRUE, 0 };
 #endif
     InterlockedExchange(&m_iSendFlag, FALSE);
+
+    PostSend(0);
 }
 
 bool CSession::PostRecv()
@@ -125,6 +127,8 @@ bool CSession::PostSend(USHORT wher)
 		return TRUE;
 	}
 
+    Sleep(0);
+
     if (InterlockedExchange(&m_iSendFlag, TRUE) == TRUE)
     {
 #ifdef POSTSEND_LOST_DEBUG
@@ -144,6 +148,8 @@ bool CSession::PostSend(USHORT wher)
 		UINT64 index = InterlockedIncrement(&sendIndex);
 		sendDebug[index % 65535] = { index, (USHORT)GetCurrentThreadId(), wher, FALSE, 1 };
 #endif
+        Sleep(0);
+
         InterlockedExchange(&m_iSendFlag, FALSE);
         return TRUE;
     }

@@ -379,7 +379,6 @@ int CLanServer::WorkerThread()
 			case IOOperation::SEND:
 			{
 				pSession->SendCompleted(dwTransferred);
-				pSession->PostSend(0);
 			}
 				break;
 			}

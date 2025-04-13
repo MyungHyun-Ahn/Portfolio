@@ -894,7 +894,6 @@ namespace LAN_CLIENT
 				case IOOperation::SEND:
 				{
 					pSession->SendCompleted(dwTransferred);
-					pSession->PostSend();
 				}
 				break;
 				case IOOperation::SENDPOST:

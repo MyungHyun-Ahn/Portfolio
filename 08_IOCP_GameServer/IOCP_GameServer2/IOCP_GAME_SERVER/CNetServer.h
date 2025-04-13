@@ -57,6 +57,8 @@ namespace NET_SERVER
 			if (m_lfSendBufferQueue.GetUseSize() > WSASEND_MAX_BUFFER_COUNT)
 				return FALSE;
 
+			// Enqueue에 성공하면 SendFlag 최상위 비트 켜줌
+			InterlockedOr(&m_iSendFlag, ENQUEUE_FLAG);
 
 			return TRUE;
 		}
@@ -64,7 +66,7 @@ namespace NET_SERVER
 		void SendCompleted(int size) noexcept;
 
 		bool PostRecv() noexcept;
-		bool PostSend(bool isPQCS = FALSE) noexcept;
+		bool PostSend(bool isSendFlag = FALSE) noexcept;
 
 	public:
 		inline static CNetSession *Alloc() noexcept
@@ -124,6 +126,7 @@ namespace NET_SERVER
 
 		inline static CTLSMemoryPoolManager<CNetSession, 16, 4> s_sSessionPool = CTLSMemoryPoolManager<CNetSession, 16, 4>();
 		inline static LONG RELEASE_FLAG = 0x80000000;
+		inline static LONG ENQUEUE_FLAG = 0x80000000;
 	};
 
 
@@ -150,9 +153,13 @@ namespace NET_SERVER
 		BOOL ReleaseSessionPQCS(CNetSession *pSession) noexcept;
 
 		virtual bool OnConnectionRequest(const WCHAR *ip, USHORT port) noexcept = 0;
+
+
 		virtual void OnAccept(const UINT64 sessionID) noexcept = 0;
 		virtual void OnClientLeave(const UINT64 sessionID) noexcept = 0;
 		virtual void OnRecv(const UINT64 sessionID, CSerializableBufferView<FALSE> *message) noexcept = 0;
+
+
 		virtual void OnError(int errorcode, WCHAR *errMsg) noexcept = 0;
 
 		// AcceptEx
@@ -167,13 +174,11 @@ namespace NET_SERVER
 			mask64 = mask64 >> 48;
 			return (USHORT)mask64;
 		}
-
 		inline static UINT64 GetId(UINT64 sessionId) noexcept
 		{
 			UINT64 mask64 = sessionId & SESSION_ID_MASK;
 			return mask64;
 		}
-
 		inline static UINT64 CombineIndex(USHORT index, UINT64 id) noexcept
 		{
 			UINT64 index64 = index;

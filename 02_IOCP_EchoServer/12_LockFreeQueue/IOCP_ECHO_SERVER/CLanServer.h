@@ -10,6 +10,7 @@ public:
 	inline LONG GetSessionCount() { return m_iSessionCount; }
 
 	void SendPacket(const UINT64 sessionID, CSerializableBuffer *sBuffer);
+	void SendPacket2(const UINT64 sessionID, CSerializableBuffer *sBuffer);
 	BOOL Disconnect(CSession *pSession);
 	BOOL ReleaseSession(CSession *pSession);
 

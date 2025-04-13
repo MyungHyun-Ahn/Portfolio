@@ -164,6 +164,21 @@ void CLanServer::SendPacket(const UINT64 sessionID, CSerializableBuffer *sBuffer
 	pSession->PostSend(0);
 }
 
+void CLanServer::SendPacket2(const UINT64 sessionID, CSerializableBuffer *sBuffer)
+{
+	CSession *pSession = m_arrPSessions[GetIndex(sessionID)];
+	if (pSession->m_uiSessionID != sessionID)
+		__debugbreak();
+
+	USHORT header = sBuffer->GetDataSize();
+	if (header != sizeof(__int64))
+		__debugbreak();
+	sBuffer->EnqueueHeader((char *)&header, sizeof(USHORT));
+	pSession->SendPacket(sBuffer);
+	pSession->PostSend2(0);
+}
+
+
 BOOL CLanServer::Disconnect(CSession *pSession)
 {
 	InterlockedExchange((LONG *)&pSession->m_bIsValid, FALSE);
@@ -395,7 +410,6 @@ int CLanServer::WorkerThread()
 			case IOOperation::SEND:
 			{
 				pSession->SendCompleted(dwTransferred);
-				pSession->PostSend();
 			}
 				break;
 			}

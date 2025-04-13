@@ -42,7 +42,7 @@ int main()
 
 	CCrashDump crashDump;
 	g_Server = new CEchoServer;
-	g_Server->Start(openIP.c_str(), openPort, 16, 4, 65535);
+	g_Server->Start(openIP.c_str(), openPort, 4, 4, 65535);
 
 	MonitorThreadFunc(nullptr);
 

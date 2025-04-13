@@ -44,6 +44,9 @@ void CSession::RecvCompleted(int size)
 bool CSession::SendPacket(CSerializableBuffer *message)
 {
     m_lfQueue.Enqueue(message);
+    
+    // Enqueue에 성공하면 SendFlag 최상위 비트 켜줌
+    InterlockedOr(&m_iSendFlag, 0x80000000);
     return TRUE;
 }
 
@@ -74,10 +77,11 @@ void CSession::SendCompleted(int size)
 #endif
     InterlockedIncrement(&g_monitor.m_lSendTPS);
 
-    if (!PostSend(TRUE))
-    {
-		InterlockedExchange(&m_iSendFlag, FALSE);
-    }
+    InterlockedExchange(&m_iSendFlag, FALSE);
+
+    PostSend();
+
+    // PostSend(TRUE);
 }
 
 bool CSession::PostRecv()
@@ -122,17 +126,21 @@ bool CSession::PostSend(BOOL isCompleted)
     int errVal;
     int retVal;
 
-	int sendUseSize = m_lfQueue.GetUseSize();
-	if (sendUseSize <= 0)
-	{
-		return FALSE;
-	}
-
-    // Sleep(0);
 
     if (!isCompleted)
     {
-		if (InterlockedExchange(&m_iSendFlag, TRUE) == TRUE)
+        int sendUseSize = m_lfQueue.GetUseSize();
+
+		if (sendUseSize <= 0)
+		{
+			return FALSE;
+		}
+
+		// Sleep(0);
+
+        // TRUE로 바꾸고 최상위 비트 빼주기
+        LONG back = InterlockedExchange(&m_iSendFlag, TRUE) & ~(0x80000000);
+		if (back == TRUE)
 		{
 #ifdef POSTSEND_LOST_DEBUG
 			UINT64 index = InterlockedIncrement(&sendIndex);
@@ -142,13 +150,22 @@ bool CSession::PostSend(BOOL isCompleted)
 		}
     }
 
+    // Sleep(0);
+
     // 여기서 얻은 만큼 쓸 것
-	sendUseSize = m_lfQueue.GetUseSize();
+	int sendUseSize = m_lfQueue.GetUseSize();
 	if (sendUseSize <= 0)
 	{
-        // Sleep(0);
-        InterlockedExchange(&m_iSendFlag, FALSE);
-		return FALSE;
+        Sleep(0);
+        // TRUE 그대로면 FALSE로 바꾸고 리턴
+        // 최상위 비트가 바뀌었으면 CAS 실패
+        // PostSend 재시도
+        LONG beforeSendFlag = InterlockedCompareExchange(&m_iSendFlag, FALSE, TRUE);
+        if ((beforeSendFlag & 0x80000000) == 0x80000000) // 최상위 비트 켜졌으면
+        {
+            PostSend(TRUE);
+        }
+		return TRUE;
 	}
 	
     WSABUF wsaBuf[WSASEND_MAX_BUFFER_COUNT];
@@ -201,4 +218,99 @@ bool CSession::PostSend(BOOL isCompleted)
     }
 
     return TRUE;
+}
+
+bool CSession::PostSend2(BOOL isCompleted)
+{
+	int errVal;
+	int retVal;
+
+	if (!isCompleted)
+	{
+		int sendUseSize = m_lfQueue.GetUseSize();
+
+		if (sendUseSize <= 0)
+		{
+			return FALSE;
+		}
+
+		Sleep(0);
+
+		// 최상위 비트 빼주기
+		ULONG back = InterlockedExchange(&m_iSendFlag, TRUE) & ~(0x80000000);
+		if (back == TRUE)
+		{
+#ifdef POSTSEND_LOST_DEBUG
+			UINT64 index = InterlockedIncrement(&sendIndex);
+			sendDebug[index % 65535] = { index, (USHORT)GetCurrentThreadId(), wher, FALSE, 2 };
+#endif
+			return TRUE;
+		}
+	}
+
+    // Sleep(0);
+
+	// 여기서 얻은 만큼 쓸 것
+	int sendUseSize = m_lfQueue.GetUseSize();
+	if (sendUseSize <= 0)
+	{
+		// Sleep(0);
+		LONG beforeSendFlag = InterlockedCompareExchange(&m_iSendFlag, FALSE, TRUE);
+		if ((beforeSendFlag & 0x80000000) == 0x80000000) // 최상위 비트 켜졌으면
+		{
+			PostSend(TRUE);
+		}
+		return FALSE;
+	}
+
+	WSABUF wsaBuf[WSASEND_MAX_BUFFER_COUNT];
+
+	m_iSendCount = min(sendUseSize, WSASEND_MAX_BUFFER_COUNT);
+
+	int count;
+	for (count = 0; count < m_iSendCount; count++)
+	{
+		CSerializableBuffer *pBuffer;
+		// 못꺼낸 것
+		if (!m_lfQueue.Dequeue(&pBuffer))
+		{
+			g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"LFQueue::Dequeue() Error");
+			// 말도 안되는 상황
+			CCrashDump::Crash();
+		}
+
+		wsaBuf[count].buf = pBuffer->GetBufferPtr();
+		wsaBuf[count].len = pBuffer->GetFullSize();
+
+		m_arrPSendBufs[count] = pBuffer;
+	}
+
+	if (count != m_iSendCount)
+	{
+		g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"CSession::PostSend %d != %d", count + 1, m_iSendCount);
+	}
+
+	ZeroMemory(&m_SendOverlapped, sizeof(OVERLAPPED));
+
+	InterlockedIncrement(&m_iIOCount);
+
+	retVal = WSASend(m_sSessionSocket, wsaBuf, m_iSendCount, nullptr, 0, (LPOVERLAPPED)&m_SendOverlapped, NULL);
+	if (retVal == SOCKET_ERROR)
+	{
+		errVal = WSAGetLastError();
+		if (errVal != WSA_IO_PENDING)
+		{
+			if (errVal != WSAECONNABORTED && errVal != WSAECONNRESET)
+				g_Logger->WriteLog(L"ERROR", LOG_LEVEL::ERR, L"WSASend() Error : %d", errVal);
+
+			// 사실 여기선 0이 될 일이 없음
+			// 반환값을 사용안해도 됨
+			if (InterlockedDecrement(&m_iIOCount) == 0)
+			{
+				return FALSE;
+			}
+		}
+	}
+
+	return TRUE;
 }

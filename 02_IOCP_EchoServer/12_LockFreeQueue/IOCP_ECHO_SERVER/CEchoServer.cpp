@@ -29,7 +29,7 @@ void CEchoServer::OnRecv(const UINT64 sessionID, CSerializableBuffer *message)
 
     CSerializableBuffer *buffer = CSerializableBuffer::Alloc();
     *buffer << num;
-    SendPacket(sessionID, buffer);
+    SendPacket2(sessionID, buffer);
 }
 
 void CEchoServer::OnError(int errorcode, WCHAR *errMsg)

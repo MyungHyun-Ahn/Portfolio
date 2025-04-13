@@ -4,17 +4,17 @@ template<bool isLanServer>
 class CSerializableBuffer
 {
 public:
-	enum class DEFINE
+	enum class DEFINE : int
 	{
 		HEADER_SIZE = isLanServer ? 2 : 5,
-		DEFAULT_SIZE = 1400
+		PACKET_MAX_SIZE = 128
 	};
 
 
 	CSerializableBuffer() noexcept
 	{
 		m_Buffer = (char *)s_sPagePool512.Alloc();
-		m_MaxSize = 128;
+		m_MaxSize = (int)DEFINE::PACKET_MAX_SIZE;
 		m_HeaderFront = 0;
 		m_Front = (int)DEFINE::HEADER_SIZE;
 		m_Rear = (int)DEFINE::HEADER_SIZE;
@@ -396,7 +396,7 @@ private:
 	int m_HeaderFront = 0;
 	int m_Front = 0;
 	int m_Rear = 0;
-	int m_MaxSize = (int)DEFINE::DEFAULT_SIZE;
+	int m_MaxSize = (int)DEFINE::PACKET_MAX_SIZE;
 
 	LONG			m_iRefCount = 0;
 
@@ -406,7 +406,7 @@ public:
 	UINT64			m_uiSessionId = 0;
 
 	inline static CTLSMemoryPoolManager<CSerializableBuffer> s_sbufferPool = CTLSMemoryPoolManager<CSerializableBuffer>();
-	inline static CTLSPagePoolManager<128, 16, false> s_sPagePool512 = CTLSPagePoolManager<128, 16, false>();
+	inline static CTLSPagePoolManager<(int)DEFINE::PACKET_MAX_SIZE, 16, false> s_sPagePool512 = CTLSPagePoolManager<(int)DEFINE::PACKET_MAX_SIZE, 16, false>();
 };
 
 template<bool isLanServer>

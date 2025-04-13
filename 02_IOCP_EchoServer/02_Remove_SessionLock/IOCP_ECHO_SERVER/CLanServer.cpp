@@ -217,8 +217,8 @@ int CLanServer::WorkerThread()
 				// }
 
 				// 여기에서 SendFlag가 FALSE인 경우
-				if (!pSession->m_iSendFlag)
-					__debugbreak();
+				// if (!pSession->m_iSendFlag)
+				// 	__debugbreak();
 
 				pSession->PostRecv();
 			}

@@ -117,10 +117,11 @@ namespace NET_SERVER
 		virtual void OnClientLeave(const UINT64 sessionID) noexcept = 0;
 		virtual void OnRecv(const UINT64 sessionID, CSerializableBufferView<FALSE> *message) noexcept = 0;
 		virtual void OnRecv(const UINT64 sessionID, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept = 0;
-		virtual void OnError(int errorcode, WCHAR *errMsg) noexcept = 0;
 
 		virtual DWORD OnUpdate() noexcept = 0;
 		virtual void RegisterContentTimerEvent() noexcept = 0;
+
+		virtual void OnError(int errorcode, WCHAR *errMsg) noexcept = 0;
 
 
 
