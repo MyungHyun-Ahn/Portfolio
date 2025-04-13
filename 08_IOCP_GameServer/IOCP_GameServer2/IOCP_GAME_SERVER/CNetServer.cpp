@@ -85,8 +85,11 @@ namespace NET_SERVER
 
 		m_iSendCount = 0;
 		// SendFlag를 풀지 않고 진행
-		if (!PostSend(TRUE))
-			PostSend(TRUE);
+
+		// TRUE만 남기고 비트 전부 끄기
+		InterlockedAnd(&m_iSendFlag, TRUE);
+
+		PostSend(TRUE);
 	}
 
 	bool CNetSession::PostRecv() noexcept
@@ -173,7 +176,7 @@ namespace NET_SERVER
 			LONG beforeSendFlag = InterlockedCompareExchange(&m_iSendFlag, FALSE, TRUE);
 			if ((beforeSendFlag & ENQUEUE_FLAG) == ENQUEUE_FLAG) // 최상위 비트 켜졌으면
 			{
-				// PostSend(TRUE);
+				PostSend(TRUE);
 				return FALSE;
 			}
 			return TRUE;
@@ -244,7 +247,7 @@ namespace NET_SERVER
 				// 반환값을 사용안해도 됨
 				if (InterlockedDecrement(&m_iIOCountAndRelease) == 0)
 				{
-					return FALSE;
+					return TRUE;
 				}
 			}
 			else
@@ -252,7 +255,7 @@ namespace NET_SERVER
 				if (m_iCacelIoCalled)
 				{
 					CancelIoEx((HANDLE)m_sSessionSocket, nullptr);
-					return FALSE;
+					return TRUE;
 				}
 			}
 		}
