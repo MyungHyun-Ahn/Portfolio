@@ -64,19 +64,16 @@ namespace NET_SERVER
 
 	}
 
+	// m_iSendCount를 믿고 할당 해제를 진행
+	// * 논블락킹 I/O일 때만 Send를 요청한 데이터보다 덜 보내는 상황이 발생 가능
+	// * 비동기 I/O는 무조건 전부 보내고 완료 통지가 도착함
+
 	void CNetSession::SendCompleted(int size) noexcept
 	{
 		InterlockedAdd(&g_monitor.m_lSendTPS, m_iSendCount);
 
-		// m_iSendCount를 믿고 할당 해제를 진행
-		// * 논블락킹 I/O일 때만 Send를 요청한 데이터보다 덜 보내는 상황이 발생 가능
-		// * 비동기 I/O는 무조건 전부 보내고 완료 통지가 도착함
-
-
-		int count;
-		for (count = 0; count < m_iSendCount; count++)
+		for (int count = 0; count < m_iSendCount; count++)
 		{
-			// RefCount를 낮추고 0이라면 보낸 거 삭제
 			if (m_arrPSendBufs[count]->DecreaseRef() == 0)
 			{
 				CSerializableBuffer<FALSE>::Free(m_arrPSendBufs[count]);
@@ -84,12 +81,10 @@ namespace NET_SERVER
 		}
 
 		m_iSendCount = 0;
-		// SendFlag를 풀지 않고 진행
 
-		// TRUE만 남기고 비트 전부 끄기
-		InterlockedAnd(&m_iSendFlag, TRUE);
+		InterlockedExchange(&m_iSendFlag, FALSE);
 
-		PostSend(TRUE);
+		PostSend();
 	}
 
 	bool CNetSession::PostRecv() noexcept
@@ -159,17 +154,15 @@ namespace NET_SERVER
 			sendUseSize = m_lfSendBufferQueue.GetUseSize();
 			if (sendUseSize <= 0)
 			{
-				return TRUE;
+				return FALSE;
 			}
 
 			if ((InterlockedExchange(&m_iSendFlag, TRUE) & ~(ENQUEUE_FLAG)) == TRUE)
 			{
-				return TRUE;
+				return FALSE;
 			}
 		}
 
-		// 여기서 얻은 만큼 쓸 것
-		// 플래그 획득 이후의 실패는 플래그 풀어주기
 		sendUseSize = m_lfSendBufferQueue.GetUseSize();
 		if (sendUseSize <= 0)
 		{
@@ -179,7 +172,7 @@ namespace NET_SERVER
 				PostSend(TRUE);
 				return FALSE;
 			}
-			return TRUE;
+			return FALSE;
 		}
 
 		InterlockedIncrement(&m_iIOCountAndRelease);
@@ -229,12 +222,11 @@ namespace NET_SERVER
 			m_arrPSendBufs[count] = sBuffer;
 		}
 
+		InterlockedAnd(&m_iSendFlag, TRUE);
+
 		ZeroMemory((m_pMyOverlappedStartAddr + 2), sizeof(OVERLAPPED));
 
-		{
-			// PROFILE_BEGIN(0, "WSASend");
-			retVal = WSASend(m_sSessionSocket, wsaBuf, m_iSendCount, nullptr, 0, (LPOVERLAPPED)(m_pMyOverlappedStartAddr + 2), NULL);
-		}
+		retVal = WSASend(m_sSessionSocket, wsaBuf, m_iSendCount, nullptr, 0, (LPOVERLAPPED)(m_pMyOverlappedStartAddr + 2), NULL);
 		if (retVal == SOCKET_ERROR)
 		{
 			errVal = WSAGetLastError();
@@ -247,7 +239,7 @@ namespace NET_SERVER
 				// 반환값을 사용안해도 됨
 				if (InterlockedDecrement(&m_iIOCountAndRelease) == 0)
 				{
-					return TRUE;
+					return FALSE;
 				}
 			}
 			else
@@ -255,7 +247,7 @@ namespace NET_SERVER
 				if (m_iCacelIoCalled)
 				{
 					CancelIoEx((HANDLE)m_sSessionSocket, nullptr);
-					return TRUE;
+					return FALSE;
 				}
 			}
 		}
@@ -504,7 +496,6 @@ namespace NET_SERVER
 		CNetSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 
 		InterlockedIncrement(&pSession->m_iIOCountAndRelease);
-		// ReleaseFlag가 이미 켜진 상황
 		if ((pSession->m_iIOCountAndRelease & CNetSession::RELEASE_FLAG) == CNetSession::RELEASE_FLAG)
 		{
 			if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
@@ -522,19 +513,6 @@ namespace NET_SERVER
 			}
 			return;
 		}
-
-		// if (!sBuffer->GetIsEnqueueHeader())
-		// {
-		// 	sBuffer->m_isEnqueueHeader = true;
-		// 	NetHeader *header = (NetHeader *)sBuffer->GetBufferPtr();
-		// 	header->code = SERVER_SETTING::PACKET_CODE; // 코드
-		// 	header->len = sBuffer->GetDataSize();
-		// 	header->randKey = 0;
-		// 	header->checkSum = CEncryption::CalCheckSum(sBuffer->GetContentBufferPtr(), sBuffer->GetDataSize());
-		// 
-		// 	// CheckSum 부터 암호화하기 위해
-		// 	CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetDataSize() + 1, header->randKey);
-		// }
 
 		if (pSession->SendPacket(sBuffer))
 			pSession->PostSend();
@@ -571,19 +549,6 @@ namespace NET_SERVER
 			}
 			return;
 		}
-
-		// if (!sBuffer->GetIsEnqueueHeader())
-		// {
-		// 	sBuffer->m_isEnqueueHeader = true;
-		// 	NetHeader *header = (NetHeader *)sBuffer->GetBufferPtr();
-		// 	header->code = SERVER_SETTING::PACKET_CODE; // 코드
-		// 	header->len = sBuffer->GetDataSize();
-		// 	header->randKey = 0;
-		// 	header->checkSum = CEncryption::CalCheckSum(sBuffer->GetContentBufferPtr(), sBuffer->GetDataSize());
-		// 
-		// 	// CheckSum 부터 암호화하기 위해
-		// 	CEncryption::Encoding(sBuffer->GetBufferPtr() + 4, sBuffer->GetDataSize() + 1, header->randKey);
-		// }
 
 		if (!pSession->SendPacket(sBuffer))
 			Disconnect(sessionID);
@@ -663,10 +628,8 @@ namespace NET_SERVER
 
 	BOOL CNetServer::ReleaseSession(CNetSession *pSession, BOOL isPQCS) noexcept
 	{
-		// IoCount 체크와 ReleaseFlag 변경을 동시에
 		if (InterlockedCompareExchange(&pSession->m_iIOCountAndRelease, CNetSession::RELEASE_FLAG, 0) != 0)
 		{
-			// ioCount 0이 아니거나 이미 Release 진행 중인게 있다면 return
 			return FALSE;
 		}
 
@@ -676,11 +639,10 @@ namespace NET_SERVER
 			return TRUE;
 		}
 
-		USHORT index = GetIndex(pSession->m_uiSessionID);
 		closesocket(pSession->m_sSessionSocket);
+		USHORT index = GetIndex(pSession->m_uiSessionID);
 		UINT64 freeSessionId = pSession->m_uiSessionID;
-		
-
+	
 		OnClientLeave(freeSessionId);
 		if (pSession->m_pCurrentContent != nullptr)
 			pSession->m_pCurrentContent->LeaveJobEnqueue(freeSessionId);
