@@ -11,7 +11,7 @@ public:
 private:
 	CTLSMemoryPool(CTLSSharedMemoryPool<DATA, bucketSize, bucketCount, UseQueue> *sharedPool) noexcept : m_pTLSSharedMemoryPool(sharedPool)
 	{
-		m_MyBucket = Bucket<DATA, bucketSize, bucketCount>::GetTLSBucket();
+		m_AllocBucket = Bucket<DATA, bucketSize, bucketCount>::GetTLSBucket();
 		m_FreeBucket = Bucket<DATA, bucketSize, bucketCount>::GetFreeBucket();
 	}
 
@@ -22,12 +22,11 @@ private:
 
 	DATA *Alloc() noexcept
 	{
-		// 가득 찬 상황
 		if (m_iCurrentBucketIndex == Bucket<DATA, bucketSize, bucketCount>::TLS_BUCKET_COUNT)
 		{
 			m_iCurrentBucketIndex--;
 		}
-		else if (m_iCurrentBucketIndex != -1 && m_MyBucket[m_iCurrentBucketIndex].m_iSize == 0)
+		else if (m_iCurrentBucketIndex != -1 && m_AllocBucket[m_iCurrentBucketIndex].m_iSize == 0)
 		{
 			m_iCurrentBucketIndex--;
 		}
@@ -35,14 +34,12 @@ private:
 		if (m_iCurrentBucketIndex == -1)
 		{
 			m_iCurrentBucketIndex++;
-			m_MyBucket[m_iCurrentBucketIndex].m_pTop = m_pTLSSharedMemoryPool->Alloc();
-			m_MyBucket[m_iCurrentBucketIndex].m_iSize = Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE;
+			m_AllocBucket[m_iCurrentBucketIndex].m_pTop = m_pTLSSharedMemoryPool->Alloc();
+			m_AllocBucket[m_iCurrentBucketIndex].m_iSize = Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE;
 		}
 
-		TLSMemoryPoolNode<DATA> *retNode = m_MyBucket[m_iCurrentBucketIndex].Pop();
-
+		TLSMemoryPoolNode<DATA> *retNode = m_AllocBucket[m_iCurrentBucketIndex].Pop();
 		m_lUsedCount++;
-
 		return &retNode->data;
 	}
 
@@ -50,12 +47,9 @@ private:
 	{
 		if (m_iCurrentBucketIndex == Bucket<DATA, bucketSize, bucketCount>::TLS_BUCKET_COUNT)
 		{
-			// Free 버킷으로
 			int retSize = m_FreeBucket->Push((TLSMemoryPoolNode<DATA> *)delPtr);
 			if (retSize == Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE)
 			{
-				// 공용 풀로 반환
-				TLSMemoryPoolNode<DATA> *node = m_FreeBucket->m_pTop;
 				m_pTLSSharedMemoryPool->Free(m_FreeBucket->m_pTop);
 				m_FreeBucket->Clear();
 			}
@@ -64,7 +58,7 @@ private:
 		{
 			if (m_iCurrentBucketIndex != -1)
 			{
-				int retSize = m_MyBucket[m_iCurrentBucketIndex].Push((TLSMemoryPoolNode<DATA> *)delPtr);
+				int retSize = m_AllocBucket[m_iCurrentBucketIndex].Push((TLSMemoryPoolNode<DATA> *)delPtr);
 				if (retSize == Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE)
 				{
 					m_iCurrentBucketIndex++;
@@ -73,17 +67,16 @@ private:
 			else
 			{
 				m_iCurrentBucketIndex++;
-				m_MyBucket[m_iCurrentBucketIndex].Push((TLSMemoryPoolNode<DATA> *)delPtr);
+				m_AllocBucket[m_iCurrentBucketIndex].Push((TLSMemoryPoolNode<DATA> *)delPtr);
 			}
 		}
-
 		m_lUsedCount--;
 	}
 
 
 private:
 
-	Bucket<DATA, bucketSize, bucketCount> *m_MyBucket;
+	Bucket<DATA, bucketSize, bucketCount> *m_AllocBucket;
 	int m_iCurrentBucketIndex = -1;
 
 	// 만약 MyBucket이 가득 찬 경우 -> FreeBucket에 반환

@@ -12,7 +12,7 @@ void MonitorTimerEvent::SetEvent() noexcept
 	execute = std::bind(&MonitorTimerEvent::Execute, this);
 	isPQCS = true;
 	timeMs = 1000; // 1초
-	nextExecuteTime = timeGetTime(); // 현재 시각
+	nextExecuteTime = timeGetTime(); // 현재 시간
 }
 
 void MonitorTimerEvent::Execute() noexcept

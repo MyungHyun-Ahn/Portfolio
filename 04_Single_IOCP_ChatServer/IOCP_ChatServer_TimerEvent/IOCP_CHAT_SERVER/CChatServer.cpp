@@ -129,7 +129,6 @@ void CChatServer::OnClientLeave(const UINT64 sessionID) noexcept
 
 void CChatServer::OnRecv(const UINT64 sessionID, CSerializableBufferView<FALSE> *message) noexcept
 {
-	// JobQ Enqueue
 	message->IncreaseRef();
 	m_RecvJobQ.Enqueue(message);
 }

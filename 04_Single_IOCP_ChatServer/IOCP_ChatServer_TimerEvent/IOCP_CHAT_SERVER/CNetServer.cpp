@@ -106,7 +106,7 @@ namespace NET_SERVER
 				}
 
 				InterlockedIncrement(&g_monitor.m_lRecvTPS);
-				m_pDelayedBuffer->m_uiSessionId = m_uiSessionID;
+				m_pDelayedBuffer->SetSesionID(m_uiSessionID);
 				g_NetServer->OnRecv(m_uiSessionID, m_pDelayedBuffer);
 				m_pDelayedBuffer = nullptr;
 			}
@@ -205,7 +205,8 @@ namespace NET_SERVER
 			}
 
 			InterlockedIncrement(&g_monitor.m_lRecvTPS);
-			view->m_uiSessionId = m_uiSessionID;
+
+			view->SetSesionID(m_uiSessionID);
 			g_NetServer->OnRecv(m_uiSessionID, view);
 
 			currentUseSize = m_pRecvBuffer->GetUseSize();
@@ -294,10 +295,7 @@ namespace NET_SERVER
 		ZeroMemory((m_pMyOverlappedStartAddr + 1), sizeof(OVERLAPPED));
 
 		DWORD flag = 0;
-		{
-			// PROFILE_BEGIN(0, "WSARecv");
-			retVal = WSARecv(m_sSessionSocket, &wsaBuf, 1, nullptr, &flag, (LPWSAOVERLAPPED)(m_pMyOverlappedStartAddr + 1), NULL);
-		}
+		retVal = WSARecv(m_sSessionSocket, &wsaBuf, 1, nullptr, &flag, (LPWSAOVERLAPPED)(m_pMyOverlappedStartAddr + 1), NULL);
 		if (retVal == SOCKET_ERROR)
 		{
 			errVal = WSAGetLastError();
@@ -848,7 +846,7 @@ namespace NET_SERVER
 
 		OnClientLeaveEvent *clientLeaveEvent = new OnClientLeaveEvent;
 		clientLeaveEvent->SetEvent(freeSessionId);
-		EventAPCEnqueue((BaseEvent *)clientLeaveEvent);
+		EventAPCEnqueue(clientLeaveEvent);
 
 		m_stackDisconnectIndex.Push(index);
 
@@ -1033,7 +1031,7 @@ namespace NET_SERVER
 
 					OnAcceptEvent *acceptEvent = new OnAcceptEvent;
 					acceptEvent->SetEvent(pSession->m_uiSessionID);
-					EventAPCEnqueue((BaseEvent *)acceptEvent);
+					EventAPCEnqueue(acceptEvent);
 
 					pSession->PostRecv();
 
@@ -1060,19 +1058,16 @@ namespace NET_SERVER
 					timerEvent->nextExecuteTime += timerEvent->timeMs;
 					timerEvent->execute();
 
-					// Event Apc Enqueue - PQ 동기화 피하기 위함
 					RegisterTimerEvent(timerEvent);
-					continue;
 				}
-				break;
-				case IOOperation::CONTENT_EVENT: // 일회성 이벤트
+				continue;
+				case IOOperation::CONTENT_EVENT:
 				{
 					BaseEvent *contentEvent = (BaseEvent *)pSession;
 					contentEvent->execute();
 					delete contentEvent;
-					continue;
 				}
-				break;
+				continue;
 				}
 			}
 
@@ -1116,43 +1111,38 @@ namespace NET_SERVER
 
 	int CNetServer::TimerEventSchedulerThread() noexcept
 	{
-		// IOCP의 병행성 관리를 받기 위한 GQCS
 		DWORD dwTransferred = 0;
 		CNetSession *pSession = nullptr;
 		OVERLAPPED *lpOverlapped = nullptr;
 
 		GetQueuedCompletionStatus(m_hIOCPHandle, &dwTransferred
-			, (PULONG_PTR)&pSession, (LPOVERLAPPED *)&lpOverlapped
-			, 0);
-
+			, (PULONG_PTR)&pSession, (LPOVERLAPPED *)&lpOverlapped, 0);
 
 		while (m_bIsTimerEventSchedulerRun)
 		{
 			if (m_TimerEventQueue.empty())
-				SleepEx(INFINITE, TRUE); // APC 작업이 Enqueue 되면 깨어날 것
+				SleepEx(INFINITE, TRUE);
 
-			// EventQueue에 무언가 있을 것
 			TimerEvent *timerEvent = m_TimerEventQueue.top();
-			// 수행 가능 여부 판단
 			LONG dTime = timerEvent->nextExecuteTime - timeGetTime();
-			if (dTime <= 0) // 0보다 작으면 수행 가능
+			if (dTime <= 0)
 			{
 				m_TimerEventQueue.pop();
-				if (timerEvent->isPQCS) // PQCS 타이머 이벤트
+				if (timerEvent->isPQCS)
 				{
-					PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)timerEvent, (LPOVERLAPPED)IOOperation::TIMER_EVENT);
+					PostQueuedCompletionStatus(m_hIOCPHandle, 0
+						, (ULONG_PTR)timerEvent
+						, (LPOVERLAPPED)IOOperation::TIMER_EVENT);
 				}
-				else // 서버 프레임 APC 이벤트
+				else
 				{
 					TimerEventAPCEnqueue(timerEvent);
 				}
 				continue;
 			}
 
-			// 남은 시간만큼 블록
 			SleepEx(dTime, TRUE);
 		}
-
 		return 0;
 	}
 
@@ -1171,7 +1161,6 @@ namespace NET_SERVER
 	{
 		int retVal;
 		int errVal;
-
 		retVal = QueueUserAPC(RegisterTimerEventAPCFunc, m_hTimerEventSchedulerThread, (ULONG_PTR)timerEvent);
 		if (retVal == FALSE)
 		{
@@ -1224,7 +1213,6 @@ namespace NET_SERVER
 		timerEvent->nextExecuteTime += timerEvent->timeMs;
 		timerEvent->execute();
 
-		// Event Apc Enqueue - PQ 동기화 피하기 위함
 		g_NetServer->RegisterTimerEvent(timerEvent);
 	}
 };

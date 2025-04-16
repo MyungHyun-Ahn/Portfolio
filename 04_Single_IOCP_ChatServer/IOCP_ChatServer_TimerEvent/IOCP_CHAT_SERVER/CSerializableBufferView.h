@@ -111,6 +111,7 @@ public:
 	}
 
 	inline UINT64 GetSessionID() const noexcept { return m_uiSessionId; }
+	inline void SetSesionID(UINT64 sessionId) noexcept { m_uiSessionId = sessionId; }
 
 	// operator
 public:

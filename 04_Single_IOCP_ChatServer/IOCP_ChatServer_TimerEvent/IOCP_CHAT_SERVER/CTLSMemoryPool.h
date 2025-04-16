@@ -54,8 +54,6 @@ private:
 			int retSize = m_FreeBucket->Push((TLSMemoryPoolNode<DATA> *)delPtr);
 			if (retSize == Bucket<DATA, bucketSize, bucketCount>::BUCKET_SIZE)
 			{
-				// 공용 풀로 반환
-				TLSMemoryPoolNode<DATA> *node = m_FreeBucket->m_pTop;
 				m_pTLSSharedMemoryPool->Free(m_FreeBucket->m_pTop);
 				m_FreeBucket->Clear();
 			}

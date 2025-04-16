@@ -13,7 +13,6 @@ namespace NET_SERVER
 	{
 		m_RecvBuffer.MoveRear(size);
 		int currentUseSize = m_RecvBuffer.GetUseSize();
-
 		while (currentUseSize > 0)
 		{
 			if (currentUseSize < sizeof(NetHeader))
@@ -27,13 +26,11 @@ namespace NET_SERVER
 				g_NetServer->Disconnect(m_uiSessionID);
 				return;
 			}
-
 			if (packetHeader.len > (int)CSerializableBuffer<FALSE>::DEFINE::PACKET_MAX_SIZE - sizeof(NetHeader) || packetHeader.len >= 65535 || packetHeader.len >= m_RecvBuffer.GetCapacity())
 			{
 				g_NetServer->Disconnect(m_uiSessionID);
 				return;
 			}
-
 			if (m_RecvBuffer.GetUseSize() < sizeof(NetHeader) + packetHeader.len)
 				break;
 
@@ -47,7 +44,6 @@ namespace NET_SERVER
 			CEncryption::Decoding(view->GetBufferPtr() + 4, view->GetFullSize() - 4, packetHeader.randKey);
 			BYTE dataCheckSum = CEncryption::CalCheckSum(view->GetContentBufferPtr(), view->GetDataSize());
 			BYTE headerCheckSum = *(view->GetBufferPtr() + offsetof(NetHeader, checkSum));
-
 			if (dataCheckSum != headerCheckSum)
 			{
 				CSerializableBuffer<FALSE>::Free(view);
@@ -58,10 +54,8 @@ namespace NET_SERVER
 			view->IncreaseRef();
 			InterlockedIncrement(&g_monitor.m_lRecvTPS);
 			m_RecvMsgQueue.Enqueue(view);
-
 			currentUseSize = m_RecvBuffer.GetUseSize();
 		}
-
 	}
 
 	// m_iSendCount를 믿고 할당 해제를 진행
