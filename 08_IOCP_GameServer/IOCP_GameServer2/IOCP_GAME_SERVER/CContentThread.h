@@ -88,9 +88,8 @@ private:
 
 				if (pEvent->isTimerEvent)
 				{
-					AcquireSRWLockExclusive(&m_lockTimerEventQ);
+					CLockGuard<LOCK_TYPE::EXCLUSIVE> lock(m_lockTimerEventQ);
 					m_TimerEventQueue.push(static_cast<TimerEvent *>(pEvent));
-					ReleaseSRWLockExclusive(&m_lockTimerEventQ);
 				}
 				else
 				{
@@ -157,17 +156,18 @@ private:
 	// 자기 자신이 바쁠 때 다른 스레드로 일을 넘겨주는 함수
 	bool DelegateWork() noexcept
 	{
-		AcquireSRWLockExclusive(&m_lockTimerEventQ);
-		if (m_TimerEventQueue.empty())
+		TimerEvent *pTimerEvent;
 		{
-			// 큐가 비어있으면 실패
-			ReleaseSRWLockExclusive(&m_lockTimerEventQ);
-			return false;
-		}
+			CLockGuard<LOCK_TYPE::EXCLUSIVE> lock(m_lockTimerEventQ);
+			if (m_TimerEventQueue.empty())
+			{
+				// 큐가 비어있으면 실패
+				return false;
+			}
 
-		TimerEvent *pTimerEvent = m_TimerEventQueue.top();
-		m_TimerEventQueue.pop();
-		ReleaseSRWLockExclusive(&m_lockTimerEventQ);
+			pTimerEvent = m_TimerEventQueue.top();
+			m_TimerEventQueue.pop();
+		}
 
 		// 가장 SleepTime이 긴 스레드를 찾아 Enqueue
 		EnqueueEvent(pTimerEvent);
@@ -177,25 +177,26 @@ private:
 	bool ConsumeTimerEvent() noexcept
 	{
 		TimerEvent *pTimerEvent;
-		AcquireSRWLockExclusive(&m_lockTimerEventQ);
-		if (m_TimerEventQueue.empty())
+		LONG dTime;
 		{
-			ReleaseSRWLockExclusive(&m_lockTimerEventQ);
-			return false;
-		}
-		pTimerEvent = m_TimerEventQueue.top();
+			CLockGuard<LOCK_TYPE::EXCLUSIVE> lock(m_lockTimerEventQ);
 
-		LONG dTime = pTimerEvent->nextExecuteTime - timeGetTime();
-		if (dTime > 0) // 0보다 작으면 수행 가능
-		{
-			m_PrevSleepTime = dTime;
-			ReleaseSRWLockExclusive(&m_lockTimerEventQ);
-			Sleep(dTime);
-			return false;
-		}
+			if (m_TimerEventQueue.empty())
+			{
+				return false;
+			}
+			pTimerEvent = m_TimerEventQueue.top();
 
-		m_TimerEventQueue.pop();
-		ReleaseSRWLockExclusive(&m_lockTimerEventQ);
+			dTime = pTimerEvent->nextExecuteTime - timeGetTime();
+			if (dTime > 0) // 0보다 작으면 수행 가능
+			{
+				m_PrevSleepTime = dTime;
+				Sleep(dTime);
+				return false;
+			}
+
+			m_TimerEventQueue.pop();
+		}
 
 		// dTime이 음수거나 0
 		// 얼마나 프레임이 밀렸는지 판단
@@ -224,9 +225,8 @@ private:
 		// 수행했으면 sleepTime = 0;
 		m_PrevSleepTime = 0;
 
-		AcquireSRWLockExclusive(&m_lockTimerEventQ);
+		CLockGuard<LOCK_TYPE::EXCLUSIVE> lock(m_lockTimerEventQ);
 		m_TimerEventQueue.push(pTimerEvent);
-		ReleaseSRWLockExclusive(&m_lockTimerEventQ);
 
 		return true;
 	}

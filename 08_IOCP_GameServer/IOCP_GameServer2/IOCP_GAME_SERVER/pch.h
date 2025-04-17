@@ -85,3 +85,4 @@
 #include "CDeque.h"
 
 #include "BaseEvent.h"
+#include "CLockGuard.h"

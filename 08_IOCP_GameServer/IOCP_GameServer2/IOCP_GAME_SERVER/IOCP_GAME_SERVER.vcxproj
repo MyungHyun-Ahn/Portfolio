@@ -168,6 +168,7 @@
     <ClInclude Include="CLFQueue.h" />
     <ClInclude Include="CLFStack.h" />
     <ClInclude Include="ClientSetting.h" />
+    <ClInclude Include="CLockGuard.h" />
     <ClInclude Include="CLogger.h" />
     <ClInclude Include="CMonitor.h" />
     <ClInclude Include="CMonitorClient.h" />
