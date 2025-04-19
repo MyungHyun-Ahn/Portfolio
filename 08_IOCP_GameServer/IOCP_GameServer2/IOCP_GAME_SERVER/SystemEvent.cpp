@@ -23,6 +23,8 @@ void MonitorTimerEvent::execute(int delayFrame) noexcept
 void KeyBoardTimerEvent::SetEvent() noexcept
 {
 	// execute = std::bind(&KeyBoardTimerEvent::Execute, this);
+	isRunning = true;
+	isTimerEvent = true;
 	timeMs = 1000; // 1초
 	nextExecuteTime = timeGetTime(); // 현재 시각
 }

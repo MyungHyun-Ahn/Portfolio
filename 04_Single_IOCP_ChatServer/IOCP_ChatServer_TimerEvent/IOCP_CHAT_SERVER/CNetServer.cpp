@@ -569,6 +569,18 @@ namespace NET_SERVER
 			}
 		}
 
+		if (SERVER_SETTING::USE_NAGLE)
+		{
+			BOOL option = TRUE; // 네이글 On
+			retVal = setsockopt(m_sListenSocket, IPPROTO_TCP, TCP_NODELAY, (char *)&option, sizeof(BOOL));
+			if (retVal == SOCKET_ERROR)
+			{
+				errVal = WSAGetLastError();
+				g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"setsockopt(SO_SNDBUF) 실패 : %d", errVal);
+				return FALSE;
+			}
+		}
+
 		// LINGER option 설정
 		LINGER ling{ 1, 0 };
 		retVal = setsockopt(m_sListenSocket, SOL_SOCKET, SO_LINGER, (char *)&ling, sizeof(ling));

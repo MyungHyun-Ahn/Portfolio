@@ -219,8 +219,11 @@ namespace NET_SERVER
 		InterlockedAnd(&m_iSendFlag, TRUE);
 
 		ZeroMemory((m_pMyOverlappedStartAddr + 2), sizeof(OVERLAPPED));
-
-		retVal = WSASend(m_sSessionSocket, wsaBuf, m_iSendCount, nullptr, 0, (LPOVERLAPPED)(m_pMyOverlappedStartAddr + 2), NULL);
+		InterlockedIncrement(&g_monitor.m_iSendCallCount);
+		{
+			PROFILE_BEGIN(0, "WSASend");
+			retVal = WSASend(m_sSessionSocket, wsaBuf, m_iSendCount, nullptr, 0, (LPOVERLAPPED)(m_pMyOverlappedStartAddr + 2), NULL);
+		}
 		if (retVal == SOCKET_ERROR)
 		{
 			errVal = WSAGetLastError();
@@ -238,6 +241,7 @@ namespace NET_SERVER
 			}
 			else
 			{
+				InterlockedIncrement(&g_monitor.m_iSendPendingCount);
 				if (m_iCacelIoCalled)
 				{
 					CancelIoEx((HANDLE)m_sSessionSocket, nullptr);
@@ -903,8 +907,13 @@ namespace NET_SERVER
 	{
 		MonitorTimerEvent *pMonitorEvent = new MonitorTimerEvent;
 		pMonitorEvent->SetEvent();
-		// CContentThread::EnqueueEvent(pMonitorEvent);
-		CContentThread::s_arrContentThreads[2]->EnqueueEventMy(pMonitorEvent);
+		CContentThread::EnqueueEvent(pMonitorEvent);
+		// CContentThread::s_arrContentThreads[2]->EnqueueEventMy(pMonitorEvent);
+
+		KeyBoardTimerEvent *pKeyBoardEvent = new KeyBoardTimerEvent;
+		pKeyBoardEvent->SetEvent();
+		CContentThread::EnqueueEvent(pKeyBoardEvent);
+		// CContentThread::s_arrContentThreads[2]->EnqueueEventMy(pKeyBoardEvent);
 
 		// SendAllTimerEvent *pSendAllEvent = new SendAllTimerEvent;
 		// pSendAllEvent->SetEvent();

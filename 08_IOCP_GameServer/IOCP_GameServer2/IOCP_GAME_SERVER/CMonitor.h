@@ -97,6 +97,11 @@ public:
 
 	tm m_startTime;
 	tm m_currentTime;
+
+	LONG m_iSendPendingCount = 0;
+	LONG m_iSendCallCount = 0;
+	LONG m_DelWork = 0;
+	LONG m_StealWork = 0;
 };
 
 extern CMonitor g_monitor;

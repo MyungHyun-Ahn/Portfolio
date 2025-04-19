@@ -189,7 +189,7 @@ void CChatServer::SectorBroadcast() noexcept
 								continue;
 
 							InterlockedIncrement(&g_monitor.m_chatMsgRes);
-							EnqueuePacket(it->first, *msgIt);
+							SendPacket(it->first, *msgIt);
 						}
 					}
 				}

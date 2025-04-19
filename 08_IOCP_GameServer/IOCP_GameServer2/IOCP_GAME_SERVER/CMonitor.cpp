@@ -159,6 +159,10 @@ void CMonitor::UpdateServer() noexcept
 	InterlockedExchange(&m_lUpdateTPS, 0);
 
 	InterlockedExchange(&m_lMaxSendCount, 0);
+	InterlockedExchange(&m_iSendPendingCount, 0);
+	InterlockedExchange(&m_iSendCallCount, 0);
+	InterlockedExchange(&m_DelWork, 0);
+	InterlockedExchange(&m_StealWork, 0);
 
 	InterlockedExchange(&((CGameServer *)NET_SERVER::g_NetServer)->m_pAuthContent->m_FPS, 0);
 	InterlockedExchange(&((CGameServer *)NET_SERVER::g_NetServer)->m_pEchoContent->m_FPS, 0);
@@ -241,6 +245,10 @@ void CMonitor::MonitoringConsole() noexcept
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSend\t : %d \t Avr : %lf", m_lSendTPS, (DOUBLE)m_SendTPSTotal / m_LoopCount);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tUpdate\t : %d \t Avr : %lf", m_lUpdateTPS, (DOUBLE)m_UpdateTPSTotal / m_LoopCount);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tMaxSend\t : %d", m_lMaxSendCount);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSendPending\t : %d", m_iSendPendingCount);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSendCall\t : %d", m_iSendCallCount);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tDelWork\t : %d", m_DelWork);
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tStealWork\t : %d", m_StealWork);
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"----------------------------------------");
 }
 
