@@ -10,9 +10,18 @@
 class CRingBuffer
 {
 public:
-	CRingBuffer() noexcept;
-	CRingBuffer(int size) noexcept;
-	~CRingBuffer() noexcept;
+	CRingBuffer() noexcept
+	{
+		m_PQueue = new char[m_iCapacity];
+	}
+	CRingBuffer(int size) noexcept : m_iCapacity(size + 1)
+	{
+		m_PQueue = new char[m_iCapacity];
+	}
+	~CRingBuffer() noexcept
+	{
+		delete m_PQueue;
+	}
 
 	// 버퍼 최대 크기
 	inline int GetCapacity() const noexcept { return m_iCapacity - 1; }
@@ -40,14 +49,85 @@ public:
 	inline void Clear() noexcept { m_iFront = 0; m_iRear = 0; }
 
 	// 데이터 삽입
-	int				Enqueue(char *data, int size) noexcept;
+	int				Enqueue(char *data, int size) noexcept
+	{
+		// 공간 부족
+		int freeSize = GetFreeSize();
+		if (freeSize < size)
+			return -1;
+
+		int rear = m_iRear;
+		int des = DirectEnqueueSize();
+		int firstPartSize = 0;
+		if (des < 0)
+			firstPartSize = size;
+		else
+			firstPartSize = min(size, des);
+
+		int secondPartSize = size - firstPartSize;
+		memcpy_s(m_PQueue + rear, freeSize, data, firstPartSize);
+		memcpy_s(m_PQueue, secondPartSize, data + firstPartSize, secondPartSize);
+		MoveRear(size);
+
+		return size;
+	}
 
 	// 데이터 추출 - buffer에 저장
-	int				Dequeue(char *buffer, int size) noexcept;
+	int				Dequeue(char *buffer, int size) noexcept
+	{
+		int ret = Peek(buffer, size);
+		if (ret == -1)
+			return -1;
+
+		MoveFront(ret);
+		return ret;
+	}
 
 	// 데이터 추출하고 꺼내지는 않음
-	int				Peek(char *buffer, int size) noexcept;
-	int				Peek(char *buffer, int size, int offset) noexcept;
+	int				Peek(char *buffer, int size) noexcept
+	{
+		if (GetUseSize() < size) {
+			return -1;
+		}
+
+		int front = m_iFront;
+		int dds = DirectDequeueSize();
+		int firstPartSize = 0;
+
+		if (dds < 0)
+			firstPartSize = size;
+		else
+			firstPartSize = min(size, dds);
+		int secondPartSize = size - firstPartSize;
+
+		memcpy_s(buffer, size, m_PQueue + front, firstPartSize);
+		memcpy_s(buffer + firstPartSize, size - firstPartSize, m_PQueue, secondPartSize);
+
+		return size;
+	}
+	int				Peek(char *buffer, int size, int offset) noexcept
+	{
+		if (GetUseSize(offset) < size) {
+			return -1;
+		}
+
+		int front = m_iFront;
+		front = (front + offset) % m_iCapacity;
+		int dds = DirectDequeueSize(offset);
+		int firstPartSize = 0;
+
+		if (dds < 0)
+			firstPartSize = size;
+		else
+			firstPartSize = min(size, dds);
+
+		int secondPartSize = size - firstPartSize;
+
+		memcpy_s(buffer, size, m_PQueue + front, firstPartSize);
+		memcpy_s(buffer + firstPartSize, size - firstPartSize, m_PQueue, secondPartSize);
+
+		return 0;
+	}
 
 
 	// 버퍼 포인터로 외부에서 조작하는 함수들

@@ -6,6 +6,7 @@
 #include "MonitorSetting.h"
 #include "CLanClient.h"
 #include "CMonitorClient.h"
+#include "GameSetting.h"
 
 #pragma warning(disable : 4101)
 
@@ -18,10 +19,8 @@ int main()
 	g_Logger->SetLogLevel(LOG_LEVEL::DEBUG);
 	g_ProfileMgr = CProfileManager::GetInstance();
 
-	CCrashDump crashDump;
-
 	{
-		CMyFileLoader serverConfigLoader;
+		CFileLoader serverConfigLoader;
 		serverConfigLoader.Parse(L"ServerConfig.conf");
 
 		serverConfigLoader.Load(L"Server", L"IP", &SERVER_SETTING::openIP);
@@ -34,9 +33,12 @@ int main()
 		serverConfigLoader.Load(L"Server", L"MAX_SESSION_COUNT", &SERVER_SETTING::MAX_SESSION_COUNT);
 		serverConfigLoader.Load(L"Server", L"ACCEPTEX_COUNT", &SERVER_SETTING::ACCEPTEX_COUNT);
 
-		serverConfigLoader.Load(L"Server", L"CONTENT_THREAD_COUNT", &SERVER_SETTING::CONTENT_THREAD_COUNT);
-		serverConfigLoader.Load(L"Server", L"MAX_CONTENT_FPS", &SERVER_SETTING::MAX_CONTENT_FPS);
+		serverConfigLoader.Load(L"Server", L"CONTENTS_THREAD_COUNT", &SERVER_SETTING::CONTENTS_THREAD_COUNT);
+		serverConfigLoader.Load(L"Server", L"MAX_CONTENTS_FPS", &SERVER_SETTING::MAX_CONTENTS_FPS);
 		serverConfigLoader.Load(L"Server", L"DELAY_FRAME", &SERVER_SETTING::DELAY_FRAME);
+
+		serverConfigLoader.Load(L"GameServer", L"AUTH_FPS", &GAME_SETTING::AUTH_FPS);
+		serverConfigLoader.Load(L"GameServer", L"ECHO_FPS", &GAME_SETTING::ECHO_FPS);
 
 		serverConfigLoader.Load(L"Monitoring", L"USE_ZERO_COPY", &CLIENT_SETTING::USE_ZERO_COPY);
 		serverConfigLoader.Load(L"Monitoring", L"IOCP_WORKER_THREAD", &CLIENT_SETTING::IOCP_WORKER_THREAD);

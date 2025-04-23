@@ -2,11 +2,12 @@
 #include "ServerSetting.h"
 #include "CNetServer.h"
 #include "CGameServer.h"
-#include "CBaseContent.h"
+#include "CBaseContents.h"
 #include "SystemEvent.h"
-#include "CGameContent.h"
+#include "CGameContents.h"
 #include "ContentEvent.h"
-#include "CContentThread.h"
+#include "CContentsThread.h"
+#include "GameSetting.h"
 
 CGameServer::CGameServer()
 {
@@ -21,7 +22,7 @@ bool CGameServer::OnConnectionRequest(const WCHAR *ip, USHORT port) noexcept
 void CGameServer::OnAccept(const UINT64 sessionID) noexcept
 {
 	// 해당 유저 Auth Content로 보냄
-	m_pAuthContent->MoveJobEnqueue(sessionID, nullptr);
+	m_pAuthContents->MoveJobEnqueue(sessionID, nullptr);
 }
 
 // 딱히 할일이 없음
@@ -41,16 +42,13 @@ void CGameServer::OnError(int errorcode, WCHAR *errMsg) noexcept
 
 void CGameServer::RegisterContentTimerEvent() noexcept
 {
-	m_pAuthContent = new CAuthContent;
-	ContentFrameEvent *pAuthEvent = new ContentFrameEvent;
-	pAuthEvent->SetEvent(m_pAuthContent, 25);
+	m_pAuthContents = new CAuthContents;
+	ContentsFrameEvent *pAuthEvent = new ContentsFrameEvent;
+	pAuthEvent->SetEvent(m_pAuthContents, GAME_SETTING::AUTH_FPS);
+	CContentsThread::EnqueueEvent(pAuthEvent);
 
-	// CContentThread::s_arrContentThreads[0]->EnqueueEventMy(pAuthEvent);
-	CContentThread::EnqueueEvent(pAuthEvent);
-
-	m_pEchoContent = new CEchoContent;
-	ContentFrameEvent *pEchoEvent = new ContentFrameEvent;
-	pEchoEvent->SetEvent(m_pEchoContent, 25);
-	// CContentThread::s_arrContentThreads[1]->EnqueueEventMy(pEchoEvent);
-	CContentThread::EnqueueEvent(pEchoEvent);
+	m_pEchoContents = new CEchoContents;
+	ContentsFrameEvent *pEchoEvent = new ContentsFrameEvent;
+	pEchoEvent->SetEvent(m_pEchoContents, GAME_SETTING::ECHO_FPS);
+	CContentsThread::EnqueueEvent(pEchoEvent);
 }

@@ -4,14 +4,16 @@
 // execute 에 인자를 넣을 경우를 대비하여 가상 함수로 만들지 않음
 struct BaseEvent
 {
-	bool isTimerEvent = false;
+	BaseEvent(bool isTimer = false) : isTimerEvent(isTimer) {}
+	bool isTimerEvent;
 	virtual void execute(int delayFrame) = 0;
-	// std::function<void(int)> execute;		// 이벤트 함수를 정의하고 여기에 함수 포인터를 저장
 };
 
 struct TimerEvent : public BaseEvent
 {
-	bool	isRunning = true;
+	TimerEvent() : BaseEvent(true), isRunning(true) {}
+
+	bool	isRunning;
 	DWORD	timeMs;
 	DWORD	nextExecuteTime;
 };
@@ -23,3 +25,4 @@ struct TimerEventComparator
 		return e1->nextExecuteTime > e2->nextExecuteTime; // 실행시간 빠른 것을 우선
 	}
 };
+

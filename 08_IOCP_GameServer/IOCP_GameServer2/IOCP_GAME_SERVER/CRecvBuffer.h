@@ -39,8 +39,27 @@ public:
 	// 데이터 삽입 데이터 추출 기능은 필요 없음
 	// * 직렬화 버퍼로 만들어서 사용할 것
 	// * Peek만 필요
-	int Peek(char *buffer, int size) noexcept;
-	int Peek(char *buffer, int size, int offset) noexcept;
+	int Peek(char *buffer, int size) noexcept
+	{
+		if (GetUseSize() < size) {
+			return -1;
+		}
+
+		memcpy_s(buffer, size, m_PQueue + m_iFront, size);
+		return size;
+	}
+	int Peek(char *buffer, int size, int offset) noexcept
+	{
+		if (GetUseSize(offset) < size) {
+			return -1;
+		}
+
+		int front = m_iFront + offset;
+
+		memcpy_s(buffer, size, m_PQueue + front, size);
+
+		return 0;
+	}
 
 	// Front, Rear 커서 이동
 	inline int				MoveRear(int size) noexcept { m_iRear = (m_iRear + size); return m_iRear; }
@@ -87,5 +106,5 @@ private:
 	LONG			m_iRefCount = 0;
 
 	inline static CTLSMemoryPoolManager<CRecvBuffer, 16, 4> s_sbufferPool = CTLSMemoryPoolManager<CRecvBuffer, 16, 4>();
-	inline static CTLSPagePoolManager<4096, 2, false> s_PagePool8KB = CTLSPagePoolManager<4096, 2, false>();
+	inline static CTLSPagePoolManager<4096, 2> s_PagePool8KB = CTLSPagePoolManager<4096, 2>();
 };

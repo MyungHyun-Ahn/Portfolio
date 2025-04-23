@@ -405,7 +405,7 @@ public:
 	BOOL			m_isEnqueueHeader = 0;
 	UINT64			m_uiSessionId = 0;
 
-	inline static CTLSMemoryPoolManager<CSerializableBuffer> s_sbufferPool = CTLSMemoryPoolManager<CSerializableBuffer>();
+	inline static CTLSMemoryPoolManager<CSerializableBuffer, 512, 2> s_sbufferPool = CTLSMemoryPoolManager<CSerializableBuffer, 512, 2>();
 	inline static CTLSPagePoolManager<(int)DEFINE::PACKET_MAX_SIZE, 16, false> s_sPagePool512 = CTLSPagePoolManager<(int)DEFINE::PACKET_MAX_SIZE, 16, false>();
 };
 

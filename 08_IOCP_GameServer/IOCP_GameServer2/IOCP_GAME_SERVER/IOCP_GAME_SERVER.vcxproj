@@ -159,12 +159,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="BaseEvent.h" />
-    <ClInclude Include="CBaseContent.h" />
-    <ClInclude Include="CContentThread.h" />
+    <ClInclude Include="CBaseContents.h" />
+    <ClInclude Include="CContentsThread.h" />
     <ClInclude Include="CCrashDump.h" />
     <ClInclude Include="CDeque.h" />
     <ClInclude Include="CEncryption.h" />
-    <ClInclude Include="CGameContent.h" />
+    <ClInclude Include="CGameContents.h" />
     <ClInclude Include="CGameServer.h" />
     <ClInclude Include="CGenPacket.h" />
     <ClInclude Include="CLanClient.h" />
@@ -176,7 +176,7 @@
     <ClInclude Include="CLogger.h" />
     <ClInclude Include="CMonitor.h" />
     <ClInclude Include="CMonitorClient.h" />
-    <ClInclude Include="CMyFileLoader.h" />
+    <ClInclude Include="CFileLoader.h" />
     <ClInclude Include="CNetServer.h" />
     <ClInclude Include="CommonProtocol.h" />
     <ClInclude Include="ContentEvent.h" />
@@ -190,8 +190,6 @@
     <ClInclude Include="CSmartPtr.h" />
     <ClInclude Include="CTLSMemoryPool.h" />
     <ClInclude Include="CTLSPagePool.h" />
-    <ClInclude Include="CTLSSharedMemoryPool.h" />
-    <ClInclude Include="CTLSSharedPagePool.h" />
     <ClInclude Include="DefineServer.h" />
     <ClInclude Include="DefineSingleton.h" />
     <ClInclude Include="GameSetting.h" />
@@ -203,24 +201,18 @@
     <ClInclude Include="SystemEvent.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CBaseContent.cpp" />
-    <ClCompile Include="CContentThread.cpp" />
-    <ClCompile Include="CGameContent.cpp" />
+    <ClCompile Include="CBaseContents.cpp" />
+    <ClCompile Include="CGameContents.cpp" />
     <ClCompile Include="CGameServer.cpp" />
     <ClCompile Include="CGenPacket.cpp" />
     <ClCompile Include="CLanClient.cpp" />
     <ClCompile Include="ClientSetting.cpp" />
-    <ClCompile Include="CLogger.cpp" />
     <ClCompile Include="CMonitor.cpp" />
     <ClCompile Include="CMonitorClient.cpp" />
-    <ClCompile Include="CMyFileLoader.cpp" />
     <ClCompile Include="CNetServer.cpp" />
     <ClCompile Include="ContentEvent.cpp" />
     <ClCompile Include="COverlappedAllocator.cpp" />
     <ClCompile Include="CPlayer.cpp" />
-    <ClCompile Include="CProfileManager.cpp" />
-    <ClCompile Include="CRecvBuffer.cpp" />
-    <ClCompile Include="CRingBuffer.cpp" />
     <ClCompile Include="GameSetting.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="MonitorSetting.cpp" />

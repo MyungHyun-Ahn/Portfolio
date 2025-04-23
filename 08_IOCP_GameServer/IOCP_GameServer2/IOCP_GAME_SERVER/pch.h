@@ -5,9 +5,6 @@
 #pragma warning(disable : 6387) // AcceptEx 인자전달
 #pragma warning(disable : 4244) // xutility
 
-// 오브젝트 풀 사용 여부
-#define USE_OBJECT_POOL
-
 #pragma comment(lib, "ws2_32")
 #pragma comment(lib, "winmm")
 #pragma comment(lib, "DbgHelp.Lib")
@@ -58,13 +55,11 @@
 // Lock-Free
 #include "LFDefine.h"
 #include "CLFMemoryPool.h"
-#include "CTLSSharedMemoryPool.h"
 #include "CTLSMemoryPool.h"
 #include "CLFStack.h"
 #include "CLFQueue.h"
 
 #include "CTLSPagePool.h"
-#include "CTLSSharedPagePool.h"
 
 #include "COverlappedAllocator.h"
 
@@ -80,7 +75,7 @@
 
 #include "CMonitor.h"
 #include "CCrashDump.h"
-#include "CMyFileLoader.h"
+#include "CFileLoader.h"
 
 #include "CDeque.h"
 

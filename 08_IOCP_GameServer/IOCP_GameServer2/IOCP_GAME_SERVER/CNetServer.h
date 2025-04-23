@@ -1,7 +1,7 @@
 #pragma once
 
-struct ContentFrameEvent;
-class CBaseContent;
+struct ContentsFrameEvent;
+class CBaseContents;
 
 namespace NET_SERVER
 {
@@ -9,8 +9,8 @@ namespace NET_SERVER
 	{
 	public:
 		friend class CNetServer;
-		friend class CBaseContent;
-		friend struct ContentFrameEvent;
+		friend class CBaseContents;
+		friend struct ContentsFrameEvent;
 
 		CNetSession() noexcept
 			: m_sSessionSocket(INVALID_SOCKET)
@@ -120,7 +120,7 @@ namespace NET_SERVER
 		// √— 460πŸ¿Ã∆Æ
 
 		// ContentPtr
-		CBaseContent *m_pCurrentContent = nullptr;
+		CBaseContents *m_pCurrentContent = nullptr;
 
 		inline static CTLSMemoryPoolManager<CNetSession, 16, 4> s_sSessionPool = CTLSMemoryPoolManager<CNetSession, 16, 4>();
 		inline static LONG RELEASE_FLAG = 0x80000000;
@@ -131,8 +131,8 @@ namespace NET_SERVER
 	class CNetServer
 	{
 	public:
-		friend class CBaseContent;
-		friend struct ContentFrameEvent;
+		friend class CBaseContents;
+		friend struct ContentsFrameEvent;
 
 		BOOL Start(const CHAR *openIP, const USHORT port) noexcept;
 		void Stop();

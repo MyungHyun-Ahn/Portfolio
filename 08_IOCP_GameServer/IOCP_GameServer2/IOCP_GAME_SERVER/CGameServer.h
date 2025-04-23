@@ -2,8 +2,8 @@
 class CGameServer : public NET_SERVER::CNetServer
 {
 public:
-	friend class CAuthContent;
-	friend class CEchoContent;
+	friend class CAuthContents;
+	friend class CEchoContents;
 	friend class CMonitor;
 
 	CGameServer();
@@ -17,7 +17,7 @@ public:
 	void RegisterContentTimerEvent() noexcept override;
 
 private:
-	CAuthContent *m_pAuthContent;
-	CEchoContent *m_pEchoContent;
+	CAuthContents *m_pAuthContents;
+	CEchoContents *m_pEchoContents;
 };
 

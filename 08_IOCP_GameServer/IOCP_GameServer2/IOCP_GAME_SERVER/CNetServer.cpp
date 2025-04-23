@@ -2,8 +2,8 @@
 #include "ServerSetting.h"
 #include "CNetServer.h"
 #include "SystemEvent.h"
-#include "CContentThread.h"
-#include "CBaseContent.h"
+#include "CContentsThread.h"
+#include "CBaseContents.h"
 
 namespace NET_SERVER
 {
@@ -430,14 +430,13 @@ namespace NET_SERVER
 		// AcceptEx ฟไรป
 		FristPostAcceptEx();
 
-		// CreateContentThread
-		for (int i = 0; i < SERVER_SETTING::CONTENT_THREAD_COUNT; i++)
+		for (int i = 0; i < SERVER_SETTING::CONTENTS_THREAD_COUNT; i++)
 		{
-			CContentThread *pContentThread = new CContentThread;
-			pContentThread->Start();
+			CContentsThread *pContentsThread = new CContentsThread;
+			pContentsThread->Create();
 		}
 
-		CContentThread::RunAll();
+		CContentsThread::RunAll();
 
 		// CreateWorkerThread
 		for (int i = 1; i <= SERVER_SETTING::IOCP_WORKER_THREAD; i++)
@@ -633,7 +632,8 @@ namespace NET_SERVER
 
 		if (isPQCS)
 		{
-			PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)pSession, (LPOVERLAPPED)IOOperation::RELEASE_SESSION);
+			PostQueuedCompletionStatus(m_hIOCPHandle, 0
+				, (ULONG_PTR)pSession, (LPOVERLAPPED)IOOperation::RELEASE_SESSION);
 			return TRUE;
 		}
 
@@ -641,9 +641,9 @@ namespace NET_SERVER
 		USHORT index = GetIndex(pSession->m_uiSessionID);
 		UINT64 freeSessionId = pSession->m_uiSessionID;
 	
-		OnClientLeave(freeSessionId);
 		if (pSession->m_pCurrentContent != nullptr)
 			pSession->m_pCurrentContent->LeaveJobEnqueue(freeSessionId);
+		OnClientLeave(freeSessionId);
 
 		CNetSession::Free(pSession);
 		InterlockedDecrement(&m_iSessionCount);
@@ -907,12 +907,12 @@ namespace NET_SERVER
 	{
 		MonitorTimerEvent *pMonitorEvent = new MonitorTimerEvent;
 		pMonitorEvent->SetEvent();
-		CContentThread::EnqueueEvent(pMonitorEvent);
+		CContentsThread::EnqueueEvent(pMonitorEvent);
 		// CContentThread::s_arrContentThreads[2]->EnqueueEventMy(pMonitorEvent);
 
 		KeyBoardTimerEvent *pKeyBoardEvent = new KeyBoardTimerEvent;
 		pKeyBoardEvent->SetEvent();
-		CContentThread::EnqueueEvent(pKeyBoardEvent);
+		CContentsThread::EnqueueEvent(pKeyBoardEvent);
 		// CContentThread::s_arrContentThreads[2]->EnqueueEventMy(pKeyBoardEvent);
 
 		// SendAllTimerEvent *pSendAllEvent = new SendAllTimerEvent;

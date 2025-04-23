@@ -19,24 +19,25 @@ struct KeyBoardTimerEvent : public TimerEvent
 	void execute(int delayFrame) noexcept override;
 };
 
-class CBaseContent;
+class CBaseContents;
 
-struct ContentFrameEvent : public TimerEvent
+struct ContentsFrameEvent : public TimerEvent
 {
-	~ContentFrameEvent();
+	~ContentsFrameEvent();
 
 	// frame 1초에 몇번 수행되어야 할지
-	void SetEvent(CBaseContent *pBaseContent, int frame) noexcept;
+	void SetEvent(CBaseContents *pBaseContent, int frame) noexcept;
 	void execute(int delayFrame) noexcept override;
 
-	CBaseContent *m_pBaseContent;
+	CBaseContents *m_pBaseContent;
 };
 
-struct EnqueuePacketEvent : public BaseEvent
+struct ExampleTimerEvent : public TimerEvent
 {
-	void SetEvent(UINT64 sessionId, CSerializableBuffer<FALSE> *sBuffer) noexcept;
+	void SetEvent(int param1, double param2, int frame) noexcept;
 	void execute(int delayFrame) noexcept override;
-	// void Execute(UINT64 sessionId, CSerializableBuffer<FALSE> *sBuffer, int delayFrame);
-	UINT64 SessionId;
-	CSerializableBuffer<FALSE> *SBuffer;
+
+	int m_iParam1;
+	double m_dParam2;
+	// ...
 };

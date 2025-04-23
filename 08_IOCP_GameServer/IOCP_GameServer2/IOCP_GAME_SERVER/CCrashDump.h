@@ -1,5 +1,7 @@
 #pragma once
 
+#define CRASH_DUMP_ON
+
 class CCrashDump
 {
 public:
@@ -106,3 +108,7 @@ public:
 	inline static SRWLOCK m_srwLock;
 	inline static bool m_bDumpFlag = false;
 };
+
+#ifdef CRASH_DUMP_ON
+inline CCrashDump crashDump;
+#endif

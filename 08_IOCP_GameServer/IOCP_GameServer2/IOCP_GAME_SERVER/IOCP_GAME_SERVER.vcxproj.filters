@@ -69,7 +69,7 @@
     <ClInclude Include="CCrashDump.h">
       <Filter>Tools</Filter>
     </ClInclude>
-    <ClInclude Include="CMyFileLoader.h">
+    <ClInclude Include="CFileLoader.h">
       <Filter>Tools</Filter>
     </ClInclude>
     <ClInclude Include="LFDefine.h">
@@ -96,9 +96,6 @@
     <ClInclude Include="CProfileManager.h">
       <Filter>Tools</Filter>
     </ClInclude>
-    <ClInclude Include="CTLSSharedMemoryPool.h">
-      <Filter>DataStructures</Filter>
-    </ClInclude>
     <ClInclude Include="CTLSMemoryPool.h">
       <Filter>DataStructures</Filter>
     </ClInclude>
@@ -107,9 +104,6 @@
     </ClInclude>
     <ClInclude Include="CNetServer.h">
       <Filter>Network\Server\Net</Filter>
-    </ClInclude>
-    <ClInclude Include="CTLSSharedPagePool.h">
-      <Filter>DataStructures</Filter>
     </ClInclude>
     <ClInclude Include="CTLSPagePool.h">
       <Filter>DataStructures</Filter>
@@ -141,16 +135,16 @@
     <ClInclude Include="GameSetting.h">
       <Filter>Contents\Server</Filter>
     </ClInclude>
-    <ClInclude Include="CBaseContent.h">
+    <ClInclude Include="CBaseContents.h">
       <Filter>Network\Content</Filter>
     </ClInclude>
-    <ClInclude Include="CContentThread.h">
+    <ClInclude Include="CContentsThread.h">
       <Filter>Network\Content</Filter>
     </ClInclude>
     <ClInclude Include="ContentEvent.h">
       <Filter>Contents\Content</Filter>
     </ClInclude>
-    <ClInclude Include="CGameContent.h">
+    <ClInclude Include="CGameContents.h">
       <Filter>Contents\Content</Filter>
     </ClInclude>
     <ClInclude Include="CPlayer.h">
@@ -182,23 +176,8 @@
     <ClCompile Include="pch.cpp">
       <Filter>Define</Filter>
     </ClCompile>
-    <ClCompile Include="CRingBuffer.cpp">
-      <Filter>DataStructures</Filter>
-    </ClCompile>
-    <ClCompile Include="CLogger.cpp">
-      <Filter>Tools</Filter>
-    </ClCompile>
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="CMonitor.cpp">
-      <Filter>Tools</Filter>
-    </ClCompile>
-    <ClCompile Include="CMyFileLoader.cpp">
-      <Filter>Tools</Filter>
-    </ClCompile>
-    <ClCompile Include="CRecvBuffer.cpp">
-      <Filter>DataStructures</Filter>
-    </ClCompile>
-    <ClCompile Include="CProfileManager.cpp">
       <Filter>Tools</Filter>
     </ClCompile>
     <ClCompile Include="CNetServer.cpp">
@@ -219,13 +198,10 @@
     <ClCompile Include="GameSetting.cpp">
       <Filter>Contents\Server</Filter>
     </ClCompile>
-    <ClCompile Include="CBaseContent.cpp">
+    <ClCompile Include="CBaseContents.cpp">
       <Filter>Network\Content</Filter>
     </ClCompile>
-    <ClCompile Include="CContentThread.cpp">
-      <Filter>Network\Content</Filter>
-    </ClCompile>
-    <ClCompile Include="CGameContent.cpp">
+    <ClCompile Include="CGameContents.cpp">
       <Filter>Contents\Content</Filter>
     </ClCompile>
     <ClCompile Include="ContentEvent.cpp">
