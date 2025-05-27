@@ -1,18 +1,19 @@
 #pragma once
 
-//struct SendDebug
-//{
-//	UINT64 m_Index;
-//	USHORT m_ThreadId;
-//	USHORT m_Where;		// 0 - SendCompleted
-//						// 1 - SendPacket
-//						// 2 - RecvCompleted
-//						// ff - sendCompleted
-//	USHORT m_IsSuccess;
-//	USHORT m_Why;		// 실패시 이유
-//						// 1 - UseSize
-//						// 2 - SendFlag
-//};
+enum class WHERE_SEND : DWORD
+{
+	ACQUIRE_SENDCOMPLETED = 1,
+	ACQUIRE_SENDPACKET = 2,
+	RELEASE_SENDCOMPLETED = 3,
+	RELEASE_POSTSEND = 4,
+	MESSAGE_ENQUEUE = 5,
+};
+
+struct SendDebug
+{
+	DWORD threadId;
+	WHERE_SEND where;
+};
 
 class CLanSession
 {
@@ -58,7 +59,7 @@ public:
 	void SendCompleted(int size) noexcept;
 
 	bool PostRecv() noexcept;
-	bool PostSend(BOOL isCompleted = FALSE) noexcept;
+	bool PostSend(WHERE_SEND where) noexcept;
 
 public:
 	inline static CLanSession *Alloc() noexcept
@@ -112,9 +113,7 @@ private:
 	inline static CTLSMemoryPoolManager<CLanSession, 16, 4> s_sSessionPool = CTLSMemoryPoolManager<CLanSession, 16, 4>();
 	inline static LONG RELEASE_FLAG = 0x80000000;
 
-#ifdef POSTSEND_LOST_DEBUG
-	UINT64 sendIndex = 0;
+	LONG sendDebugIndex = 0;
 	SendDebug sendDebug[65535];
-#endif
 };
 

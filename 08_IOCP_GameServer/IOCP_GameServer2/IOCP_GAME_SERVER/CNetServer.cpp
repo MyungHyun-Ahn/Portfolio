@@ -53,7 +53,10 @@ namespace NET_SERVER
 
 			view->IncreaseRef();
 			InterlockedIncrement(&g_monitor.m_lRecvTPS);
-			m_RecvMsgQueue.Enqueue(view);
+			{
+				PROFILE_BEGIN(0, "RECV_MSG ENQUEUE");
+				m_RecvMsgQueue.Enqueue(view);
+			}
 			currentUseSize = m_RecvBuffer.GetUseSize();
 		}
 	}
@@ -190,11 +193,14 @@ namespace NET_SERVER
 		{
 			CSerializableBuffer<FALSE> *sBuffer;
 			// 못꺼낸 것
-			if (!m_lfSendBufferQueue.Dequeue(&sBuffer))
 			{
-				g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"LFQueue::Dequeue() Error");
-				// 말도 안되는 상황
-				CCrashDump::Crash();
+				PROFILE_BEGIN(0, "SEND_MSQ DEQUEUE");
+				if (!m_lfSendBufferQueue.Dequeue(&sBuffer))
+				{
+					g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"LFQueue::Dequeue() Error");
+					// 말도 안되는 상황
+					CCrashDump::Crash();
+				}
 			}
 
 			if (!sBuffer->GetIsEnqueueHeader())
@@ -221,7 +227,7 @@ namespace NET_SERVER
 		ZeroMemory((m_pMyOverlappedStartAddr + 2), sizeof(OVERLAPPED));
 		InterlockedIncrement(&g_monitor.m_iSendCallCount);
 		{
-			PROFILE_BEGIN(0, "WSASend");
+			// PROFILE_BEGIN(0, "WSASend");
 			retVal = WSASend(m_sSessionSocket, wsaBuf, m_iSendCount, nullptr, 0, (LPOVERLAPPED)(m_pMyOverlappedStartAddr + 2), NULL);
 		}
 		if (retVal == SOCKET_ERROR)
@@ -270,11 +276,14 @@ namespace NET_SERVER
 		{
 			CSerializableBuffer<FALSE> *pBuffer;
 			// 못꺼낸 것
-			if (!m_lfSendBufferQueue.Dequeue(&pBuffer))
 			{
-				g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"LFQueue::Dequeue() Error");
-				// 말도 안되는 상황
-				CCrashDump::Crash();
+				PROFILE_BEGIN(0, "SEND_MSQ DEQUEUE");
+				if (!m_lfSendBufferQueue.Dequeue(&pBuffer))
+				{
+					g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"LFQueue::Dequeue() Error");
+					// 말도 안되는 상황
+					CCrashDump::Crash();
+				}
 			}
 
 			// RefCount를 낮추고 0이라면 보낸 거 삭제
@@ -294,9 +303,12 @@ namespace NET_SERVER
 		for (int i = 0; i < useBufferSize; i++)
 		{
 			CSerializableBuffer<FALSE> *pBuffer;
-			if (!m_RecvMsgQueue.Dequeue(&pBuffer))
 			{
-				CCrashDump::Crash();
+				PROFILE_BEGIN(0, "RECV_MSQ DEQUEUE");
+				if (!m_RecvMsgQueue.Dequeue(&pBuffer))
+				{
+					CCrashDump::Crash();
+				}
 			}
 
 			if (pBuffer->DecreaseRef() == 0)

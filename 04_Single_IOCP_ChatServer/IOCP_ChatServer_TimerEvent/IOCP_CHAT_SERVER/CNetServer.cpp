@@ -393,8 +393,9 @@ namespace NET_SERVER
 		ZeroMemory((m_pMyOverlappedStartAddr + 2), sizeof(OVERLAPPED));
 
 		{
-			// PROFILE_BEGIN(0, "WSASend");
+			PROFILE_BEGIN(0, "WSASend");
 			retVal = WSASend(m_sSessionSocket, wsaBuf, m_iSendCount, nullptr, 0, (LPOVERLAPPED)(m_pMyOverlappedStartAddr + 2), NULL);
+			InterlockedIncrement(&g_monitor.m_WSASendCall);
 		}
 		if (retVal == SOCKET_ERROR)
 		{

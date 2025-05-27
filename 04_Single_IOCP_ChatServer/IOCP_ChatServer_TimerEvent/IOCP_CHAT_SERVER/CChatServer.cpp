@@ -81,7 +81,7 @@ void CChatServer::SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX, CSeri
 					continue;
 
 				InterlockedIncrement(&g_monitor.m_chatMsgRes);
-				SendPacket(it.first, message);
+				EnqueuePacket(it.first, message);
 			}
 		}
 	}
@@ -189,7 +189,7 @@ void CChatServer::SectorBroadcast() noexcept
 								continue;
 
 							InterlockedIncrement(&g_monitor.m_chatMsgRes);
-							SendPacket(it->first, *msgIt);
+							EnqueuePacket(it->first, *msgIt);
 						}
 					}
 				}
@@ -205,9 +205,9 @@ void CChatServer::SectorBroadcast() noexcept
 
 void CChatServer::RegisterContentTimerEvent() noexcept
 {
-	SectorBroadcastTimerEvent *sectorBroadcastEvent = new SectorBroadcastTimerEvent;
-	sectorBroadcastEvent->SetEvent();
-	RegisterTimerEvent(sectorBroadcastEvent);
+	// SectorBroadcastTimerEvent *sectorBroadcastEvent = new SectorBroadcastTimerEvent;
+	// sectorBroadcastEvent->SetEvent();
+	// RegisterTimerEvent(sectorBroadcastEvent);
 
 	// NonLoginHeartBeatEvent *nonLoginHeartBeatEvent = new NonLoginHeartBeatEvent;
 	// nonLoginHeartBeatEvent->SetEvent();

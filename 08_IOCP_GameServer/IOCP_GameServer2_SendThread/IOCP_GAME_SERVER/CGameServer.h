@@ -16,6 +16,8 @@ public:
 	void OnError(int errorcode, WCHAR *errMsg) noexcept override;
 	void RegisterContentTimerEvent() noexcept override;
 
+	void SendEchoAll();
+
 private:
 	CAuthContent *m_pAuthContent;
 	CEchoContent *m_pEchoContent;

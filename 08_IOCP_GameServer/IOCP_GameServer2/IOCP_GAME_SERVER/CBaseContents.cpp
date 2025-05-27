@@ -112,8 +112,10 @@ void CBaseContents::ProcessRecvMsg(int delayFrame) noexcept
 		for (int i = 0; i < recvMsgCount; i++)
 		{
 			CSerializableBuffer<FALSE> *pMsg;
-			pSession->m_RecvMsgQueue.Dequeue(&pMsg);
-
+			{
+				PROFILE_BEGIN(0, "RECV_MSQ DEQUEUE");
+				pSession->m_RecvMsgQueue.Dequeue(&pMsg);
+			}
 			RECV_RET ret = OnRecv(sessionId, pMsg, delayFrame);
 			if (ret == RECV_RET::RECV_MOVE)
 			{

@@ -60,11 +60,11 @@ void CChatServer::SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX, CSeri
 	{
 		for (int x = 0; x < SECTOR_VIEW_COUNT; x++)
 		{
-			if (startY + y < 0 || startY + y >= MAX_SECTOR_Y || startX + x < 0 || startX + x >= MAX_SECTOR_X)
+			if (startY + y < 0 || startY + y >= MAX_SECTOR_Y || 
+				startX + x < 0 || startX + x >= MAX_SECTOR_X)
 				continue;
 
 			sectors[sectorCount++] = &m_arrCSector[y + startY][x + startX];
-
 			AcquireSRWLockShared(&m_arrCSector[y + startY][x + startX].m_srwLock);
 		}
 	}

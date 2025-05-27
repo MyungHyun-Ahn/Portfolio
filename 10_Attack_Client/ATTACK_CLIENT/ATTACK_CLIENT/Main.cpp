@@ -41,26 +41,23 @@ int main()
 	while (runningFlag)
 	{
 		// 접속된 모든 클라이언트가 해당 행동을 함
-		// printf("메뉴\n");
-		// printf("1. connect\n");
-		// printf("2. login\n");
-		// printf("3. echo\n");
-		// printf("4. only send\n");
-		// printf("5. custom\n");
-		// printf("6. exit\n");
+		printf("메뉴\n");
+		printf("1. connect\n");
+		printf("2. login\n");
+		printf("3. echo\n");
+		printf("4. only send\n");
+		printf("5. custom\n");
+		printf("6. exit\n");
 		int selVal;
-		// scanf_s("%d", &selVal);
-		for (int i = 1; i < 4; i++)
-		{
-			selVal = i;
+		scanf_s("%d", &selVal);
 			switch (selVal)
 			{
 				// connect
 				// 입력한 수 만큼 서버에 connect 요청
 			case 1:
 			{
-				int connectCount = 10;
-				// scanf_s("%d", &connectCount);
+				int connectCount;
+				scanf_s("%d", &connectCount);
 
 				for (int i = 0; i < connectCount; i++)
 				{
@@ -310,6 +307,18 @@ int main()
 			break;
 			// custom
 			case 5:
+			{
+				while (true)
+				{
+					for (auto &[key, value] : clientMap)
+					{
+						char recvBuf[1024];
+						char front = sizeof(NetHeader);
+						char rear = 0;
+						int received = recv(value, recvBuf, 1024, 0);
+					}
+				}
+			}
 				break;
 
 				// exit
@@ -322,7 +331,6 @@ int main()
 				break;
 			}
 		}
-	}
 
 	return 0;
 }

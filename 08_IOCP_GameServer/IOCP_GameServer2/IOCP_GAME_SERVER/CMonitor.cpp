@@ -201,6 +201,16 @@ void CMonitor::MonitoringConsole() noexcept
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tnow \t: %04d.%02d.%02d.%02d.%02d.%02d",
 		m_currentTime.tm_year + 1900, m_currentTime.tm_mon + 1, m_currentTime.tm_mday,
 		m_currentTime.tm_hour, m_currentTime.tm_min, m_currentTime.tm_sec);
+
+	// 10분 경과하면 프로파일 저장
+	static LONG isProfile = FALSE;
+
+	if (!isProfile && m_startTime.tm_min + 10 == m_currentTime.tm_min)
+	{
+		g_ProfileMgr->DataOutToFile();
+		isProfile = TRUE;
+	}
+
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"              System info");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Process memory usage");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\ttotal \t: %u MB", m_stPmc.PrivateUsage / (1024 * 1024));

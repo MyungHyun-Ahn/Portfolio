@@ -377,6 +377,15 @@ namespace NET_SERVER
 			}
 		}
 
+		BOOL flag = TRUE;
+		retVal = setsockopt(m_sListenSocket, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag));
+		if (retVal == SOCKET_ERROR)
+		{
+			errVal = WSAGetLastError();
+			g_Logger->WriteLog(L"SYSTEM", L"NetworkLib", LOG_LEVEL::ERR, L"setsockopt(TCP_NODELAY) 실패 : %d", errVal);
+			return FALSE;
+		}
+
 		// LINGER option 설정
 		LINGER ling{ 1, 0 };
 		retVal = setsockopt(m_sListenSocket, SOL_SOCKET, SO_LINGER, (char *)&ling, sizeof(ling));

@@ -3,12 +3,12 @@ class CGenPacket
 {
 public:
 	// Chat Server
-	static CSerializableBuffer<FALSE> *makePacketResLogin(BYTE status, INT64 accountNo);
-	static CSerializableBuffer<FALSE> *makePacketResSectorMove(INT64 accountNo, WORD sectorX, WORD sectorY);
-	static CSerializableBuffer<FALSE> *makePacketResMessage(INT64 accountNo, WCHAR *id, WCHAR *nickname, WORD messageLen, WCHAR *message);
+	static CSerializableBuffer<SERVER_TYPE::WAN> *makePacketResLogin(BYTE status, INT64 accountNo);
+	static CSerializableBuffer<SERVER_TYPE::WAN> *makePacketResSectorMove(INT64 accountNo, WORD sectorX, WORD sectorY);
+	static CSerializableBuffer<SERVER_TYPE::WAN> *makePacketResMessage(INT64 accountNo, WCHAR *id, WCHAR *nickname, WORD messageLen, WCHAR *message);
 
 	// Monitor Client
-	static CSerializableBuffer<TRUE> *makePacketReqMonitorLogin(const INT serverNo);
-	static CSerializableBuffer<TRUE> *makePacketReqMonitorUpdate(const BYTE dataType, const INT dataValue, const INT timeStamp);
+	static CSerializableBuffer<SERVER_TYPE::LAN> *makePacketReqMonitorLogin(const INT serverNo);
+	static CSerializableBuffer<SERVER_TYPE::LAN> *makePacketReqMonitorUpdate(const BYTE dataType, const INT dataValue, const INT timeStamp);
 };
 

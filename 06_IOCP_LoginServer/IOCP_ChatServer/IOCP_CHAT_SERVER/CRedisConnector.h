@@ -18,7 +18,7 @@ public:
 		m_redisClient.sync_commit();
 	}
 
-	void Get(const INT64 key, char *value, int valueLen) noexcept
+	void Get(const INT64 key, char *value, int valueLen)
 	{
 		auto reply = m_redisClient.get(std::to_string(key));
 		m_redisClient.sync_commit();

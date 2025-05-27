@@ -1,5 +1,7 @@
 #pragma once
 
+#define NATVIS
+
 #define ENQUEUE_CAS1 0
 #define ENQUEUE_CAS2 1
 #define DEQUEUE 2
@@ -27,30 +29,9 @@ struct alignas(16) QUEUE_NODE_PTR
 	ULONG_PTR queueIdent;
 };
 
-template<typename DATA, bool CAS2First = TRUE>
+template<typename DATA>
 struct QueueNode
 {
-
-};
-
-template<typename DATA>
-struct QueueNode<DATA, TRUE>
-{
-	QueueNode()
-	{
-	}
-
-	DATA data;
-	ULONG_PTR next;
-};
-
-template<typename DATA>
-struct QueueNode<DATA, FALSE>
-{
-	QueueNode()
-	{
-	}
-
 	DATA data;
 	ULONG_PTR next;
 };
@@ -68,7 +49,7 @@ class CLFQueue<T, TRUE>
 	// 	"T must be a fundamental type or a pointer type.");
 
 public:
-	using Node = QueueNode<T, TRUE>;
+	using Node = QueueNode<T>;
 
 	CLFQueue() noexcept
 		: m_iSize(0)
@@ -190,7 +171,7 @@ class CLFQueue<T, FALSE>
 	// 	"T must be a fundamental type or a pointer type.");
 
 public:
-	using Node = QueueNode<T, FALSE>;
+	using Node = QueueNode<T>;
 
 	CLFQueue() noexcept
 		: m_iSize(0)
@@ -208,7 +189,6 @@ public:
 	void Enqueue(T t) noexcept
 	{
 		UINT_PTR ident = InterlockedIncrement(&m_ullCurrentIdentifier);
-		UINT_PTR nullID = m_NULL_ID;
 		Node *newNode = m_QueueNodePool.Alloc();
 		newNode->data = t;
 		newNode->next = m_NULL;
@@ -218,6 +198,7 @@ public:
 		{
 			ULONG_PTR readTail = m_pTail;
 			Node *readTailAddr = (Node *)GetAddress(readTail);
+			UINT_PTR nullID = m_NULL_ID;
 
 			if (nullID != m_NULL_ID)
 				continue;
@@ -283,6 +264,12 @@ public:
 	}
 
 	inline LONG GetUseSize() const noexcept { return m_iSize; }
+
+#ifdef NATVIS
+	Node *GetHeadPtr() const { return reinterpret_cast<Node *>(GetAddress(m_pHead)); }
+	Node *GetTailPtr() const { return reinterpret_cast<Node *>(GetAddress(m_pTail)); }
+#endif
+	
 
 private:
 	ULONG_PTR			m_pHead = NULL;

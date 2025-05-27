@@ -227,7 +227,10 @@ void CLanServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<TRUE> *s
 	}
 
 	pSession->SendPacket(sBuffer);
-	// pSession->PostSend();
+	LONG index = InterlockedIncrement(&pSession->sendDebugIndex);
+	pSession->sendDebug[index % 65535] = { GetCurrentThreadId(), WHERE_SEND::MESSAGE_ENQUEUE };
+	pSession->PostSend(WHERE_SEND::ACQUIRE_SENDPACKET);
+
 
 	if (InterlockedDecrement(&pSession->m_iIOCountAndRelease) == 0)
 	{
@@ -511,19 +514,17 @@ int CLanServer::WorkerThread() noexcept
 			case IOOperation::RECV:
 			{
 				pSession->RecvCompleted(dwTransferred);
-				pSession->PostSend();
 				pSession->PostRecv();
 			}
 				break;
 			case IOOperation::SEND:
 			{
 				pSession->SendCompleted(dwTransferred);
-				pSession->PostSend();
 			}
 				break;
 			case IOOperation::SENDPOST:
 			{
-				pSession->PostSend();
+				// pSession->PostSend();
 				continue;
 			}
 				break;

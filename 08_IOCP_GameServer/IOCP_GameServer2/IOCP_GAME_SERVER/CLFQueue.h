@@ -1,5 +1,7 @@
 #pragma once
 
+// #define LOCK
+
 struct alignas(16) QUEUE_NODE_PTR
 {
 	ULONG_PTR ptr;
@@ -152,6 +154,8 @@ public:
 	CLFQueue() noexcept
 		: m_iSize(0)
 	{
+		InitializeSRWLock(&m_srwLock);
+
 		// 큐 식별자로 각기 다른 NULL 값을 사용
 		m_NULL = InterlockedIncrement(&s_iQueueIdentifier) % 0xFFFF; // 윈도우의 페이지 보호 영역만큼만 사용
 
@@ -164,6 +168,10 @@ public:
 
 	void Enqueue(T t) noexcept
 	{
+#ifdef LOCK
+		CLockGuard<LOCK_TYPE::EXCLUSIVE> lockGuard(m_srwLock);
+#endif
+
 		UINT_PTR ident = InterlockedIncrement(&m_ullCurrentIdentifier);
 		Node *newNode = m_QueueNodePool.Alloc();
 		newNode->data = t;
@@ -196,6 +204,10 @@ public:
 
 	bool Dequeue(T *t) noexcept
 	{
+#ifdef LOCK
+		CLockGuard<LOCK_TYPE::EXCLUSIVE> lockGuard(m_srwLock);
+#endif
+
 		// 2번 밖에 Dequeue 안하는 상황
 		// -1 했는데 0은 있는 거
 		if (InterlockedDecrement(&m_iSize) < 0)
@@ -203,7 +215,6 @@ public:
 			InterlockedIncrement(&m_iSize);
 			return false;
 		}
-
 		// PROFILE_BEGIN(1, "Dequeue");
 
 		while (true)
@@ -252,6 +263,8 @@ private:
 
 	ULONG_PTR			m_NULL;
 	ULONG_PTR			m_ENQUEUE_ID = 0;
+
+	SRWLOCK m_srwLock;
 
 	inline static LONG	s_iQueueIdentifier = 0;
 };

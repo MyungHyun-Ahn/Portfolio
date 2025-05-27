@@ -19,11 +19,11 @@ namespace NET_SERVER
 			// 딜레이 된걸 처리해야함
 			USHORT delayedHeaderSize = m_pDelayedBuffer->isReadHeaderSize();
 			// 헤더 사이즈 부족
-			if (delayedHeaderSize < (int)CSerializableBuffer<FALSE>::DEFINE::HEADER_SIZE)
+			if (delayedHeaderSize < (int)CSerializableBuffer<SERVER_TYPE::WAN>::DEFINE::HEADER_SIZE)
 			{
 				// 헤더가 딜레이 됐나?
 				// 딜레이 됐다면 여기에 모자른 만큼써줌
-				int requireHeaderSize = (int)CSerializableBuffer<FALSE>::DEFINE::HEADER_SIZE - delayedHeaderSize;
+				int requireHeaderSize = (int)CSerializableBuffer<SERVER_TYPE::WAN>::DEFINE::HEADER_SIZE - delayedHeaderSize;
 				// 헤더가 2번씩 밀릴일은 없을 것임
 				// 짤린 헤더를 써주고
 				m_pDelayedBuffer->WriteDelayedHeader(m_pRecvBuffer->GetFrontPtr(), requireHeaderSize);
@@ -45,7 +45,7 @@ namespace NET_SERVER
 			// code 다른게 오면 끊음
 			if (header.code != SERVER_SETTING::PACKET_CODE)
 			{
-				CSerializableBufferView<FALSE>::Free(m_pDelayedBuffer);
+				CSerializableBufferView<SERVER_TYPE::WAN>::Free(m_pDelayedBuffer);
 				m_pDelayedBuffer = nullptr;
 
 				if (m_pRecvBuffer->DecreaseRef() == 0)
@@ -59,7 +59,7 @@ namespace NET_SERVER
 
 			if (header.len >= 65535 || header.len >= m_pRecvBuffer->GetCapacity())
 			{
-				CSerializableBufferView<FALSE>::Free(m_pDelayedBuffer);
+				CSerializableBufferView<SERVER_TYPE::WAN>::Free(m_pDelayedBuffer);
 				m_pDelayedBuffer = nullptr;
 
 				if (m_pRecvBuffer->DecreaseRef() == 0)
@@ -90,10 +90,10 @@ namespace NET_SERVER
 				// OnRecv 호출 전 패킷 검증
 				CEncryption::Decoding(m_pDelayedBuffer->GetBufferPtr() + 4, m_pDelayedBuffer->GetFullSize() - 4, header.randKey);
 				BYTE dataCheckSum = CEncryption::CalCheckSum(m_pDelayedBuffer->GetContentBufferPtr(), m_pDelayedBuffer->GetDataSize());
-				m_pDelayedBuffer->GetHeader((char *)&header, (int)CSerializableBuffer<FALSE>::DEFINE::HEADER_SIZE);
+				m_pDelayedBuffer->GetHeader((char *)&header, (int)CSerializableBuffer<SERVER_TYPE::WAN>::DEFINE::HEADER_SIZE);
 				if (dataCheckSum != header.checkSum) // code 다른 것도 걸러낼 것임
 				{
-					CSerializableBufferView<FALSE>::Free(m_pDelayedBuffer);
+					CSerializableBufferView<SERVER_TYPE::WAN>::Free(m_pDelayedBuffer);
 					m_pDelayedBuffer = nullptr;
 
 					if (m_pRecvBuffer->DecreaseRef() == 0)
@@ -116,9 +116,9 @@ namespace NET_SERVER
 		while (currentUseSize > 0)
 		{
 			NetHeader packetHeader;
-			CSerializableBufferView<FALSE> *view = CSerializableBufferView<FALSE>::Alloc();
+			CSerializableBufferView<SERVER_TYPE::WAN> *view = CSerializableBufferView<SERVER_TYPE::WAN>::Alloc();
 
-			if (currentUseSize < (int)CSerializableBuffer<FALSE>::DEFINE::HEADER_SIZE)
+			if (currentUseSize < (int)CSerializableBuffer<SERVER_TYPE::WAN>::DEFINE::HEADER_SIZE)
 			{
 				// Peek 실패 delayedBuffer로
 				delayFlag = true;
@@ -134,11 +134,11 @@ namespace NET_SERVER
 			}
 
 			int useSize = m_pRecvBuffer->GetUseSize();
-			m_pRecvBuffer->Peek((char *)&packetHeader, (int)CSerializableBuffer<FALSE>::DEFINE::HEADER_SIZE);
+			m_pRecvBuffer->Peek((char *)&packetHeader, (int)CSerializableBuffer<SERVER_TYPE::WAN>::DEFINE::HEADER_SIZE);
 			// code 다른게 오면 끊음
 			if (packetHeader.code != SERVER_SETTING::PACKET_CODE)
 			{
-				CSerializableBufferView<FALSE>::Free(view);
+				CSerializableBufferView<SERVER_TYPE::WAN>::Free(view);
 
 				if (m_pRecvBuffer->DecreaseRef() == 0)
 					CRecvBuffer::Free(m_pRecvBuffer);
@@ -151,7 +151,7 @@ namespace NET_SERVER
 
 			if (packetHeader.len >= 65535 || packetHeader.len >= m_pRecvBuffer->GetCapacity())
 			{
-				CSerializableBufferView<FALSE>::Free(view);
+				CSerializableBufferView<SERVER_TYPE::WAN>::Free(view);
 
 				if (m_pRecvBuffer->DecreaseRef() == 0)
 					CRecvBuffer::Free(m_pRecvBuffer);
@@ -162,7 +162,7 @@ namespace NET_SERVER
 				return;
 			}
 
-			if (useSize < (int)CSerializableBuffer<FALSE>::DEFINE::HEADER_SIZE + packetHeader.len)
+			if (useSize < (int)CSerializableBuffer<SERVER_TYPE::WAN>::DEFINE::HEADER_SIZE + packetHeader.len)
 			{
 				// 직접 할당해서 뒤로 밀기 Delayed
 				delayFlag = true;
@@ -180,20 +180,20 @@ namespace NET_SERVER
 			// 실질적으로 Recv 버퍼 입장에서는 읽은 것
 			// - 하나의 메시지가 완전히 완성된 상태
 			int offsetStart = m_pRecvBuffer->GetFrontOffset();
-			int offsetEnd = offsetStart + packetHeader.len + (int)CSerializableBuffer<FALSE>::DEFINE::HEADER_SIZE;
+			int offsetEnd = offsetStart + packetHeader.len + (int)CSerializableBuffer<SERVER_TYPE::WAN>::DEFINE::HEADER_SIZE;
 
 			// 이 view를 그냥 써도 됨
 			// Init 에서 RecvBuffer의 Ref가 증가
 			view->Init(m_pRecvBuffer, offsetStart, offsetEnd);
-			m_pRecvBuffer->MoveFront((int)CSerializableBuffer<FALSE>::DEFINE::HEADER_SIZE + packetHeader.len);
+			m_pRecvBuffer->MoveFront((int)CSerializableBuffer<SERVER_TYPE::WAN>::DEFINE::HEADER_SIZE + packetHeader.len);
 
 			// OnRecv 호출 전 패킷 검증
 			CEncryption::Decoding(view->GetBufferPtr() + 4, view->GetFullSize() - 4, packetHeader.randKey);
 			BYTE dataCheckSum = CEncryption::CalCheckSum(view->GetContentBufferPtr(), view->GetDataSize());
-			view->GetHeader((char *)&packetHeader, (int)CSerializableBuffer<FALSE>::DEFINE::HEADER_SIZE);
+			view->GetHeader((char *)&packetHeader, (int)CSerializableBuffer<SERVER_TYPE::WAN>::DEFINE::HEADER_SIZE);
 			if (dataCheckSum != packetHeader.checkSum) // code 다른 것도 걸러낼 것임
 			{
-				CSerializableBufferView<FALSE>::Free(view);
+				CSerializableBufferView<SERVER_TYPE::WAN>::Free(view);
 
 				if (m_pRecvBuffer->DecreaseRef() == 0)
 					CRecvBuffer::Free(m_pRecvBuffer);
@@ -224,7 +224,7 @@ namespace NET_SERVER
 	}
 
 	// 인큐할 때 직렬화 버퍼의 포인터를 인큐
-	bool CNetSession::SendPacket(CSerializableBuffer<FALSE> *message) noexcept
+	bool CNetSession::SendPacket(CSerializableBuffer<SERVER_TYPE::WAN> *message) noexcept
 	{
 		// 여기서 올라간 RefCount는 SendCompleted에서 내려감
 		// 혹은 ReleaseSession
@@ -243,7 +243,7 @@ namespace NET_SERVER
 		// * 논블락킹 I/O일 때만 Send를 요청한 데이터보다 덜 보내는 상황이 발생 가능
 		// * 비동기 I/O는 무조건 전부 보내고 완료 통지가 도착함
 
-		CDeque<CSerializableBuffer<FALSE> *> *freeQueue = new CDeque<CSerializableBuffer<FALSE> *>();
+		CDeque<CSerializableBuffer<SERVER_TYPE::WAN> *> *freeQueue = new CDeque<CSerializableBuffer<SERVER_TYPE::WAN> *>();
 
 		int count;
 		for (count = 0; count < m_iSendCount; count++)
@@ -370,7 +370,7 @@ namespace NET_SERVER
 		int count;
 		for (count = 0; count < m_iSendCount; count++)
 		{
-			CSerializableBuffer<FALSE> *pBuffer;
+			CSerializableBuffer<SERVER_TYPE::WAN> *pBuffer;
 			// 못꺼낸 것
 			if (!m_lfSendBufferQueue.Dequeue(&pBuffer))
 			{
@@ -427,12 +427,12 @@ namespace NET_SERVER
 
 		if (m_pDelayedBuffer != nullptr)
 		{
-			CSerializableBufferView<FALSE>::Free(m_pDelayedBuffer);
+			CSerializableBufferView<SERVER_TYPE::WAN>::Free(m_pDelayedBuffer);
 			m_pDelayedBuffer = nullptr;
 		}
 
 		// 싱글 Enqueue - 싱글 Dequeue
-		CDeque<CSerializableBuffer<FALSE> *> *freeQueue = new CDeque<CSerializableBuffer<FALSE> *>();
+		CDeque<CSerializableBuffer<SERVER_TYPE::WAN> *> *freeQueue = new CDeque<CSerializableBuffer<SERVER_TYPE::WAN> *>();
 
 		for (int count = 0; count < m_iSendCount; count++)
 		{
@@ -447,7 +447,7 @@ namespace NET_SERVER
 		LONG useBufferSize = m_lfSendBufferQueue.GetUseSize();
 		for (int i = 0; i < useBufferSize; i++)
 		{
-			CSerializableBuffer<FALSE> *pBuffer;
+			CSerializableBuffer<SERVER_TYPE::WAN> *pBuffer;
 			// 못꺼낸 것
 			if (!m_lfSendBufferQueue.Dequeue(&pBuffer))
 			{
@@ -687,7 +687,7 @@ namespace NET_SERVER
 		m_bIsTimerEventSchedulerRun = FALSE;
 	}
 
-	void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept
+	void CNetServer::SendPacket(const UINT64 sessionID, CSerializableBuffer<SERVER_TYPE::WAN> *sBuffer) noexcept
 	{
 		CNetSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 
@@ -733,7 +733,7 @@ namespace NET_SERVER
 		}
 	}
 
-	void CNetServer::EnqueuePacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept
+	void CNetServer::EnqueuePacket(const UINT64 sessionID, CSerializableBuffer<SERVER_TYPE::WAN> *sBuffer) noexcept
 	{
 		CNetSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 

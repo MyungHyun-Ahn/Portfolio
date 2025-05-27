@@ -60,6 +60,8 @@ RECV_RET CAuthContents::OnRecv(const UINT64 sessionID, CSerializableBuffer<FALSE
 		// 인증 통과
 
 		// Echo 컨텐츠
+		// 
+		// 
 		// Auth Content에서 삭제
 		LeaveJobEnqueue(sessionID);
 
@@ -69,9 +71,8 @@ RECV_RET CAuthContents::OnRecv(const UINT64 sessionID, CSerializableBuffer<FALSE
 		pPlayer->m_iAccountNo = accountNo;
 		pEchoContent->MoveJobEnqueue(sessionID, pPlayer);
 
-		CSerializableBuffer<FALSE> *pLoginRes = CGenPacket::makePacketResLogin(1, accountNo);
+		CSerializableBuffer<FALSE> *pLoginRes = CGenPacket::makePacketResLogin(TRUE, accountNo);
 		NET_SERVER::g_NetServer->SendPacket(sessionID, pLoginRes);
-
 
 		return RECV_RET::RECV_MOVE;
 	}

@@ -158,12 +158,11 @@ void CLanSession::SendCompleted(int size) noexcept
 
     // m_iSendCount = 0;
 
-#ifdef POSTSEND_LOST_DEBUG
-	UINT64 index = InterlockedIncrement(&sendIndex);
-	sendDebug[index % 65535] = { index, (USHORT)GetCurrentThreadId(), 0xff, TRUE, 0 };
-#endif
+	LONG idx = InterlockedIncrement(&sendDebugIndex);
+	sendDebug[idx % 65535] = { GetCurrentThreadId(), WHERE_SEND::RELEASE_SENDCOMPLETED };
+	InterlockedExchange(&m_iSendFlag, FALSE);
 
-    PostSend(TRUE);
+    PostSend(WHERE_SEND::ACQUIRE_SENDCOMPLETED);
 }
 
 bool CLanSession::PostRecv() noexcept
@@ -222,34 +221,36 @@ bool CLanSession::PostRecv() noexcept
     return TRUE;
 }
 
-bool CLanSession::PostSend(BOOL isCompleted) noexcept
+bool CLanSession::PostSend(WHERE_SEND where) noexcept
 {
     int errVal;
     int retVal;
     int sendUseSize;
 
-    if (!isCompleted)
-    {
-		sendUseSize = m_SendRingBuffer.GetUseSize();
-		if (sendUseSize <= 0)
-		{
-			return FALSE;
-	}
-
-		if (InterlockedExchange(&m_iSendFlag, TRUE) == TRUE)
-		{
-#ifdef POSTSEND_LOST_DEBUG
-			UINT64 index = InterlockedIncrement(&sendIndex);
-			sendDebug[index % 65535] = { index, (USHORT)GetCurrentThreadId(), wher, FALSE, 2 };
-#endif
-			return FALSE;
-		}
-    }
-
-    // 여기서 얻은 만큼 쓸 것
 	sendUseSize = m_SendRingBuffer.GetUseSize();
 	if (sendUseSize <= 0)
 	{
+		return FALSE;
+	}
+
+	Sleep(0);
+
+	if (InterlockedExchange(&m_iSendFlag, TRUE) == TRUE)
+	{
+		return FALSE;
+	}
+	{
+		LONG idx = InterlockedIncrement(&sendDebugIndex);
+		sendDebug[idx % 65535] = { GetCurrentThreadId(), where };
+	}
+	sendUseSize = m_SendRingBuffer.GetUseSize();
+	if (sendUseSize <= 0)
+	{
+		Sleep(0);
+		{
+			LONG idx = InterlockedIncrement(&sendDebugIndex);
+			sendDebug[idx % 65535] = { GetCurrentThreadId(), WHERE_SEND::RELEASE_POSTSEND };
+		}
         InterlockedExchange(&m_iSendFlag, FALSE);
 		return FALSE;
 	}

@@ -10,7 +10,7 @@
 #include "DBSetting.h"
 #include "CRedisConnector.h"
 
-bool CChatProcessPacket::PacketProcReqLogin(UINT64 sessionId, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept
+bool CChatProcessPacket::PacketProcReqLogin(UINT64 sessionId, CSmartPtr<CSerializableBufferView<SERVER_TYPE::WAN>> message) noexcept
 {
 	std::unordered_map<UINT64, CNonLoginPlayer> &umapNonLoginPlayer = m_pChatServer->m_umapNonLoginPlayer;
 	auto it = umapNonLoginPlayer.find(sessionId);
@@ -57,15 +57,12 @@ bool CChatProcessPacket::PacketProcReqLogin(UINT64 sessionId, CSmartPtr<CSeriali
 	m_pChatServer->m_umapNonLoginPlayer.erase(sessionId);
 	m_pChatServer->m_umapLoginPlayer.insert(std::make_pair(sessionId, loginPlayer));
 
-	CSerializableBuffer<FALSE> *loginRes = CGenPacket::makePacketResLogin(TRUE, accountNo);
-	loginRes->IncreaseRef();
+	CSerializableBuffer<SERVER_TYPE::WAN> *loginRes = CGenPacket::makePacketResLogin(TRUE, accountNo);
 	m_pChatServer->SendPacket(sessionId, loginRes);
-	if (loginRes->DecreaseRef() == 0)
-		CSerializableBuffer<FALSE>::Free(loginRes);
 	return true;
 }
 
-bool CChatProcessPacket::PacketProcReqSectorMove(UINT64 sessionId, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept
+bool CChatProcessPacket::PacketProcReqSectorMove(UINT64 sessionId, CSmartPtr<CSerializableBufferView<SERVER_TYPE::WAN>> message) noexcept
 {
 	std::unordered_map<UINT64, CPlayer *> &umapPlayer = m_pChatServer->m_umapLoginPlayer;
 	auto it = umapPlayer.find(sessionId);
@@ -109,16 +106,16 @@ bool CChatProcessPacket::PacketProcReqSectorMove(UINT64 sessionId, CSmartPtr<CSe
 	player->m_usSectorY = sectorY;
 	player->m_usSectorX = sectorX;
 
-	CSerializableBuffer<FALSE> *sectorMoveRes = CGenPacket::makePacketResSectorMove(accountNo, sectorX, sectorY);
+	CSerializableBuffer<SERVER_TYPE::WAN> *sectorMoveRes = CGenPacket::makePacketResSectorMove(accountNo, sectorX, sectorY);
 	sectorMoveRes->IncreaseRef();
 	m_pChatServer->SendPacket(sessionId, sectorMoveRes);
 	if (sectorMoveRes->DecreaseRef() == 0)
-		CSerializableBuffer<FALSE>::Free(sectorMoveRes);
+		CSerializableBuffer<SERVER_TYPE::WAN>::Free(sectorMoveRes);
 
 	return true;
 }
 
-bool CChatProcessPacket::PacketProcReqMessage(UINT64 sessionId, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept
+bool CChatProcessPacket::PacketProcReqMessage(UINT64 sessionId, CSmartPtr<CSerializableBufferView<SERVER_TYPE::WAN>> message) noexcept
 {
 	std::unordered_map<UINT64, CPlayer *> &umapPlayer = m_pChatServer->m_umapLoginPlayer;
 	auto it = umapPlayer.find(sessionId);
@@ -146,13 +143,18 @@ bool CChatProcessPacket::PacketProcReqMessage(UINT64 sessionId, CSmartPtr<CSeria
 	if (message->GetDataSize() != 0)
 		return false;
 
-	CSerializableBuffer<FALSE> *messageRes = CGenPacket::makePacketResMessage(accountNo, player->m_szID, player->m_szNickname, messageLen, chatMessage);
-
-	messageRes->IncreaseRef();
-	messageRes->SetSessionId(sessionId);
-	InterlockedIncrement(&g_monitor.m_chatMsgRes);
-	m_pChatServer->SendPacket(sessionId, messageRes);
-	m_pChatServer->m_arrCSector[player->m_usSectorY][player->m_usSectorX].m_sendMsgQ.push_back(messageRes);
+	CSerializableBuffer<SERVER_TYPE::WAN> *messageRes = CGenPacket::makePacketResMessage(accountNo, player->m_szID, player->m_szNickname, messageLen, chatMessage);
+	{
+		messageRes->IncreaseRef();
+		messageRes->SetSessionId(sessionId);
+		InterlockedIncrement(&g_monitor.m_chatMsgRes);
+		m_pChatServer->SendPacket(sessionId, messageRes);
+		m_pChatServer->SendSector(0, player->m_usSectorY, player->m_usSectorX, CSmartPtr<CSerializableBuffer<SERVER_TYPE::WAN>>(messageRes));
+		if (messageRes->DecreaseRef() == 0)
+			CSerializableBuffer<SERVER_TYPE::WAN>::Free(messageRes);
+	}
+	
+	// m_pChatServer->m_arrCSector[player->m_usSectorY][player->m_usSectorX].m_sendMsgQ.push_back(messageRes);
 
 	// m_pChatServer->SendSector(0, player->m_usSectorY, player->m_usSectorX, messageRes);
 	// if (messageRes->DecreaseRef() == 0)
@@ -161,7 +163,7 @@ bool CChatProcessPacket::PacketProcReqMessage(UINT64 sessionId, CSmartPtr<CSeria
 	return true;
 }
 
-bool CChatProcessPacket::PacketProcReqHeartBeat(UINT64 sessionId, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept
+bool CChatProcessPacket::PacketProcReqHeartBeat(UINT64 sessionId, CSmartPtr<CSerializableBufferView<SERVER_TYPE::WAN>> message) noexcept
 {
 	std::unordered_map<UINT64, CPlayer *> &umapPlayer = m_pChatServer->m_umapLoginPlayer;
 	auto it = umapPlayer.find(sessionId);

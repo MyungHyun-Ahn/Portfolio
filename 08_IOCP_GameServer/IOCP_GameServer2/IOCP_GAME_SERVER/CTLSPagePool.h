@@ -369,7 +369,6 @@ private:
 	// 버킷 개수만큼 VirtualAlloc 할당해서 나눠주기
 	Node *CreateNodeList() noexcept
 	{
-		// 64KB 할당 단위
 		BYTE *ptr = (BYTE *)VirtualAlloc(nullptr, 64 * 1024, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 
 		if constexpr (pageLock)

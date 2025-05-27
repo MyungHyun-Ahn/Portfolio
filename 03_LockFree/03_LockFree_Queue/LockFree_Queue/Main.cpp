@@ -19,33 +19,33 @@
 // 	int val;
 // };
 
-// CLFQueue<UINT64, FALSE> lockfreeQueue1;
+CLFQueue<UINT64, FALSE> lockfreeQueue1;
 // CLFQueue<UINT64, TRUE> lockfreeQueue2;
 // 
 // std::queue<UINT64> stdQueue;
 // 
-// unsigned int CAS01ThreadFunc(LPVOID lpParam)
-// {
-// 	for (int i = 0; i < TEST_LOOP_COUNT; i++)
-// 	// while (1)
-// 	{
-// 		PROFILE_BEGIN(1, "ThreadFunc");
-// 
-// 		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
-// 		{
-// 			lockfreeQueue1.Enqueue(i);
-// 
-// 		}
-// 
-// 		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
-// 		{
-// 			UINT64 data;
-// 			lockfreeQueue1.Dequeue(&data);
-// 		}
-// 	}
-// 
-// 	return 0;
-// }
+unsigned int CAS01ThreadFunc(LPVOID lpParam)
+{
+	for (int i = 0; i < TEST_LOOP_COUNT; i++)
+	// while (1)
+	{
+		// PROFILE_BEGIN(1, "ThreadFunc");
+
+		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
+		{
+			lockfreeQueue1.Enqueue(i);
+
+		}
+
+		for (UINT64 i = 0; i < ENQUEUE_DEQUEUE_COUNT; i++)
+		{
+			UINT64 data;
+			lockfreeQueue1.Dequeue(&data);
+		}
+	}
+
+	return 0;
+}
 // 
 // unsigned int CAS02ThreadFunc(LPVOID lpParam)
 // {
@@ -143,20 +143,20 @@ int main()
 	// 
 	// InitializeSRWLock(&lock);
 	// 
-	// HANDLE arrTh[THREAD_COUNT];
-	// for (int i = 0; i < THREAD_COUNT; i++)
-	// {
-	// 	arrTh[i] = (HANDLE)_beginthreadex(nullptr, 0, CAS01ThreadFunc, nullptr, CREATE_SUSPENDED, nullptr);
-	// 	if (arrTh[i] == 0)
-	// 		return 1;
-	// }
-	// 
-	// for (int i = 0; i < THREAD_COUNT; i++)
-	// {
-	// 	ResumeThread(arrTh[i]);
-	// }
-	// 
-	// WaitForMultipleObjects(THREAD_COUNT, arrTh, true, INFINITE);
+	HANDLE arrTh[THREAD_COUNT];
+	for (int i = 0; i < THREAD_COUNT; i++)
+	{
+		arrTh[i] = (HANDLE)_beginthreadex(nullptr, 0, CAS01ThreadFunc, nullptr, CREATE_SUSPENDED, nullptr);
+		if (arrTh[i] == 0)
+			return 1;
+	}
+	
+	for (int i = 0; i < THREAD_COUNT; i++)
+	{
+		ResumeThread(arrTh[i]);
+	}
+	
+	WaitForMultipleObjects(THREAD_COUNT, arrTh, true, INFINITE);
 	// 
 	// for (int i = 0; i < THREAD_COUNT; i++)
 	// {
@@ -179,18 +179,18 @@ int main()
 	// 		return 1;
 	// }
 
-	HANDLE arrTh[THREAD_COUNT];
-	for (int i = 0; i < THREAD_COUNT; i++)
-	{
-		arrTh[i] = (HANDLE)_beginthreadex(nullptr, 0, TestFunc, nullptr, CREATE_SUSPENDED, nullptr);
-		if (arrTh[i] == 0)
-			return 1;
-	}
-
-	for (int i = 0; i < THREAD_COUNT; i++)
-	{
-		ResumeThread(arrTh[i]);
-	}
+	// HANDLE arrTh[THREAD_COUNT];
+	// for (int i = 0; i < THREAD_COUNT; i++)
+	// {
+	// 	arrTh[i] = (HANDLE)_beginthreadex(nullptr, 0, TestFunc, nullptr, CREATE_SUSPENDED, nullptr);
+	// 	if (arrTh[i] == 0)
+	// 		return 1;
+	// }
+	// 
+	// for (int i = 0; i < THREAD_COUNT; i++)
+	// {
+	// 	ResumeThread(arrTh[i]);
+	// }
 
 	WaitForMultipleObjects(THREAD_COUNT, arrTh, true, INFINITE);
 

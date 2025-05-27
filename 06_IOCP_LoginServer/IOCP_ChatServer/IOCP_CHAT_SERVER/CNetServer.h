@@ -40,7 +40,7 @@ namespace NET_SERVER
 
 		void RecvCompleted(int size) noexcept;
 
-		bool SendPacket(CSerializableBuffer<FALSE> *message) noexcept;
+		bool SendPacket(CSerializableBuffer<SERVER_TYPE::WAN> *message) noexcept;
 		void SendCompleted(int size) noexcept;
 
 		bool PostRecv() noexcept;
@@ -81,14 +81,14 @@ namespace NET_SERVER
 		USHORT		m_ClientPort;
 		char		m_dummy01[2]; // 패딩 계산용
 		// 최대 무조건 1개 -> 있거나 없거나
-		CSerializableBufferView<FALSE> *m_pDelayedBuffer = nullptr;
-		CLFQueue<CSerializableBuffer<FALSE> *> m_lfSendBufferQueue;
+		CSerializableBufferView<SERVER_TYPE::WAN> *m_pDelayedBuffer = nullptr;
+		CLFQueue<CSerializableBuffer<SERVER_TYPE::WAN> *> m_lfSendBufferQueue;
 		// m_pMyOverlappedStartAddr
 		//  + 0 : ACCEPTEX
 		//  + 1 : RECV
 		//  + 2 : SEND
 		OVERLAPPED *m_pMyOverlappedStartAddr = nullptr;
-		CSerializableBuffer<FALSE> *m_arrPSendBufs[WSASEND_MAX_BUFFER_COUNT]; // 8 * 32 = 256
+		CSerializableBuffer<SERVER_TYPE::WAN> *m_arrPSendBufs[WSASEND_MAX_BUFFER_COUNT]; // 8 * 32 = 256
 
 		LONG m_iCacelIoCalled = FALSE;
 
@@ -107,16 +107,16 @@ namespace NET_SERVER
 
 		inline LONG GetSessionCount() const noexcept { return m_iSessionCount; }
 
-		void SendPacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept;
-		void EnqueuePacket(const UINT64 sessionID, CSerializableBuffer<FALSE> *sBuffer) noexcept;
+		void SendPacket(const UINT64 sessionID, CSerializableBuffer<SERVER_TYPE::WAN> *sBuffer) noexcept;
+		void EnqueuePacket(const UINT64 sessionID, CSerializableBuffer<SERVER_TYPE::WAN> *sBuffer) noexcept;
 		BOOL Disconnect(const UINT64 sessionID) noexcept;
 		BOOL ReleaseSession(CNetSession *pSession) noexcept;
 
 		virtual bool OnConnectionRequest(const WCHAR *ip, USHORT port) noexcept = 0;
 		virtual void OnAccept(const UINT64 sessionID) noexcept = 0;
 		virtual void OnClientLeave(const UINT64 sessionID) noexcept = 0;
-		virtual void OnRecv(const UINT64 sessionID, CSerializableBufferView<FALSE> *message) noexcept = 0;
-		virtual void OnRecv(const UINT64 sessionID, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept = 0;
+		virtual void OnRecv(const UINT64 sessionID, CSerializableBufferView<SERVER_TYPE::WAN> *message) noexcept = 0;
+		virtual void OnRecv(const UINT64 sessionID, CSmartPtr<CSerializableBufferView<SERVER_TYPE::WAN>> message) noexcept = 0;
 		virtual void OnError(int errorcode, WCHAR *errMsg) noexcept = 0;
 
 		// 콘텐츠 프레임

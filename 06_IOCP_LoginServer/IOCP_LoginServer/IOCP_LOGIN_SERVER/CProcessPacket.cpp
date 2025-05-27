@@ -29,14 +29,12 @@ bool CLoginProcessPacket::PacketProcReqLogin(UINT64 sessionId, CSmartPtr<CSerial
 		return false;
 	}
 
-	CRedisConnector *redisConnector = CRedisConnector::GetRedisConnector();
-	redisConnector->Set(accountNo, sessionKey);
-
 	WCHAR ID[20];
 	WCHAR Nickname[20];
 
 	CDBConnector *mySqlConnector = CDBConnector::GetDBConnector();
-	mySqlConnector->Query(L"SELECT `userid`, `usernick` FROM `account` WHERE `accountno` = '%lld';", accountNo);
+	mySqlConnector->Query(
+		L"SELECT `userid`, `usernick` FROM `account` WHERE `accountno` = '%lld';", accountNo);
 	{
 		DBGetResult dbResult;
 		MYSQL_ROW dbRow = mySqlConnector->GetRow();
@@ -61,14 +59,14 @@ bool CLoginProcessPacket::PacketProcReqLogin(UINT64 sessionId, CSmartPtr<CSerial
 		}
 	}
 
+	CRedisConnector *redisConnector = CRedisConnector::GetRedisConnector();
+	redisConnector->Set(accountNo, sessionKey);
+
 	// 인증 성공 TPS
 	InterlockedIncrement(&g_monitor.m_lAuthTPS);
 
 	CSerializableBuffer<FALSE> *loginRes = CGenPacket::makePacketResLogin(accountNo, (BYTE)dfLOGIN_STATUS_OK, ID, Nickname, L"0.0.0.0", 0, LOGIN_SERVER_SETTING::CHAT_SERVER_IP_1.c_str(), LOGIN_SERVER_SETTING::CHAT_SERVER_PORT_1);
-	loginRes->IncreaseRef();
 	m_pLoginServer->SendPacket(sessionId, loginRes);
-	if (loginRes->DecreaseRef() == 0)
-		CSerializableBuffer<FALSE>::Free(loginRes);
 
 	return true;
 }

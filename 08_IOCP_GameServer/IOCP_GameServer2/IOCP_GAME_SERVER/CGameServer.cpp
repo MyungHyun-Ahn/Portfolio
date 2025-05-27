@@ -21,7 +21,6 @@ bool CGameServer::OnConnectionRequest(const WCHAR *ip, USHORT port) noexcept
 
 void CGameServer::OnAccept(const UINT64 sessionID) noexcept
 {
-	// 해당 유저 Auth Content로 보냄
 	m_pAuthContents->MoveJobEnqueue(sessionID, nullptr);
 }
 

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+	<Type Name="CLFQueue&lt;*&gt;">
+		<DisplayString>
+			Size = {m_iSize}, Head = {(Node *)GetAddress(m_pHead)}, Tail = {(Node *)GetAddress(m_pTail)}
+		</DisplayString>
+		<Expand>
+			<Item Name="Size">m_iSize</Item>
+			<Item Name="Head Node">(Node *)GetAddress(m_pHead)</Item>
+			<Item Name="Tail Node">(Node *)GetAddress(m_pTail)</Item>
+		</Expand>
+	</Type>
+
+	<Type Name="QueueNode&lt;unsigned __int64&gt;">
+		<DisplayString>
+			Next = {next},
+			Data = {data}
+		</DisplayString>
+		<Expand>
+			<Item Name="Data">data</Item>
+			<Item Name="Next Pointer">next</Item>
+			<Item Name="Next Node">(QueueNode&lt;unsigned __int64&gt; *)GetAddress(next)</Item>
+		</Expand>
+	</Type>
+</AutoVisualizer>
+

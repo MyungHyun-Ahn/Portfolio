@@ -8,6 +8,7 @@
 #include "CommonProtocol.h"
 #include "CProcessPacket.h"
 #include "CGenPacket.h"
+#include "MHLib/utils/CLockGuard.h"
 
 bool CChatProcessPacket::PacketProcReqLogin(UINT64 sessionId, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept
 {
@@ -54,17 +55,20 @@ bool CChatProcessPacket::PacketProcReqLogin(UINT64 sessionId, CSmartPtr<CSeriali
 bool CChatProcessPacket::PacketProcReqSectorMove(UINT64 sessionId, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept
 {
 	std::unordered_map<UINT64, CPlayer *> &umapPlayer = m_pChatServer->m_umapLoginPlayer;
-	// 맵에서 찾기만 함 - Shared
-	AcquireSRWLockShared(&m_pChatServer->m_playerMapLock);
-	auto it = umapPlayer.find(sessionId);
-	if (it == umapPlayer.end())
-	{
-		ReleaseSRWLockShared(&m_pChatServer->m_playerMapLock);
-		return false;
-	}
 
-	CPlayer *player = it->second;
-	ReleaseSRWLockShared(&m_pChatServer->m_playerMapLock);
+
+	CPlayer *player;
+	{
+		MHLib::utils::CLockGuard<MHLib::utils::LOCK_TYPE::SHARED> sharedLock(m_pChatServer->m_playerMapLock);
+
+		auto it = umapPlayer.find(sessionId);
+		if (it == umapPlayer.end())
+		{
+			return false;
+		}
+
+		player = it->second;
+	}
 
 	player->m_dwPrevRecvTime = timeGetTime();
 
@@ -97,7 +101,6 @@ bool CChatProcessPacket::PacketProcReqSectorMove(UINT64 sessionId, CSmartPtr<CSe
 
 	if (player->m_usSectorY != 0xFF && player->m_usSectorX != 0xFF)
 	{
-		// 같은 경우엔 아무것도 안함
 		if (!(player->m_usSectorY == sectorY && player->m_usSectorX == sectorX))
 		{
 			// 락 순서 직렬화
@@ -138,14 +141,11 @@ bool CChatProcessPacket::PacketProcReqSectorMove(UINT64 sessionId, CSmartPtr<CSe
 				}
 			}
 		
-			AcquireSRWLockExclusive(&m_pChatServer->m_arrCSector[lock1Y][lock1X].m_srwLock);
-			AcquireSRWLockExclusive(&m_pChatServer->m_arrCSector[lock2Y][lock2X].m_srwLock);
+			MHLib::utils::CLockGuard<MHLib::utils::LOCK_TYPE::EXCLUSIVE> exclusiveLock1(m_pChatServer->m_arrCSector[lock1Y][lock1X].m_srwLock);
+			MHLib::utils::CLockGuard<MHLib::utils::LOCK_TYPE::EXCLUSIVE> exclusiveLock2(m_pChatServer->m_arrCSector[lock2Y][lock2X].m_srwLock);
 		
 			m_pChatServer->m_arrCSector[player->m_usSectorY][player->m_usSectorX].m_players.erase(sessionId);
 			m_pChatServer->m_arrCSector[sectorY][sectorX].m_players.insert(std::make_pair(sessionId, player));
-		
-			ReleaseSRWLockExclusive(&m_pChatServer->m_arrCSector[lock2Y][lock2X].m_srwLock);
-			ReleaseSRWLockExclusive(&m_pChatServer->m_arrCSector[lock1Y][lock1X].m_srwLock);
 		}
 	}
 	else

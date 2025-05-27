@@ -5,16 +5,16 @@
 Lock-Free 자료구조, Memory Pool, 싱글톤, 스마트 포인터 등 다양한 유틸리티가 포함되어 있어,  
 **경량성**과 **속도**, 그리고 **사용 편의성**을 동시에 제공합니다.
 
-> ⚙️ C++17 이상 지원  
+> ⚙️ C++20 이상 지원  
 > 📁 Header-Only (빌드 없이 바로 사용 가능)  
 > 🧵 Lock-Free 자료구조, 메모리 풀, 유틸리티, 암호화 등 포함
 
 ## ⚡️ 설치 방법
-1. `include/` 디렉토리를 프로젝트에 추가하세요.
-2. Visual Studio or CMake에서 **헤더 경로만 지정**하면 사용 준비 완료!
+1. **Visual Studio**에서  C/C++ > 일반 > 추가 포함 디렉터리에 `$(SolutionDir)..\includes\` 설정
+2. 바로 include 하여 사용!
 
 ## ⚙️ 요구 사항
-1. C++17 이상
+1. C++20 이상 - concepts 사용
 2. Windows 전용
 
 ## 📂 폴더 구조
@@ -25,7 +25,8 @@ MHLib/
 │       ├── containers/      		    # Lock-Free Queue, Stack, Deque 등
 │       │   ├── CLFQueue.h
 │       │   ├── CLFStack.h
-│       │   └── CDeque.h
+│       │   ├── CDeque.h
+│       │   └── LFDefine.h
 │       ├── debug/           		    # 크래시 덤프 등 디버깅 도구
 │       │   └── CCrashDump.h
 │       ├── memory/          		    # Memory Pool 관련 헤더들
@@ -41,9 +42,7 @@ MHLib/
 │       │   ├── CLogger.h
 │       │   ├── CProfileManager.h
 │       │   ├── CSmartPtr.h
-│       │   ├── CDefineSingleton.h
-│       │   └── LFDefine.h
-│       └── MHLib.h
+│       │   └── CDefineSingleton.h
 ```
 
 ## 📚 주요 컴포넌트
@@ -53,6 +52,7 @@ MHLib/
 | `containers/`        | `CLFQueue.h`                  | Lock-Free 큐 |
 |                      | `CLFStack.h`                  | Lock-Free 스택|
 |                      | `CDeque.h`                    | 덱(양방향 리스트) |
+|                      | `LFDefine.h`                  | Lock-Free define |
 | `memory/`            | `CLFMemoryPool.h`             | Lock-Free 메모리 풀 |
 |                      | `CTLSMemoryPool.h`            | TLS 기반 메모리 풀 |
 |                      | `CTLSPagePool.h`              | TLS 페이지 할당 풀 |
@@ -63,6 +63,5 @@ MHLib/
 |                      | `CLogger.h`                   | 로그 출력 유틸리티 |
 |                      | `CProfileManager.h`           | 코드 실행 시간 측정용 프로파일러 |
 |                      | `CDefineSingleton.h`          | 상속 기반 싱글톤 유틸 |
-|                      | `LFDefine.h`                  | Lock-Free define |
 | `debug/`             | `CCrashDump.h`                | 크래시 덤프 설정 유틸 |
 | `security/`          | `CEncryption.h`               | 간단한 XOR 암호화/복호화 유틸 |

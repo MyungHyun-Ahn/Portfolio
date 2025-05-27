@@ -121,7 +121,7 @@ private:
 	// 항상 target의 next에만 삽입
 	void append_node(DequeNode *target, T data) noexcept;
 
-		// delNode를 삭제
+	// delNode를 삭제
 	void delete_node(DequeNode *delNode) noexcept;
 
 private:

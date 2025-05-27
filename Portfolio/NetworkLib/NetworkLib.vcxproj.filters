@@ -1,0 +1,42 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="ServerSetting.cpp" />
+    <ClCompile Include="SystemEvent.cpp" />
+    <ClCompile Include="CBaseContents.cpp" />
+    <ClCompile Include="CLanClient.cpp" />
+    <ClCompile Include="ClientSetting.cpp" />
+    <ClCompile Include="CNetServer.cpp" />
+    <ClCompile Include="COverlappedAllocator.cpp" />
+    <ClCompile Include="pch.cpp">
+      <Filter>pch</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ServerSetting.h" />
+    <ClInclude Include="SystemEvent.h" />
+    <ClInclude Include="BaseEvent.h" />
+    <ClInclude Include="CBaseContents.h" />
+    <ClInclude Include="CContentsThread.h" />
+    <ClInclude Include="CLanClient.h" />
+    <ClInclude Include="ClientSetting.h" />
+    <ClInclude Include="CNetServer.h" />
+    <ClInclude Include="COverlappedAllocator.h" />
+    <ClInclude Include="CRecvBuffer.h" />
+    <ClInclude Include="CRingBuffer.h" />
+    <ClInclude Include="CSerializableBuffer.h" />
+    <ClInclude Include="CSerializableBufferView.h" />
+    <ClInclude Include="DefineServer.h" />
+    <ClInclude Include="pch.h">
+      <Filter>pch</Filter>
+    </ClInclude>
+    <ClInclude Include="NetPch.h">
+      <Filter>pch</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="pch">
+      <UniqueIdentifier>{a0c92cb9-3a24-4deb-9bfd-60eaf32c1e6d}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

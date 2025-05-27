@@ -59,16 +59,16 @@ void OnClientLeaveEvent::Execute(const UINT64 sessionID) noexcept
 	NET_SERVER::g_NetServer->OnClientLeave(sessionID);
 }
 
-void SerializableBufferFreeEvent::SetEvent(CDeque<CSerializableBuffer<FALSE> *> *freeQueue) noexcept
+void SerializableBufferFreeEvent::SetEvent(CDeque<CSerializableBuffer<SERVER_TYPE::WAN> *> *freeQueue) noexcept
 {
 	execute = std::bind(&SerializableBufferFreeEvent::Execute, this, freeQueue);
 }
 
-void SerializableBufferFreeEvent::Execute(CDeque<CSerializableBuffer<FALSE> *> *freeQueue) noexcept
+void SerializableBufferFreeEvent::Execute(CDeque<CSerializableBuffer<SERVER_TYPE::WAN> *> *freeQueue) noexcept
 {
 	for (auto it = freeQueue->begin(); it != freeQueue->end(); )
 	{
-		CSerializableBuffer<FALSE>::Free(*it);
+		CSerializableBuffer<SERVER_TYPE::WAN>::Free(*it);
 		it = freeQueue->erase(it);
 	}
 

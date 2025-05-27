@@ -46,7 +46,7 @@ namespace LAN_CLIENT
 
 		void RecvCompleted(int size) noexcept;
 
-		bool SendPacket(CSerializableBuffer<TRUE> *message) noexcept;
+		bool SendPacket(CSerializableBuffer<SERVER_TYPE::LAN> *message) noexcept;
 		void SendCompleted(int size) noexcept;
 
 		bool PostRecv() noexcept;
@@ -87,14 +87,14 @@ namespace LAN_CLIENT
 		USHORT		m_ClientPort;
 		char		m_dummy01[2]; // 패딩 계산용
 		// 최대 무조건 1개 -> 있거나 없거나
-		CSerializableBufferView<TRUE> *m_pDelayedBuffer = nullptr;
-		CLFQueue<CSerializableBuffer<TRUE> *> m_lfSendBufferQueue;
+		CSerializableBufferView<SERVER_TYPE::LAN> *m_pDelayedBuffer = nullptr;
+		CLFQueue<CSerializableBuffer<SERVER_TYPE::LAN> *> m_lfSendBufferQueue;
 		// m_pMyOverlappedStartAddr
 		//  + 0 : ACCEPTEX
 		//  + 1 : RECV
 		//  + 2 : SEND
 		OVERLAPPED *m_pMyOverlappedStartAddr = nullptr;
-		CSerializableBuffer<TRUE> *m_arrPSendBufs[WSASEND_MAX_BUFFER_COUNT]; // 8 * 32 = 256
+		CSerializableBuffer<SERVER_TYPE::LAN> *m_arrPSendBufs[WSASEND_MAX_BUFFER_COUNT]; // 8 * 32 = 256
 
 		LONG m_iCacelIoCalled = FALSE;
 
@@ -113,8 +113,8 @@ namespace LAN_CLIENT
 
 		inline LONG GetSessionCount() const noexcept { return m_iSessionCount; }
 
-		void SendPacket(const UINT64 sessionID, CSerializableBuffer<TRUE> *sBuffer) noexcept;
-		void EnqueuePacket(const UINT64 sessionID, CSerializableBuffer<TRUE> *sBuffer) noexcept;
+		void SendPacket(const UINT64 sessionID, CSerializableBuffer<SERVER_TYPE::LAN> *sBuffer) noexcept;
+		void EnqueuePacket(const UINT64 sessionID, CSerializableBuffer<SERVER_TYPE::LAN> *sBuffer) noexcept;
 
 		BOOL Disconnect(const UINT64 sessionID, BOOL isPQCS = FALSE) noexcept;
 		BOOL ReleaseSession(CLanSession *pSession, BOOL isPQCS = FALSE) noexcept;
@@ -122,7 +122,7 @@ namespace LAN_CLIENT
 
 		virtual void OnConnect(const UINT64 sessionID) noexcept = 0;
 		virtual void OnDisconnect(const UINT64 sessionID) noexcept = 0;
-		virtual void OnRecv(const UINT64 sessionID, CSerializableBufferView<TRUE> *message) noexcept = 0;
+		virtual void OnRecv(const UINT64 sessionID, CSerializableBufferView<SERVER_TYPE::LAN> *message) noexcept = 0;
 
 		BOOL PostConnectEx(const CHAR *ip, const USHORT port) noexcept;
 		BOOL ConnectExCompleted(CLanSession *pSession) noexcept;

@@ -234,8 +234,8 @@ void CMonitor::MonitoringConsole(INT sessionCount, INT playerCount) noexcept
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tMsg queue \t: %d\n", ((CChatServer *)NET_SERVER::g_NetServer)->m_RecvJobQ.GetUseSize());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"Pool capacity");
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tSession pool capacity \t: %d, usage \t: %d", NET_SERVER::CNetSession::GetPoolCapacity(), NET_SERVER::CNetSession::GetPoolUsage());
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tBuffer pool capacity \t: %d, usage \t: %d", CSerializableBuffer<FALSE>::GetPoolCapacity(), CSerializableBuffer<FALSE>::GetPoolUsage());
-	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tView pool capacity \t: %d, usage \t: %d", CSerializableBufferView<FALSE>::GetPoolCapacity(), CSerializableBufferView<FALSE>::GetPoolUsage());
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tBuffer pool capacity \t: %d, usage \t: %d", CSerializableBuffer<SERVER_TYPE::WAN>::GetPoolCapacity(), CSerializableBuffer<SERVER_TYPE::WAN>::GetPoolUsage());
+	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tView pool capacity \t: %d, usage \t: %d", CSerializableBufferView<SERVER_TYPE::WAN>::GetPoolCapacity(), CSerializableBufferView<SERVER_TYPE::WAN>::GetPoolUsage());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tRecv pool capacity \t: %d, usage \t: %d", CRecvBuffer::GetPoolCapacity(), CRecvBuffer::GetPoolUsage());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"\tPlayer pool capacity \t: %d, usage \t: %d\n", CPlayer::GetPoolCapacity(), CPlayer::GetPoolUsage());
 	g_Logger->WriteLogConsole(LOG_LEVEL::SYSTEM, L"TPS");
@@ -249,68 +249,68 @@ void CMonitor::MonitoringConsole(INT sessionCount, INT playerCount) noexcept
 void CMonitor::SendMonitoringServer(INT sessionCount, INT playerCount) noexcept
 {
 	int currentTime = time(NULL);
-	CSerializableBuffer<TRUE> *pChatServerRunBuffer 
+	CSerializableBuffer<SERVER_TYPE::LAN> *pChatServerRunBuffer
 		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_CHAT_SERVER_RUN
 			, TRUE, currentTime);
 	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pChatServerRunBuffer);
 
-	CSerializableBuffer<TRUE> *pCpuTotalBuffer 
+	CSerializableBuffer<SERVER_TYPE::LAN> *pCpuTotalBuffer
 		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_MONITOR_CPU_TOTAL
 			, m_fProcessorTotal, currentTime);
 	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pCpuTotalBuffer);
 
-	CSerializableBuffer<TRUE> *pNonpagedMemBuffer 
+	CSerializableBuffer<SERVER_TYPE::LAN> *pNonpagedMemBuffer
 		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_MONITOR_NONPAGED_MEMORY
 			, m_SystemNPMemoryVal.largeValue / (1024 * 1024), currentTime);
 	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pNonpagedMemBuffer);
 
-	CSerializableBuffer<TRUE> *pNetworkRecvBuffer 
+	CSerializableBuffer<SERVER_TYPE::LAN> *pNetworkRecvBuffer
 		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_MONITOR_NETWORK_RECV
 			, m_NetworkRecvKB1Val.largeValue / (1024) + m_NetworkRecvKB2Val.largeValue / (1024), currentTime);
 	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pNetworkRecvBuffer);
 
-	CSerializableBuffer<TRUE> *pNetworkSendBuffer
+	CSerializableBuffer<SERVER_TYPE::LAN> *pNetworkSendBuffer
 		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_MONITOR_NETWORK_SEND
 			, m_NetworkSendKB1Val.largeValue / (1024) + m_NetworkSendKB2Val.largeValue / (1024), currentTime);
 	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pNetworkSendBuffer);
 
-	CSerializableBuffer<TRUE> *pAvailableMemBuffer
+	CSerializableBuffer<SERVER_TYPE::LAN> *pAvailableMemBuffer
 		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_MONITOR_AVAILABLE_MEMORY
 			, m_SystemAvailableMemoryVal.largeValue, currentTime);
 	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pAvailableMemBuffer);
 
-	CSerializableBuffer<TRUE> *pChatServerCpuBuffer
+	CSerializableBuffer<SERVER_TYPE::LAN> *pChatServerCpuBuffer
 		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_CHAT_SERVER_CPU
 			, m_fProcessTotal, currentTime);
 	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pChatServerCpuBuffer);
 
-	CSerializableBuffer<TRUE> *pChatServerMemBuffer
+	CSerializableBuffer<SERVER_TYPE::LAN> *pChatServerMemBuffer
 		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_CHAT_SERVER_MEM
 			, m_stPmc.PrivateUsage / (1024 * 1024), currentTime);
 	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pChatServerMemBuffer);
 	
-	CSerializableBuffer<TRUE> *pChatServerSession
+	CSerializableBuffer<SERVER_TYPE::LAN> *pChatServerSession
 		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_CHAT_SESSION
 			, sessionCount, currentTime);
 	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pChatServerSession);
 
-	CSerializableBuffer<TRUE> *pChatServerPlayer
+	CSerializableBuffer<SERVER_TYPE::LAN> *pChatServerPlayer
 		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_CHAT_PLAYER
 			, playerCount, currentTime);
 	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pChatServerPlayer);
 
-	CSerializableBuffer<TRUE> *pChatServerUpdateTPS
+	CSerializableBuffer<SERVER_TYPE::LAN> *pChatServerUpdateTPS
 		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_CHAT_UPDATE_TPS
 			, m_lUpdateTPS, currentTime);
 	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pChatServerUpdateTPS);
 
-	CSerializableBuffer<TRUE> *pChatServerPacketPool
+	CSerializableBuffer<SERVER_TYPE::LAN> *pChatServerPacketPool
 		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_CHAT_PACKET_POOL
-			, CSerializableBuffer<FALSE>::GetPoolCapacity(), currentTime);
+			, CSerializableBuffer<SERVER_TYPE::WAN>::GetPoolCapacity(), currentTime);
 	g_MonitorClient->EnqueuePacket(m_MonitorClientSessionId, pChatServerPacketPool);
 
-	CSerializableBuffer<TRUE> *pChatServerViewPool
+	CSerializableBuffer<SERVER_TYPE::LAN> *pChatServerViewPool
 		= CGenPacket::makePacketReqMonitorUpdate(dfMONITOR_DATA_TYPE_CHAT_UPDATEMSG_POOL
-			, CSerializableBufferView<FALSE>::GetPoolCapacity(), currentTime);
+			, CSerializableBufferView<SERVER_TYPE::WAN>::GetPoolCapacity(), currentTime);
 	g_MonitorClient->SendPacket(m_MonitorClientSessionId, pChatServerViewPool);
 }

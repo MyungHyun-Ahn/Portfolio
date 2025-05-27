@@ -15,7 +15,7 @@ namespace LAN_CLIENT
 
 		if (m_pDelayedBuffer != nullptr)
 		{
-			CSerializableBufferView<TRUE>::Free(m_pDelayedBuffer);
+			CSerializableBufferView<SERVER_TYPE::LAN>::Free(m_pDelayedBuffer);
 			m_pDelayedBuffer = nullptr;
 		}
 
@@ -23,7 +23,7 @@ namespace LAN_CLIENT
 		{
 			if (m_arrPSendBufs[count]->DecreaseRef() == 0)
 			{
-				CSerializableBuffer<TRUE>::Free(m_arrPSendBufs[count]);
+				CSerializableBuffer<SERVER_TYPE::LAN>::Free(m_arrPSendBufs[count]);
 			}
 		}
 
@@ -32,7 +32,7 @@ namespace LAN_CLIENT
 		LONG useBufferSize = m_lfSendBufferQueue.GetUseSize();
 		for (int i = 0; i < useBufferSize; i++)
 		{
-			CSerializableBuffer<TRUE> *pBuffer;
+			CSerializableBuffer<SERVER_TYPE::LAN> *pBuffer;
 			// 못꺼낸 것
 			if (!m_lfSendBufferQueue.Dequeue(&pBuffer))
 			{
@@ -44,7 +44,7 @@ namespace LAN_CLIENT
 			// RefCount를 낮추고 0이라면 보낸 거 삭제
 			if (pBuffer->DecreaseRef() == 0)
 			{
-				CSerializableBuffer<TRUE>::Free(pBuffer);
+				CSerializableBuffer<SERVER_TYPE::LAN>::Free(pBuffer);
 			}
 		}
 
@@ -77,11 +77,11 @@ namespace LAN_CLIENT
 			// 딜레이 된걸 처리해야함
 			USHORT delayedHeaderSize = m_pDelayedBuffer->isReadHeaderSize();
 			// 헤더 사이즈 부족
-			if (delayedHeaderSize < (int)CSerializableBuffer<TRUE>::DEFINE::HEADER_SIZE)
+			if (delayedHeaderSize < (int)CSerializableBuffer<SERVER_TYPE::LAN>::DEFINE::HEADER_SIZE)
 			{
 				// 헤더가 딜레이 됐나?
 				// 딜레이 됐다면 여기에 모자른 만큼써줌
-				int requireHeaderSize = (int)CSerializableBuffer<TRUE>::DEFINE::HEADER_SIZE - delayedHeaderSize;
+				int requireHeaderSize = (int)CSerializableBuffer<SERVER_TYPE::LAN>::DEFINE::HEADER_SIZE - delayedHeaderSize;
 				// 헤더가 2번씩 밀릴일은 없을 것임
 				// 짤린 헤더를 써주고
 				m_pDelayedBuffer->WriteDelayedHeader(m_pRecvBuffer->GetFrontPtr(), requireHeaderSize);
@@ -103,7 +103,7 @@ namespace LAN_CLIENT
 
 			if (header.len >= 65535 || header.len >= m_pRecvBuffer->GetCapacity())
 			{
-				CSerializableBufferView<TRUE>::Free(m_pDelayedBuffer);
+				CSerializableBufferView<SERVER_TYPE::LAN>::Free(m_pDelayedBuffer);
 				m_pDelayedBuffer = nullptr;
 
 				if (m_pRecvBuffer->DecreaseRef() == 0)
@@ -141,9 +141,9 @@ namespace LAN_CLIENT
 		while (currentUseSize > 0)
 		{
 			LanHeader packetHeader;
-			CSerializableBufferView<TRUE> *view = CSerializableBufferView<TRUE>::Alloc();
+			CSerializableBufferView<SERVER_TYPE::LAN> *view = CSerializableBufferView<SERVER_TYPE::LAN>::Alloc();
 
-			if (currentUseSize < (int)CSerializableBuffer<TRUE>::DEFINE::HEADER_SIZE)
+			if (currentUseSize < (int)CSerializableBuffer<SERVER_TYPE::LAN>::DEFINE::HEADER_SIZE)
 			{
 				// Peek 실패 delayedBuffer로
 				delayFlag = true;
@@ -159,11 +159,11 @@ namespace LAN_CLIENT
 			}
 
 			int useSize = m_pRecvBuffer->GetUseSize();
-			m_pRecvBuffer->Peek((char *)&packetHeader, (int)CSerializableBuffer<TRUE>::DEFINE::HEADER_SIZE);
+			m_pRecvBuffer->Peek((char *)&packetHeader, (int)CSerializableBuffer<SERVER_TYPE::LAN>::DEFINE::HEADER_SIZE);
 
 			if (packetHeader.len >= 65535 || packetHeader.len >= m_pRecvBuffer->GetCapacity())
 			{
-				CSerializableBufferView<TRUE>::Free(view);
+				CSerializableBufferView<SERVER_TYPE::LAN>::Free(view);
 
 				if (m_pRecvBuffer->DecreaseRef() == 0)
 					CRecvBuffer::Free(m_pRecvBuffer);
@@ -174,7 +174,7 @@ namespace LAN_CLIENT
 				return;
 			}
 
-			if (useSize < (int)CSerializableBuffer<TRUE>::DEFINE::HEADER_SIZE + packetHeader.len)
+			if (useSize < (int)CSerializableBuffer<SERVER_TYPE::LAN>::DEFINE::HEADER_SIZE + packetHeader.len)
 			{
 				// 직접 할당해서 뒤로 밀기 Delayed
 				delayFlag = true;
@@ -192,12 +192,12 @@ namespace LAN_CLIENT
 			// 실질적으로 Recv 버퍼 입장에서는 읽은 것
 			// - 하나의 메시지가 완전히 완성된 상태
 			int offsetStart = m_pRecvBuffer->GetFrontOffset();
-			int offsetEnd = offsetStart + packetHeader.len + (int)CSerializableBuffer<TRUE>::DEFINE::HEADER_SIZE;
+			int offsetEnd = offsetStart + packetHeader.len + (int)CSerializableBuffer<SERVER_TYPE::LAN>::DEFINE::HEADER_SIZE;
 
 			// 이 view를 그냥 써도 됨
 			// Init 에서 RecvBuffer의 Ref가 증가
 			view->Init(m_pRecvBuffer, offsetStart, offsetEnd);
-			m_pRecvBuffer->MoveFront((int)CSerializableBuffer<TRUE>::DEFINE::HEADER_SIZE + packetHeader.len);
+			m_pRecvBuffer->MoveFront((int)CSerializableBuffer<SERVER_TYPE::LAN>::DEFINE::HEADER_SIZE + packetHeader.len);
 
 			InterlockedIncrement(&g_monitor.m_lRecvTPS);
 			view->m_uiSessionId = m_uiSessionID;
@@ -218,7 +218,7 @@ namespace LAN_CLIENT
 		m_pRecvBuffer = nullptr;
 	}
 
-	bool CLanSession::SendPacket(CSerializableBuffer<TRUE> *message) noexcept
+	bool CLanSession::SendPacket(CSerializableBuffer<SERVER_TYPE::LAN> *message) noexcept
 	{
 		// 여기서 올라간 RefCount는 SendCompleted에서 내려감
 		// 혹은 ReleaseSession
@@ -242,7 +242,7 @@ namespace LAN_CLIENT
 			// RefCount를 낮추고 0이라면 보낸 거 삭제
 			if (m_arrPSendBufs[count]->DecreaseRef() == 0)
 			{
-				CSerializableBuffer<TRUE>::Free(m_arrPSendBufs[count]);
+				CSerializableBuffer<SERVER_TYPE::LAN>::Free(m_arrPSendBufs[count]);
 			}
 		}
 
@@ -357,7 +357,7 @@ namespace LAN_CLIENT
 		int count;
 		for (count = 0; count < m_iSendCount; count++)
 		{
-			CSerializableBuffer<TRUE> *pBuffer;
+			CSerializableBuffer<SERVER_TYPE::LAN> *pBuffer;
 			// 못꺼낸 것
 			if (!m_lfSendBufferQueue.Dequeue(&pBuffer))
 			{
@@ -423,7 +423,7 @@ namespace LAN_CLIENT
 		return TRUE;
 	}
 
-	void CLanClient::SendPacket(const UINT64 sessionID, CSerializableBuffer<TRUE> *sBuffer) noexcept
+	void CLanClient::SendPacket(const UINT64 sessionID, CSerializableBuffer<SERVER_TYPE::LAN> *sBuffer) noexcept
 	{
 		CLanSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 
@@ -463,7 +463,7 @@ namespace LAN_CLIENT
 		}
 	}
 
-	void CLanClient::EnqueuePacket(const UINT64 sessionID, CSerializableBuffer<TRUE> *sBuffer) noexcept
+	void CLanClient::EnqueuePacket(const UINT64 sessionID, CSerializableBuffer<SERVER_TYPE::LAN> *sBuffer) noexcept
 	{
 		CLanSession *pSession = m_arrPSessions[GetIndex(sessionID)];
 

@@ -7,6 +7,8 @@
 #include "CGameContent.h"
 #include "ContentEvent.h"
 #include "CContentThread.h"
+#include "CPlayer.h"
+#include "CGenPacket.h"
 
 CGameServer::CGameServer()
 {
@@ -53,4 +55,26 @@ void CGameServer::RegisterContentTimerEvent() noexcept
 	pEchoEvent->SetEvent(m_pEchoContent, 25);
 	CContentThread::s_arrContentThreads[1]->EnqueueEventMy(pEchoEvent);
 	// CContentThread::EnqueueEvent(pEchoEvent);
+
+	SendAllTimer *sendAllTimer = new SendAllTimer;
+	sendAllTimer->SetEvent();
+	CContentThread::EnqueueEvent(sendAllTimer);
+}
+
+void CGameServer::SendEchoAll()
+{
+	CLockGuard<LOCK_TYPE::EXCLUSIVE> lock(m_pEchoContent->m_lockSessionMapLock);
+	for (auto &[key, ptr] : m_pEchoContent->m_umapSessions)
+	{
+		CPlayer *pPlayer = (CPlayer *)ptr;
+
+		for (int i = 0; i < 50; i++)
+		{
+			CSerializableBuffer<FALSE> *pEchoRes = CGenPacket::makePacketResEcho(pPlayer->m_iAccountNo, 1);
+			NET_SERVER::g_NetServer->EnqueuePacket(key, pEchoRes);
+		}
+
+		CSerializableBuffer<FALSE> *pEchoRes = CGenPacket::makePacketResEcho(pPlayer->m_iAccountNo, 1);
+		NET_SERVER::g_NetServer->SendPacket(key, pEchoRes);
+	}
 }

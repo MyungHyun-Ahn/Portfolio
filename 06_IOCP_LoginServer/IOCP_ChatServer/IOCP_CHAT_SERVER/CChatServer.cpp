@@ -19,10 +19,11 @@ CChatServer::CChatServer() noexcept
 void CChatServer::Update() noexcept
 {
 	// 이때 확인한 JobCount 만큼 진행할 것임
+
 	LONG jobCount = m_RecvJobQ.GetUseSize();
 	for (int i = 0; i < jobCount; i++)
 	{
-		CSerializableBufferView<FALSE> *recvJob;
+		CSerializableBufferView<SERVER_TYPE::WAN> *recvJob;
 		if (!m_RecvJobQ.Dequeue(&recvJob))
 			__debugbreak();
 
@@ -30,13 +31,14 @@ void CChatServer::Update() noexcept
 
 		WORD type;
 		*recvJob >> type;
-		if (!m_pProcessPacket->ConsumPacket((en_PACKET_TYPE)type, recvJob->GetSessionID(), CSmartPtr<CSerializableBufferView<FALSE>>(recvJob)))
+		if (!m_pProcessPacket->ConsumePacket((en_PACKET_TYPE)type
+			, recvJob->GetSessionID(), CSmartPtr<CSerializableBufferView<SERVER_TYPE::WAN>>(recvJob)))
 		{
 			Disconnect(recvJob->GetSessionID());
 		}
 
 		if (recvJob->DecreaseRef() == 0)
-			CSerializableBufferView<FALSE>::Free(recvJob);
+			CSerializableBufferView<SERVER_TYPE::WAN>::Free(recvJob);
 	}
 }
 
@@ -63,7 +65,8 @@ void CChatServer::LoginHeartBeat() noexcept
 	}
 }
 
-void CChatServer::SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX, CSerializableBuffer<FALSE> *message) noexcept
+void CChatServer::SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX
+	, CSmartPtr<CSerializableBuffer<SERVER_TYPE::WAN>> message) noexcept
 {
 	int startY = sectorY - SECTOR_VIEW_START;
 	int startX = sectorX - SECTOR_VIEW_START;
@@ -71,17 +74,18 @@ void CChatServer::SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX, CSeri
 	{
 		for (int x = 0; x < SECTOR_VIEW_COUNT; x++)
 		{
-			if (startY + y < 0 || startY + y >= MAX_SECTOR_Y || startX + x < 0 || startX + x >= MAX_SECTOR_X)
+			if (startY + y < 0 || startY + y >= MAX_SECTOR_Y 
+				|| startX + x < 0 || startX + x >= MAX_SECTOR_X)
 				continue;
 
 			CSector &sector = m_arrCSector[y + startY][x + startX];
-			for (auto &it : sector.m_players)
+			for (auto &[id, player] : sector.m_players)
 			{
-				if (it.first == sessionId)
+				if (id == sessionId)
 					continue;
 
 				InterlockedIncrement(&g_monitor.m_chatMsgRes);
-				SendPacket(it.first, message);
+				SendPacket(id, message.GetRealPtr());
 			}
 		}
 	}
@@ -127,14 +131,14 @@ void CChatServer::OnClientLeave(const UINT64 sessionID) noexcept
 	}
 }
 
-void CChatServer::OnRecv(const UINT64 sessionID, CSerializableBufferView<FALSE> *message) noexcept
+void CChatServer::OnRecv(const UINT64 sessionID, CSerializableBufferView<SERVER_TYPE::WAN> *message) noexcept
 {
 	// JobQ Enqueue
 	message->IncreaseRef();
 	m_RecvJobQ.Enqueue(message);
 }
 
-void CChatServer::OnRecv(const UINT64 sessionID, CSmartPtr<CSerializableBufferView<FALSE>> message) noexcept
+void CChatServer::OnRecv(const UINT64 sessionID, CSmartPtr<CSerializableBufferView<SERVER_TYPE::WAN>> message) noexcept
 {
 }
 
@@ -165,7 +169,8 @@ void CChatServer::SectorBroadcast() noexcept
 	{
 		for (int sectorX = 0; sectorX < MAX_SECTOR_X; sectorX++)
 		{
-			CDeque<CSerializableBuffer<FALSE> *> &msgQ = m_arrCSector[sectorY][sectorX].m_sendMsgQ;
+			CDeque<CSerializableBuffer<SERVER_TYPE::WAN> *> &msgQ 
+				= m_arrCSector[sectorY][sectorX].m_sendMsgQ;
 			if (msgQ.empty())
 				continue;
 
@@ -180,23 +185,24 @@ void CChatServer::SectorBroadcast() noexcept
 				{
 					for (int x = 0; x < SECTOR_VIEW_COUNT; x++)
 					{
-						if (startY + y < 0 || startY + y >= MAX_SECTOR_Y || startX + x < 0 || startX + x >= MAX_SECTOR_X)
+						if (startY + y < 0 || startY + y >= MAX_SECTOR_Y 
+							|| startX + x < 0 || startX + x >= MAX_SECTOR_X)
 							continue;
 
 						CSector &sector = m_arrCSector[y + startY][x + startX];
-						for (auto it = sector.m_players.begin(); it != sector.m_players.end(); ++it)
+						for (auto &[id, player] : sector.m_players)
 						{
-							if (it->first == sessionId)
+							if (id == sessionId)
 								continue;
 
 							InterlockedIncrement(&g_monitor.m_chatMsgRes);
-							EnqueuePacket(it->first, *msgIt);
+							EnqueuePacket(id, *msgIt);
 						}
 					}
 				}
 
 				if ((*msgIt)->DecreaseRef() == 0)
-					CSerializableBuffer<FALSE>::Free(*msgIt);
+					CSerializableBuffer<SERVER_TYPE::WAN>::Free(*msgIt);
 
 				msgIt = msgQ.erase(msgIt);
 			}

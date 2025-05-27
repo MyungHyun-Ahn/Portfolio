@@ -137,11 +137,11 @@ bool CChatProcessPacket::PacketProcReqMessage(UINT64 sessionId, CSmartPtr<CSeria
 	messageRes->SetSessionId(sessionId);
 	InterlockedIncrement(&g_monitor.m_chatMsgRes);
 	m_pChatServer->SendPacket(sessionId, messageRes);
-	m_pChatServer->m_arrCSector[player->m_usSectorY][player->m_usSectorX].m_sendMsgQ.push_back(messageRes);
+	// m_pChatServer->m_arrCSector[player->m_usSectorY][player->m_usSectorX].m_sendMsgQ.push_back(messageRes);
 
-	// m_pChatServer->SendSector(0, player->m_usSectorY, player->m_usSectorX, messageRes);
-	// if (messageRes->DecreaseRef() == 0)
-	// 	CSerializableBuffer<FALSE>::Free(messageRes);
+	m_pChatServer->SendSector(sessionId, player->m_usSectorY, player->m_usSectorX, messageRes);
+	if (messageRes->DecreaseRef() == 0)
+		CSerializableBuffer<FALSE>::Free(messageRes);
 
 	return true;
 }

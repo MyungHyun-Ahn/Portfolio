@@ -4,6 +4,8 @@
 #pragma warning(disable : 6386)
 #pragma warning(disable : 6385)
 
+#ifdef USE_PROFILE
+
 #define PROFILE_BEGIN(num, tagName)											\
 				int tlsIdx_##num = (int)TlsGetValue(g_ProfileMgr->m_dwInfosTlsIdx); \
 				if (tlsIdx_##num == 0)	\
@@ -14,6 +16,11 @@
 				stTlsProfileInfo *tlsInfo_##num = g_ProfileMgr->m_arrProfileInfos[tlsIdx_##num]; \
 				thread_local static int profileIdx_##num = tlsInfo_##num->currentProfileSize++; \
 				CProfile profile_##num(profileIdx_##num, __FUNCSIG__, tagName)
+#else
+
+#define PROFILE_BEGIN(num, tagName)	do { } while(0)
+
+#endif
 
 struct stPROFILE
 {

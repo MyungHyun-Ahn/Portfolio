@@ -53,7 +53,10 @@ namespace NET_SERVER
 		inline bool SendPacket(CSerializableBuffer<FALSE> *message) noexcept
 		{
 			message->IncreaseRef();
-			m_lfSendBufferQueue.Enqueue(message);
+			{
+				PROFILE_BEGIN(0, "SEND_MSQ ENQUEUE");
+				m_lfSendBufferQueue.Enqueue(message);
+			}
 			if (m_lfSendBufferQueue.GetUseSize() > WSASEND_MAX_BUFFER_COUNT)
 				return FALSE;
 

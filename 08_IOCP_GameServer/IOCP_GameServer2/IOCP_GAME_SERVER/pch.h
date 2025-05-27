@@ -18,7 +18,7 @@
 
 // 윈도우 API
 #include <windows.h>
-#include <Psapi.h>
+#include <Psapi.h> // 프로세스 메모리 pmi
 #include <strsafe.h>
 #include <Pdh.h>
 
@@ -45,6 +45,10 @@
 #include <chrono>
 #include <functional>
 
+#define USE_PROFILE
+// #define LOCK
+
+#include "CLockGuard.h"
 #include "DefineSingleton.h"
 #include "CProfileManager.h"
 
@@ -80,4 +84,3 @@
 #include "CDeque.h"
 
 #include "BaseEvent.h"
-#include "CLockGuard.h"

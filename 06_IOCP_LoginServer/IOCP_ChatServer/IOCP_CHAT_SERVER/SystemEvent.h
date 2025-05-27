@@ -27,6 +27,6 @@ struct OnClientLeaveEvent : public BaseEvent
 
 struct SerializableBufferFreeEvent : public BaseEvent
 {
-	void SetEvent(CDeque<CSerializableBuffer<FALSE> *> *freeQueue) noexcept;
-	void Execute(CDeque<CSerializableBuffer<FALSE> *> *freeQueue) noexcept;
+	void SetEvent(CDeque<CSerializableBuffer<SERVER_TYPE::WAN> *> *freeQueue) noexcept;
+	void Execute(CDeque<CSerializableBuffer<SERVER_TYPE::WAN> *> *freeQueue) noexcept;
 };

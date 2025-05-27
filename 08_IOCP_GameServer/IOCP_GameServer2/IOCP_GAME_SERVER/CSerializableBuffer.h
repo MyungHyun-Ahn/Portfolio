@@ -13,7 +13,7 @@ public:
 
 	CSerializableBuffer() noexcept
 	{
-		m_Buffer = (char *)s_sPagePool512.Alloc();
+		m_Buffer = (char *)s_sPagePool.Alloc();
 		m_MaxSize = (int)DEFINE::PACKET_MAX_SIZE;
 		m_HeaderFront = 0;
 		m_Front = (int)DEFINE::HEADER_SIZE;
@@ -22,7 +22,7 @@ public:
 
 	virtual ~CSerializableBuffer() noexcept
 	{
-		s_sPagePool512.Free(m_Buffer);
+		s_sPagePool.Free(m_Buffer);
 	}
 
 
@@ -406,7 +406,7 @@ public:
 	UINT64			m_uiSessionId = 0;
 
 	inline static CTLSMemoryPoolManager<CSerializableBuffer, 512, 2> s_sbufferPool = CTLSMemoryPoolManager<CSerializableBuffer, 512, 2>();
-	inline static CTLSPagePoolManager<(int)DEFINE::PACKET_MAX_SIZE, 16, false> s_sPagePool512 = CTLSPagePoolManager<(int)DEFINE::PACKET_MAX_SIZE, 16, false>();
+	inline static CTLSPagePoolManager<(int)DEFINE::PACKET_MAX_SIZE, 16, false> s_sPagePool = CTLSPagePoolManager<(int)DEFINE::PACKET_MAX_SIZE, 16, false>();
 };
 
 template<bool isLanServer>

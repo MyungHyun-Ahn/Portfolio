@@ -10,6 +10,8 @@ class CAuthContent : public CBaseContent
 
 class CEchoContent : public CBaseContent
 {
+	friend class CGameServer;
+
 	// CBaseContent을(를) 통해 상속됨
 	void OnEnter(const UINT64 sessionID, void *pObject) noexcept override;
 	void OnLeave(const UINT64 sessionID) noexcept override;

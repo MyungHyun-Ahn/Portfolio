@@ -23,4 +23,7 @@
     <Text Include="CAS02_FIX_DEBUG01.txt" />
     <Text Include="CAS02_DEBUG05.txt" />
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="LockFreeQueue.natvis" />
+  </ItemGroup>
 </Project>

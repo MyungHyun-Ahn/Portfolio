@@ -29,7 +29,10 @@ void DBTimerEvent::Excute() noexcept
 		// 테이블 생성
 		mon = t.tm_mon + 1;
 		// 실패해도 상관없음
-		pConnector->Query(L"CREATE TABLE monitorlog_%04d%02d LIKE monitorlog_temp", t.tm_year + 1900, t.tm_mon + 1);
+
+		pConnector->Query(
+			L"CREATE TABLE monitorlog_%04d%02d LIKE monitorlog_temp"
+			, t.tm_year + 1900, t.tm_mon + 1);
 	}
 	MonitoringInfo *pArrMonitorInfo = ((CLanMonitoringServer *)LAN_SERVER::g_LanServer)->m_arrMonitorInfo;
 

@@ -1,12 +1,18 @@
 #pragma once
 
-template<bool isLanServer>
+enum class SERVER_TYPE
+{
+	LAN,
+	WAN
+};
+
+template<SERVER_TYPE isLanServer>
 class CSerializableBuffer
 {
 public:
 	enum class DEFINE
 	{
-		HEADER_SIZE = isLanServer ? sizeof(LanHeader) : sizeof(NetHeader),
+		HEADER_SIZE = isLanServer == SERVER_TYPE::LAN ? sizeof(LanHeader) : sizeof(NetHeader),
 		DEFAULT_SIZE = 1400
 	};
 
@@ -407,7 +413,7 @@ private:
 	inline static CTLSPagePoolManager<512, 4, false> s_sPagePool512 = CTLSPagePoolManager<512, 4, false>();
 };
 
-template<bool isLanServer>
+template<SERVER_TYPE isLanServer>
 bool CSerializableBuffer<isLanServer>::EnqueueHeader(char *buffer, int size) noexcept
 {
 	m_isEnqueueHeader = TRUE;
@@ -425,7 +431,7 @@ bool CSerializableBuffer<isLanServer>::EnqueueHeader(char *buffer, int size) noe
 	return true;
 }
 
-template<bool isLanServer>
+template<SERVER_TYPE isLanServer>
 bool CSerializableBuffer<isLanServer>::Enqueue(char *buffer, int size) noexcept
 {
 	if (m_MaxSize - m_Rear < size)
@@ -441,7 +447,7 @@ bool CSerializableBuffer<isLanServer>::Enqueue(char *buffer, int size) noexcept
 	return true;
 }
 
-template<bool isLanServer>
+template<SERVER_TYPE isLanServer>
 bool CSerializableBuffer<isLanServer>::Dequeue(char *buffer, int size) noexcept
 {
 	if (GetDataSize() < size)

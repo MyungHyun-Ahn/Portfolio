@@ -159,6 +159,9 @@
     <Text Include="CAS02_FIX_DEBUG01.txt" />
     <Text Include="Dequeue_DEBUG01.txt" />
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="LockFreeQueue.natvis" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

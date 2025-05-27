@@ -108,6 +108,8 @@ public:
 
 	tm m_startTime;
 	tm m_currentTime;
+
+	LONG m_WSASendCall = 0;
 };
 
 extern CMonitor g_monitor;

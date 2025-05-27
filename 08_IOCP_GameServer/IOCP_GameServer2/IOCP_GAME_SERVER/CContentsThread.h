@@ -220,7 +220,7 @@ private:
 
 	void Run() noexcept
 	{
-		SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+		// SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
 		while (m_RunningFlag)
 		{

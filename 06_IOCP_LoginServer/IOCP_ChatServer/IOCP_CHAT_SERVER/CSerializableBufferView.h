@@ -11,7 +11,7 @@ namespace LAN_CLIENT
 }
 
 // CRecvBuffer로 받은 데이터를 직렬화 버퍼처럼 볼 수 있게 함
-template<bool isLanServer>
+template<SERVER_TYPE isLanServer>
 class CSerializableBufferView
 {
 public:
@@ -294,7 +294,7 @@ private:
 };
 
 // offset은 거의 0만 쓸 듯?
-template<bool isLanServer>
+template<SERVER_TYPE isLanServer>
 bool CSerializableBufferView<isLanServer>::Copy(char *buffer, int offset, int size) noexcept
 {
 	if (m_iBufferSize - m_Rear < size)
@@ -313,7 +313,7 @@ bool CSerializableBufferView<isLanServer>::Copy(char *buffer, int offset, int si
 	return true;
 }
 
-template<bool isLanServer>
+template<SERVER_TYPE isLanServer>
 bool CSerializableBufferView<isLanServer>::Copy(char *buffer, int size) noexcept
 {
 	if (m_iBufferSize - m_Rear < size)
@@ -332,7 +332,7 @@ bool CSerializableBufferView<isLanServer>::Copy(char *buffer, int size) noexcept
 	return true;
 }
 
-template<bool isLanServer>
+template<SERVER_TYPE isLanServer>
 bool CSerializableBufferView<isLanServer>::Dequeue(char *buffer, int size) noexcept
 {
 	if (GetDataSize() < size)
@@ -346,7 +346,7 @@ bool CSerializableBufferView<isLanServer>::Dequeue(char *buffer, int size) noexc
 	return true;
 }
 
-template<bool isLanServer>
+template<SERVER_TYPE isLanServer>
 bool CSerializableBufferView<isLanServer>::GetHeader(char *buffer, int size) noexcept
 {
 	if (size < (int)CSerializableBuffer<isLanServer>::DEFINE::HEADER_SIZE)
@@ -359,7 +359,7 @@ bool CSerializableBufferView<isLanServer>::GetHeader(char *buffer, int size) noe
 	return true;
 }
 
-template<bool isLanServer>
+template<SERVER_TYPE isLanServer>
 bool CSerializableBufferView<isLanServer>::WriteDelayedHeader(char *buffer, int size) noexcept
 {
 	if (m_iReadHeaderSize + size > (int)CSerializableBuffer<isLanServer>::DEFINE::HEADER_SIZE)
@@ -372,7 +372,7 @@ bool CSerializableBufferView<isLanServer>::WriteDelayedHeader(char *buffer, int 
 	return true;
 }
 
-template<bool isLanServer>
+template<SERVER_TYPE isLanServer>
 bool CSerializableBufferView<isLanServer>::GetDelayedHeader(char *buffer, int size) noexcept
 {
 	if (size < m_iReadHeaderSize)
