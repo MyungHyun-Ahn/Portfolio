@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <ItemGroup />
+  <ItemGroup>
+    <ClCompile Include="CBaseContents.cpp" />
+    <ClCompile Include="CLanClient.cpp" />
+    <ClCompile Include="ClientSetting.cpp" />
+    <ClCompile Include="CMonitor.cpp" />
+    <ClCompile Include="CNetServer.cpp" />
+    <ClCompile Include="COverlappedAllocator.cpp" />
+    <ClCompile Include="pch.cpp" />
+    <ClCompile Include="ServerSetting.cpp" />
+    <ClCompile Include="SystemEvent.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="CBaseContents.h" />
+    <ClInclude Include="CContentsThread.h" />
+    <ClInclude Include="CLanClient.h" />
+    <ClInclude Include="ClientSetting.h" />
+    <ClInclude Include="CMonitor.h" />
+    <ClInclude Include="CNetServer.h" />
+    <ClInclude Include="COverlappedAllocator.h" />
+    <ClInclude Include="CRecvBuffer.h" />
+    <ClInclude Include="CRingBuffer.h" />
+    <ClInclude Include="CSerializableBuffer.h" />
+    <ClInclude Include="CSerializableBufferView.h" />
+    <ClInclude Include="DefineServer.h" />
+    <ClInclude Include="NetPch.h" />
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="SBaseEvent.h" />
+    <ClInclude Include="ServerSetting.h" />
+    <ClInclude Include="SystemEvent.h" />
+  </ItemGroup>
+</Project>

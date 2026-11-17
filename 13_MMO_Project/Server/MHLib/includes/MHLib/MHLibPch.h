@@ -1,0 +1,49 @@
+#pragma once
+
+// 헤더 전용 라이브러리의 안정적인 의존성을 순서대로 공급한다.
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#include <MSWSock.h>
+#include <windows.h>
+#include <cstdio>
+#include <cstdlib>
+#include <ctime>
+#include <process.h>
+#include <cwchar>
+#include <share.h>
+#include <crtdbg.h>
+#include <DbgHelp.h>
+#include <strsafe.h>
+#include <deque>
+#include <vector>
+#include <unordered_map>
+#include <unordered_set>
+#include <map>
+#include <string>
+#include <queue>
+#include <new>
+#include <chrono>
+#include <functional>
+#include <algorithm>
+#include <type_traits>
+#include <concepts>
+
+#include "MHLib/utils/CSingleton.h"
+#include "MHLib/utils/CProfileManager.h"
+#include "MHLib/utils/CSmartPtr.h"
+#include "MHLib/utils/CLockGuard.h"
+#include "MHLib/utils/CLogger.h"
+#include "MHLib/utils/CFileLoader.h"
+#include "MHLib/debug/CCrashDump.h"
+#include "MHLib/security/CEncryption.h"
+#include "MHLib/containers/LfDefine.h"
+#include "MHLib/memory/CLfMemoryPool.h"
+#include "MHLib/memory/CSingleMemoryPool.h"
+#include "MHLib/memory/CTlsMemoryPool.h"
+#include "MHLib/memory/CTlsPagePool.h"
+#include "MHLib/containers/CDeque.h"
+#include "MHLib/containers/CLfStack.h"
+#include "MHLib/containers/CLfQueue.h"
