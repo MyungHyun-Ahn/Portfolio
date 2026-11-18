@@ -1,0 +1,7 @@
+packets:
+  - name: HeartbeatNoti
+    kind: noti
+    id: 7
+    direction: client_to_server
+    fields:
+      - {name: account_no, type: int64}

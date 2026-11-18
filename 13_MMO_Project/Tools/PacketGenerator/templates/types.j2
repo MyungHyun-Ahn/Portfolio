@@ -1,0 +1,11 @@
+#pragma once
+
+namespace Chatting
+{
+	enum class EPacketType : std::uint16_t
+	{
+{% for packet in packets %}
+		{{ packet.name }} = {{ packet.id }},
+{% endfor %}
+	};
+}

@@ -1,0 +1,17 @@
+reserved:
+  - {name: ChatServer, id: 0}
+packets:
+  - name: ReqLogin
+    kind: req
+    id: 1
+    fields:
+      - {name: account_no, type: int64}
+      - {name: id, type: utf16_fixed, code_units: 20}
+      - {name: nickname, type: utf16_fixed, code_units: 20}
+      - {name: session_key, type: bytes_fixed, bytes: 64}
+  - name: ResLogin
+    kind: res
+    id: 2
+    fields:
+      - {name: status, type: uint8}
+      - {name: account_no, type: int64}

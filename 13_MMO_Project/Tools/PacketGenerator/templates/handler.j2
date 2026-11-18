@@ -1,0 +1,19 @@
+#pragma once
+
+namespace Chatting
+{
+{% for packet in packets %}
+	struct S{{ packet.name }};
+{% endfor %}
+{% if packets %}
+
+{% endif %}
+	class I{{ side }}PacketHandler
+	{
+	public:
+		virtual ~I{{ side }}PacketHandler() = default;
+{% for packet in packets %}
+		virtual bool Handle{{ packet.name }}({% if side == 'Server' %}UINT64 sessionId, {% endif %}const S{{ packet.name }} &packet) noexcept = 0;
+{% endfor %}
+	};
+}

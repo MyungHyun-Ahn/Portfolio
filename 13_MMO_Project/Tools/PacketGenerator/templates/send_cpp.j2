@@ -1,0 +1,30 @@
+#include "pch.h"
+#include "CSerializableBuffer.h"
+#include "MHLib/serialization/ISerializable.h"
+#include "IncludePacketAll.g.h"
+#include "{{ side }}PacketSend.g.h"
+
+namespace Chatting
+{
+{% for packet in packets %}
+	NetworkLib::CSerializableBuffer<FALSE> *MakePacket{{ packet.name }}(const S{{ packet.name }} &packet) noexcept
+	{
+		auto *pBuffer = NetworkLib::CSerializableBuffer<FALSE>::Alloc();
+		if (pBuffer == nullptr)
+		{
+			return nullptr;
+		}
+
+		*pBuffer << static_cast<std::uint16_t>(EPacketType::{{ packet.name }}) << packet;
+		if (!pBuffer->IsValid())
+		{
+			NetworkLib::CSerializableBuffer<FALSE>::Free(pBuffer);
+			return nullptr;
+		}
+		return pBuffer;
+	}
+{% if not loop.last %}
+
+{% endif %}
+{% endfor %}
+}

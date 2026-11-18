@@ -1,0 +1,15 @@
+packets:
+  - name: ReqMessage
+    kind: req
+    id: 5
+    fields:
+      - {name: account_no, type: int64}
+      - {name: message, type: utf16}
+  - name: ResMessage
+    kind: res
+    id: 6
+    fields:
+      - {name: account_no, type: int64}
+      - {name: id, type: utf16_fixed, code_units: 20}
+      - {name: nickname, type: utf16_fixed, code_units: 20}
+      - {name: message, type: utf16}

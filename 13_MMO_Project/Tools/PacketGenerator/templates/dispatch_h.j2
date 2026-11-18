@@ -1,0 +1,9 @@
+#pragma once
+
+namespace Chatting
+{
+	class I{{ side }}PacketHandler;
+
+	[[nodiscard]] bool Dispatch{{ side }}Packet({% if side == 'Server' %}std::uint16_t type, UINT64 sessionId,
+		{% endif %}NetworkLib::CSerializableBuffer<FALSE> &message, I{{ side }}PacketHandler &handler) noexcept;
+}

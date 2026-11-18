@@ -1,0 +1,47 @@
+#include "pch.h"
+#include "CSerializableBuffer.h"
+#include "MHLib/serialization/ISerializable.h"
+#include "IncludePacketAll.g.h"
+#include "I{{ side }}PacketHandler.g.h"
+#include "{{ side }}PacketDispatch.g.h"
+
+namespace Chatting
+{
+	bool Dispatch{{ side }}Packet({% if side == 'Server' %}std::uint16_t type, UINT64 sessionId,
+		{% endif %}NetworkLib::CSerializableBuffer<FALSE> &message, I{{ side }}PacketHandler &handler) noexcept
+	{
+{% if not packets %}
+{% if side == 'Server' %}
+		(void)type;
+		(void)sessionId;
+{% endif %}
+		(void)message;
+		(void)handler;
+		return false;
+{% else %}
+{% if side == 'Client' %}
+		std::uint16_t type{};
+		message >> type;
+		if (!message.IsValid())
+		{
+			return false;
+		}
+
+{% endif %}
+		switch (static_cast<EPacketType>(type))
+		{
+{% for packet in packets %}
+		case EPacketType::{{ packet.name }}:
+		{
+			S{{ packet.name }} packet;
+			message >> packet;
+			return message.IsValid() && message.GetDataSize() == 0
+				&& handler.Handle{{ packet.name }}({% if side == 'Server' %}sessionId, {% endif %}packet);
+		}
+{% endfor %}
+		default:
+			return false;
+		}
+{% endif %}
+	}
+}

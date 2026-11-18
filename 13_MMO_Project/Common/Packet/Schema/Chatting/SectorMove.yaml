@@ -1,0 +1,15 @@
+packets:
+  - name: ReqSectorMove
+    kind: req
+    id: 3
+    fields:
+      - {name: account_no, type: int64}
+      - {name: sector_x, type: uint16}
+      - {name: sector_y, type: uint16}
+  - name: ResSectorMove
+    kind: res
+    id: 4
+    fields:
+      - {name: account_no, type: int64}
+      - {name: sector_x, type: uint16}
+      - {name: sector_y, type: uint16}

@@ -1,0 +1,15 @@
+#pragma once
+
+namespace Chatting
+{
+{% for packet in packets %}
+	struct S{{ packet.name }};
+{% endfor %}
+{% if packets %}
+
+{% endif %}
+{% for packet in packets %}
+	[[nodiscard]] NetworkLib::CSerializableBuffer<FALSE> *MakePacket{{ packet.name }}(
+		const S{{ packet.name }} &packet) noexcept;
+{% endfor %}
+}

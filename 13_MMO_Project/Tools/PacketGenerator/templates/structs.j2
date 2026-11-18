@@ -1,0 +1,38 @@
+#pragma once
+
+namespace Chatting
+{
+{% for packet in packets %}
+	struct S{{ packet.name }} final : public MHLib::serialization::ISerializable<false>
+	{
+{% for field in packet.fields %}
+		{{ field.cpp_type }} {{ field.member }}{};
+{% endfor %}
+
+		[[nodiscard]] bool Serialize(NetworkLib::CSerializableBuffer<false> &buffer) const noexcept override
+		{
+{% if packet.fields %}
+			buffer
+{% for field in packet.fields %}
+				<< {{ field.member }}{{ ';' if loop.last else '' }}{{ '\n' -}}
+{% endfor %}
+{% endif %}
+			return buffer.IsValid();
+		}
+
+		[[nodiscard]] bool Deserialize(NetworkLib::CSerializableBuffer<false> &buffer) noexcept override
+		{
+{% if packet.fields %}
+			buffer
+{% for field in packet.fields %}
+				>> {{ field.member }}{{ ';' if loop.last else '' }}{{ '\n' -}}
+{% endfor %}
+{% endif %}
+			return buffer.IsValid();
+		}
+	};
+{% if not loop.last %}
+
+{% endif %}
+{% endfor %}
+}
