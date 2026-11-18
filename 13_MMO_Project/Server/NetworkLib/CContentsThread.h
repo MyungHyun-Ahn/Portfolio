@@ -80,8 +80,8 @@ private:
 			for (int i = 0; i < eventQSize; i++)
 			{
 				SBaseEvent *pEvent;
-				// 꺼내고
-				m_enqueueEventQ.Dequeue(&pEvent);
+				if (!m_enqueueEventQ.Dequeue(&pEvent))
+					break;
 
 				if (pEvent->m_isTimerEvent)
 				{

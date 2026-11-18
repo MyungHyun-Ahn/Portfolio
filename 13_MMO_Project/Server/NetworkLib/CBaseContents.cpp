@@ -62,7 +62,8 @@ void CBaseContents::ProcessMoveJob() noexcept
 		SMoveJob *pMoveJob;
 		// 올린 상태로 들어올 것
 		// InterlockedIncrement(&pSession->m_iIOCountAndRelease);
-		m_moveJobQ.Dequeue(&pMoveJob);
+		if (!m_moveJobQ.Dequeue(&pMoveJob))
+			break;
 
 		// 세션 찾기
 		NetworkLib::CNetSession *pSession = NetworkLib::g_pNetServer->m_pSessions[NetworkLib::CNetServer::getIndex(pMoveJob->m_sessionId)];
@@ -90,7 +91,8 @@ void CBaseContents::ProcessLeaveJob() noexcept
 	for (int i = 0; i < leaveJobQSize; i++)
 	{
 		UINT64 sessionId;
-		m_leaveJobQ.Dequeue(&sessionId);
+		if (!m_leaveJobQ.Dequeue(&sessionId))
+			break;
 		OnLeave(sessionId);
 	}
 }
@@ -127,7 +129,8 @@ void CBaseContents::ProcessRecvMsg(int delayFrame) noexcept
 		for (int i = 0; i < recvMsgCount; i++)
 		{
 			CSerializableBuffer<FALSE> *pMsg;
-			pSession->m_recvMsgQueue.Dequeue(&pMsg);
+			if (!pSession->m_recvMsgQueue.Dequeue(&pMsg))
+				break;
 
 			ERecvResult ret = OnRecv(sessionId, pMsg, delayFrame);
 			if (ret == ERecvResult::Moved)
