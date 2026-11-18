@@ -1,0 +1,80 @@
+#include "pch.h"
+#include "CSerializableBuffer.h"
+#include "CommonProtocol.h"
+#include "Config.h"
+#include "Console.h"
+#include "CNetClient.h"
+#include "CConsoleChatClient.h"
+
+int main(void)
+{
+	using MHLib::utils::ELogLevel;
+	using MHLib::utils::g_pLogger;
+	SetConsoleOutputCP(CP_UTF8);
+	SetConsoleCP(CP_UTF8);
+	g_pLogger = MHLib::utils::CLogger::GetInstance();
+	g_pLogger->SetMainDirectory(L"LogFile");
+	Chatting::SChatConfig config;
+	if (!Chatting::LoadConfig(L"ClientConfig.conf", false, config))
+		return 2;
+
+	int exitCode = 0;
+	{
+		Chatting::CConsoleChatClient client(config);
+		MHLib::security::CEncryption::sm_packetKey = Chatting::kPacketKey;
+		if (!client.Connect(config.m_ip.c_str(), config.m_port, Chatting::kPacketCode) || !client.Login())
+		{
+			g_pLogger->WriteLogConsole(ELogLevel::Error, L"CONNECT FAILED ip=%hs port=%u", config.m_ip.c_str(), config.m_port);
+			exitCode = 1;
+		}
+		else
+		{
+			DWORD startTime = timeGetTime();
+			while (client.IsConnected() && !client.IsReady() && timeGetTime() - startTime < 5000)
+				Sleep(10);
+			if (!client.IsReady())
+			{
+				g_pLogger->WriteLogConsole(ELogLevel::Error, L"LOGIN/SECTOR FAILED");
+				exitCode = 1;
+			}
+			else
+			{
+				g_pLogger->WriteLogConsole(ELogLevel::System, L"Type a message, /exit to quit. Test-only authentication.");
+				std::string pending;
+				WCHAR highSurrogate = 0;
+				DWORD prevHeartbeatTime = timeGetTime();
+				bool isUserExit = false;
+				while (client.IsConnected())
+				{
+					std::string line;
+					auto inputResult = Chatting::PollInput(pending, highSurrogate, line);
+					if (inputResult == Chatting::EInputResult::End || (inputResult == Chatting::EInputResult::Line && line == "/exit"))
+					{
+						isUserExit = true;
+						break;
+					}
+					if (inputResult == Chatting::EInputResult::Line && !line.empty())
+					{
+						std::wstring text;
+						if (!Chatting::Utf8ToWide(line, text) || !client.SendMessage(text))
+						{
+							g_pLogger->WriteLogConsole(ELogLevel::Error, L"MESSAGE REJECTED: use UTF-8, 1..256 UTF-16 code units");
+						}
+					}
+					if (timeGetTime() - prevHeartbeatTime >= Chatting::kHeartbeatMilliseconds)
+					{
+						client.SendHeartbeat();
+						prevHeartbeatTime = timeGetTime();
+					}
+					Sleep(10);
+				}
+				if (!isUserExit)
+					exitCode = 1;
+			}
+		}
+		client.Disconnect();
+	}
+	fflush(nullptr);
+	// 클라이언트 IO는 위에서 정리했다. 상속된 정적 풀 종료는 별도 범위다.
+	ExitProcess(exitCode);
+}

@@ -16,7 +16,8 @@ namespace MHLib::utils
 			FILE *pFile = _wfsopen(pFileName, L"r, ccs = UTF-16LE", _SH_DENYWR);
 			if (pFile == nullptr)
 			{
-				wprintf(L"file open fail, errorCode = %d\n", GetLastError());
+				const int errorCode = errno;
+				CLogger::GetInstance()->WriteLogConsole(ELogLevel::Error, L"config file open failed: %ls, errno=%d", pFileName, errorCode);
 				return;
 			}
 
@@ -25,7 +26,7 @@ namespace MHLib::utils
 			fileBytes = ftell(pFile);
 			fseek(pFile, 0, SEEK_SET);
 
-			WCHAR *pFileBuffer = new WCHAR[fileBytes / 2]; // wchar니깐
+			WCHAR *pFileBuffer = new WCHAR[fileBytes / sizeof(WCHAR) + 1/*마지막 널문자 자리 확보*/];
 			retVal = fread_s(pFileBuffer, fileBytes, sizeof(char), fileBytes, pFile);
 			if (retVal == 0)
 			{
@@ -175,6 +176,28 @@ namespace MHLib::utils
 
 			INT out = _wtoi(keyIt->second.c_str());
 			*outValue = out;
+			return TRUE;
+		}
+		BOOL Load(const WCHAR *pClassStr, const WCHAR *pKeyStr, INT64 *outValue) noexcept
+		{
+			auto classIt = m_parsedDatas.find(pClassStr);
+			if (classIt == m_parsedDatas.end())
+				return FALSE;
+
+			auto keyIt = classIt->second.find(pKeyStr);
+			if (keyIt == classIt->second.end())
+				return FALSE;
+
+			// 문자열 전체가 INT64 범위의 정수일 때만 반환한다.
+			const std::wstring &text = keyIt->second;
+			const WCHAR *pText = text.c_str();
+			WCHAR *pEnd = nullptr;
+			errno = 0;
+			INT64 value = std::wcstoll(pText, &pEnd, 10);
+			if (errno != 0 || pEnd == pText || pEnd != pText + text.size())
+				return FALSE;
+
+			*outValue = value;
 			return TRUE;
 		}
 		BOOL		Load(const WCHAR *pClassStr, const WCHAR *pKeyStr, unsigned int *outValue) noexcept

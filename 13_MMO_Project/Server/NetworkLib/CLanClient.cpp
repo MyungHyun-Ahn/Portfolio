@@ -49,7 +49,7 @@ CLanClientManager *g_pLanClientManager;
 			if (!m_lfSendBufferQueue.Dequeue(&pBuffer))
 			{
 				MHLib::utils::g_pLogger->WriteLog(L"SYSTEM", L"NetworkLib", MHLib::utils::ELogLevel::Error, L"LFQueue::Dequeue() Error");
-				MHLib::debug::CCrashDump::Crash();
+				MHLib::diagnostics::CCrashDump::Crash();
 			}
 
 			// RefCount를 낮추고 0이라면 보낸 거 삭제
@@ -374,7 +374,7 @@ CLanClientManager *g_pLanClientManager;
 			{
 				MHLib::utils::g_pLogger->WriteLog(L"SYSTEM", L"NetworkLib", MHLib::utils::ELogLevel::Error, L"LFQueue::Dequeue() Error");
 				// 말도 안되는 상황
-				MHLib::debug::CCrashDump::Crash();
+				MHLib::diagnostics::CCrashDump::Crash();
 			}
 
 			wsaBuf[count].buf = pBuffer->GetBufferPtr();

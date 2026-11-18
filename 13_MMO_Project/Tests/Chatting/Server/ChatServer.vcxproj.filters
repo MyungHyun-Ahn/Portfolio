@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Common" />
+    <Filter Include="Server" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="pch.cpp">
+      <Filter>Server</Filter>
+    </ClCompile>
+    <ClCompile Include="Main.cpp">
+      <Filter>Server</Filter>
+    </ClCompile>
+    <ClCompile Include="CChatServer.cpp">
+      <Filter>Server</Filter>
+    </ClCompile>
+    <ClCompile Include="CChatContents.cpp">
+      <Filter>Server</Filter>
+    </ClCompile>
+    <ClCompile Include="CProcessPacket.cpp">
+      <Filter>Server</Filter>
+    </ClCompile>
+    <ClCompile Include="CGenPacket.cpp">
+      <Filter>Server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Common\Console.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Common\Config.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pch.h">
+      <Filter>Server</Filter>
+    </ClInclude>
+    <ClInclude Include="CChatServer.h">
+      <Filter>Server</Filter>
+    </ClInclude>
+    <ClInclude Include="CChatContents.h">
+      <Filter>Server</Filter>
+    </ClInclude>
+    <ClInclude Include="CPlayer.h">
+      <Filter>Server</Filter>
+    </ClInclude>
+    <ClInclude Include="CSector.h">
+      <Filter>Server</Filter>
+    </ClInclude>
+    <ClInclude Include="CProcessPacket.h">
+      <Filter>Server</Filter>
+    </ClInclude>
+    <ClInclude Include="CGenPacket.h">
+      <Filter>Server</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\CommonProtocol.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\Console.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\Config.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ServerConfig.conf">
+      <Filter>Server</Filter>
+    </None>
+  </ItemGroup>
+</Project>

@@ -10,7 +10,7 @@
     <Filter Include="includes\MHLib\containers">
       <UniqueIdentifier>{435ABCF8-DD2A-5549-B450-564C0C1B5F9B}</UniqueIdentifier>
     </Filter>
-    <Filter Include="includes\MHLib\debug">
+    <Filter Include="includes\MHLib\diagnostics">
       <UniqueIdentifier>{BC9D3408-F63B-55B6-8488-DAC7DC3D8E22}</UniqueIdentifier>
     </Filter>
     <Filter Include="includes\MHLib\memory">
@@ -37,8 +37,8 @@
     <ClInclude Include="includes\MHLib\containers\LfDefine.h">
       <Filter>includes\MHLib\containers</Filter>
     </ClInclude>
-    <ClInclude Include="includes\MHLib\debug\CCrashDump.h">
-      <Filter>includes\MHLib\debug</Filter>
+    <ClInclude Include="includes\MHLib\diagnostics\CCrashDump.h">
+      <Filter>includes\MHLib\diagnostics</Filter>
     </ClInclude>
     <ClInclude Include="includes\MHLib\memory\CLfMemoryPool.h">
       <Filter>includes\MHLib\memory</Filter>

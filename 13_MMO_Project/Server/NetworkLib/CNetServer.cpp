@@ -205,7 +205,7 @@ CNetServer *g_pNetServer = nullptr;
 			{
 				MHLib::utils::g_pLogger->WriteLog(L"SYSTEM", L"NetworkLib", MHLib::utils::ELogLevel::Error, L"LFQueue::Dequeue() Error");
 				// 말도 안되는 상황
-				MHLib::debug::CCrashDump::Crash();
+				MHLib::diagnostics::CCrashDump::Crash();
 			}
 
 			if (!pSBuffer->GetIsEnqueueHeader())

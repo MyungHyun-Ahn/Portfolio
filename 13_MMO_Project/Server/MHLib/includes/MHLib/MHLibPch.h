@@ -9,6 +9,7 @@
 #include <MSWSock.h>
 #include <windows.h>
 #include <cstdio>
+#include <cerrno>
 #include <cstdlib>
 #include <ctime>
 #include <process.h>
@@ -37,7 +38,7 @@
 #include "MHLib/utils/CLockGuard.h"
 #include "MHLib/utils/CLogger.h"
 #include "MHLib/utils/CFileLoader.h"
-#include "MHLib/debug/CCrashDump.h"
+#include "MHLib/diagnostics/CCrashDump.h"
 #include "MHLib/security/CEncryption.h"
 #include "MHLib/containers/LfDefine.h"
 #include "MHLib/memory/CLfMemoryPool.h"

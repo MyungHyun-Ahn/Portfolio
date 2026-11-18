@@ -133,8 +133,9 @@ namespace MHLib::utils
 			FILE *pFile = _wfsopen(fileName, L"a, ccs = UTF-16LE", _SH_DENYWR);
 			if (pFile == nullptr)
 			{
-				wprintf(L"file open fail, errorCode = %d\n", GetLastError());
+				const int errorCode = errno;
 				ReleaseSRWLockExclusive(pSrwLock);
+				WriteLogConsole(ELogLevel::Error, L"log file open failed, errno=%d", errorCode);
 				return;
 			}
 			fwrite(totalBuf, 1, wcslen(totalBuf) * sizeof(WCHAR), pFile);
@@ -182,7 +183,27 @@ namespace MHLib::utils
 			va_end(va);
 
 			consoleLock();
-			wprintf(L"%s\n", logBuffer);
+			// 콘솔은 UTF-16, 리디렉션된 stdout은 UTF-8로 출력한다.
+			HANDLE output = GetStdHandle(STD_OUTPUT_HANDLE);
+			DWORD consoleMode = 0;
+			if (GetConsoleMode(output, &consoleMode))
+			{
+				fflush(stdout);
+				DWORD written = 0;
+				WriteConsoleW(output, logBuffer, static_cast<DWORD>(wcslen(logBuffer)), &written, nullptr);
+				WriteConsoleW(output, L"\r\n", 2, &written, nullptr);
+			}
+			else
+			{
+				char utf8Buffer[1024 * 3];
+				int bytes = WideCharToMultiByte(CP_UTF8, 0, logBuffer, -1, utf8Buffer, sizeof(utf8Buffer), nullptr, nullptr);
+				if (bytes > 0)
+				{
+					fwrite(utf8Buffer, 1, bytes - 1, stdout);
+					fputc('\n', stdout);
+					fflush(stdout);
+				}
+			}
 			consoleUnlock();
 		}
 
@@ -206,7 +227,7 @@ namespace MHLib::utils
 
 	private:
 		SRWLOCK m_fileMapLock;
-		SRWLOCK m_consolelock;
+		SRWLOCK m_consolelock = SRWLOCK_INIT;
 
 		std::unordered_map<std::wstring, SRWLOCK *> m_lockMap;
 

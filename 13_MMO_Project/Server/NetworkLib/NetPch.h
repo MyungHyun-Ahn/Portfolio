@@ -5,6 +5,10 @@
 #include <mmsystem.h>
 #include <pdh.h>
 #include <psapi.h>
+#include <thread>
+#include <mutex>
+#include <atomic>
+#include <array>
 
 #pragma comment(lib, "ws2_32")
 #pragma comment(lib, "winmm")
@@ -20,5 +24,5 @@ namespace NetworkLib
 	using namespace MHLib::containers;
 	using namespace MHLib::memory;
 	using namespace MHLib::security;
-	using namespace MHLib::debug;
+	using namespace MHLib::diagnostics;
 }

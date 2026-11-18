@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Client" />
+    <Filter Include="Common" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="pch.cpp">
+      <Filter>Client</Filter>
+    </ClCompile>
+    <ClCompile Include="Main.cpp">
+      <Filter>Client</Filter>
+    </ClCompile>
+    <ClCompile Include="CConsoleChatClient.cpp">
+      <Filter>Client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Common\Console.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Common\Config.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pch.h">
+      <Filter>Client</Filter>
+    </ClInclude>
+    <ClInclude Include="CConsoleChatClient.h">
+      <Filter>Client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\CommonProtocol.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\Console.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\Config.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ClientConfig.conf">
+      <Filter>Client</Filter>
+    </None>
+  </ItemGroup>
+</Project>

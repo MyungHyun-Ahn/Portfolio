@@ -9,7 +9,7 @@ public:
 	enum class EBufferDefine : int
 	{
 		HeaderSize = isLanServer ? 2 : 5,
-		PacketMaxSize = 128
+		PacketMaxSize = isLanServer ? 128 : 1024 // 채팅 로그인과 최대 메시지 응답
 	};
 
 

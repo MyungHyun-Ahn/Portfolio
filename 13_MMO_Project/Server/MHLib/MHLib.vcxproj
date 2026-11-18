@@ -38,7 +38,7 @@
     <ClInclude Include="includes\MHLib\containers\CLfQueue.h" />
     <ClInclude Include="includes\MHLib\containers\CLfStack.h" />
     <ClInclude Include="includes\MHLib\containers\LfDefine.h" />
-    <ClInclude Include="includes\MHLib\debug\CCrashDump.h" />
+    <ClInclude Include="includes\MHLib\diagnostics\CCrashDump.h" />
     <ClInclude Include="includes\MHLib\memory\CLfMemoryPool.h" />
     <ClInclude Include="includes\MHLib\memory\CSingleMemoryPool.h" />
     <ClInclude Include="includes\MHLib\memory\CTlsMemoryPool.h" />

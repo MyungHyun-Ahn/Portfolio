@@ -6,7 +6,9 @@
     <ClCompile Include="CLanClient.cpp" />
     <ClCompile Include="ClientSetting.cpp" />
     <ClCompile Include="CMonitor.cpp" />
+    <ClCompile Include="CNetClient.cpp" />
     <ClCompile Include="CNetServer.cpp" />
+    <ClCompile Include="NetPacket.cpp" />
     <ClCompile Include="COverlappedAllocator.cpp" />
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="ServerSetting.cpp" />
@@ -18,7 +20,9 @@
     <ClInclude Include="CLanClient.h" />
     <ClInclude Include="ClientSetting.h" />
     <ClInclude Include="CMonitor.h" />
+    <ClInclude Include="CNetClient.h" />
     <ClInclude Include="CNetServer.h" />
+    <ClInclude Include="NetPacket.h" />
     <ClInclude Include="COverlappedAllocator.h" />
     <ClInclude Include="CRecvBuffer.h" />
     <ClInclude Include="CRingBuffer.h" />
