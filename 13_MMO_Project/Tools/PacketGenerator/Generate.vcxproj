@@ -5,6 +5,10 @@
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>
@@ -18,12 +22,13 @@
     <PlatformToolset>v145</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
-  <PropertyGroup>
-    <OutDir>$(ProjectDir)..\..\Build\$(ProjectName)\$(PlatformToolset)\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(OutDir)obj\</IntDir>
-  </PropertyGroup>
+
   <ItemGroup>
     <None Include="GeneratePackets.bat" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <!-- BAT는 직접 실행한다. 빌드 명령은 중간 파일도 만들지 않는다. -->
+  <Target Name="Build" />
+  <Target Name="Clean" />
+  <Target Name="Rebuild" />
 </Project>

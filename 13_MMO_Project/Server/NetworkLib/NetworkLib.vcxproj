@@ -157,7 +157,8 @@
     </Link>
   </ItemDefinitionGroup>
   <PropertyGroup>
-    <OutDir>$(ProjectDir)..\..\Build\$(ProjectName)\$(PlatformToolset)\$(Platform)\$(Configuration)\</OutDir>
+    <OutDir>$(ProjectDir)..\..\Build\$(Configuration)\$(ProjectName)\</OutDir>
+    <OutDir Condition="'$(Platform)' == 'Win32'">$(OutDir)Win32\</OutDir>
     <IntDir>$(OutDir)obj\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup>
