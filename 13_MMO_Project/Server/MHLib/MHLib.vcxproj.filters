@@ -22,6 +22,7 @@
     <Filter Include="includes\MHLib\utils">
       <UniqueIdentifier>{8CEE4642-0657-5A14-9AF5-98A8497D38B2}</UniqueIdentifier>
     </Filter>
+    <Filter Include="includes\MHLib\serialization" />
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>
@@ -57,6 +58,9 @@
     </ClInclude>
     <ClInclude Include="includes\MHLib\security\CEncryption.h">
       <Filter>includes\MHLib\security</Filter>
+    </ClInclude>
+    <ClInclude Include="includes\MHLib\serialization\ISerializable.h">
+      <Filter>includes\MHLib\serialization</Filter>
     </ClInclude>
     <ClInclude Include="includes\MHLib\utils\CFileLoader.h">
       <Filter>includes\MHLib\utils</Filter>

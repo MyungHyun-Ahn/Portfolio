@@ -1,5 +1,10 @@
 #pragma once
 
+namespace MHLib::serialization
+{
+	template<bool isLanServer> class ISerializable;
+}
+
 namespace NetworkLib
 {
 template<bool isLanServer>
@@ -34,11 +39,14 @@ public:
 		m_front = (int)EBufferDefine::HeaderSize;
 		m_rear = (int)EBufferDefine::HeaderSize;
 		m_isEnqueueHeader = FALSE;
+		m_isValid = true;
 	}
 
 	bool EnqueueHeader(char *pBuffer, int size) noexcept;
 	bool Enqueue(char *pBuffer, int size) noexcept;
 	bool Dequeue(char *outBuffer, int size) noexcept;
+	// 실패 후 직렬화 연산은 Clear() 호출 전까지 버퍼를 변경하지 않는다.
+	[[nodiscard]] bool IsValid() const noexcept { return m_isValid; }
 
 	inline int GetBufferSize() const noexcept { return m_maxSize; }
 	inline int GetDataSize() const noexcept { return m_rear - m_front; }
@@ -49,318 +57,132 @@ public:
 	// 외부에서 버퍼를 직접 조작하기 위한 용도
 	inline char *GetBufferPtr() const noexcept { return m_pBuffer; }
 	inline char *GetContentBufferPtr() const noexcept { return m_pBuffer + m_front; }
-	inline int MoveWritePos(int size) noexcept { m_rear += size; return m_rear; }
-	inline int MoveReadPos(int size) noexcept { m_front += size; return m_front; }
+	int MoveWritePos(int sizeBytes) noexcept
+	{
+		if (sizeBytes < 0 || !canWrite(sizeBytes))
+			fail();
+		else
+			m_rear += sizeBytes;
+		return m_rear;
+	}
+
+	int MoveReadPos(int sizeBytes) noexcept
+	{
+		if (sizeBytes < 0 || !canRead(sizeBytes))
+			fail();
+		else
+			m_front += sizeBytes;
+		return m_front;
+	}
+
+private:
+	static_assert(std::endian::native == std::endian::little);
+	static_assert(sizeof(wchar_t) == 2);
+	inline static constexpr std::size_t sm_utf16PrefixBytes = sizeof(std::uint32_t);
+
+	template<typename TValue>
+	inline static constexpr bool sm_isScalar = std::is_same_v<TValue, char> || std::is_same_v<TValue, signed char>
+		|| std::is_same_v<TValue, unsigned char> || std::is_same_v<TValue, short> || std::is_same_v<TValue, unsigned short>
+		|| std::is_same_v<TValue, int> || std::is_same_v<TValue, unsigned int> || std::is_same_v<TValue, long>
+		|| std::is_same_v<TValue, unsigned long> || std::is_same_v<TValue, long long> || std::is_same_v<TValue, unsigned long long>
+		|| std::is_same_v<TValue, float> || std::is_same_v<TValue, double>;
 
 public:
-	inline CSerializableBuffer &operator<<(char chData) noexcept
+	template<typename TValue> requires sm_isScalar<TValue>
+	CSerializableBuffer &operator<<(TValue value) noexcept
 	{
-		if (m_maxSize - m_rear > sizeof(char))
-		{
-			// TODO: resize
-		}
-
-		char *pPtr = (char *)(m_pBuffer + m_rear);
-		*pPtr = chData;
-
-		MoveWritePos(sizeof(char));
-
+		writeBytes(&value, sizeof(value));
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator<<(unsigned char byData) noexcept
+	template<typename TValue> requires sm_isScalar<TValue>
+	CSerializableBuffer &operator>>(TValue &outValue) noexcept
 	{
-		if (m_maxSize - m_rear > sizeof(unsigned char))
-		{
-			// TODO: resize
-		}
-
-		unsigned char *pPtr = (unsigned char *)(m_pBuffer + m_rear);
-		*pPtr = byData;
-
-		MoveWritePos(sizeof(unsigned char));
-
+		readBytes(&outValue, sizeof(outValue));
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator<<(short shData) noexcept
+	template<typename TValue> requires std::derived_from<TValue, MHLib::serialization::ISerializable<isLanServer>>
+	CSerializableBuffer &operator<<(const TValue &value) noexcept
 	{
-		if (m_maxSize - m_rear > sizeof(short))
-		{
-			// TODO: resize
-		}
-
-		short *pPtr = (short *)(m_pBuffer + m_rear);
-		*pPtr = shData;
-
-		MoveWritePos(sizeof(short));
-
+		const MHLib::serialization::ISerializable<isLanServer> &serializable = value;
+		if (m_isValid && !serializable.Serialize(*this))
+			fail();
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator<<(unsigned short wData) noexcept
+	template<typename TValue> requires std::derived_from<TValue, MHLib::serialization::ISerializable<isLanServer>>
+	CSerializableBuffer &operator>>(TValue &outValue) noexcept
 	{
-		if (m_maxSize - m_rear > sizeof(unsigned short))
-		{
-			// TODO: resize
-		}
-
-		unsigned short *pPtr = (unsigned short *)(m_pBuffer + m_rear);
-		*pPtr = wData;
-
-		MoveWritePos(sizeof(unsigned short));
-
+		MHLib::serialization::ISerializable<isLanServer> &serializable = outValue;
+		if (m_isValid && !serializable.Deserialize(*this))
+			fail();
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator<<(int iData) noexcept
+	template<typename TChar, std::size_t kCount> requires (std::is_same_v<TChar, char> || std::is_same_v<TChar, wchar_t>)
+	CSerializableBuffer &operator<<(const std::array<TChar, kCount> &value) noexcept
 	{
-		if (m_maxSize - m_rear > sizeof(int))
-		{
-			// TODO: resize
-		}
-
-		int *pPtr = (int *)(m_pBuffer + m_rear);
-		*pPtr = iData;
-
-		MoveWritePos(sizeof(int));
-
+		writeBytes(value.data(), kCount * sizeof(TChar));
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator<<(long lData) noexcept
+	template<typename TChar, std::size_t kCount> requires (std::is_same_v<TChar, char> || std::is_same_v<TChar, wchar_t>)
+	CSerializableBuffer &operator>>(std::array<TChar, kCount> &outValue) noexcept
 	{
-		if (m_maxSize - m_rear > sizeof(long))
-		{
-			// TODO: resize
-		}
-
-		long *pPtr = (long *)(m_pBuffer + m_rear);
-		*pPtr = lData;
-
-		MoveWritePos(sizeof(long));
-
+		readBytes(outValue.data(), kCount * sizeof(TChar));
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator<<(unsigned long lData) noexcept
+	CSerializableBuffer &operator<<(const std::wstring &value) noexcept
 	{
-		if (m_maxSize - m_rear > sizeof(unsigned long))
+		const auto remainingBytes = static_cast<std::size_t>(m_maxSize - m_rear);
+		if (!canWrite(sm_utf16PrefixBytes) || value.size() > (remainingBytes - sm_utf16PrefixBytes) / sizeof(wchar_t))
 		{
-			// TODO: resize
+			fail();
+			return *this;
 		}
 
-		unsigned long *pPtr = (unsigned long *)(m_pBuffer + m_rear);
-		*pPtr = lData;
-
-		MoveWritePos(sizeof(unsigned long));
-
+		const auto codeUnitCount = static_cast<std::uint32_t>(value.size());
+		writeBytes(&codeUnitCount, sm_utf16PrefixBytes);
+		writeBytes(value.data(), value.size() * sizeof(wchar_t));
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator<<(float fData) noexcept
+	CSerializableBuffer &operator>>(std::wstring &outValue) noexcept
 	{
-		if (m_maxSize - m_rear > sizeof(float))
+		if (!canRead(sm_utf16PrefixBytes))
 		{
-			// TODO: resize
+			fail();
+			return *this;
 		}
 
-		float *pPtr = (float *)(m_pBuffer + m_rear);
-		*pPtr = fData;
+		std::uint32_t codeUnitCount = 0;
+		std::memcpy(&codeUnitCount, m_pBuffer + m_front, sm_utf16PrefixBytes);
+		const auto remainingBytes = static_cast<std::size_t>(GetDataSize()) - sm_utf16PrefixBytes;
+		if (codeUnitCount > remainingBytes / sizeof(wchar_t))
+		{
+			fail();
+			return *this;
+		}
 
-		MoveWritePos(sizeof(float));
+		const char *pText = m_pBuffer + m_front + sm_utf16PrefixBytes;
 
+		const std::size_t textBytes = codeUnitCount * sizeof(wchar_t);
+		try
+		{
+			std::wstring value(codeUnitCount, L'\0');
+			std::memcpy(value.data(), pText, textBytes);
+			outValue.swap(value);
+			m_front += static_cast<int>(sm_utf16PrefixBytes + textBytes);
+		}
+		catch (const std::bad_alloc &)
+		{
+			fail();
+		}
 		return *this;
 	}
 
-	inline CSerializableBuffer &operator<<(__int64 iData) noexcept
-	{
-		if (m_maxSize - m_rear > sizeof(__int64))
-		{
-			// TODO: resize
-		}
-
-		__int64 *pPtr = (__int64 *)(m_pBuffer + m_rear);
-		*pPtr = iData;
-
-		MoveWritePos(sizeof(__int64));
-
-		return *this;
-	}
-
-	inline CSerializableBuffer &operator<<(unsigned __int64 uiData) noexcept
-	{
-		if (m_maxSize - m_rear > sizeof(unsigned __int64))
-		{
-			// TODO: resize
-		}
-
-		unsigned __int64 *pPtr = (unsigned __int64 *)(m_pBuffer + m_rear);
-		*pPtr = uiData;
-
-		MoveWritePos(sizeof(unsigned __int64));
-
-		return *this;
-	}
-
-	inline CSerializableBuffer &operator<<(double dData) noexcept
-	{
-		if (m_maxSize - m_rear > sizeof(double))
-		{
-			// TODO: resize
-		}
-
-		*(double *)(m_pBuffer + m_rear) = dData;
-
-		MoveWritePos(sizeof(double));
-
-		return *this;
-	}
-
-	inline CSerializableBuffer &operator>>(char &outValue) noexcept
-	{
-		if (GetDataSize() < sizeof(char))
-		{
-			__debugbreak();
-		}
-
-		outValue = *(char *)(m_pBuffer + m_front);
-		MoveReadPos(sizeof(char));
-
-		return *this;
-	}
-
-	inline CSerializableBuffer &operator>>(unsigned char &outValue) noexcept
-	{
-		if (GetDataSize() < sizeof(unsigned char))
-		{
-			__debugbreak();
-		}
-
-		outValue = *(unsigned char *)(m_pBuffer + m_front);
-		MoveReadPos(sizeof(unsigned char));
-
-		return *this;
-	}
-
-	inline CSerializableBuffer &operator>>(short &outValue) noexcept
-	{
-		if (GetDataSize() < sizeof(short))
-		{
-			__debugbreak();
-		}
-
-		outValue = *(short *)(m_pBuffer + m_front);
-		MoveReadPos(sizeof(short));
-
-		return *this;
-	}
-
-	inline CSerializableBuffer &operator>>(unsigned short &outValue) noexcept
-	{
-		if (GetDataSize() < sizeof(char))
-		{
-			__debugbreak();
-		}
-
-		outValue = *(unsigned short *)(m_pBuffer + m_front);
-		MoveReadPos(sizeof(unsigned short));
-
-		return *this;
-	}
-
-	inline CSerializableBuffer &operator>>(int &outValue) noexcept
-	{
-		if (GetDataSize() < sizeof(int))
-		{
-			__debugbreak();
-		}
-
-		outValue = *(int *)(m_pBuffer + m_front);
-		MoveReadPos(sizeof(int));
-
-		return *this;
-	}
-
-	inline CSerializableBuffer &operator>>(long &outValue) noexcept
-	{
-		if (GetDataSize() < sizeof(long))
-		{
-			__debugbreak();
-		}
-
-		outValue = *(long *)(m_pBuffer + m_front);
-		MoveReadPos(sizeof(long));
-
-		return *this;
-	}
-
-	inline CSerializableBuffer &operator>>(unsigned long &outValue) noexcept
-	{
-		if (GetDataSize() < sizeof(unsigned long))
-		{
-			__debugbreak();
-		}
-
-		outValue = *(unsigned long *)(m_pBuffer + m_front);
-		MoveReadPos(sizeof(unsigned long));
-
-		return *this;
-	}
-
-	inline CSerializableBuffer &operator>>(float &outValue) noexcept
-	{
-		if (GetDataSize() < sizeof(float))
-		{
-			__debugbreak();
-		}
-
-		outValue = *(float *)(m_pBuffer + m_front);
-		MoveReadPos(sizeof(float));
-
-		return *this;
-	}
-
-	inline CSerializableBuffer &operator>>(__int64 &outValue) noexcept
-	{
-		if (GetDataSize() < sizeof(__int64))
-		{
-			__debugbreak();
-		}
-
-		outValue = *(__int64 *)(m_pBuffer + m_front);
-		MoveReadPos(sizeof(__int64));
-
-		return *this;
-	}
-
-	inline CSerializableBuffer &operator>>(unsigned __int64 &outValue) noexcept
-	{
-		if (GetDataSize() < sizeof(unsigned __int64))
-		{
-			__debugbreak();
-		}
-
-		outValue = *(unsigned __int64 *)(m_pBuffer + m_front);
-		MoveReadPos(sizeof(unsigned __int64));
-
-		return *this;
-	}
-
-	inline CSerializableBuffer &operator>>(double &outValue) noexcept
-	{
-		if (GetDataSize() < sizeof(double))
-		{
-			__debugbreak();
-		}
-
-		outValue = *(double *)(m_pBuffer + m_front);
-		MoveReadPos(sizeof(double));
-
-		return *this;
-	}
-
-public:
 	inline static CSerializableBuffer *Alloc() noexcept
 	{
 		// 할당하고 초기화해서 반환
@@ -394,6 +216,43 @@ public:
 	inline UINT64 GetSessionId() noexcept { return m_sessionId; }
 
 private:
+	bool fail() noexcept
+	{
+		m_isValid = false;
+		return false;
+	}
+
+	bool canWrite(std::size_t sizeBytes) const noexcept
+	{
+		return m_isValid && sizeBytes <= static_cast<std::size_t>(m_maxSize - m_rear);
+	}
+
+	bool canRead(std::size_t sizeBytes) const noexcept
+	{
+		return m_isValid && sizeBytes <= static_cast<std::size_t>(GetDataSize());
+	}
+
+	bool writeBytes(const void *pData, std::size_t sizeBytes) noexcept
+	{
+		if (!canWrite(sizeBytes) || (sizeBytes != 0 && pData == nullptr))
+			return fail();
+		if (sizeBytes != 0)
+			std::memmove(m_pBuffer + m_rear, pData, sizeBytes);
+		m_rear += static_cast<int>(sizeBytes);
+		return true;
+	}
+
+	bool readBytes(void *outData, std::size_t sizeBytes) noexcept
+	{
+		if (!canRead(sizeBytes) || (sizeBytes != 0 && outData == nullptr))
+			return fail();
+		if (sizeBytes != 0)
+			std::memmove(outData, m_pBuffer + m_front, sizeBytes);
+		m_front += static_cast<int>(sizeBytes);
+		return true;
+	}
+
+	bool m_isValid = true;
 	char *m_pBuffer;
 	int m_headerFront = 0;
 	int m_front = 0;
@@ -416,16 +275,16 @@ public:
 template<bool isLanServer>
 bool CSerializableBuffer<isLanServer>::EnqueueHeader(char *pBuffer, int size) noexcept
 {
+	if (!m_isValid)
+		return false;
+	if (size < 0 || size > GetHeaderSize() || (size != 0 && pBuffer == nullptr))
+		return fail();
+	if (size > GetHeaderSize() - m_headerFront)
+		return true; // 이미 준비한 송신 헤더를 덮어쓰지 않는다.
+
+	if (size != 0)
+		std::memmove(m_pBuffer + m_headerFront, pBuffer, size);
 	m_isEnqueueHeader = TRUE;
-
-	// 이 상황은 이미 헤더를 삽입한 것
-	//	* CGameServer::SendSector에서 발생 가능
-	//  * 싱글 스레드에서는 문제가 발생할 여지가 없으므로 그냥 return true
-	if (m_headerFront + size > m_front)
-		return true;
-
-	memcpy_s(m_pBuffer + m_headerFront, m_front - m_headerFront, pBuffer, size);
-
 	m_headerFront += size;
 
 	return true;
@@ -434,30 +293,12 @@ bool CSerializableBuffer<isLanServer>::EnqueueHeader(char *pBuffer, int size) no
 template<bool isLanServer>
 bool CSerializableBuffer<isLanServer>::Enqueue(char *pBuffer, int size) noexcept
 {
-	if (m_maxSize - m_rear < size)
-	{
-		// TODO: resize
-
-		return false;
-	}
-
-	memcpy_s(m_pBuffer + m_rear, m_maxSize - m_rear, pBuffer, size);
-	MoveWritePos(size);
-
-	return true;
+	return size >= 0 ? writeBytes(pBuffer, size) : fail();
 }
 
 template<bool isLanServer>
 bool CSerializableBuffer<isLanServer>::Dequeue(char *outBuffer, int size) noexcept
 {
-	if (GetDataSize() < size)
-	{
-		return false;
-	}
-
-	memcpy_s(outBuffer, size, m_pBuffer + m_front, size);
-	MoveReadPos(size);
-
-	return true;
+	return size >= 0 ? readBytes(outBuffer, size) : fail();
 }
 }

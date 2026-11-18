@@ -14,58 +14,35 @@
 #include "NetPacket.h"
 #include "CPlayer.h"
 #include "CSector.h"
+#include "MHLib/serialization/ISerializable.h"
+#include "IncludePacketAll.g.h"
+#include "IServerPacketHandler.g.h"
+#include "ServerPacketSend.g.h"
 #include "CProcessPacket.h"
 #include "CChatContents.h"
 #include "CChatServer.h"
-#include "CGenPacket.h"
 
 namespace Chatting
 {
 	using MHLib::utils::ELogLevel;
 	using MHLib::utils::g_pLogger;
 
-	bool CProcessPacket::ConsumePacket(EPacketType type, UINT64 sessionId,
-		NetworkLib::CSerializableBuffer<FALSE> &message) noexcept
-	{
-		switch (type)
-		{
-		case EPacketType::ReqLogin:
-			InterlockedIncrement(&NetworkLib::g_monitor.m_loginReq);
-			return packetProcReqLogin(sessionId, message);
-		case EPacketType::ReqSectorMove:
-			InterlockedIncrement(&NetworkLib::g_monitor.m_sectorMoveReq);
-			return packetProcReqSectorMove(sessionId, message);
-		case EPacketType::ReqMessage:
-			InterlockedIncrement(&NetworkLib::g_monitor.m_chatMsgReq);
-			return packetProcReqMessage(sessionId, message);
-		case EPacketType::ReqHeartbeat:
-			return packetProcReqHeartbeat(sessionId, message);
-		default:
-			return false;
-		}
-	}
-
-	bool CProcessPacket::packetProcReqLogin(UINT64 sessionId, NetworkLib::CSerializableBuffer<FALSE> &message) noexcept
+	bool CProcessPacket::HandleReqLogin(UINT64 sessionId, const SReqLogin &packet) noexcept
 	{
 		auto it = m_contents.m_umapNonLoginPlayer.find(sessionId);
-		if (it == m_contents.m_umapNonLoginPlayer.end() || message.GetDataSize() != 152)
+		if (it == m_contents.m_umapNonLoginPlayer.end())
 			return false;
 
-		INT64 accountNo;
-		WCHAR id[kNameLength];
-		WCHAR nickname[kNameLength];
-		char sessionKey[kSessionKeyBytes];
-		message >> accountNo;
-		message.Dequeue((char *)id, sizeof(id));
-		message.Dequeue((char *)nickname, sizeof(nickname));
-		message.Dequeue(sessionKey, sizeof(sessionKey));
-
+		SResLogin response;
+		const INT64 accountNo = packet.m_accountNo;
+		response.m_accountNo = accountNo;
 		// 로컬 테스트 전용 인증이다.
-		if (accountNo <= 0 || id[0] == L'\0' || nickname[0] == L'\0'
-			|| wmemchr(id, L'\0', kNameLength) == nullptr || wmemchr(nickname, L'\0', kNameLength) == nullptr
-			|| memcmp(sessionKey, kTestSessionKey, sizeof(sessionKey)) != 0)
+		if (accountNo <= 0 || packet.m_id.front() == L'\0' || packet.m_nickname.front() == L'\0'
+			|| wmemchr(packet.m_id.data(), L'\0', packet.m_id.size()) == nullptr
+			|| wmemchr(packet.m_nickname.data(), L'\0', packet.m_nickname.size()) == nullptr
+			|| std::memcmp(packet.m_sessionKey.data(), kTestSessionKey, kSessionKeyBytes) != 0)
 		{
-			m_contents.SendResponse(sessionId, CGenPacket::MakePacketResLogin(FALSE, accountNo));
+			m_contents.SendResponse(sessionId, MakePacketResLogin(response));
 			return false;
 		}
 		for (const auto &entry : m_contents.m_umapLoginPlayer)
@@ -74,32 +51,42 @@ namespace Chatting
 				return false;
 		}
 
+		response.m_status = TRUE;
+		auto *pResponse = MakePacketResLogin(response);
+		if (pResponse == nullptr)
+			return false;
 		CPlayer *pPlayer = it->second;
 		pPlayer->m_accountNo = accountNo;
 		pPlayer->m_prevRecvTime = timeGetTime();
-		memcpy(pPlayer->m_id, id, sizeof(id));
-		memcpy(pPlayer->m_nickname, nickname, sizeof(nickname));
+		std::copy(packet.m_id.begin(), packet.m_id.end(), pPlayer->m_id);
+		std::copy(packet.m_nickname.begin(), packet.m_nickname.end(), pPlayer->m_nickname);
 		m_contents.m_umapNonLoginPlayer.erase(it);
 		m_contents.m_umapLoginPlayer.emplace(sessionId, pPlayer);
-		m_contents.SendResponse(sessionId, CGenPacket::MakePacketResLogin(TRUE, accountNo));
+		m_contents.SendResponse(sessionId, pResponse);
 		g_pLogger->WriteLogConsole(ELogLevel::System, L"LOGIN account=%lld", accountNo);
 		return true;
 	}
 
-	bool CProcessPacket::packetProcReqSectorMove(UINT64 sessionId, NetworkLib::CSerializableBuffer<FALSE> &message) noexcept
+	bool CProcessPacket::HandleReqSectorMove(UINT64 sessionId, const SReqSectorMove &packet) noexcept
 	{
 		auto it = m_contents.m_umapLoginPlayer.find(sessionId);
-		if (it == m_contents.m_umapLoginPlayer.end() || message.GetDataSize() != 12)
+		if (it == m_contents.m_umapLoginPlayer.end())
 			return false;
 
 		CPlayer *pPlayer = it->second;
-		INT64 accountNo;
-		WORD sectorX;
-		WORD sectorY;
-		message >> accountNo >> sectorX >> sectorY;
+		const INT64 accountNo = packet.m_accountNo;
+		const WORD sectorX = packet.m_sectorX;
+		const WORD sectorY = packet.m_sectorY;
 		if (accountNo != pPlayer->m_accountNo || sectorX >= kMaxSectorX || sectorY >= kMaxSectorY)
 			return false;
 
+		SResSectorMove response;
+		response.m_accountNo = accountNo;
+		response.m_sectorX = sectorX;
+		response.m_sectorY = sectorY;
+		auto *pResponse = MakePacketResSectorMove(response);
+		if (pResponse == nullptr)
+			return false;
 		// 콘텐츠 프레임 안에서 이전 섹터 제거 후 등록한다.
 		if (pPlayer->m_sectorX != 0xff && pPlayer->m_sectorY != 0xff)
 			m_contents.m_sectors[pPlayer->m_sectorY][pPlayer->m_sectorX].m_players.erase(sessionId);
@@ -107,30 +94,38 @@ namespace Chatting
 		pPlayer->m_sectorX = sectorX;
 		pPlayer->m_sectorY = sectorY;
 		pPlayer->m_prevRecvTime = timeGetTime();
-		m_contents.SendResponse(sessionId, CGenPacket::MakePacketResSectorMove(accountNo, sectorX, sectorY));
+		m_contents.SendResponse(sessionId, pResponse);
 		g_pLogger->WriteLogConsole(ELogLevel::System, L"SECTOR account=%lld x=%u y=%u", accountNo, sectorX, sectorY);
 		return true;
 	}
 
-	bool CProcessPacket::packetProcReqMessage(UINT64 sessionId, NetworkLib::CSerializableBuffer<FALSE> &message) noexcept
+	bool CProcessPacket::HandleReqMessage(UINT64 sessionId, const SReqMessage &packet) noexcept
 	{
 		auto it = m_contents.m_umapLoginPlayer.find(sessionId);
-		if (it == m_contents.m_umapLoginPlayer.end() || message.GetDataSize() < 10)
+		if (it == m_contents.m_umapLoginPlayer.end())
 			return false;
 
 		CPlayer *pPlayer = it->second;
-		INT64 accountNo;
-		WORD messageBytes;
-		message >> accountNo >> messageBytes;
-		if (accountNo != pPlayer->m_accountNo || pPlayer->m_sectorX == 0xff || pPlayer->m_sectorY == 0xff
-			|| messageBytes == 0 || messageBytes > kMaxMessageBytes || messageBytes % sizeof(WCHAR) != 0
-			|| message.GetDataSize() != messageBytes)
+		if (packet.m_accountNo != pPlayer->m_accountNo || pPlayer->m_sectorX == 0xff || pPlayer->m_sectorY == 0xff
+			|| packet.m_message.empty() || packet.m_message.size() > kMaxMessageBytes / sizeof(WCHAR))
 			return false;
 
-		WCHAR chatMessage[kMaxMessageBytes / sizeof(WCHAR)];
-		message.Dequeue((char *)chatMessage, messageBytes);
+		SResMessage response;
+		response.m_accountNo = packet.m_accountNo;
+		std::copy_n(pPlayer->m_id, response.m_id.size(), response.m_id.begin());
+		std::copy_n(pPlayer->m_nickname, response.m_nickname.size(), response.m_nickname.begin());
+		try
+		{
+			response.m_message = packet.m_message;
+		}
+		catch (const std::bad_alloc &)
+		{
+			return false;
+		}
+		auto *pResponse = MakePacketResMessage(response);
+		if (pResponse == nullptr)
+			return false;
 		pPlayer->m_prevRecvTime = timeGetTime();
-		auto *pResponse = CGenPacket::MakePacketResMessage(accountNo, pPlayer->m_id, pPlayer->m_nickname, messageBytes, chatMessage);
 		pResponse->IncreaseRef();
 		pResponse->SetSessionId(sessionId);
 		NetworkLib::PrepareNetPacket(*pResponse, kPacketCode);
@@ -142,14 +137,10 @@ namespace Chatting
 		return true;
 	}
 
-	bool CProcessPacket::packetProcReqHeartbeat(UINT64 sessionId, NetworkLib::CSerializableBuffer<FALSE> &message) noexcept
+	bool CProcessPacket::HandleHeartbeatNoti(UINT64 sessionId, const SHeartbeatNoti &packet) noexcept
 	{
 		auto it = m_contents.m_umapLoginPlayer.find(sessionId);
-		if (it == m_contents.m_umapLoginPlayer.end() || message.GetDataSize() != sizeof(INT64))
-			return false;
-		INT64 accountNo;
-		message >> accountNo;
-		if (accountNo != it->second->m_accountNo)
+		if (it == m_contents.m_umapLoginPlayer.end() || packet.m_accountNo != it->second->m_accountNo)
 			return false;
 		it->second->m_prevRecvTime = timeGetTime();
 		return true;

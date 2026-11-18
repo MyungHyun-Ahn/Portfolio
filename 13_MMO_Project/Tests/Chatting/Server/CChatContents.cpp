@@ -13,6 +13,9 @@
 #include "NetPacket.h"
 #include "CPlayer.h"
 #include "CSector.h"
+#include "PacketTypes.g.h"
+#include "IServerPacketHandler.g.h"
+#include "ServerPacketDispatch.g.h"
 #include "CProcessPacket.h"
 #include "CChatContents.h"
 #include "CChatServer.h"
@@ -59,12 +62,28 @@ namespace Chatting
 		NetworkLib::CSerializableBuffer<FALSE> *pMessage, int /*delayFrame*/) noexcept
 	{
 		InterlockedIncrement(&NetworkLib::g_monitor.m_updateTps);
-		if (pMessage->GetDataSize() < sizeof(WORD))
-			return NetworkLib::ERecvResult::Failed;
-		WORD type;
+		std::uint16_t type{};
 		*pMessage >> type;
+		if (!pMessage->IsValid())
+		{
+			return NetworkLib::ERecvResult::Failed;
+		}
+		switch (static_cast<EPacketType>(type))
+		{
+		case EPacketType::ReqLogin:
+			InterlockedIncrement(&NetworkLib::g_monitor.m_loginReq);
+			break;
+		case EPacketType::ReqSectorMove:
+			InterlockedIncrement(&NetworkLib::g_monitor.m_sectorMoveReq);
+			break;
+		case EPacketType::ReqMessage:
+			InterlockedIncrement(&NetworkLib::g_monitor.m_chatMsgReq);
+			break;
+		default:
+			break;
+		}
 		// 수신 버퍼의 ref 반환은 CBaseContents에서 수행한다.
-		if (!m_processPacket.ConsumePacket(static_cast<EPacketType>(type), sessionId, *pMessage))
+		if (!DispatchServerPacket(type, sessionId, *pMessage, m_processPacket))
 		{
 			g_pLogger->WriteLogConsole(ELogLevel::Error, L"REJECT session=%llu type=%u", sessionId, type);
 			return NetworkLib::ERecvResult::Failed;
@@ -74,6 +93,8 @@ namespace Chatting
 
 	void CChatContents::SendResponse(UINT64 sessionId, NetworkLib::CSerializableBuffer<FALSE> *pMessage) noexcept
 	{
+		if (pMessage == nullptr)
+			return;
 		pMessage->IncreaseRef();
 		NetworkLib::PrepareNetPacket(*pMessage, kPacketCode);
 		m_server.SendPacket(sessionId, pMessage);

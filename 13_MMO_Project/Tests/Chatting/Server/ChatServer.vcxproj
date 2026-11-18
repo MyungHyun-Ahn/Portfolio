@@ -32,7 +32,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderOutputFile>$(IntDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\Common;$(ProjectDir)..\..\..\Server\NetworkLib;$(ProjectDir)..\..\..\Server\MHLib\includes;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\Common;$(ProjectDir)Generated\PacketHandler;$(ProjectDir)..\..\..\Common\Packet\Struct;$(ProjectDir)..\..\..\Server\NetworkLib;$(ProjectDir)..\..\..\Server\MHLib\includes;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <Optimization>Disabled</Optimization>
@@ -47,7 +47,8 @@
     <ClCompile Include="CChatServer.cpp" />
     <ClCompile Include="CChatContents.cpp" />
     <ClCompile Include="CProcessPacket.cpp" />
-    <ClCompile Include="CGenPacket.cpp" />
+    <ClCompile Include="Generated\PacketHandler\ServerPacketSend.g.cpp" />
+    <ClCompile Include="Generated\PacketHandler\ServerPacketDispatch.g.cpp" />
     <ClCompile Include="..\Common\Console.cpp" />
     <ClCompile Include="..\Common\Config.cpp" />
   </ItemGroup>
@@ -58,7 +59,9 @@
     <ClInclude Include="CPlayer.h" />
     <ClInclude Include="CSector.h" />
     <ClInclude Include="CProcessPacket.h" />
-    <ClInclude Include="CGenPacket.h" />
+    <ClInclude Include="Generated\PacketHandler\ServerPacketSend.g.h" />
+    <ClInclude Include="Generated\PacketHandler\ServerPacketDispatch.g.h" />
+    <ClInclude Include="Generated\PacketHandler\IServerPacketHandler.g.h" />
     <ClInclude Include="..\Common\CommonProtocol.h" />
     <ClInclude Include="..\Common\Console.h" />
     <ClInclude Include="..\Common\Config.h" />

@@ -9,6 +9,10 @@
 #include <mutex>
 #include <atomic>
 #include <array>
+#include <bit>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 
 #pragma comment(lib, "ws2_32")
 #pragma comment(lib, "winmm")

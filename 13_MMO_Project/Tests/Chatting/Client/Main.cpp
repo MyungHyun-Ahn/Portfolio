@@ -4,6 +4,7 @@
 #include "Config.h"
 #include "Console.h"
 #include "CNetClient.h"
+#include "IClientPacketHandler.g.h"
 #include "CConsoleChatClient.h"
 
 int main(void)

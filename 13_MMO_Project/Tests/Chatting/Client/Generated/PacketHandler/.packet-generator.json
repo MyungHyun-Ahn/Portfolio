@@ -1,0 +1,11 @@
+{
+  "files": {
+    "ClientPacketDispatch.g.cpp": "8c1bb499da9878140652cfac0b1e148f1c9ce65c8b451d6e4f689c2b463d3c85",
+    "ClientPacketDispatch.g.h": "19ad875636bc774c66a87214d69cb493569b743cab89d1a3af49cfc27bab1183",
+    "ClientPacketSend.g.cpp": "38a87089691f10002d39f448923df47596c65e25f612c1725ce16a00094be1be",
+    "ClientPacketSend.g.h": "698f1aca8dd1b8036b2c20ac5e706f86fae70706951db9425afb573bde145521",
+    "IClientPacketHandler.g.h": "a75fee480d06b5d8a9cc8ec125cd7262a158d4a9633dcf64f560892939aca8ec"
+  },
+  "role": "Client",
+  "version": 1
+}

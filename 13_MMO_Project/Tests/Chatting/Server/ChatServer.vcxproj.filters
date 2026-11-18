@@ -3,6 +3,8 @@
   <ItemGroup>
     <Filter Include="Common" />
     <Filter Include="Server" />
+    <Filter Include="Generated" />
+    <Filter Include="Generated\PacketHandler" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -20,8 +22,11 @@
     <ClCompile Include="CProcessPacket.cpp">
       <Filter>Server</Filter>
     </ClCompile>
-    <ClCompile Include="CGenPacket.cpp">
-      <Filter>Server</Filter>
+    <ClCompile Include="Generated\PacketHandler\ServerPacketSend.g.cpp">
+      <Filter>Generated\PacketHandler</Filter>
+    </ClCompile>
+    <ClCompile Include="Generated\PacketHandler\ServerPacketDispatch.g.cpp">
+      <Filter>Generated\PacketHandler</Filter>
     </ClCompile>
     <ClCompile Include="..\Common\Console.cpp">
       <Filter>Common</Filter>
@@ -49,8 +54,14 @@
     <ClInclude Include="CProcessPacket.h">
       <Filter>Server</Filter>
     </ClInclude>
-    <ClInclude Include="CGenPacket.h">
-      <Filter>Server</Filter>
+    <ClInclude Include="Generated\PacketHandler\ServerPacketSend.g.h">
+      <Filter>Generated\PacketHandler</Filter>
+    </ClInclude>
+    <ClInclude Include="Generated\PacketHandler\ServerPacketDispatch.g.h">
+      <Filter>Generated\PacketHandler</Filter>
+    </ClInclude>
+    <ClInclude Include="Generated\PacketHandler\IServerPacketHandler.g.h">
+      <Filter>Generated\PacketHandler</Filter>
     </ClInclude>
     <ClInclude Include="..\Common\CommonProtocol.h">
       <Filter>Common</Filter>

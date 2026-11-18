@@ -1,0 +1,14 @@
+{
+  "files": {
+    "Chatting/Chatting.g.h": "90880cc9adcd1a762cd28b9d597703fdb92d388cf9d4d690f7d2e610dbbc3906",
+    "Chatting/ChattingPacketAll.g.h": "312b751a10ea5a56a896b85f76c0de53eab0f8aeb17fc074f2cc4ab6d391c7af",
+    "Chatting/Login.g.h": "66710ab29884ed7bc34cef549c040bdd33484468d1a708d2e57c9311b12e0a4f",
+    "Chatting/SectorMove.g.h": "3236061448d707d383b0cd01e7ff7b3c8aaac626c8f918f0811661df84965d6d",
+    "IncludePacketAll.g.h": "8beb5d5488e838e392ab220a6a7db387a013476008d2b7b842ed7b4bae2b5946",
+    "PacketTypes.g.h": "bde87058c98f4bd44527efef195f6ca82b3e3d53f639a089aae82d2c0c90e96d",
+    "System/Heartbeat.g.h": "635d82c6e594079c3149fc0af8e83adcd5f158117fac267d7263f4a990390e1d",
+    "System/SystemPacketAll.g.h": "1e11ffe9ea00deb712d584b621acd536e26412e2b28d5e89d697f5742de16df5"
+  },
+  "role": "Common",
+  "version": 1
+}

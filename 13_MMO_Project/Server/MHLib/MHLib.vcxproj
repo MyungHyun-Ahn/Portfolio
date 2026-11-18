@@ -45,6 +45,7 @@
     <ClInclude Include="includes\MHLib\memory\CTlsPagePool.h" />
     <ClInclude Include="includes\MHLib\MHLibPch.h" />
     <ClInclude Include="includes\MHLib\security\CEncryption.h" />
+    <ClInclude Include="includes\MHLib\serialization\ISerializable.h" />
     <ClInclude Include="includes\MHLib\utils\CFileLoader.h" />
     <ClInclude Include="includes\MHLib\utils\CLockGuard.h" />
     <ClInclude Include="includes\MHLib\utils\CLogger.h" />

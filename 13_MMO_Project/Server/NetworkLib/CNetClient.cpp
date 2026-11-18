@@ -100,6 +100,7 @@ namespace NetworkLib
 		m_sendQueue.push_back(pMessage);
 		if (m_pSending == nullptr)
 			return postSend();
+
 		return true;
 	}
 

@@ -10,6 +10,8 @@ Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "ChatClient", "Client\ChatCl
 EndProject
 Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "ChatServer", "Server\ChatServer.vcxproj", "{3B071B4E-91C9-4F7F-82C2-53BEE4E73430}"
 EndProject
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "Generate", "..\..\Tools\PacketGenerator\Generate.vcxproj", "{B07A0594-6BB1-4C91-B4D9-EB0DE1FB6C69}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -23,5 +25,6 @@ Global
 		{CE18A521-297B-4453-876E-702C7E7AD31F}.Debug|x64.Build.0 = Debug|x64
 		{3B071B4E-91C9-4F7F-82C2-53BEE4E73430}.Debug|x64.ActiveCfg = Debug|x64
 		{3B071B4E-91C9-4F7F-82C2-53BEE4E73430}.Debug|x64.Build.0 = Debug|x64
+		{B07A0594-6BB1-4C91-B4D9-EB0DE1FB6C69}.Debug|x64.ActiveCfg = Debug|x64
 	EndGlobalSection
 EndGlobal

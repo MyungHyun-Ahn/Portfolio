@@ -3,6 +3,8 @@
   <ItemGroup>
     <Filter Include="Client" />
     <Filter Include="Common" />
+    <Filter Include="Generated" />
+    <Filter Include="Generated\PacketHandler" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -13,6 +15,12 @@
     </ClCompile>
     <ClCompile Include="CConsoleChatClient.cpp">
       <Filter>Client</Filter>
+    </ClCompile>
+    <ClCompile Include="Generated\PacketHandler\ClientPacketSend.g.cpp">
+      <Filter>Generated\PacketHandler</Filter>
+    </ClCompile>
+    <ClCompile Include="Generated\PacketHandler\ClientPacketDispatch.g.cpp">
+      <Filter>Generated\PacketHandler</Filter>
     </ClCompile>
     <ClCompile Include="..\Common\Console.cpp">
       <Filter>Common</Filter>
@@ -27,6 +35,15 @@
     </ClInclude>
     <ClInclude Include="CConsoleChatClient.h">
       <Filter>Client</Filter>
+    </ClInclude>
+    <ClInclude Include="Generated\PacketHandler\ClientPacketSend.g.h">
+      <Filter>Generated\PacketHandler</Filter>
+    </ClInclude>
+    <ClInclude Include="Generated\PacketHandler\ClientPacketDispatch.g.h">
+      <Filter>Generated\PacketHandler</Filter>
+    </ClInclude>
+    <ClInclude Include="Generated\PacketHandler\IClientPacketHandler.g.h">
+      <Filter>Generated\PacketHandler</Filter>
     </ClInclude>
     <ClInclude Include="..\Common\CommonProtocol.h">
       <Filter>Common</Filter>

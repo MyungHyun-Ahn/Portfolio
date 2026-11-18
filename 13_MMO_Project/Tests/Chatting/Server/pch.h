@@ -9,3 +9,7 @@
 #include <array>
 #include <charconv>
 #include <io.h>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <limits>
