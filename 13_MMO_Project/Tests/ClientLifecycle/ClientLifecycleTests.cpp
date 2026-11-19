@@ -274,7 +274,7 @@ namespace
 		closesocket(peer);
 		closesocket(listener);
 		client.Stop();
-		g_pLogger->WriteLogConsole(ELogLevel::System, L"PASS: Net receive ring wrap, split header/body and adjacent frames");
+		g_pLogger->WriteLogConsole(ELogLevel::Info, L"PASS: Net receive ring wrap, split header/body and adjacent frames");
 	}
 
 	class CTickClient : public CNetClient
@@ -347,7 +347,7 @@ namespace
 		closesocket(peer);
 		closesocket(listener);
 		network.Stop();
-		g_pLogger->WriteLogConsole(ELogLevel::System, L"PASS: Net Tick callback order, app thread and mailbox retirement");
+		g_pLogger->WriteLogConsole(ELogLevel::Info, L"PASS: Net Tick callback order, app thread and mailbox retirement");
 	}
 
 	void VerifyNetSendBatch()
@@ -426,7 +426,7 @@ namespace
 		}
 		CloseHandle(completionPort);
 		closesocket(peer);
-		g_pLogger->WriteLogConsole(ELogLevel::System, L"PASS: Net batch FIFO and whole completion ownership");
+		g_pLogger->WriteLogConsole(ELogLevel::Info, L"PASS: Net batch FIFO and whole completion ownership");
 	}
 
 	void CheckConnectPending(CNetClientManager &client, SessionId sessionId, const wchar_t *pCase)
@@ -533,7 +533,7 @@ namespace
 		CloseHandle(lanPort);
 		WSACleanup();
 		g_pLanClientManager = nullptr;
-		g_pLogger->WriteLogConsole(ELogLevel::System, L"PASS: LAN FIFO wire, cross-thread view return, slot reuse");
+		g_pLogger->WriteLogConsole(ELogLevel::Info, L"PASS: LAN FIFO wire, cross-thread view return, slot reuse");
 	}
 
 	BOOL PASCAL RejectConnectEx(SOCKET, const sockaddr *, int, PVOID, DWORD, LPDWORD, LPOVERLAPPED)
@@ -725,7 +725,7 @@ namespace
 		closesocket(nonListener);
 		closesocket(saturatedListener);
 		closesocket(listener);
-		g_pLogger->WriteLogConsole(ELogLevel::System,
+		g_pLogger->WriteLogConsole(ELogLevel::Info,
 			L"PASS: %lu worker(s): simultaneous sessions, mailbox order/isolation, reconnect, refusal, timeout, cancel, Stop", workers);
 	}
 }

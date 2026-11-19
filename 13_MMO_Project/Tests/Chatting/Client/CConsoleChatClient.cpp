@@ -40,7 +40,7 @@ namespace Chatting
 		if (m_isLogin || packet.m_status != TRUE || packet.m_accountNo != m_config.m_accountNo)
 			return false;
 		m_isLogin = true;
-		g_pLogger->WriteLogConsole(ELogLevel::System, L"LOGIN OK account=%lld", packet.m_accountNo);
+		g_pLogger->WriteLogConsole(ELogLevel::Info, L"LOGIN OK account=%lld", packet.m_accountNo);
 		// 로그인 응답을 받은 다음 섹터에 등록한다.
 		return SendReqSectorMove(packet.m_accountNo, m_config.m_sectorX, m_config.m_sectorY);
 	}
@@ -50,7 +50,7 @@ namespace Chatting
 		if (!m_isLogin || packet.m_accountNo != m_config.m_accountNo
 			|| packet.m_sectorX != m_config.m_sectorX || packet.m_sectorY != m_config.m_sectorY)
 			return false;
-		g_pLogger->WriteLogConsole(ELogLevel::System, L"READY account=%lld sector=%u,%u",
+		g_pLogger->WriteLogConsole(ELogLevel::Info, L"READY account=%lld sector=%u,%u",
 			packet.m_accountNo, packet.m_sectorX, packet.m_sectorY);
 		m_isReady = true;
 		return true;
@@ -62,7 +62,7 @@ namespace Chatting
 			|| wmemchr(packet.m_id.data(), L'\0', packet.m_id.size()) == nullptr
 			|| wmemchr(packet.m_nickname.data(), L'\0', packet.m_nickname.size()) == nullptr)
 			return false;
-		g_pLogger->WriteLogConsole(ELogLevel::System, L"CHAT account=%lld name=%ls: %ls",
+		g_pLogger->WriteLogConsole(ELogLevel::Info, L"CHAT account=%lld name=%ls: %ls",
 			packet.m_accountNo, packet.m_nickname.data(), packet.m_message.c_str());
 		return true;
 	}
@@ -73,6 +73,6 @@ namespace Chatting
 			g_pLogger->WriteLogConsole(ELogLevel::Error, L"ConnectEx completion failed: error=%lu", error);
 		m_isReady = false;
 		m_isLogin = false;
-		g_pLogger->WriteLogConsole(ELogLevel::System, L"DISCONNECTED");
+		g_pLogger->WriteLogConsole(ELogLevel::Info, L"DISCONNECTED");
 	}
 }

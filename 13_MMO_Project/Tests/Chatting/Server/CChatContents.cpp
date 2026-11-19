@@ -39,7 +39,8 @@ namespace Chatting
 		CPlayer *pPlayer = pObject == nullptr ? CPlayer::Alloc() : static_cast<CPlayer *>(pObject);
 		m_umapSessions.emplace(sessionId, pPlayer);
 		m_umapNonLoginPlayer.emplace(sessionId, pPlayer);
-		g_pLogger->WriteLogConsole(ELogLevel::System, L"ENTER session=%llu", sessionId);
+		g_pLogger->WriteLog(ELogLevel::Debug, L"ChatServer", sessionId, std::source_location::current(),
+			L"event=session_enter | 세션이 콘텐츠에 진입했습니다.");
 	}
 
 	void CChatContents::OnLeave(UINT64 sessionId) noexcept
@@ -55,7 +56,8 @@ namespace Chatting
 		m_umapLoginPlayer.erase(sessionId);
 		m_umapSessions.erase(it);
 		CPlayer::Free(pPlayer);
-		g_pLogger->WriteLogConsole(ELogLevel::System, L"LEAVE session=%llu", sessionId);
+		g_pLogger->WriteLog(ELogLevel::Debug, L"ChatServer", sessionId, std::source_location::current(),
+			L"event=session_leave | 세션이 콘텐츠를 떠났습니다.");
 	}
 
 	NetworkLib::ERecvResult CChatContents::OnRecv(UINT64 sessionId,
@@ -85,7 +87,8 @@ namespace Chatting
 		// 수신 버퍼의 ref 반환은 CBaseContents에서 수행한다.
 		if (!DispatchServerPacket(type, sessionId, *pMessage, m_processPacket))
 		{
-			g_pLogger->WriteLogConsole(ELogLevel::Error, L"REJECT session=%llu type=%u", sessionId, type);
+			g_pLogger->WriteLog(ELogLevel::Error, L"ChatServer", sessionId, std::source_location::current(),
+				L"event=packet_rejected packet_type=%u | 패킷을 처리하지 못했습니다.", type);
 			return NetworkLib::ERecvResult::Failed;
 		}
 		return NetworkLib::ERecvResult::Received;

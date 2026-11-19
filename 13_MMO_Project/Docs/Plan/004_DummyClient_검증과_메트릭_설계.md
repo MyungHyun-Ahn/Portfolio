@@ -42,7 +42,7 @@ EXE 옆 `DummyClientConfig.conf`를 기존 `CFileLoader`와 UTF-16LE BOM 규칙�
 | `ACTION_INTERVAL_MS` | `load`에서 Ready 클라이언트별로 다음 동작을 시작하는 간격. 양의 정수이며, 이전 동작이 아직 끝나지 않았으면 겹쳐 보내지 않는다. |
 | `RECONNECT_PROBABILITY_BPS` | `load`에서 정상 동작 완료마다 한 번 적용하는 만분율 정수 `0..10000`. 기본 `0`은 재접속하지 않음, `10000`은 매 정상 동작 완료 후 재접속. 접속·로그인·초기 섹터 진입 및 heartbeat에는 적용하지 않는다. |
 | `HEARTBEAT_INTERVAL_MS`, `DELIVERY_TIMEOUT_MS`, `DRAIN_TIMEOUT_MS` | `30000`, `3000`, `5000`. 일반 모드에서 heartbeat 주기는 서버 수신 제한보다 짧아야 한다. 끄는 것은 명시적 idle 테스트에서만 허용한다. |
-| `LOG_LEVEL`, `REPORT_DIRECTORY`, `METRICS_ENABLED`, `METRICS_PORT` | `system`, 실행별 하위 경로, `false`, `9465`(더미 제안). 로컬 요약 저장은 필수이고 HTTP 노출·중앙 수집은 선택이다. 로그·요약의 실제 절대 경로를 시작 시 출력한다. |
+| `LOG_LEVEL`, `REPORT_DIRECTORY`, `METRICS_ENABLED`, `METRICS_PORT` | `info`, 실행별 하위 경로, `false`, `9465`(더미 제안). 로컬 요약 저장은 필수이고 HTTP 노출·중앙 수집은 선택이다. 로그·요약의 실제 절대 경로를 시작 시 출력한다. |
 
 - `smoke`는 두 방향으로 한 번씩 보내는 고정 시나리오라 가중치·동작 주기·확률 설정을 적용하지 않는다. 이전 안의 초당 접속·전체 송신 개수, 고정 실행 시간, 미확인 수신 추적 상한은 운영 계약이나 서버 한도가 아니며 초기 필수 설정에서 뺀다. 필요해지면 접속 증가율과 실행 종료 조건을 동작 주기와 별도로 설계한다.
 - 현재 **256은 테스트용 `ChatServer`의 `Main.cpp`가 설정한 서버 세션 슬롯 수**다. 클라이언트 PC의 포트 수나 더미의 입력 한도가 아니다. 용량 시험은 더미에 256 한도를 두지 않고, 해당 PC에서 테스트에 실제로 사용할 수 있는 클라이언트 TCP 포트 수까지 동시 접속하는 것을 목표로 한다. 서버 슬롯 설정과 16비트 슬롯 인덱스·개수 표현 범위를 먼저 확인하고, 포트 고갈·재접속 중 잔류 연결·서버 슬롯 부족을 구분해 목표 수와 실제 TCP 연결 수·Ready 수를 기록한다. 포트 범위 크기만으로 같은 수의 동시 연결을 보장하지 않는다. Windows에서는 `netsh int ipv4 show dynamicport tcp`로 설정 범위를 확인한다.

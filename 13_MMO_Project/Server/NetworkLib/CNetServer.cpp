@@ -126,7 +126,8 @@ CNetServer *g_pNetServer = nullptr;
 			if (errVal != WSA_IO_PENDING)
 			{
 				if (errVal != WSAECONNABORTED && errVal != WSAECONNRESET && errVal != WSAEINTR)
-					g_pLogger->WriteLog(L"SYSTEM", L"NetworkLib", ELogLevel::Error, L"WSARecv() Error : %d", errVal);
+					g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", m_sessionId, std::source_location::current(),
+						L"event=recv_failed error_code=%d | 소켓 수신 요청에 실패했습니다.", errVal);
 
 				// 사실 여기선 0이 될 일이 없음
 				// 반환값을 사용안해도 됨
@@ -203,7 +204,8 @@ CNetServer *g_pNetServer = nullptr;
 			// 못꺼낸 것
 			if (!m_lfSendBufferQueue.Dequeue(&pSBuffer))
 			{
-				MHLib::utils::g_pLogger->WriteLog(L"SYSTEM", L"NetworkLib", MHLib::utils::ELogLevel::Error, L"LFQueue::Dequeue() Error");
+				g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", m_sessionId, std::source_location::current(),
+					L"event=send_dequeue_failed | 송신 큐에서 패킷을 꺼내지 못했습니다.");
 				// 말도 안되는 상황
 				MHLib::diagnostics::CCrashDump::Crash();
 			}
@@ -241,7 +243,8 @@ CNetServer *g_pNetServer = nullptr;
 			if (errVal != WSA_IO_PENDING)
 			{
 				if (errVal != WSAECONNABORTED && errVal != WSAECONNRESET && errVal != WSAEINTR)
-					g_pLogger->WriteLog(L"SYSTEM", L"NetworkLib", ELogLevel::Error, L"WSASend() Error : %d", errVal);
+					g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", m_sessionId, std::source_location::current(),
+						L"event=send_failed error_code=%d | 소켓 송신 요청에 실패했습니다.", errVal);
 
 				// 사실 여기선 0이 될 일이 없음
 				// 반환값을 사용안해도 됨
@@ -283,7 +286,8 @@ CNetServer *g_pNetServer = nullptr;
 			// 못꺼낸 것
 			if (!m_lfSendBufferQueue.Dequeue(&pBuffer))
 			{
-				MHLib::utils::g_pLogger->WriteLog(L"SYSTEM", L"NetworkLib", MHLib::utils::ELogLevel::Error, L"LFQueue::Dequeue() Error");
+				g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", m_sessionId, std::source_location::current(),
+					L"event=send_dequeue_failed | 송신 큐에서 패킷을 꺼내지 못했습니다.");
 				// 말도 안되는 상황
 				CCrashDump::Crash();
 			}
@@ -298,7 +302,8 @@ CNetServer *g_pNetServer = nullptr;
 		useBufferSize = m_lfSendBufferQueue.GetUseSize();
 		if (useBufferSize != 0)
 		{
-			g_pLogger->WriteLog(L"SYSTEM", L"NetworkLib", ELogLevel::Error, L"LFQueue is not empty Error");
+			g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", m_sessionId, std::source_location::current(),
+				L"event=send_queue_not_empty | 세션 정리 후에도 송신 큐에 패킷이 남아 있습니다.");
 		}
 
 		useBufferSize = m_recvMsgQueue.GetUseSize();
@@ -352,7 +357,8 @@ CNetServer *g_pNetServer = nullptr;
 		if (retVal != 0)
 		{
 			errVal = WSAGetLastError();
-			g_pLogger->WriteLog(L"SYSTEM", L"NetworkLib", ELogLevel::Error, L"WSAStartup() 실패 : %d", errVal);
+			g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", 0, std::source_location::current(),
+				L"event=winsock_start_failed error_code=%d | Winsock 초기화에 실패했습니다.", errVal);
 			return FALSE;
 		}
 
@@ -360,7 +366,8 @@ CNetServer *g_pNetServer = nullptr;
 		if (m_listenSocket == INVALID_SOCKET)
 		{
 			errVal = WSAGetLastError();
-			g_pLogger->WriteLog(L"SYSTEM", L"NetworkLib", ELogLevel::Error, L"WSASocket() 실패 : %d", errVal);
+			g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", 0, std::source_location::current(),
+				L"event=listen_socket_create_failed error_code=%d | 수신 대기 소켓을 생성하지 못했습니다.", errVal);
 			return FALSE;
 		}
 
@@ -374,7 +381,8 @@ CNetServer *g_pNetServer = nullptr;
 		if (retVal == SOCKET_ERROR)
 		{
 			errVal = WSAGetLastError();
-			g_pLogger->WriteLog(L"SYSTEM", L"NetworkLib", ELogLevel::Error, L"bind() 실패 : %d", errVal);
+			g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", 0, std::source_location::current(),
+				L"event=bind_failed error_code=%d | 서버 소켓 바인딩에 실패했습니다.", errVal);
 			return FALSE;
 		}
 
@@ -386,7 +394,8 @@ CNetServer *g_pNetServer = nullptr;
 			if (retVal == SOCKET_ERROR)
 			{
 				errVal = WSAGetLastError();
-				g_pLogger->WriteLog(L"SYSTEM", L"NetworkLib", ELogLevel::Error, L"setsockopt(SO_SNDBUF) 실패 : %d", errVal);
+				g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", 0, std::source_location::current(),
+					L"event=send_buffer_set_failed error_code=%d | 소켓 송신 버퍼 설정에 실패했습니다.", errVal);
 				return FALSE;
 			}
 		}
@@ -397,7 +406,8 @@ CNetServer *g_pNetServer = nullptr;
 		if (retVal == SOCKET_ERROR)
 		{
 			errVal = WSAGetLastError();
-			g_pLogger->WriteLog(L"SYSTEM", L"NetworkLib", ELogLevel::Error, L"setsockopt(SO_LINGER) 실패 : %d", errVal);
+			g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", 0, std::source_location::current(),
+				L"event=linger_set_failed error_code=%d | 소켓 종료 대기 옵션 설정에 실패했습니다.", errVal);
 			return FALSE;
 		}
 
@@ -406,7 +416,8 @@ CNetServer *g_pNetServer = nullptr;
 		if (retVal == SOCKET_ERROR)
 		{
 			errVal = WSAGetLastError();
-			g_pLogger->WriteLog(L"SYSTEM", L"NetworkLib", ELogLevel::Error, L"listen() 실패 : %d", errVal);
+			g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", 0, std::source_location::current(),
+				L"event=listen_failed error_code=%d | 소켓 수신 대기를 시작하지 못했습니다.", errVal);
 			return FALSE;
 		}
 
@@ -415,7 +426,8 @@ CNetServer *g_pNetServer = nullptr;
 		if (m_iocpHandle == NULL)
 		{
 			errVal = WSAGetLastError();
-			g_pLogger->WriteLog(L"SYSTEM", L"NetworkLib", ELogLevel::Error, L"CreateIoCompletionPort(생성) 실패 : %d", errVal);
+			g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", 0, std::source_location::current(),
+				L"event=iocp_create_failed error_code=%d | I/O 완료 포트를 생성하지 못했습니다.", errVal);
 			return FALSE;
 		}
 
@@ -427,7 +439,8 @@ CNetServer *g_pNetServer = nullptr;
 		if (retVal == SOCKET_ERROR)
 		{
 			errVal = WSAGetLastError();
-			g_pLogger->WriteLog(L"SYSTEM", L"NetworkLib", ELogLevel::Error, L"WSAIoctl(lpfnAcceptEx) 실패 : %d", errVal);
+			g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", 0, std::source_location::current(),
+				L"event=accept_ex_lookup_failed error_code=%d | AcceptEx 함수 조회에 실패했습니다.", errVal);
 			return FALSE;
 		}
 
@@ -436,7 +449,8 @@ CNetServer *g_pNetServer = nullptr;
 		if (retVal == SOCKET_ERROR)
 		{
 			errVal = WSAGetLastError();
-			g_pLogger->WriteLog(L"SYSTEM", L"NetworkLib", ELogLevel::Error, L"WSAIoctl(lpfnGetAcceptExSockaddrs) 실패 : %d", errVal);
+			g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", 0, std::source_location::current(),
+				L"event=accept_addr_lookup_failed error_code=%d | GetAcceptExSockaddrs 함수 조회에 실패했습니다.", errVal);
 			return FALSE;
 		}
 
@@ -458,12 +472,14 @@ CNetServer *g_pNetServer = nullptr;
 			if (hWorkerThread == 0)
 			{
 				errVal = GetLastError();
-				g_pLogger->WriteLog(L"SYSTEM", L"NetworkLib", ELogLevel::Error, L"WorkerThread[%d] running fail.. : %d", i, errVal);
+				g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", 0, std::source_location::current(),
+					L"event=worker_start_failed worker_index=%d error_code=%d | 네트워크 워커를 시작하지 못했습니다.", i, errVal);
 				return FALSE;
 			}
 
 			m_arrWorkerThreads.push_back(hWorkerThread);
-			g_pLogger->WriteLogConsole(ELogLevel::System, L"[SYSTEM] WorkerThread[%d] running..", i);
+			g_pLogger->WriteLog(ELogLevel::Info, L"NetworkLib", 0, std::source_location::current(),
+				L"event=worker_started worker_index=%d | 네트워크 워커를 시작했습니다.", i);
 		}
 
 		RegisterSystemTimerEvent();
@@ -704,7 +720,8 @@ CNetServer *g_pNetServer = nullptr;
 		if (pNewAcceptEx->m_sessionSocket == INVALID_SOCKET)
 		{
 			errVal = WSAGetLastError();
-			g_pLogger->WriteLog(L"SYSTEM", L"NetworkLib", ELogLevel::Error, L"PostAcceptEx socket() 실패 : %d", errVal);
+			g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", 0, std::source_location::current(),
+				L"event=accept_socket_create_failed error_code=%d | 접속 수락용 소켓을 생성하지 못했습니다.", errVal);
 			return FALSE;
 		}
 
@@ -720,7 +737,8 @@ CNetServer *g_pNetServer = nullptr;
 			if (errVal != WSA_IO_PENDING)
 			{
 				if (errVal != WSAECONNABORTED && errVal != WSAECONNRESET)
-					g_pLogger->WriteLog(L"SYSTEM", L"NetworkLib", ELogLevel::Error, L"AcceptEx() Error : %d", errVal);
+					g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", 0, std::source_location::current(),
+						L"event=accept_submit_failed error_code=%d | 접속 수락 요청에 실패했습니다.", errVal);
 
 				return FALSE;
 			}
@@ -742,7 +760,8 @@ CNetServer *g_pNetServer = nullptr;
 			errVal = WSAGetLastError();
 
 			if (!m_isStop)
-				g_pLogger->WriteLog(L"SYSTEM", L"NetworkLib", ELogLevel::Error, L"setsockopt(SO_UPDATE_ACCEPT_CONTEXT) 실패 : %d", errVal);
+				g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", 0, std::source_location::current(),
+					L"event=accept_context_update_failed error_code=%d | 수락 소켓의 컨텍스트 갱신에 실패했습니다.", errVal);
 			return FALSE;
 		}
 
@@ -769,7 +788,8 @@ CNetServer *g_pNetServer = nullptr;
 		// 연결 실패 : FALSE
 		if (!m_stackDisconnectIndex.Pop(&index))
 		{
-			g_pLogger->WriteLog(L"SYSTEM", L"NetworkLib", ELogLevel::Error, L"m_stackDisconnectIndex.Pop(&index) failed");
+			g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", 0, std::source_location::current(),
+				L"event=session_slot_pop_failed | 비어 있는 세션 슬롯을 꺼내지 못했습니다.");
 			return FALSE;
 		}
 

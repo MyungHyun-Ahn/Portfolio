@@ -62,7 +62,9 @@ namespace Chatting
 
 	void CChatServer::OnError(int errorCode, WCHAR *pMessage) noexcept
 	{
-		g_pLogger->WriteLogConsole(ELogLevel::Error, L"NETWORK error=%d %ls", errorCode, pMessage != nullptr ? pMessage : L"");
+		g_pLogger->WriteLog(ELogLevel::Error, L"ChatServer", 0, std::source_location::current(),
+			L"event=network_error error_code=%d | 네트워크 오류가 발생했습니다. %.160ls",
+			errorCode, pMessage != nullptr ? pMessage : L"");
 	}
 
 	void CChatServer::RegisterContentTimerEvent() noexcept
@@ -70,6 +72,7 @@ namespace Chatting
 		auto *pEvent = new SChatFrameEvent;
 		pEvent->SetEvent(m_pContents, 25);
 		NetworkLib::CContentsThread::EnqueueEvent(pEvent);
-		g_pLogger->WriteLogConsole(ELogLevel::System, L"READY chat test-only port=%u", NetworkLib::serverSetting::openPort);
+		g_pLogger->WriteLog(ELogLevel::Info, L"ChatServer", 0, std::source_location::current(),
+			L"event=server_ready port=%u | 테스트 채팅 서버가 준비되었습니다.", NetworkLib::serverSetting::openPort);
 	}
 }

@@ -196,56 +196,56 @@ void CMonitor::UpdatePdh() noexcept
 void CMonitor::MonitoringConsole(INT sessionCount) noexcept
 {
 	// Cpu Usage
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"----------------------------------------");
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"              System info");
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"Process memory usage");
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\ttotal \t: %u MB", m_pmc.PrivateUsage / (1024 * 1024));
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tnon-paged pool \t: %u KB\n", m_processNPMemoryVal.largeValue / (1024));
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"System memory usage");
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tavailable \t: %u MB", m_systemAvailableMemoryVal.largeValue);
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tnon-paged pool \t: %u MB\n", m_systemNPMemoryVal.largeValue / (1024 * 1024));
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"Processor CPU usage");
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tTotal \t: %f", m_processorTotal);
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tUser \t: %f", m_processorUser);
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tKernel \t: %f\n", m_processorKernel);
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"Process CPU usage");
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tTotal \t: %f", m_processTotal);
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tUser \t: %f", m_processUser);
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tKernel \t: %f\n", m_processKernel);
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"Network");
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tSend1 \t: %u KB", m_networkSendKB1Val.largeValue / (1024));
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tSend2 \t: %u KB", m_networkSendKB2Val.largeValue / (1024));
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tRecv1 \t: %u KB", m_networkRecvKB1Val.largeValue / (1024));
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tRecv2 \t: %u KB", m_networkRecvKB2Val.largeValue / (1024));
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tRetransmission \t: %u\n", m_networkRetransmissionVal.largeValue);
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"----------------------------------------");
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"              System info");
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"Process memory usage");
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\ttotal \t: %u MB", m_pmc.PrivateUsage / (1024 * 1024));
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tnon-paged pool \t: %u KB\n", m_processNPMemoryVal.largeValue / (1024));
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"System memory usage");
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tavailable \t: %u MB", m_systemAvailableMemoryVal.largeValue);
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tnon-paged pool \t: %u MB\n", m_systemNPMemoryVal.largeValue / (1024 * 1024));
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"Processor CPU usage");
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tTotal \t: %f", m_processorTotal);
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tUser \t: %f", m_processorUser);
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tKernel \t: %f\n", m_processorKernel);
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"Process CPU usage");
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tTotal \t: %f", m_processTotal);
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tUser \t: %f", m_processUser);
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tKernel \t: %f\n", m_processKernel);
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"Network");
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tSend1 \t: %u KB", m_networkSendKB1Val.largeValue / (1024));
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tSend2 \t: %u KB", m_networkSendKB2Val.largeValue / (1024));
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tRecv1 \t: %u KB", m_networkRecvKB1Val.largeValue / (1024));
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tRecv2 \t: %u KB", m_networkRecvKB2Val.largeValue / (1024));
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tRetransmission \t: %u\n", m_networkRetransmissionVal.largeValue);
 	
 
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"Send calls : %d, pending : %d", m_sendCallCount, m_sendPendingCount);
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"DelWork : %d, StealWork : %d", m_delWork, m_stealWork);
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"Send calls : %d, pending : %d", m_sendCallCount, m_sendPendingCount);
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"DelWork : %d, StealWork : %d", m_delWork, m_stealWork);
 	// Server Monitor
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"        Server monitoring info");
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"Info");
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tAccept total \t: %lld", m_acceptTotal);
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tSession count \t: %d", sessionCount);
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"Pool capacity");
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tSession pool capacity \t: %d, usage \t: %d",
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"        Server monitoring info");
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"Info");
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tAccept total \t: %lld", m_acceptTotal);
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tSession count \t: %d", sessionCount);
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"Pool capacity");
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tSession pool capacity \t: %d, usage \t: %d",
 		NetworkLib::CNetSession::GetPoolCapacity(), NetworkLib::CNetSession::GetPoolUsage());
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tBuffer pool capacity \t: %d, usage \t: %d",
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tBuffer pool capacity \t: %d, usage \t: %d",
 		CSerializableBuffer<FALSE>::GetPoolCapacity(), CSerializableBuffer<FALSE>::GetPoolUsage());
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tView pool capacity \t: %d, usage \t: %d",
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tView pool capacity \t: %d, usage \t: %d",
 		CSerializableBufferView<FALSE>::GetPoolCapacity(), CSerializableBufferView<FALSE>::GetPoolUsage());
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tRecv pool capacity \t: %d, usage \t: %d",
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tRecv pool capacity \t: %d, usage \t: %d",
 		CRecvBuffer::GetPoolCapacity(), CRecvBuffer::GetPoolUsage());
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"TPS");
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tAccept\t : %d \t Avr : %lf", m_acceptTps, (double)m_acceptTpsTotal / m_loopCount);
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tRecv\t : %d \t Avr : %lf",
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"TPS");
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tAccept\t : %d \t Avr : %lf", m_acceptTps, (double)m_acceptTpsTotal / m_loopCount);
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tRecv\t : %d \t Avr : %lf",
 		g_networkCounters.m_recvTps, (double)m_recvTpsTotal / m_loopCount);
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tSend\t : %d \t Avr : %lf",
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tSend\t : %d \t Avr : %lf",
 		g_networkCounters.m_sendTps, (double)m_sendTpsTotal / m_loopCount);
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tUpdate\t : %d \t Avr : %lf", m_updateTps, (double)m_updateTpsTotal / m_loopCount);
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tMaxSend\t : %d", g_networkCounters.m_maxSendCount);
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tLoginReq\t : %d\t\tSectorMoveReq\t : %d", m_loginReq, m_sectorMoveReq);
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tChatMsgReq\t : %d\t\tChatMsgRes\t : %d", m_chatMsgReq, m_chatMsgRes);
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"----------------------------------------");
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tUpdate\t : %d \t Avr : %lf", m_updateTps, (double)m_updateTpsTotal / m_loopCount);
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tMaxSend\t : %d", g_networkCounters.m_maxSendCount);
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tLoginReq\t : %d\t\tSectorMoveReq\t : %d", m_loginReq, m_sectorMoveReq);
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"\tChatMsgReq\t : %d\t\tChatMsgRes\t : %d", m_chatMsgReq, m_chatMsgRes);
+	g_pLogger->WriteLogConsole(ELogLevel::Info, L"----------------------------------------");
 }
 }

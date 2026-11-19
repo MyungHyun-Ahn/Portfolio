@@ -80,7 +80,8 @@ namespace Chatting
 		m_contents.m_umapNonLoginPlayer.erase(it);
 		m_contents.m_umapLoginPlayer.emplace(sessionId, pPlayer);
 		ReleaseResponse(submitPreparedPacket(sessionId, EPacketType::ResLogin, pResponse));
-		g_pLogger->WriteLogConsole(ELogLevel::System, L"LOGIN account=%lld", accountNo);
+		g_pLogger->WriteLog(ELogLevel::Debug, L"ChatServer", sessionId, std::source_location::current(),
+			L"event=login_accepted account_no=%lld | 테스트 로그인을 승인했습니다.", accountNo);
 		return true;
 	}
 
@@ -112,7 +113,8 @@ namespace Chatting
 		pPlayer->m_sectorY = sectorY;
 		pPlayer->m_prevRecvTime = timeGetTime();
 		ReleaseResponse(submitPreparedPacket(sessionId, EPacketType::ResSectorMove, pResponse));
-		g_pLogger->WriteLogConsole(ELogLevel::System, L"SECTOR account=%lld x=%u y=%u", accountNo, sectorX, sectorY);
+		g_pLogger->WriteLog(ELogLevel::Debug, L"ChatServer", sessionId, std::source_location::current(),
+			L"event=sector_entered account_no=%lld sector_x=%u sector_y=%u | 섹터에 입장했습니다.", accountNo, sectorX, sectorY);
 		return true;
 	}
 

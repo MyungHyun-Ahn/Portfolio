@@ -689,7 +689,7 @@ CLanClientManager *g_pLanClientManager;
 			}
 
 			m_arrWorkerThreads.push_back(hWorkerThread);
-			g_pLogger->WriteLogConsole(ELogLevel::System, L"[SYSTEM] WorkerThread[%d] running..", i);
+			g_pLogger->WriteLogConsole(ELogLevel::Info, L"[Info] WorkerThread[%d] running..", i);
 		}
 
 		return TRUE;

@@ -46,7 +46,8 @@ int main(void)
 		isReturned = true;
 	});
 
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"LOCAL TEST ONLY. /exit or EOF ends the server process.");
+	g_pLogger->WriteLog(ELogLevel::Info, L"ChatServer", 0, std::source_location::current(),
+		L"event=server_local_test | 로컬 테스트 전용입니다. /exit 또는 EOF로 서버 프로세스를 종료합니다.");
 	std::string pending;
 	WCHAR highSurrogate = 0;
 	while (!isReturned)
@@ -55,14 +56,25 @@ int main(void)
 		auto result = Chatting::PollInput(pending, highSurrogate, line);
 		if (result == Chatting::EInputResult::End || (result == Chatting::EInputResult::Line && line == "/exit"))
 		{
-			g_pLogger->WriteLogConsole(ELogLevel::System, L"STOP process boundary (NetworkLib Stop lifecycle is deferred)");
+			g_pLogger->WriteLog(ELogLevel::Info, L"ChatServer", 0, std::source_location::current(),
+				L"event=server_process_exit | 서버 프로세스를 종료합니다. NetworkLib 정상 종료 처리는 보류 중입니다.");
 			fflush(nullptr);
 			ExitProcess(0);
 		}
 		Sleep(10);
 	}
 	serverThread.join();
-	g_pLogger->WriteLogConsole(ELogLevel::Error, L"SERVER START RETURNED success=%d", static_cast<int>(isStarted.load()));
+	const bool didStart = isStarted.load();
+	if (didStart)
+	{
+		g_pLogger->WriteLog(ELogLevel::Info, L"ChatServer", 0, std::source_location::current(),
+			L"event=server_run_ended | 서버 실행이 종료되었습니다.");
+	}
+	else
+	{
+		g_pLogger->WriteLog(ELogLevel::Error, L"ChatServer", 0, std::source_location::current(),
+			L"event=server_start_failed | 서버 시작에 실패했습니다.");
+	}
 	fflush(nullptr);
-	ExitProcess(isStarted ? 0 : 1);
+	ExitProcess(didStart ? 0 : 1);
 }

@@ -57,7 +57,7 @@ int main(void)
 			}
 			else
 			{
-				g_pLogger->WriteLogConsole(ELogLevel::System, L"Type a message, /exit to quit. Test-only authentication.");
+				g_pLogger->WriteLogConsole(ELogLevel::Info, L"Type a message, /exit to quit. Test-only authentication.");
 				std::string pending;
 				WCHAR highSurrogate = 0;
 				DWORD prevHeartbeatTime = timeGetTime();
