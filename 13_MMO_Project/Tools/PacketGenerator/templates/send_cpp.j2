@@ -1,4 +1,10 @@
 #include "pch.h"
+{% if side == 'Client' %}
+#include <utility>
+{% endif %}
+{% if packets | selectattr('copies_string') | list %}
+#include <new>
+{% endif %}
 #include "CSerializableBuffer.h"
 #include "MHLib/serialization/ISerializable.h"
 #include "IncludePacketAll.g.h"
@@ -29,5 +35,53 @@ namespace Chatting
 {% if not loop.last %}
 
 {% endif %}
+{% endfor %}
+{% if side == 'Server' %}
+
+	NetworkLib::CSerializableBuffer<FALSE> *CServerPacketSender::submitPreparedPacket(
+		UINT64 sessionId, EPacketType type, NetworkLib::CSerializableBuffer<FALSE> *pPacket) noexcept
+	{
+		if (pPacket == nullptr)
+		{
+			return nullptr;
+		}
+		pPacket->IncreaseRef();
+		sendPacket(sessionId, type, *pPacket);
+		return pPacket;
+	}
+{% endif %}
+{% for packet in packets %}
+
+	{{ packet.send_result }}C{{ side }}PacketSender::{{ packet.send_name }}({% if packet.send_parameters %}{{ '\n' }}
+{% for parameter in packet.send_parameters %}
+		{{ parameter }}{{ ',' if not loop.last else ') noexcept' }}
+{% endfor %}
+{% else %}) noexcept{{ '\n' }}
+{% endif %}
+	{
+		S{{ packet.name }} packet;
+{% for field in packet.fields if field.cpp_type != 'std::wstring' %}
+		packet.{{ field.member }} = {{ field.argument }};
+{% endfor %}
+{% if packet.copies_string %}
+		try
+		{
+{% for field in packet.fields if field.cpp_type == 'std::wstring' %}
+			packet.{{ field.member }} = {{ field.argument }};
+{% endfor %}
+		}
+		catch (const std::bad_alloc &)
+		{
+			return {{ 'false' if side == 'Client' else 'nullptr' }};
+		}
+{% endif %}
+{% if side == 'Client' %}
+		auto spPacket = MakePacket{{ packet.name }}(packet);
+		return spPacket != nullptr && this->sendPacket(std::move(spPacket));
+{% else %}
+		return this->submitPreparedPacket(sessionId, EPacketType::{{ packet.name }},
+			MakePacket{{ packet.name }}(packet));
+{% endif %}
+	}
 {% endfor %}
 }

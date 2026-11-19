@@ -2,6 +2,7 @@
 #include "CSerializableBuffer.h"
 #include "CClientMailbox.h"
 #include "CNetClientManager.h"
+#include "NetworkLimits.h"
 #include "CNetSession.h"
 
 namespace NetworkLib
@@ -161,7 +162,7 @@ namespace NetworkLib
 				spSession->m_isDrainingSend = true;
 				spSession->m_sendDrainedCv.wait_for(sessionStateLock, std::chrono::milliseconds(drainMilliseconds), [&spSession]
 				{
-					return spSession->m_spSending == nullptr || spSession->m_state == CNetSession::EState::Closing;
+					return (spSession->m_sendCount == 0 && spSession->m_sendQueue.empty()) || spSession->m_state == CNetSession::EState::Closing;
 				});
 			}
 			spSession->beginCloseLocked(ERROR_OPERATION_ABORTED);

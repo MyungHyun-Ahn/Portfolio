@@ -2,6 +2,9 @@
 
 namespace Chatting
 {
+{% if side == 'Server' %}
+	enum class EPacketType : std::uint16_t;
+{% endif %}
 {% for packet in packets %}
 	struct S{{ packet.name }};
 {% endfor %}
@@ -12,4 +15,37 @@ namespace Chatting
 	[[nodiscard]] {% if side == 'Client' %}std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> {% else %}NetworkLib::CSerializableBuffer<FALSE> *{% endif %}MakePacket{{ packet.name }}(
 		const S{{ packet.name }} &packet) noexcept;
 {% endfor %}
+
+	class C{{ side }}PacketSender
+	{
+	public:
+{% for packet in packets %}
+{% if side == 'Server' %}
+		// 준비 실패 시 nullptr. 반환한 참조 1개는 호출자가 반환한다. 첫 전송 성공을 뜻하지 않는다.
+{% endif %}
+		[[nodiscard]] {{ packet.send_result }}{{ packet.send_name }}({% if packet.send_parameters %}{{ '\n' }}
+{% for parameter in packet.send_parameters %}
+			{{ parameter }}{{ ',' if not loop.last else ') noexcept;' }}
+{% endfor %}
+{% else %}) noexcept;{{ '\n' }}
+{% endif %}
+{% endfor %}
+{% if packets %}
+
+{% endif %}
+	protected:
+		virtual ~C{{ side }}PacketSender() = default;
+{% if side == 'Server' %}
+		// 직렬화된 버퍼를 받아 호출자 참조를 확보한 뒤 전송한다.
+		[[nodiscard]] NetworkLib::CSerializableBuffer<FALSE> *submitPreparedPacket(
+			UINT64 sessionId, EPacketType type, NetworkLib::CSerializableBuffer<FALSE> *pPacket) noexcept;
+{% endif %}
+
+	private:
+{% if side == 'Client' %}
+		virtual bool sendPacket(std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> spPacket) noexcept = 0;
+{% else %}
+		virtual void sendPacket(UINT64 sessionId, EPacketType type, NetworkLib::CSerializableBuffer<FALSE> &packet) noexcept = 0;
+{% endif %}
+	};
 }

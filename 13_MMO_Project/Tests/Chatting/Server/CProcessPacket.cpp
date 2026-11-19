@@ -27,22 +27,37 @@ namespace Chatting
 	using MHLib::utils::ELogLevel;
 	using MHLib::utils::g_pLogger;
 
+	namespace
+	{
+		void ReleaseResponse(NetworkLib::CSerializableBuffer<FALSE> *pResponse) noexcept
+		{
+			if (pResponse != nullptr && pResponse->DecreaseRef() == 0)
+				NetworkLib::CSerializableBuffer<FALSE>::Free(pResponse);
+		}
+	}
+
+	void CProcessPacket::sendPacket(UINT64 sessionId, EPacketType type, NetworkLib::CSerializableBuffer<FALSE> &packet) noexcept
+	{
+		if (type == EPacketType::ResMessage)
+			packet.SetSessionId(sessionId);
+		NetworkLib::PrepareNetPacket(packet, kPacketCode);
+		m_contents.m_server.SendPacket(sessionId, &packet);
+	}
+
 	bool CProcessPacket::HandleReqLogin(UINT64 sessionId, const SReqLogin &packet) noexcept
 	{
 		auto it = m_contents.m_umapNonLoginPlayer.find(sessionId);
 		if (it == m_contents.m_umapNonLoginPlayer.end())
 			return false;
 
-		SResLogin response;
 		const INT64 accountNo = packet.m_accountNo;
-		response.m_accountNo = accountNo;
 		// 로컬 테스트 전용 인증이다.
 		if (accountNo <= 0 || packet.m_id.front() == L'\0' || packet.m_nickname.front() == L'\0'
 			|| wmemchr(packet.m_id.data(), L'\0', packet.m_id.size()) == nullptr
 			|| wmemchr(packet.m_nickname.data(), L'\0', packet.m_nickname.size()) == nullptr
 			|| std::memcmp(packet.m_sessionKey.data(), kTestSessionKey, kSessionKeyBytes) != 0)
 		{
-			m_contents.SendResponse(sessionId, MakePacketResLogin(response));
+			ReleaseResponse(SendResLogin(sessionId, FALSE, accountNo));
 			return false;
 		}
 		for (const auto &entry : m_contents.m_umapLoginPlayer)
@@ -51,7 +66,9 @@ namespace Chatting
 				return false;
 		}
 
+		SResLogin response;
 		response.m_status = TRUE;
+		response.m_accountNo = accountNo;
 		auto *pResponse = MakePacketResLogin(response);
 		if (pResponse == nullptr)
 			return false;
@@ -62,7 +79,7 @@ namespace Chatting
 		std::copy(packet.m_nickname.begin(), packet.m_nickname.end(), pPlayer->m_nickname);
 		m_contents.m_umapNonLoginPlayer.erase(it);
 		m_contents.m_umapLoginPlayer.emplace(sessionId, pPlayer);
-		m_contents.SendResponse(sessionId, pResponse);
+		ReleaseResponse(submitPreparedPacket(sessionId, EPacketType::ResLogin, pResponse));
 		g_pLogger->WriteLogConsole(ELogLevel::System, L"LOGIN account=%lld", accountNo);
 		return true;
 	}
@@ -94,7 +111,7 @@ namespace Chatting
 		pPlayer->m_sectorX = sectorX;
 		pPlayer->m_sectorY = sectorY;
 		pPlayer->m_prevRecvTime = timeGetTime();
-		m_contents.SendResponse(sessionId, pResponse);
+		ReleaseResponse(submitPreparedPacket(sessionId, EPacketType::ResSectorMove, pResponse));
 		g_pLogger->WriteLogConsole(ELogLevel::System, L"SECTOR account=%lld x=%u y=%u", accountNo, sectorX, sectorY);
 		return true;
 	}
@@ -110,30 +127,17 @@ namespace Chatting
 			|| packet.m_message.empty() || packet.m_message.size() > kMaxMessageBytes / sizeof(WCHAR))
 			return false;
 
-		SResMessage response;
-		response.m_accountNo = packet.m_accountNo;
-		std::copy_n(pPlayer->m_id, response.m_id.size(), response.m_id.begin());
-		std::copy_n(pPlayer->m_nickname, response.m_nickname.size(), response.m_nickname.begin());
-		try
-		{
-			response.m_message = packet.m_message;
-		}
-		catch (const std::bad_alloc &)
-		{
-			return false;
-		}
-		auto *pResponse = MakePacketResMessage(response);
+		std::array<WCHAR, kNameLength> id{};
+		std::array<WCHAR, kNameLength> nickname{};
+		std::copy_n(pPlayer->m_id, id.size(), id.begin());
+		std::copy_n(pPlayer->m_nickname, nickname.size(), nickname.begin());
+		auto *pResponse = SendResMessage(sessionId, packet.m_accountNo, id, nickname, packet.m_message);
 		if (pResponse == nullptr)
 			return false;
 		pPlayer->m_prevRecvTime = timeGetTime();
-		pResponse->IncreaseRef();
-		pResponse->SetSessionId(sessionId);
-		NetworkLib::PrepareNetPacket(*pResponse, kPacketCode);
-		m_contents.m_server.SendPacket(sessionId, pResponse);
 		InterlockedIncrement(&NetworkLib::g_monitor.m_chatMsgRes);
 		m_contents.SendSector(sessionId, pPlayer->m_sectorY, pPlayer->m_sectorX, pResponse);
-		if (pResponse->DecreaseRef() == 0)
-			NetworkLib::CSerializableBuffer<FALSE>::Free(pResponse);
+		ReleaseResponse(pResponse);
 		return true;
 	}
 

@@ -15,6 +15,7 @@
 #include "CommonProtocol.h"
 #include "CSector.h"
 #include "IServerPacketHandler.g.h"
+#include "ServerPacketSend.g.h"
 #include "CProcessPacket.h"
 #include "CChatContents.h"
 #include "CChatServer.h"

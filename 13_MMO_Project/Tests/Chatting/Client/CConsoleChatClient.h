@@ -2,7 +2,7 @@
 
 namespace Chatting
 {
-	class CConsoleChatClient : private IClientPacketHandler
+	class CConsoleChatClient : public CClientPacketSender, private IClientPacketHandler
 	{
 	public:
 		CConsoleChatClient(NetworkLib::CNetClientManager &network, const SChatConfig &config)
@@ -21,6 +21,8 @@ namespace Chatting
 		{
 			return m_isConnected;
 		}
+		using CClientPacketSender::SendReqMessage;
+		using CClientPacketSender::SendNotiHeartbeat;
 		bool SendReqMessage(const std::wstring &text) noexcept;
 		bool SendNotiHeartbeat() noexcept;
 		bool IsReady() const noexcept
@@ -29,6 +31,7 @@ namespace Chatting
 		}
 
 	private:
+		bool sendPacket(std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> spPacket) noexcept override;
 		void onConnect() noexcept;
 		bool login() noexcept;
 		bool onRecv(NetworkLib::CSerializableBuffer<FALSE> &message) noexcept;

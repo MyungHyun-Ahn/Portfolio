@@ -46,8 +46,44 @@ INTEGER_TYPES = {f'{sign}int{width}': f'std::{sign}int{width}_t'
 FIXED_TYPES = {'utf16_fixed': ('WCHAR', 'code_units'),
                'bytes_fixed': ('char', 'bytes')}
 DIRECTIONS = {'req': 'client_to_server', 'res': 'server_to_client'}
+CPP_PARAMETER_RESERVED = set('''
+    alignas alignof and and_eq asm auto bitand bitor bool break case catch char char8_t char16_t char32_t
+    class compl concept const const_cast consteval constexpr constinit continue co_await co_return co_yield
+    decltype default delete do double dynamic_cast else enum explicit export extern false float for friend goto
+    if inline int long mutable namespace new noexcept not not_eq nullptr operator or or_eq private protected
+    public register reinterpret_cast requires return short signed sizeof static static_assert static_cast struct
+    switch template this thread_local throw true try typedef typeid typename union unsigned using virtual void
+    volatile wchar_t while xor xor_eq interface near far small pascal cdecl std
+'''.split()) | {'packet', 'sessionId', 'spPacket'}
 SIDE_OUTPUTS = {side: {f'{side}Packet{kind}.g.{ext}' for kind in ('Send', 'Dispatch') for ext in ('h', 'cpp')}
                 | {f'I{side}PacketHandler.g.h'} for side in ('Client', 'Server')}
+
+
+def sender_name(name, kind):
+    prefix = kind.capitalize()
+    if name.startswith(prefix) and len(name) > len(prefix):
+        name = name[len(prefix):]
+    elif kind == 'noti' and name.endswith(prefix) and len(name) > len(prefix):
+        name = name[:-len(prefix)]
+    return f'Send{prefix}{name}'
+
+
+def set_send_parameters(fields):
+    # 정상 필드명은 먼저 확보해 접미사를 붙인 이름과 충돌하지 않게 한다.
+    names = {field['member'][2:] for field in fields}
+    used = names | CPP_PARAMETER_RESERVED
+    for field in fields:
+        name = field['member'][2:]
+        if name in CPP_PARAMETER_RESERVED:
+            base = f'{name}Value'
+            name, suffix = base, 2
+            while name in used:
+                name = f'{base}{suffix}'
+                suffix += 1
+            used.add(name)
+        cpp_type = field['cpp_type']
+        field['parameter'] = f'const {cpp_type} &{name}' if field['copy_by_ref'] else f'{cpp_type} {name}'
+        field['argument'] = name
 
 
 def check_name(name, context):
@@ -106,7 +142,7 @@ def parse_field(value):
             cpp_type = 'std::wstring'
         else:
             raise GenerationError(f'unsupported type: {field_type!r}')
-    return dict(member=member, cpp_type=cpp_type)
+    return dict(member=member, cpp_type=cpp_type, copy_by_ref=field_type not in INTEGER_TYPES)
 
 
 def parse_packet(value):
@@ -128,7 +164,14 @@ def parse_packet(value):
     fields = [parse_field(field) for field in sequence(value['fields'])]
     if len({field['member'] for field in fields}) != len(fields):
         raise GenerationError(f'{name}: duplicate field')
-    return dict(name=name, id=packet_id, kind=kind, direction=direction, fields=fields)
+    set_send_parameters(fields)
+    is_client = direction == 'client_to_server'
+    parameters = [] if is_client else ['UINT64 sessionId']
+    parameters.extend(field['parameter'] for field in fields)
+    return dict(name=name, id=packet_id, kind=kind, direction=direction, fields=fields,
+                send_name=sender_name(name, kind), send_parameters=parameters,
+                send_result='bool ' if is_client else 'NetworkLib::CSerializableBuffer<FALSE> *',
+                copies_string=any(field['cpp_type'] == 'std::wstring' for field in fields))
 
 
 def is_link(path):
@@ -147,6 +190,7 @@ def load_protocol(root):
         if path.suffix.lower() in ('.yaml', '.yml') and path.is_file():
             files.append(path)
     packets, reserved, groups, names, ids, outputs = [], [], {}, set(), set(), set()
+    sender_names = set()
 
     def register(entry):
         if entry['id'] in ids:
@@ -197,6 +241,10 @@ def load_protocol(root):
                     reserved.append(value)
                 for packet in local:
                     register(packet)
+                    sender_key = (packet['direction'], packet['send_name'].casefold())
+                    if sender_key in sender_names:
+                        raise GenerationError(f'duplicate sender name: {packet["send_name"]}')
+                    sender_names.add(sender_key)
                 packets.extend(local)
                 contents[group][output] = local
             except (GenerationError, UnicodeError, yaml.YAMLError, RecursionError) as error:

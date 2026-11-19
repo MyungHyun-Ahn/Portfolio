@@ -1,5 +1,6 @@
 // PacketGenerator generated file. Do not edit.
 #include "pch.h"
+#include <new>
 #include "CSerializableBuffer.h"
 #include "MHLib/serialization/ISerializable.h"
 #include "IncludePacketAll.g.h"
@@ -56,5 +57,69 @@ namespace Chatting
 			return nullptr;
 		}
 		return pBuffer;
+	}
+
+	NetworkLib::CSerializableBuffer<FALSE> *CServerPacketSender::submitPreparedPacket(
+		UINT64 sessionId, EPacketType type, NetworkLib::CSerializableBuffer<FALSE> *pPacket) noexcept
+	{
+		if (pPacket == nullptr)
+		{
+			return nullptr;
+		}
+		pPacket->IncreaseRef();
+		sendPacket(sessionId, type, *pPacket);
+		return pPacket;
+	}
+
+	NetworkLib::CSerializableBuffer<FALSE> *CServerPacketSender::SendResMessage(
+
+		UINT64 sessionId,
+		std::int64_t accountNo,
+		const std::array<WCHAR, 20> &id,
+		const std::array<WCHAR, 20> &nickname,
+		const std::wstring &message) noexcept
+	{
+		SResMessage packet;
+		packet.m_accountNo = accountNo;
+		packet.m_id = id;
+		packet.m_nickname = nickname;
+		try
+		{
+			packet.m_message = message;
+		}
+		catch (const std::bad_alloc &)
+		{
+			return nullptr;
+		}
+		return this->submitPreparedPacket(sessionId, EPacketType::ResMessage,
+			MakePacketResMessage(packet));
+	}
+
+	NetworkLib::CSerializableBuffer<FALSE> *CServerPacketSender::SendResLogin(
+
+		UINT64 sessionId,
+		std::uint8_t status,
+		std::int64_t accountNo) noexcept
+	{
+		SResLogin packet;
+		packet.m_status = status;
+		packet.m_accountNo = accountNo;
+		return this->submitPreparedPacket(sessionId, EPacketType::ResLogin,
+			MakePacketResLogin(packet));
+	}
+
+	NetworkLib::CSerializableBuffer<FALSE> *CServerPacketSender::SendResSectorMove(
+
+		UINT64 sessionId,
+		std::int64_t accountNo,
+		std::uint16_t sectorX,
+		std::uint16_t sectorY) noexcept
+	{
+		SResSectorMove packet;
+		packet.m_accountNo = accountNo;
+		packet.m_sectorX = sectorX;
+		packet.m_sectorY = sectorY;
+		return this->submitPreparedPacket(sessionId, EPacketType::ResSectorMove,
+			MakePacketResSectorMove(packet));
 	}
 }

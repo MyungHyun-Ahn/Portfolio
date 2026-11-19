@@ -4,7 +4,7 @@ namespace Chatting
 {
 	class CChatContents;
 
-	class CProcessPacket final : public IServerPacketHandler
+	class CProcessPacket final : public CServerPacketSender, public IServerPacketHandler
 	{
 	public:
 		explicit CProcessPacket(CChatContents &contents) noexcept
@@ -17,6 +17,7 @@ namespace Chatting
 		bool HandleHeartbeatNoti(UINT64 sessionId, const SHeartbeatNoti &packet) noexcept override;
 
 	private:
+		void sendPacket(UINT64 sessionId, EPacketType type, NetworkLib::CSerializableBuffer<FALSE> &packet) noexcept override;
 		CChatContents &m_contents;
 	};
 }

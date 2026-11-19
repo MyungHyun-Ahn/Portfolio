@@ -10,11 +10,11 @@
 #include "CBaseContents.h"
 #include "CMonitor.h"
 #include "CommonProtocol.h"
-#include "NetPacket.h"
 #include "CPlayer.h"
 #include "CSector.h"
 #include "PacketTypes.g.h"
 #include "IServerPacketHandler.g.h"
+#include "ServerPacketSend.g.h"
 #include "ServerPacketDispatch.g.h"
 #include "CProcessPacket.h"
 #include "CChatContents.h"
@@ -89,17 +89,6 @@ namespace Chatting
 			return NetworkLib::ERecvResult::Failed;
 		}
 		return NetworkLib::ERecvResult::Received;
-	}
-
-	void CChatContents::SendResponse(UINT64 sessionId, NetworkLib::CSerializableBuffer<FALSE> *pMessage) noexcept
-	{
-		if (pMessage == nullptr)
-			return;
-		pMessage->IncreaseRef();
-		NetworkLib::PrepareNetPacket(*pMessage, kPacketCode);
-		m_server.SendPacket(sessionId, pMessage);
-		if (pMessage->DecreaseRef() == 0)
-			NetworkLib::CSerializableBuffer<FALSE>::Free(pMessage);
 	}
 
 	void CChatContents::SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX,

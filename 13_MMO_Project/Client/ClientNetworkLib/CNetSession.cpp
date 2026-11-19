@@ -4,6 +4,7 @@
 #include "NetPacket.h"
 #include "CClientMailbox.h"
 #include "CNetClientManager.h"
+#include "NetworkLimits.h"
 #include "CNetSession.h"
 
 namespace ClientNetworkLib
@@ -48,28 +49,33 @@ namespace ClientNetworkLib
 			return false;
 		}
 		PrepareNetPacket(*m_sendQueue.back(), m_packetCode);
-		return m_spSending != nullptr || postSendLocked();
+		return postSendLocked();
 	}
 
 	bool CNetSession::postSendLocked() noexcept
 	{
-		if (m_spSending == nullptr)
+		if (m_sendCount != 0)
+			return true;
+
+		if (m_sendQueue.empty())
 		{
-			if (m_sendQueue.empty())
-			{
-				m_sendDrainedCv.notify_all();
-				return true;
-			}
-			m_spSending = std::move(m_sendQueue.front());
+			m_sendDrainedCv.notify_all();
+			return true;
+		}
+
+		WSABUF buffers[kWsasendMaxBufferCount];
+		while (m_sendCount < m_sendBatch.size() && !m_sendQueue.empty())
+		{
+			auto &spPacket = m_sendBatch[m_sendCount];
+			spPacket = std::move(m_sendQueue.front());
 			m_sendQueue.pop_front();
-			m_sentBytes = 0;
+			buffers[m_sendCount].buf = spPacket->GetBufferPtr();
+			buffers[m_sendCount].len = spPacket->GetFullSize();
+			++m_sendCount;
 		}
 		m_sendOverlapped = {};
-		WSABUF buffer;
-		buffer.buf = m_spSending->GetBufferPtr() + m_sentBytes;
-		buffer.len = m_spSending->GetFullSize() - m_sentBytes;
 		++m_pendingIo;
-		if (WSASend(m_socket, &buffer, 1, nullptr, 0, &m_sendOverlapped, nullptr) == 0)
+		if (WSASend(m_socket, buffers, m_sendCount, nullptr, 0, &m_sendOverlapped, nullptr) == 0)
 			return true;
 		const int error = WSAGetLastError();
 		if (error == WSA_IO_PENDING)
@@ -106,10 +112,10 @@ namespace ClientNetworkLib
 			beginCloseLocked(error);
 		else if (pOverlapped == &m_connectOverlapped)
 			connectCompletedLocked(); // 첫 데이터를 보내지 않은 ConnectEx도 0바이트 성공이다.
+		else if (pOverlapped == &m_sendOverlapped)
+			sendCompletedLocked();
 		else if (bytes == 0)
 			beginCloseLocked(0);
-		else if (pOverlapped == &m_sendOverlapped)
-			sendCompletedLocked(bytes);
 		else if (!m_isDrainingSend)
 		{
 			try
@@ -143,12 +149,17 @@ namespace ClientNetworkLib
 		m_spMailbox->publishConnected();
 	}
 
-	void CNetSession::sendCompletedLocked(DWORD bytes) noexcept
+	void CNetSession::sendCompletedLocked() noexcept
 	{
-		m_sentBytes += bytes;
-		if (m_sentBytes == static_cast<DWORD>(m_spSending->GetFullSize()))
-			m_spSending.reset();
+		releaseSendBatchLocked();
 		(void)postSendLocked();
+	}
+
+	void CNetSession::releaseSendBatchLocked() noexcept
+	{
+		for (DWORD index = 0; index < m_sendCount; ++index)
+			m_sendBatch[index].reset();
+		m_sendCount = 0;
 	}
 
 	DWORD CNetSession::recvCompletedLocked(DWORD bytes)
@@ -202,7 +213,7 @@ namespace ClientNetworkLib
 		if (m_state != EState::Closing || m_pendingIo != 0 || m_isFinalized)
 			return false;
 		m_isFinalized = true;
-		m_spSending.reset();
+		releaseSendBatchLocked();
 		m_sendQueue.clear();
 		m_spMailbox->publishTerminal(m_wasConnected ? EClientEvent::Disconnected : EClientEvent::ConnectFailed, m_closeError);
 		return true;

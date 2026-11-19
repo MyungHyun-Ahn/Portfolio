@@ -48,10 +48,10 @@ class GeneratorTests(unittest.TestCase):
     def test_single_noti_projects_by_direction_and_identical_run_keeps_mtimes(self):
         self.assert_generated(self.generate())
         self.assertIn('SPulseNoti', (self.common / 'System/Pulse.g.h').read_text())
-        self.assertIn('MakePacketPulseNoti', (self.client / 'ClientPacketSend.g.h').read_text())
+        self.assertIn('MakePacketPulseNoti', (self.client / 'ClientPacketSend.g.h').read_text(encoding='utf-8'))
         self.assertNotIn('HandlePulseNoti', (self.client / 'IClientPacketHandler.g.h').read_text())
         self.assertIn('HandlePulseNoti', (self.server / 'IServerPacketHandler.g.h').read_text())
-        self.assertNotIn('MakePacketPulseNoti', (self.server / 'ServerPacketSend.g.h').read_text())
+        self.assertNotIn('MakePacketPulseNoti', (self.server / 'ServerPacketSend.g.h').read_text(encoding='utf-8'))
         before = self.snapshot()
         self.assert_generated(self.generate())
         self.assertEqual(before, self.snapshot())
@@ -97,7 +97,7 @@ class GeneratorTests(unittest.TestCase):
             with self.subTest(side=side):
                 send = (root / f'{side}PacketSend.g.cpp').read_text()
                 dispatch = (root / f'{side}PacketDispatch.g.cpp').read_text()
-                header = (root / f'{side}PacketSend.g.h').read_text()
+                header = (root / f'{side}PacketSend.g.h').read_text(encoding='utf-8')
                 if side == 'Client':
                     self.assertIn('std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>>', header)
                     self.assertIn('CSerializableBuffer<FALSE>::MakeShared()', send)
@@ -114,6 +114,60 @@ class GeneratorTests(unittest.TestCase):
                                  r' && message.GetDataSize\(\) == 0\s*&& handler.Handle')
                 for obsolete in ('PacketCodec', 'PacketBufferAdapter', 'CPacketBufferWriter', 'CPacketBufferReader'):
                     self.assertNotIn(obsolete, send + dispatch)
+
+    def test_generated_senders_use_field_arguments_and_distinct_ownership(self):
+        self.assert_generated(self.generate(schema=ROOT / 'Common/Packet/Schema'))
+        client = (self.client / 'ClientPacketSend.g.h').read_text(encoding='utf-8')
+        server = (self.server / 'ServerPacketSend.g.h').read_text(encoding='utf-8')
+        client_cpp = (self.client / 'ClientPacketSend.g.cpp').read_text()
+        server_cpp = (self.server / 'ServerPacketSend.g.cpp').read_text()
+        self.assertIn('class CClientPacketSender', client)
+        self.assertIn('class CServerPacketSender', server)
+        self.assertRegex(client, r'bool SendReqMessage\(\s*std::int64_t accountNo,\s*const std::wstring &message\) noexcept;')
+        self.assertRegex(client, r'bool SendNotiHeartbeat\(\s*std::int64_t accountNo\) noexcept;')
+        self.assertRegex(client, r'const std::array<WCHAR, 20> &id,\s*const std::array<WCHAR, 20> &nickname,\s*'
+                                 r'const std::array<char, 64> &sessionKey')
+        for name in ('Login', 'SectorMove', 'Message'):
+            self.assertRegex(server, rf'\*SendRes{name}\(\s*UINT64 sessionId,')
+            self.assertNotIn(f'SendRes{name}', client)
+        self.assertNotRegex(server, r'Send(?:Req|Noti)')
+        self.assertIn('packet.m_message = message;', client_cpp)
+        self.assertRegex(client_cpp, r'catch \(const std::bad_alloc &\)\s*\{\s*return false;')
+        self.assertRegex(client_cpp, r'auto spPacket = MakePacketReqMessage\(packet\);\s*'
+                                     r'return spPacket != nullptr && this->sendPacket\(std::move\(spPacket\)\);')
+        self.assertRegex(server_cpp, r'catch \(const std::bad_alloc &\)\s*\{\s*return nullptr;')
+        self.assertRegex(server_cpp, r'submitPreparedPacket\(sessionId, EPacketType::ResMessage,\s*MakePacketResMessage\(packet\)\)')
+        self.assertRegex(server_cpp, r'if \(pPacket == nullptr\)\s*\{\s*return nullptr;\s*\}\s*'
+                                     r'pPacket->IncreaseRef\(\);\s*sendPacket\(sessionId, type, \*pPacket\);\s*return pPacket;')
+
+    def test_server_noti_and_field_parameter_name_conflicts(self):
+        schema = NOTI.replace('client_to_server', 'server_to_client').replace('account_no', 'session_id')
+        schema += ('      - {name: packet, type: uint8}\n'
+                   '      - {name: class, type: uint8}\n'
+                   '      - {name: packet_value, type: uint8}\n')
+        self.source.write_text(schema, encoding='utf-8')
+        empty = schema[:schema.index('    fields:')].replace('PulseNoti', 'NotiReady').replace('id: 7', 'id: 8')
+        self.source.with_name('Ready.yaml').write_text(empty + '    fields: []\n', encoding='utf-8')
+        self.assert_generated(self.generate())
+        server = (self.server / 'ServerPacketSend.g.h').read_text(encoding='utf-8')
+        server_cpp = (self.server / 'ServerPacketSend.g.cpp').read_text()
+        self.assertRegex(server, r'\*SendNotiPulse\(\s*UINT64 sessionId,\s*std::int64_t sessionIdValue,\s*'
+                                 r'std::uint8_t packetValue2,\s*std::uint8_t classValue,\s*std::uint8_t packetValue\) noexcept;')
+        self.assertRegex(server, r'\*SendNotiReady\(\s*UINT64 sessionId\) noexcept;')
+        self.assertIn('packet.m_sessionId = sessionIdValue;', server_cpp)
+        self.assertIn('packet.m_packet = packetValue2;', server_cpp)
+        self.assertNotIn('SendNotiPulse', (self.client / 'ClientPacketSend.g.h').read_text(encoding='utf-8'))
+        self.assertIn('HandlePulseNoti', (self.client / 'IClientPacketHandler.g.h').read_text())
+
+    def test_generated_send_name_collision_is_rejected_before_writing(self):
+        self.assert_generated(self.generate())
+        before = self.snapshot()
+        other = NOTI.replace('PulseNoti', 'NotiPulse').replace('id: 7', 'id: 8')
+        self.source.with_name('Other.yaml').write_text(other, encoding='utf-8')
+        result = self.generate()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('duplicate sender name: SendNotiPulse', result.stderr)
+        self.assertEqual(before, self.snapshot())
 
     def test_validation_preserves_all_outputs(self):
         self.assert_generated(self.generate())

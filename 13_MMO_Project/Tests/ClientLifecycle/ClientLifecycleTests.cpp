@@ -4,8 +4,8 @@
 #include "NetPacket.h"
 #include "CClientMailbox.h"
 #include "CNetClientManager.h"
-#include "CNetSession.h"
 #include "NetworkLimits.h"
+#include "CNetSession.h"
 #include "CRecvBuffer.h"
 #include "CSerializableBufferView.h"
 #include "CLanClient.h"
@@ -62,6 +62,35 @@ namespace NetworkLib
 		static HANDLE GetLanPort(CLanClientManager &manager)
 		{
 			return manager.m_iocpHandle;
+		}
+
+		static void AttachSendTestSocket(ClientNetworkLib::CNetSession &session, SOCKET socketHandle)
+		{
+			std::lock_guard sessionStateLock(session.m_sessionStateLock);
+			session.m_socket = socketHandle;
+			session.m_state = ClientNetworkLib::CNetSession::EState::Connected;
+		}
+
+		static bool QueueSend(ClientNetworkLib::CNetSession &session, std::shared_ptr<CSerializableBuffer<FALSE>> spPacket)
+		{
+			std::lock_guard sessionStateLock(session.m_sessionStateLock);
+			return session.queueSendLocked(std::move(spPacket));
+		}
+
+		static bool CompleteSend(ClientNetworkLib::CNetSession &session, OVERLAPPED *pOverlapped, DWORD bytes, DWORD error)
+		{
+			std::lock_guard sessionStateLock(session.m_sessionStateLock);
+			if (pOverlapped != &session.m_sendOverlapped || session.m_pendingIo != 1)
+				return false;
+			session.completeLocked(pOverlapped, bytes, error);
+			return true;
+		}
+
+		static bool FinishSendTestClose(ClientNetworkLib::CNetSession &session)
+		{
+			std::lock_guard sessionStateLock(session.m_sessionStateLock);
+			session.beginCloseLocked(ERROR_OPERATION_ABORTED);
+			return session.finishCloseLocked();
 		}
 	};
 }
@@ -125,6 +154,85 @@ namespace
 		SClientEvent event = WaitEvent(mailbox);
 		Check(event.m_kind == kind && event.m_error == error, L"expected terminal event and reason");
 		Check(!mailbox.TryPop(event), L"terminal event was delivered only once");
+	}
+
+	void VerifyNetSendBatch()
+	{
+		constexpr BYTE kPacketCode = 0x77;
+		USHORT port = 0;
+		const SOCKET listener = BindLoopback(port);
+		Check(listen(listener, SOMAXCONN) == 0, L"batch listen");
+		const SOCKET sender = WSASocketW(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED);
+		SOCKADDR_IN address{};
+		address.sin_family = AF_INET;
+		address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+		address.sin_port = htons(port);
+		Check(sender != INVALID_SOCKET && connect(sender, reinterpret_cast<sockaddr *>(&address), sizeof(address)) == 0,
+			L"connect batch sender");
+		const SOCKET peer = AcceptPeer(listener);
+		closesocket(listener);
+		const HANDLE completionPort = CreateIoCompletionPort(reinterpret_cast<HANDLE>(sender), nullptr, 0, 1);
+		Check(completionPort != nullptr, L"batch sender uses an IOCP consumed by the test");
+		{
+			ClientNetworkLib::CNetSession session(kPacketCode, std::make_shared<CClientMailbox>());
+			CClientLifecycleProbe::AttachSendTestSocket(session, sender);
+			constexpr DWORD kFrameBytes = sizeof(SNetHeader) + sizeof(BYTE);
+			constexpr BYTE kPacketCount = 4;
+			std::array<std::weak_ptr<CSerializableBuffer<FALSE>>, kPacketCount> packets;
+			auto enqueuePacket = [&](BYTE index)
+			{
+				auto spPacket = CSerializableBuffer<FALSE>::MakeShared();
+				Check(spPacket != nullptr, L"allocate batch packet");
+				*spPacket << index;
+				packets[index] = spPacket;
+				Check(CClientLifecycleProbe::QueueSend(session, std::move(spPacket)), L"enqueue batch packet");
+			};
+			for (BYTE index = 0; index < kPacketCount; ++index)
+				enqueuePacket(index);
+			auto completeSend = [&](DWORD expectedBytes, bool isClosing = false)
+			{
+				DWORD bytes = 0;
+				ULONG_PTR key = 0;
+				OVERLAPPED *pOverlapped = nullptr;
+				const BOOL isCompleted = GetQueuedCompletionStatus(completionPort, &bytes, &key, &pOverlapped, 7000);
+				const DWORD error = isCompleted ? ERROR_SUCCESS : GetLastError();
+				Check(pOverlapped != nullptr, L"Send completion was dequeued before deadline");
+				Check(isCompleted ? bytes == expectedBytes : isClosing && error == ERROR_OPERATION_ABORTED,
+					L"Send completion covers the batch or reports cancellation during close");
+				Check(CClientLifecycleProbe::CompleteSend(session, pOverlapped, bytes, error), L"only one Send I/O is in flight");
+			};
+			completeSend(kFrameBytes);
+			Check(packets[0].expired() && !packets[1].expired() && !packets[2].expired() && !packets[3].expired(),
+				L"queued batch remains owned until completion is processed");
+			completeSend(kFrameBytes * (kPacketCount - 1));
+			for (BYTE index = 0; index < kPacketCount; ++index)
+			{
+				Check(packets[index].expired(), L"batch completion releases each owned buffer");
+				std::array<char, kFrameBytes> frame{};
+				Check(recv(peer, frame.data(), static_cast<int>(frame.size()), MSG_WAITALL) == static_cast<int>(frame.size()),
+					L"peer receives each complete frame");
+				SNetHeader header{};
+				memcpy(&header, frame.data(), sizeof(header));
+				Check(header.code == kPacketCode && header.len == 1, L"batch preserves each Net header");
+				MHLib::security::CEncryption::Decoding(frame.data() + 4, header.len + 1, header.randKey);
+				Check(static_cast<BYTE>(frame.back()) == index, L"batch preserves packet FIFO on the wire");
+			}
+
+			for (BYTE index = 0; index < kPacketCount; ++index)
+				enqueuePacket(index);
+			completeSend(kFrameBytes);
+			enqueuePacket(0);
+			Check(!CClientLifecycleProbe::FinishSendTestClose(session), L"close waits for the active batch completion");
+			for (const auto &wpPacket : packets)
+				Check(!wpPacket.expired(), L"close retains active batch and queued owners while completion is unread");
+			completeSend(kFrameBytes * (kPacketCount - 1), true);
+			Check(CClientLifecycleProbe::FinishSendTestClose(session), L"close finishes after the active batch completion");
+			for (const auto &wpPacket : packets)
+				Check(wpPacket.expired(), L"close releases active batch and queued owners after completion");
+		}
+		CloseHandle(completionPort);
+		closesocket(peer);
+		g_pLogger->WriteLogConsole(ELogLevel::System, L"PASS: Net batch FIFO and whole completion ownership");
 	}
 
 	void CheckConnectPending(CNetClientManager &client, SessionId sessionId, const wchar_t *pCase)
@@ -422,6 +530,7 @@ int main(void)
 	Check(WSAStartup(MAKEWORD(2, 2), &wsaData) == 0, L"fixture Winsock startup");
 	VerifyLifecycle(1);
 	VerifyLifecycle(2);
+	VerifyNetSendBatch();
 	VerifyLanLoopback();
 	WSACleanup();
 	fflush(nullptr);

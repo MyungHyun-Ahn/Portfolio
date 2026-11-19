@@ -28,7 +28,8 @@ namespace ClientNetworkLib
 		[[nodiscard]] bool postRecvLocked() noexcept;
 		void completeLocked(OVERLAPPED *pOverlapped, DWORD bytes, DWORD error) noexcept;
 		void connectCompletedLocked() noexcept;
-		void sendCompletedLocked(DWORD bytes) noexcept;
+		void sendCompletedLocked() noexcept;
+		void releaseSendBatchLocked() noexcept;
 		[[nodiscard]] DWORD recvCompletedLocked(DWORD bytes);
 		void beginCloseLocked(DWORD error) noexcept;
 		[[nodiscard]] bool finishCloseLocked() noexcept;
@@ -53,7 +54,7 @@ namespace ClientNetworkLib
 		std::array<char, 4096> m_recvBytes{};
 		std::vector<char> m_recvStream;
 		std::deque<std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>>> m_sendQueue;
-		std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> m_spSending;
-		DWORD m_sentBytes = 0;
+		std::array<std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>>, NetworkLib::kWsasendMaxBufferCount> m_sendBatch;
+		DWORD m_sendCount = 0;
 	};
 }

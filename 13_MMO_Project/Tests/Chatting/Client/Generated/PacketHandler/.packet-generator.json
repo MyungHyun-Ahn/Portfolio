@@ -2,8 +2,8 @@
   "files": {
     "ClientPacketDispatch.g.cpp": "8c1bb499da9878140652cfac0b1e148f1c9ce65c8b451d6e4f689c2b463d3c85",
     "ClientPacketDispatch.g.h": "19ad875636bc774c66a87214d69cb493569b743cab89d1a3af49cfc27bab1183",
-    "ClientPacketSend.g.cpp": "d130eb5d86dbec5ed00f132a008a5e1abd480b9e411523426a00ba79a282a217",
-    "ClientPacketSend.g.h": "7f4cf1a850f6e65a1d55743d0a6e9d258085bffb65350eeba011ab5f1260b701",
+    "ClientPacketSend.g.cpp": "90ef404d45ee548bf630a353e3b5ad1d0e955740c0a3dc0850cc1dfc57d82e39",
+    "ClientPacketSend.g.h": "ab8b83dcc2b226657e82a415aae49fd35f4927a785f7a3c66e2e0894bd351ce1",
     "IClientPacketHandler.g.h": "a75fee480d06b5d8a9cc8ec125cd7262a158d4a9633dcf64f560892939aca8ec"
   },
   "role": "Client",

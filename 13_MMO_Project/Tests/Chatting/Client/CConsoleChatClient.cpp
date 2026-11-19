@@ -1,6 +1,7 @@
 #include "pch.h"
 #include <memory>
 #include <condition_variable>
+#include <utility>
 #include "CSerializableBuffer.h"
 #include "CommonProtocol.h"
 #include "Config.h"
@@ -86,42 +87,34 @@ namespace Chatting
 
 	bool CConsoleChatClient::login() noexcept
 	{
-		SReqLogin packet;
-		packet.m_accountNo = m_config.m_accountNo;
-		WCHAR id[kNameLength]{};
-		if (m_config.m_accountNo <= 0 || _i64tow_s(m_config.m_accountNo, id, kNameLength, 10) != 0
-			|| m_config.m_name.size() >= packet.m_nickname.size()
-			|| wcscpy_s(packet.m_id.data(), packet.m_id.size(), id) != 0
-			|| wcscpy_s(packet.m_nickname.data(), packet.m_nickname.size(), m_config.m_name.c_str()) != 0)
+		std::array<WCHAR, kNameLength> id{};
+		std::array<WCHAR, kNameLength> nickname{};
+		std::array<char, kSessionKeyBytes> sessionKey{};
+		if (m_config.m_accountNo <= 0 || _i64tow_s(m_config.m_accountNo, id.data(), id.size(), 10) != 0
+			|| m_config.m_name.size() >= nickname.size()
+			|| wcscpy_s(nickname.data(), nickname.size(), m_config.m_name.c_str()) != 0)
 			return false;
-		std::copy_n(kTestSessionKey, kSessionKeyBytes, packet.m_sessionKey.begin());
-		return m_network.SendPacket(m_sessionId, MakePacketReqLogin(packet));
+		std::copy_n(kTestSessionKey, kSessionKeyBytes, sessionKey.begin());
+		return SendReqLogin(m_config.m_accountNo, id, nickname, sessionKey);
 	}
 
 	bool CConsoleChatClient::SendReqMessage(const std::wstring &text) noexcept
 	{
 		if (!m_isReady || text.empty() || text.size() > kMaxMessageBytes / sizeof(WCHAR))
 			return false;
-		try
-		{
-			SReqMessage packet;
-			packet.m_accountNo = m_config.m_accountNo;
-			packet.m_message = text;
-			return m_network.SendPacket(m_sessionId, MakePacketReqMessage(packet));
-		}
-		catch (const std::bad_alloc &)
-		{
-			return false;
-		}
+		return SendReqMessage(m_config.m_accountNo, text);
 	}
 
 	bool CConsoleChatClient::SendNotiHeartbeat() noexcept
 	{
 		if (!m_isReady)
 			return false;
-		SHeartbeatNoti packet;
-		packet.m_accountNo = m_config.m_accountNo;
-		return m_network.SendPacket(m_sessionId, MakePacketHeartbeatNoti(packet));
+		return SendNotiHeartbeat(m_config.m_accountNo);
+	}
+
+	bool CConsoleChatClient::sendPacket(std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> spPacket) noexcept
+	{
+		return m_network.SendPacket(m_sessionId, std::move(spPacket));
 	}
 
 	bool CConsoleChatClient::onRecv(NetworkLib::CSerializableBuffer<FALSE> &message) noexcept
@@ -136,11 +129,7 @@ namespace Chatting
 		m_isLogin = true;
 		g_pLogger->WriteLogConsole(ELogLevel::System, L"LOGIN OK account=%lld", packet.m_accountNo);
 		// 로그인 응답을 받은 다음 섹터에 등록한다.
-		SReqSectorMove request;
-		request.m_accountNo = packet.m_accountNo;
-		request.m_sectorX = m_config.m_sectorX;
-		request.m_sectorY = m_config.m_sectorY;
-		return m_network.SendPacket(m_sessionId, MakePacketReqSectorMove(request));
+		return SendReqSectorMove(packet.m_accountNo, m_config.m_sectorX, m_config.m_sectorY);
 	}
 
 	bool CConsoleChatClient::HandleResSectorMove(const SResSectorMove &packet) noexcept

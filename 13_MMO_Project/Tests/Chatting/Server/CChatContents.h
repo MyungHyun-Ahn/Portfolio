@@ -17,7 +17,6 @@ namespace Chatting
 			int delayFrame) noexcept override;
 		void OnLoopEnd() noexcept override;
 		void SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX, NetworkLib::CSerializableBuffer<FALSE> *pMessage) noexcept;
-		void SendResponse(UINT64 sessionId, NetworkLib::CSerializableBuffer<FALSE> *pMessage) noexcept;
 
 	private:
 		void nonLoginHeartbeat() noexcept;
