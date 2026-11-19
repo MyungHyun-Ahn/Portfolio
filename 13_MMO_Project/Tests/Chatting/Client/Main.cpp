@@ -6,6 +6,7 @@
 #include "Config.h"
 #include "Console.h"
 #include "CNetClientManager.h"
+#include "CNetClient.h"
 #include "IClientPacketHandler.g.h"
 #include "ClientPacketSend.g.h"
 #include "CConsoleChatClient.h"
@@ -27,7 +28,8 @@ int main(void)
 		NetworkLib::CNetClientManager network;
 		Chatting::CConsoleChatClient client(network, config);
 		MHLib::security::CEncryption::sm_packetKey = Chatting::kPacketKey;
-		if (network.Init(1) && client.Connect())
+		if (network.Init(1, config.m_recvBufferBytes)
+			&& client.Connect(config.m_ip.c_str(), config.m_port, Chatting::kPacketCode, config.m_connectTimeoutMilliseconds))
 		{
 			while (client.IsActive() && !client.IsConnected())
 			{
@@ -75,14 +77,17 @@ int main(void)
 					if (inputResult == Chatting::EInputResult::Line && !line.empty())
 					{
 						std::wstring text;
-						if (!Chatting::Utf8ToWide(line, text) || !client.SendReqMessage(text))
+						if (!client.IsReady() || !Chatting::Utf8ToWide(line, text) || text.empty()
+							|| text.size() > Chatting::kMaxMessageBytes / sizeof(WCHAR)
+							|| !client.SendReqMessage(config.m_accountNo, text))
 						{
 							g_pLogger->WriteLogConsole(ELogLevel::Error, L"MESSAGE REJECTED: use UTF-8, 1..256 UTF-16 code units");
 						}
 					}
 					if (timeGetTime() - prevHeartbeatTime >= Chatting::kHeartbeatMilliseconds)
 					{
-						client.SendNotiHeartbeat();
+						if (client.IsReady())
+							(void)client.SendNotiHeartbeat(config.m_accountNo);
 						prevHeartbeatTime = timeGetTime();
 					}
 					Sleep(10);

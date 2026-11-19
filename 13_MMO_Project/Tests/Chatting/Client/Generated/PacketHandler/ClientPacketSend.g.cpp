@@ -5,6 +5,10 @@
 #include "CSerializableBuffer.h"
 #include "MHLib/serialization/ISerializable.h"
 #include "IncludePacketAll.g.h"
+#include "CNetClientManager.h"
+#include "CNetClient.h"
+#include "IClientPacketHandler.g.h"
+#include "ClientPacketDispatch.g.h"
 #include "ClientPacketSend.g.h"
 
 namespace Chatting
@@ -73,7 +77,12 @@ namespace Chatting
 		return spBuffer;
 	}
 
-	bool CClientPacketSender::SendReqMessage(
+	bool CChatNetClient::onRecv(NetworkLib::CSerializableBuffer<FALSE> &message) noexcept
+	{
+		return DispatchClientPacket(message, *this);
+	}
+
+	bool CChatNetClient::SendReqMessage(
 
 		std::int64_t accountNo,
 		const std::wstring &message) noexcept
@@ -89,10 +98,10 @@ namespace Chatting
 			return false;
 		}
 		auto spPacket = MakePacketReqMessage(packet);
-		return spPacket != nullptr && this->sendPacket(std::move(spPacket));
+		return spPacket != nullptr && sendNetworkPacket(std::move(spPacket));
 	}
 
-	bool CClientPacketSender::SendReqLogin(
+	bool CChatNetClient::SendReqLogin(
 
 		std::int64_t accountNo,
 		const std::array<WCHAR, 20> &id,
@@ -105,10 +114,10 @@ namespace Chatting
 		packet.m_nickname = nickname;
 		packet.m_sessionKey = sessionKey;
 		auto spPacket = MakePacketReqLogin(packet);
-		return spPacket != nullptr && this->sendPacket(std::move(spPacket));
+		return spPacket != nullptr && sendNetworkPacket(std::move(spPacket));
 	}
 
-	bool CClientPacketSender::SendReqSectorMove(
+	bool CChatNetClient::SendReqSectorMove(
 
 		std::int64_t accountNo,
 		std::uint16_t sectorX,
@@ -119,16 +128,16 @@ namespace Chatting
 		packet.m_sectorX = sectorX;
 		packet.m_sectorY = sectorY;
 		auto spPacket = MakePacketReqSectorMove(packet);
-		return spPacket != nullptr && this->sendPacket(std::move(spPacket));
+		return spPacket != nullptr && sendNetworkPacket(std::move(spPacket));
 	}
 
-	bool CClientPacketSender::SendNotiHeartbeat(
+	bool CChatNetClient::SendNotiHeartbeat(
 
 		std::int64_t accountNo) noexcept
 	{
 		SHeartbeatNoti packet;
 		packet.m_accountNo = accountNo;
 		auto spPacket = MakePacketHeartbeatNoti(packet);
-		return spPacket != nullptr && this->sendPacket(std::move(spPacket));
+		return spPacket != nullptr && sendNetworkPacket(std::move(spPacket));
 	}
 }

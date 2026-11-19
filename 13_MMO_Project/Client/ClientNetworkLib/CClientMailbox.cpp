@@ -1,9 +1,10 @@
 #include "pch.h"
+#include "ClientEvent.h"
 #include "CClientMailbox.h"
 
 namespace NetworkLib
 {
-	bool CClientMailbox::TryPop(SClientEvent &outEvent) noexcept
+	bool CClientMailbox::tryPop(SClientEvent &outEvent) noexcept
 	{
 		std::lock_guard mailboxLock(m_mailboxLock);
 		if (m_hasConnected)
@@ -16,10 +17,10 @@ namespace NetworkLib
 			outEvent = { EClientEvent::Packet, 0, std::move(m_packets.front()) };
 			m_packets.pop_front();
 		}
-		else if (m_hasTerminal)
+		else if (m_terminal)
 		{
-			outEvent = std::move(m_terminal);
-			m_hasTerminal = false;
+			outEvent = std::move(*m_terminal);
+			m_terminal.reset();
 		}
 		else
 			return false;
@@ -49,10 +50,13 @@ namespace NetworkLib
 		m_hasConnected = true;
 	}
 
-	void CClientMailbox::publishTerminal(EClientEvent kind, DWORD error) noexcept
+	// 종료 이벤트를 발행한다.
+	// - Disconnected와 연결 전 종료시에 사용
+	// - Mailbox에 종료 이벤트를 저장하고
+	// - Tick()에서 이 이벤트를 꺼내면 onDisconnect가 호출된다.
+	void CClientMailbox::publishTerminalEvent(EClientEvent kind, DWORD error) noexcept
 	{
 		std::lock_guard mailboxLock(m_mailboxLock);
-		m_terminal = { kind, error, {} };
-		m_hasTerminal = true;
+		m_terminal = SClientEvent{ kind, error, {} };
 	}
 }

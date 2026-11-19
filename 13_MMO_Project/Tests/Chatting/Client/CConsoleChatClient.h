@@ -2,48 +2,28 @@
 
 namespace Chatting
 {
-	class CConsoleChatClient : public CClientPacketSender, private IClientPacketHandler
+	class CConsoleChatClient : public CChatNetClient
 	{
 	public:
 		CConsoleChatClient(NetworkLib::CNetClientManager &network, const SChatConfig &config)
-			: m_network(network)
+			: CChatNetClient(network)
 			, m_config(config)
 		{
 		}
-		bool Connect() noexcept;
-		void Disconnect() noexcept;
-		void Tick() noexcept;
-		bool IsActive() const noexcept
-		{
-			return m_sessionId != 0;
-		}
-		bool IsConnected() const noexcept
-		{
-			return m_isConnected;
-		}
-		using CClientPacketSender::SendReqMessage;
-		using CClientPacketSender::SendNotiHeartbeat;
-		bool SendReqMessage(const std::wstring &text) noexcept;
-		bool SendNotiHeartbeat() noexcept;
+
 		bool IsReady() const noexcept
 		{
 			return m_isReady;
 		}
 
 	private:
-		bool sendPacket(std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> spPacket) noexcept override;
-		void onConnect() noexcept;
+		bool onConnect() noexcept override;
 		bool login() noexcept;
-		bool onRecv(NetworkLib::CSerializableBuffer<FALSE> &message) noexcept;
-		void onDisconnect() noexcept;
+		void onDisconnect(bool wasConnected, DWORD error) noexcept override;
 		bool HandleResLogin(const SResLogin &packet) noexcept override;
 		bool HandleResSectorMove(const SResSectorMove &packet) noexcept override;
 		bool HandleResMessage(const SResMessage &packet) noexcept override;
-		NetworkLib::CNetClientManager &m_network;
 		SChatConfig m_config;
-		NetworkLib::SessionId m_sessionId = 0;
-		std::shared_ptr<NetworkLib::CClientMailbox> m_spMailbox;
-		bool m_isConnected = false;
 		bool m_isReady = false;
 		bool m_isLogin = false;
 	};

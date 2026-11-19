@@ -1,10 +1,14 @@
 #include "ClientLifecyclePch.h"
+#include <optional>
 #include "CSerializableBuffer.h"
 #include "NetHeaders.h"
 #include "NetPacket.h"
+#include "ClientEvent.h"
 #include "CClientMailbox.h"
 #include "CNetClientManager.h"
+#include "CNetClient.h"
 #include "NetworkLimits.h"
+#include "CRingBuffer.h"
 #include "CNetSession.h"
 #include "CRecvBuffer.h"
 #include "CSerializableBufferView.h"
@@ -17,7 +21,22 @@ namespace NetworkLib
 		static_assert(std::is_same_v<decltype(CNetClientManager::m_sessions),
 			std::unordered_map<SessionId, std::shared_ptr<ClientNetworkLib::CNetSession>>>);
 
+		static_assert(std::is_same_v<decltype(CNetClientManager::m_mailboxes),
+			std::unordered_map<SessionId, std::shared_ptr<CClientMailbox>>>);
+
 	public:
+		static size_t GetMailboxCount(CNetClientManager &client)
+		{
+			std::lock_guard sessionTableLock(client.m_sessionTableLock);
+			return client.m_mailboxes.size();
+		}
+
+		static LPFN_CONNECTEX ReplaceConnectEx(CNetClientManager &client, LPFN_CONNECTEX pConnectEx)
+		{
+			std::lock_guard sessionTableLock(client.m_sessionTableLock);
+			return std::exchange(client.m_pConnectEx, pConnectEx);
+		}
+
 		static auto FindSession(CNetClientManager &client, SessionId sessionId)
 		{
 			return client.findSession(sessionId);
@@ -36,6 +55,17 @@ namespace NetworkLib
 			return std::unique_lock(session.m_sessionStateLock);
 		}
 
+		static int GetBufferedRecvBytes(ClientNetworkLib::CNetSession &session)
+		{
+			std::lock_guard sessionStateLock(session.m_sessionStateLock);
+			return session.m_recvBuffer.GetUseSize();
+		}
+
+		static int GetRecvBufferCapacity(const ClientNetworkLib::CNetSession &session)
+		{
+			return session.m_recvBuffer.GetCapacity();
+		}
+
 		static bool IsAccepting(CNetClientManager &client)
 		{
 			std::lock_guard sessionTableLock(client.m_sessionTableLock);
@@ -51,7 +81,7 @@ namespace NetworkLib
 		static bool IsConnectPending(ClientNetworkLib::CNetSession &session)
 		{
 			std::lock_guard sessionStateLock(session.m_sessionStateLock);
-			if (session.m_state != ClientNetworkLib::CNetSession::EState::Connecting || session.m_pendingIo != 1)
+			if (session.m_state != ClientNetworkLib::CNetSession::EState::Connecting || session.m_ioCount != 1)
 				return false;
 			DWORD bytes = 0;
 			DWORD flags = 0;
@@ -80,7 +110,7 @@ namespace NetworkLib
 		static bool CompleteSend(ClientNetworkLib::CNetSession &session, OVERLAPPED *pOverlapped, DWORD bytes, DWORD error)
 		{
 			std::lock_guard sessionStateLock(session.m_sessionStateLock);
-			if (pOverlapped != &session.m_sendOverlapped || session.m_pendingIo != 1)
+			if (pOverlapped != &session.m_sendOverlapped || session.m_ioCount != 1)
 				return false;
 			session.completeLocked(pOverlapped, bytes, error);
 			return true;
@@ -98,6 +128,10 @@ namespace NetworkLib
 namespace
 {
 	using namespace NetworkLib;
+	constexpr DWORD kConnectTimeoutMilliseconds = 5000;
+	constexpr int kDefaultFixtureRecvBufferBytes = 4096;
+	static_assert(std::is_same_v<decltype(&CNetClient::Disconnect), void (CNetClient::*)() noexcept>);
+	static_assert(std::is_same_v<decltype(&CNetClientManager::Disconnect), bool (CNetClientManager::*)(SessionId) noexcept>);
 
 	void Check(bool isPassed, const wchar_t *pCase)
 	{
@@ -122,11 +156,11 @@ namespace
 		return socketHandle;
 	}
 
-	SClientEvent WaitEvent(CClientMailbox &mailbox)
+	SClientEvent WaitEvent(CNetClientManager &client, SessionId sessionId)
 	{
 		const auto deadline = GetTickCount64() + 7000;
 		SClientEvent event{};
-		while (!mailbox.TryPop(event))
+		while (!client.TryPopEvent(sessionId, event))
 		{
 			Check(GetTickCount64() < deadline, L"mailbox deadline");
 			Sleep(1);
@@ -149,11 +183,171 @@ namespace
 		return peer;
 	}
 
-	void ExpectOnlyTerminal(CClientMailbox &mailbox, EClientEvent kind, DWORD error)
+	void ExpectOnlyTerminal(CNetClientManager &client, SessionId sessionId, EClientEvent kind, DWORD error)
 	{
-		SClientEvent event = WaitEvent(mailbox);
+		SClientEvent event = WaitEvent(client, sessionId);
 		Check(event.m_kind == kind && event.m_error == error, L"expected terminal event and reason");
-		Check(!mailbox.TryPop(event), L"terminal event was delivered only once");
+		Check(!client.TryPopEvent(sessionId, event), L"terminal event was delivered only once");
+	}
+
+	void VerifyNetRecvRing()
+	{
+		constexpr BYTE kPacketCode = 0x77;
+		constexpr int kPacketBytes = static_cast<int>(CSerializableBuffer<FALSE>::EBufferDefine::PacketMaxSize);
+		constexpr int kHeaderBytes = sizeof(SNetHeader);
+		constexpr int kRecvBufferBytes = kPacketBytes * 2;
+		CNetClientManager client;
+		Check(!client.Init(1, kPacketBytes - 1), L"ring rejects capacity below a full frame");
+		Check(!client.Init(1, INT_MAX), L"ring rejects capacity that overflows cursor arithmetic");
+		Check(client.Init(1, kRecvBufferBytes), L"ring fixture initializes the manager with a custom capacity");
+		USHORT port = 0;
+		SOCKET listener = BindLoopback(port);
+		Check(listen(listener, SOMAXCONN) == 0, L"ring fixture listens");
+		const auto sessionId = client.Connect("127.0.0.1", port, kPacketCode, kConnectTimeoutMilliseconds);
+		Check(sessionId != 0, L"ring fixture submits a connection");
+		SOCKET peer = AcceptPeer(listener);
+		Check(WaitEvent(client, sessionId).m_kind == EClientEvent::Connected, L"ring fixture connects");
+		auto spSession = CClientLifecycleProbe::FindSession(client, sessionId);
+		Check(spSession != nullptr, L"ring fixture finds the live session");
+		Check(CClientLifecycleProbe::GetRecvBufferCapacity(*spSession) == kRecvBufferBytes, L"session uses configured ring capacity");
+
+		const auto makeFrame = [](int packetBytes, BYTE value)
+		{
+			auto spPacket = CSerializableBuffer<FALSE>::MakeShared();
+			Check(spPacket != nullptr, L"allocate ring fixture frame");
+			for (int index = kHeaderBytes; index < packetBytes; ++index)
+				*spPacket << value;
+			PrepareNetPacket(*spPacket, kPacketCode);
+			return spPacket;
+		};
+		const auto sendBytes = [peer](const char *pBytes, int size)
+		{
+			Check(send(peer, pBytes, size, 0) == size, L"send ring fixture bytes");
+		};
+		const auto expectFrame = [&](int packetBytes, BYTE expected)
+		{
+			auto event = WaitEvent(client, sessionId);
+			Check(event.m_kind == EClientEvent::Packet && event.m_spPacket->GetDataSize() == packetBytes - kHeaderBytes,
+				L"ring fixture delivers a complete frame");
+			for (int index = kHeaderBytes; index < packetBytes; ++index)
+			{
+				BYTE value = 0;
+				*event.m_spPacket >> value;
+				Check(value == expected, L"ring fixture preserves payload bytes");
+			}
+		};
+		const auto expectPartial = [&](int bytes)
+		{
+			const auto deadline = GetTickCount64() + 3000;
+			while (CClientLifecycleProbe::GetBufferedRecvBytes(*spSession) != bytes)
+			{
+				Check(GetTickCount64() < deadline, L"ring retains incomplete bytes across receive completions");
+				Sleep(1);
+			}
+			SClientEvent event;
+			Check(!client.TryPopEvent(sessionId, event), L"incomplete frame is not published");
+		};
+
+		// 사용 가능 용량보다 1바이트 적게 소비해 다음 헤더를 링 끝에 걸친다.
+		const auto spFull = makeFrame(kPacketBytes, 42);
+		sendBytes(spFull->GetBufferPtr(), kPacketBytes);
+		expectFrame(kPacketBytes, 42);
+		const auto spAlmostFull = makeFrame(kPacketBytes - 1, 43);
+		sendBytes(spAlmostFull->GetBufferPtr(), kPacketBytes - 1);
+		expectFrame(kPacketBytes - 1, 43);
+
+		constexpr int kSmallFrameBytes = kHeaderBytes + 3;
+		const auto spFirst = makeFrame(kSmallFrameBytes, 21);
+		const auto spSecond = makeFrame(kSmallFrameBytes, 22);
+		sendBytes(spFirst->GetBufferPtr(), 2);
+		expectPartial(2);
+		sendBytes(spFirst->GetBufferPtr() + 2, kHeaderBytes - 1);
+		expectPartial(kHeaderBytes + 1);
+		std::array<char, 2 + kSmallFrameBytes> tail{};
+		memcpy(tail.data(), spFirst->GetBufferPtr() + kHeaderBytes + 1, 2);
+		memcpy(tail.data() + 2, spSecond->GetBufferPtr(), kSmallFrameBytes);
+		sendBytes(tail.data(), static_cast<int>(tail.size()));
+		expectFrame(kSmallFrameBytes, 21);
+		expectFrame(kSmallFrameBytes, 22);
+		Check(shutdown(peer, SD_SEND) == 0, L"ring fixture sends EOF");
+		ExpectOnlyTerminal(client, sessionId, EClientEvent::Disconnected, 0);
+		closesocket(peer);
+		closesocket(listener);
+		client.Stop();
+		g_pLogger->WriteLogConsole(ELogLevel::System, L"PASS: Net receive ring wrap, split header/body and adjacent frames");
+	}
+
+	class CTickClient : public CNetClient
+	{
+	public:
+		explicit CTickClient(CNetClientManager &network) noexcept
+			: CNetClient(network)
+		{
+		}
+
+		int m_callbackCount = 0;
+
+	private:
+		bool onConnect() noexcept override
+		{
+			Check(GetCurrentThreadId() == m_appThreadId && m_callbackCount == 0 && IsConnected(), L"Tick dispatches Connected");
+			++m_callbackCount;
+			return true;
+		}
+
+		bool onRecv(CSerializableBuffer<FALSE> &message) noexcept override
+		{
+			Check(GetCurrentThreadId() == m_appThreadId && m_callbackCount == 1, L"Tick dispatches Packet after Connected");
+			BYTE value = 0;
+			message >> value;
+			Check(value == 42, L"Tick passes the received packet to onRecv");
+			++m_callbackCount;
+			return true;
+		}
+
+		void onDisconnect(bool wasConnected, DWORD error) noexcept override
+		{
+			Check(GetCurrentThreadId() == m_appThreadId && m_callbackCount == 2, L"Tick dispatches Disconnected after Packet");
+			Check(wasConnected && error == 0 && !IsActive() && !IsConnected(), L"Tick clears connection state before onDisconnect");
+			++m_callbackCount;
+		}
+
+		DWORD m_appThreadId = GetCurrentThreadId();
+	};
+
+	void VerifyClientTick()
+	{
+		constexpr BYTE kPacketCode = 0x77;
+		CNetClientManager network;
+		CTickClient client(network);
+		Check(network.Init(1, kDefaultFixtureRecvBufferBytes), L"Tick fixture initializes the manager");
+		USHORT port = 0;
+		SOCKET listener = BindLoopback(port);
+		Check(listen(listener, SOMAXCONN) == 0, L"Tick fixture listens");
+		Check(client.Connect("127.0.0.1", port, kPacketCode, kConnectTimeoutMilliseconds), L"Tick fixture submits a connection");
+		SOCKET peer = AcceptPeer(listener);
+		auto spPacket = CSerializableBuffer<FALSE>::MakeShared();
+		Check(spPacket != nullptr, L"Tick fixture allocates a packet");
+		*spPacket << BYTE{42};
+		PrepareNetPacket(*spPacket, kPacketCode);
+		const int frameBytes = spPacket->GetFullSize();
+		Check(send(peer, spPacket->GetBufferPtr(), frameBytes, 0) == frameBytes, L"Tick peer sends a packet");
+		Check(shutdown(peer, SD_SEND) == 0, L"Tick peer sends EOF after the packet");
+		const auto deadline = GetTickCount64() + 7000;
+		while (CClientLifecycleProbe::GetFirstSessionEntry(network).second)
+		{
+			Check(GetTickCount64() < deadline, L"session retires before the app calls Tick");
+			Sleep(1);
+		}
+		Check(client.m_callbackCount == 0 && client.IsActive() && !client.IsConnected(), L"callbacks wait for the app's Tick");
+		client.Tick();
+		client.Tick();
+		Check(client.m_callbackCount == 3 && CClientLifecycleProbe::GetMailboxCount(network) == 0,
+			L"Tick drains callbacks once and consumes the mailbox");
+		closesocket(peer);
+		closesocket(listener);
+		network.Stop();
+		g_pLogger->WriteLogConsole(ELogLevel::System, L"PASS: Net Tick callback order, app thread and mailbox retirement");
 	}
 
 	void VerifyNetSendBatch()
@@ -174,7 +368,7 @@ namespace
 		const HANDLE completionPort = CreateIoCompletionPort(reinterpret_cast<HANDLE>(sender), nullptr, 0, 1);
 		Check(completionPort != nullptr, L"batch sender uses an IOCP consumed by the test");
 		{
-			ClientNetworkLib::CNetSession session(kPacketCode, std::make_shared<CClientMailbox>());
+			ClientNetworkLib::CNetSession session(kPacketCode, std::make_shared<CClientMailbox>(), kDefaultFixtureRecvBufferBytes);
 			CClientLifecycleProbe::AttachSendTestSocket(session, sender);
 			constexpr DWORD kFrameBytes = sizeof(SNetHeader) + sizeof(BYTE);
 			constexpr BYTE kPacketCount = 4;
@@ -342,38 +536,50 @@ namespace
 		g_pLogger->WriteLogConsole(ELogLevel::System, L"PASS: LAN FIFO wire, cross-thread view return, slot reuse");
 	}
 
+	BOOL PASCAL RejectConnectEx(SOCKET, const sockaddr *, int, PVOID, DWORD, LPDWORD, LPOVERLAPPED)
+	{
+		WSASetLastError(WSAEINVAL);
+		return FALSE;
+	}
+
 	void VerifyLifecycle(DWORD workers)
 	{
 		constexpr BYTE kPacketCode = 0x77;
 		CNetClientManager client;
-		Check(!client.Init(0) && CClientLifecycleProbe::GetCachedConnectEx(client) == nullptr,
+		Check(!client.Init(0, kDefaultFixtureRecvBufferBytes) && CClientLifecycleProbe::GetCachedConnectEx(client) == nullptr,
 			L"invalid worker count leaves no cache");
-		Check(client.Init(workers), L"manager initialization succeeds");
+		Check(client.Init(workers, kDefaultFixtureRecvBufferBytes), L"manager initialization succeeds");
 		const auto pConnectEx = CClientLifecycleProbe::GetCachedConnectEx(client);
 		Check(pConnectEx != nullptr, L"initialization caches ConnectEx before any connection");
-		Check(!client.Init(workers) && CClientLifecycleProbe::GetCachedConnectEx(client) == pConnectEx,
+		Check(!client.Init(workers, kDefaultFixtureRecvBufferBytes) && CClientLifecycleProbe::GetCachedConnectEx(client) == pConnectEx,
 			L"duplicate initialization preserves cache");
 		USHORT port = 0;
 		SOCKET listener = BindLoopback(port);
 		Check(listen(listener, SOMAXCONN) == 0, L"listen");
-		auto spFirst = std::make_shared<CClientMailbox>();
-		auto spSecond = std::make_shared<CClientMailbox>();
-		const auto first = client.Connect("127.0.0.1", port, kPacketCode, spFirst);
-		const auto second = client.Connect("127.0.0.1", port, kPacketCode, spSecond);
+		Check(CClientLifecycleProbe::ReplaceConnectEx(client, RejectConnectEx) == pConnectEx, L"install immediate failure fixture");
+		Check(client.Connect("127.0.0.1", port, kPacketCode, kConnectTimeoutMilliseconds) == 0,
+			L"immediate ConnectEx failure returns no ID");
+		Check(CClientLifecycleProbe::ReplaceConnectEx(client, pConnectEx) == RejectConnectEx, L"restore real ConnectEx");
+		Check(!CClientLifecycleProbe::GetFirstSessionEntry(client).second && CClientLifecycleProbe::GetMailboxCount(client) == 0,
+			L"immediate failure rolls back both tables");
+		const auto first = client.Connect("127.0.0.1", port, kPacketCode, kConnectTimeoutMilliseconds);
+		const auto second = client.Connect("127.0.0.1", port, kPacketCode, kConnectTimeoutMilliseconds);
 		Check(first != 0 && second != 0 && first != second, L"two accepted attempts with distinct IDs");
 		Check(CClientLifecycleProbe::GetCachedConnectEx(client) == pConnectEx, L"multiple attempts share the initialized cache");
-		Check(client.Connect("127.0.0.1", port, kPacketCode, spFirst) == 0, L"mailbox is connection-specific");
 		SOCKET firstPeer = AcceptPeer(listener);
 		SOCKET secondPeer = AcceptPeer(listener);
-		Check(WaitEvent(*spFirst).m_kind == EClientEvent::Connected && WaitEvent(*spSecond).m_kind == EClientEvent::Connected,
+		Check(WaitEvent(client, first).m_kind == EClientEvent::Connected && WaitEvent(client, second).m_kind == EClientEvent::Connected,
 			L"both attempts complete");
 		Check(client.Disconnect(first), L"close one session");
-		ExpectOnlyTerminal(*spFirst, EClientEvent::Disconnected, ERROR_OPERATION_ABORTED);
+		const auto firstRetireDeadline = GetTickCount64() + 3000;
+		while (CClientLifecycleProbe::FindSession(client, first))
+		{
+			Check(GetTickCount64() < firstRetireDeadline, L"first session retires without event polling");
+			Sleep(1);
+		}
 		Check(!client.Disconnect(first), L"old ID cannot disconnect");
-		Check(client.Connect("127.0.0.1", port, kPacketCode, spFirst) == 0, L"retired mailbox cannot be rebound");
 
-		auto spNext = std::make_shared<CClientMailbox>();
-		const auto next = client.Connect("127.0.0.1", port, kPacketCode, spNext);
+		const auto next = client.Connect("127.0.0.1", port, kPacketCode, kConnectTimeoutMilliseconds);
 		Check(next != 0 && next != first && next != second, L"reconnect returns a new ID");
 		SOCKET nextPeer = AcceptPeer(listener);
 
@@ -383,15 +589,18 @@ namespace
 		PrepareNetPacket(*spMessage, kPacketCode);
 		const int frameBytes = spMessage->GetFullSize();
 		Check(send(nextPeer, spMessage->GetBufferPtr(), frameBytes, 0) == frameBytes, L"peer sends a frame before app polls");
-		Check(WaitEvent(*spNext).m_kind == EClientEvent::Connected, L"Connected precedes the first packet");
-		SClientEvent packet = WaitEvent(*spNext);
+		Check(WaitEvent(client, next).m_kind == EClientEvent::Connected, L"Connected precedes the first packet");
+		SClientEvent packet = WaitEvent(client, next);
 		BYTE value = 0;
 		Check(packet.m_kind == EClientEvent::Packet && packet.m_spPacket != nullptr && packet.m_spPacket->IsHeapAllocated(),
 			L"new mailbox owns its first heap packet");
 		auto spReceived = packet.m_spPacket;
 		packet = {};
 		*spReceived >> value;
-		Check(value == 42 && !spFirst->TryPop(packet) && !spSecond->TryPop(packet), L"receive stays in its own mailbox");
+		Check(value == 42 && !client.TryPopEvent(second, packet), L"receive stays in its own mailbox");
+		ExpectOnlyTerminal(client, first, EClientEvent::Disconnected, ERROR_OPERATION_ABORTED);
+		Check(CClientLifecycleProbe::GetMailboxCount(client) == 2,
+			L"terminal consumption removes only the retired mailbox");
 
 		std::weak_ptr wpRejected = spMessage;
 		Check(!client.SendPacket(first, std::move(spMessage)) && wpRejected.expired(), L"stale ID does not retain a shared packet");
@@ -425,36 +634,33 @@ namespace
 
 		USHORT refusedPort = 0;
 		SOCKET nonListener = BindLoopback(refusedPort);
-		auto spRefused = std::make_shared<CClientMailbox>();
-		Check(client.Connect("127.0.0.1", refusedPort, kPacketCode, spRefused) != 0, L"refused attempt accepted for async I/O");
-		SClientEvent refused = WaitEvent(*spRefused);
+		const auto refusedId = client.Connect("127.0.0.1", refusedPort, kPacketCode, kConnectTimeoutMilliseconds);
+		Check(refusedId != 0, L"refused attempt accepted for async I/O");
+		SClientEvent refused = WaitEvent(client, refusedId);
 		Check(refused.m_kind == EClientEvent::ConnectFailed
 			&& (refused.m_error == ERROR_CONNECTION_REFUSED || refused.m_error == WSAECONNREFUSED), L"asynchronous refusal");
-		Check(!spRefused->TryPop(refused), L"refusal reported once");
+		Check(!client.TryPopEvent(refusedId, refused), L"refusal reported once");
 
-		auto spDeadline = std::make_shared<CClientMailbox>();
-		Check(client.Connect("127.0.0.1", port, kPacketCode, spDeadline, 0) != 0, L"accept a ConnectEx with an immediate deadline");
-		ExpectOnlyTerminal(*spDeadline, EClientEvent::ConnectFailed, WSAETIMEDOUT);
+		const auto deadlineId = client.Connect("127.0.0.1", port, kPacketCode, 0);
+		Check(deadlineId != 0, L"accept a ConnectEx with an immediate deadline");
+		ExpectOnlyTerminal(client, deadlineId, EClientEvent::ConnectFailed, WSAETIMEDOUT);
 
 		// accept하지 않아 대기열을 채우면 후속 연결을 Connecting 상태로 유지할 수 있다.
 		USHORT saturatedPort = 0;
 		SOCKET saturatedListener = BindLoopback(saturatedPort);
 		Check(listen(saturatedListener, 0) == 0, L"listen with a minimal backlog");
-		auto spFiller = std::make_shared<CClientMailbox>();
-		Check(client.Connect("127.0.0.1", saturatedPort, kPacketCode, spFiller) != 0
-			&& WaitEvent(*spFiller).m_kind == EClientEvent::Connected, L"fill listener backlog");
+		const auto filler = client.Connect("127.0.0.1", saturatedPort, kPacketCode, kConnectTimeoutMilliseconds);
+		Check(filler != 0 && WaitEvent(client, filler).m_kind == EClientEvent::Connected, L"fill listener backlog");
 
-		auto spTimedOut = std::make_shared<CClientMailbox>();
-		const auto timedOut = client.Connect("127.0.0.1", saturatedPort, kPacketCode, spTimedOut, 1000);
+		const auto timedOut = client.Connect("127.0.0.1", saturatedPort, kPacketCode, 1000);
 		CheckConnectPending(client, timedOut, L"timeout fixture has outstanding ConnectEx");
 		Check(timedOut != 0 && !client.SendPacket(timedOut, makePacket()), L"send rejected while Connecting");
-		ExpectOnlyTerminal(*spTimedOut, EClientEvent::ConnectFailed, WSAETIMEDOUT);
+		ExpectOnlyTerminal(client, timedOut, EClientEvent::ConnectFailed, WSAETIMEDOUT);
 
-		auto spCanceled = std::make_shared<CClientMailbox>();
-		const auto canceled = client.Connect("127.0.0.1", saturatedPort, kPacketCode, spCanceled);
+		const auto canceled = client.Connect("127.0.0.1", saturatedPort, kPacketCode, kConnectTimeoutMilliseconds);
 		CheckConnectPending(client, canceled, L"ConnectEx still outstanding before Disconnect");
 		Check(client.Disconnect(canceled), L"cancel a pending connection");
-		ExpectOnlyTerminal(*spCanceled, EClientEvent::ConnectFailed, ERROR_OPERATION_ABORTED);
+		ExpectOnlyTerminal(client, canceled, EClientEvent::ConnectFailed, ERROR_OPERATION_ABORTED);
 		const auto retireDeadline = GetTickCount64() + 3000;
 		while (CClientLifecycleProbe::FindSession(client, canceled) || CClientLifecycleProbe::FindSession(client, timedOut))
 		{
@@ -462,8 +668,7 @@ namespace
 			Sleep(1);
 		}
 
-		auto spStopPending = std::make_shared<CClientMailbox>();
-		const auto stopPending = client.Connect("127.0.0.1", saturatedPort, kPacketCode, spStopPending);
+		const auto stopPending = client.Connect("127.0.0.1", saturatedPort, kPacketCode, kConnectTimeoutMilliseconds);
 		CheckConnectPending(client, stopPending, L"ConnectEx still outstanding before Stop");
 		auto [blockerId, spStopBlocker] = CClientLifecycleProbe::GetFirstSessionEntry(client);
 		const auto sendTarget = blockerId == next ? second : next;
@@ -493,25 +698,27 @@ namespace
 			stopper.join();
 		}
 		spStopBlocker.reset();
-		ExpectOnlyTerminal(*spStopPending, EClientEvent::ConnectFailed, ERROR_OPERATION_ABORTED);
-		ExpectOnlyTerminal(*spFiller, EClientEvent::Disconnected, ERROR_OPERATION_ABORTED);
-		ExpectOnlyTerminal(*spSecond, EClientEvent::Disconnected, ERROR_OPERATION_ABORTED);
-		ExpectOnlyTerminal(*spNext, EClientEvent::Disconnected, ERROR_OPERATION_ABORTED);
-		spNext.reset();
+		ExpectOnlyTerminal(client, stopPending, EClientEvent::ConnectFailed, ERROR_OPERATION_ABORTED);
+		ExpectOnlyTerminal(client, filler, EClientEvent::Disconnected, ERROR_OPERATION_ABORTED);
+		ExpectOnlyTerminal(client, next, EClientEvent::Disconnected, ERROR_OPERATION_ABORTED);
 		std::weak_ptr wpReceived = spReceived;
 		Check(spReceived->GetDataSize() == 0 && spReceived.use_count() == 1, L"Net packet outlives mailbox and Stop");
 		spReceived.reset();
 		Check(wpReceived.expired(), L"Net receive packet releases its last owner");
 		Check(!client.SendPacket(second, makePacket()) && !client.Disconnect(next), L"no sessions remain after Stop");
 		Check(CClientLifecycleProbe::GetCachedConnectEx(client) == nullptr, L"Stop clears the ConnectEx cache");
-		Check(client.Connect("127.0.0.1", port, kPacketCode, std::make_shared<CClientMailbox>()) == 0, L"Stop rejects new attempts");
-		Check(client.Init(workers), L"manager restarts after draining pending receives");
+		Check(client.Connect("127.0.0.1", port, kPacketCode, kConnectTimeoutMilliseconds) == 0, L"Stop rejects new attempts");
+		Check(client.Init(workers, kDefaultFixtureRecvBufferBytes), L"manager restarts after draining pending receives");
 		Check(CClientLifecycleProbe::GetCachedConnectEx(client) != nullptr, L"reinitialization restores the ConnectEx cache");
-		auto spRestarted = std::make_shared<CClientMailbox>();
-		const auto restarted = client.Connect("127.0.0.1", port, kPacketCode, spRestarted);
-		Check(restarted > next && WaitEvent(*spRestarted).m_kind == EClientEvent::Connected, L"IDs remain fresh across Stop/Init");
+		const auto restarted = client.Connect("127.0.0.1", port, kPacketCode, kConnectTimeoutMilliseconds);
+		Check(restarted > stopPending && WaitEvent(client, restarted).m_kind == EClientEvent::Connected,
+			L"IDs remain fresh across Stop/Init");
+		ExpectOnlyTerminal(client, second, EClientEvent::Disconnected, ERROR_OPERATION_ABORTED);
+		Check(client.SendPacket(restarted, makePacket()), L"restarted session accepts a send");
 		client.Stop();
-		ExpectOnlyTerminal(*spRestarted, EClientEvent::Disconnected, ERROR_OPERATION_ABORTED);
+		Check(CClientLifecycleProbe::GetMailboxCount(client) == 1, L"Stop returns with the terminal event still unread");
+		ExpectOnlyTerminal(client, restarted, EClientEvent::Disconnected, ERROR_OPERATION_ABORTED);
+		Check(CClientLifecycleProbe::GetMailboxCount(client) == 0, L"reading the final terminal event removes the final mailbox");
 		closesocket(firstPeer);
 		closesocket(secondPeer);
 		closesocket(nextPeer);
@@ -530,6 +737,8 @@ int main(void)
 	Check(WSAStartup(MAKEWORD(2, 2), &wsaData) == 0, L"fixture Winsock startup");
 	VerifyLifecycle(1);
 	VerifyLifecycle(2);
+	VerifyClientTick();
+	VerifyNetRecvRing();
 	VerifyNetSendBatch();
 	VerifyLanLoopback();
 	WSACleanup();

@@ -121,7 +121,13 @@ class GeneratorTests(unittest.TestCase):
         server = (self.server / 'ServerPacketSend.g.h').read_text(encoding='utf-8')
         client_cpp = (self.client / 'ClientPacketSend.g.cpp').read_text()
         server_cpp = (self.server / 'ServerPacketSend.g.cpp').read_text()
-        self.assertIn('class CClientPacketSender', client)
+        self.assertIn('class CChatNetClient : public NetworkLib::CNetClient, private IClientPacketHandler', client)
+        self.assertRegex(client, r'private:\s*bool onRecv\(NetworkLib::CSerializableBuffer<FALSE> &message\) noexcept override final;')
+        self.assertRegex(client_cpp, r'bool CChatNetClient::onRecv\(NetworkLib::CSerializableBuffer<FALSE> &message\) noexcept\s*'
+                                     r'\{\s*return DispatchClientPacket\(message, \*this\);\s*\}')
+        self.assertIn('bool CChatNetClient::SendReqMessage(', client_cpp)
+        self.assertNotIn('CClientPacketSender', client + client_cpp)
+        self.assertNotIn('virtual bool sendPacket(', client)
         self.assertIn('class CServerPacketSender', server)
         self.assertRegex(client, r'bool SendReqMessage\(\s*std::int64_t accountNo,\s*const std::wstring &message\) noexcept;')
         self.assertRegex(client, r'bool SendNotiHeartbeat\(\s*std::int64_t accountNo\) noexcept;')
@@ -134,7 +140,7 @@ class GeneratorTests(unittest.TestCase):
         self.assertIn('packet.m_message = message;', client_cpp)
         self.assertRegex(client_cpp, r'catch \(const std::bad_alloc &\)\s*\{\s*return false;')
         self.assertRegex(client_cpp, r'auto spPacket = MakePacketReqMessage\(packet\);\s*'
-                                     r'return spPacket != nullptr && this->sendPacket\(std::move\(spPacket\)\);')
+                                     r'return spPacket != nullptr && sendNetworkPacket\(std::move\(spPacket\)\);')
         self.assertRegex(server_cpp, r'catch \(const std::bad_alloc &\)\s*\{\s*return nullptr;')
         self.assertRegex(server_cpp, r'submitPreparedPacket\(sessionId, EPacketType::ResMessage,\s*MakePacketResMessage\(packet\)\)')
         self.assertRegex(server_cpp, r'if \(pPacket == nullptr\)\s*\{\s*return nullptr;\s*\}\s*'

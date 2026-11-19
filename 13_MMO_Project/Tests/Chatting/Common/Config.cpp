@@ -1,4 +1,6 @@
 #include "pch.h"
+#include "CSerializableBuffer.h"
+#include "NetworkLimits.h"
 #include "CommonProtocol.h"
 #include "Config.h"
 
@@ -59,6 +61,22 @@ namespace Chatting
 		config.m_port = static_cast<USHORT>(number);
 		if (!isServer)
 		{
+			std::wstring connectTimeout;
+			if (loader.Load(pSection, L"CONNECT_TIMEOUT_MS", &connectTimeout))
+			{
+				if (!loader.Load(pSection, L"CONNECT_TIMEOUT_MS", &number) || number < 1 || number > MAXDWORD)
+					return ConfigError(pFileName, L"CONNECT_TIMEOUT_MS must be an integer (1..4294967295)");
+				config.m_connectTimeoutMilliseconds = static_cast<DWORD>(number);
+			}
+			std::wstring recvBufferBytes;
+			if (loader.Load(pSection, L"RECV_BUFFER_BYTES", &recvBufferBytes))
+			{
+				constexpr int kMinRecvBufferBytes = static_cast<int>(NetworkLib::CSerializableBuffer<FALSE>::EBufferDefine::PacketMaxSize);
+				if (!loader.Load(pSection, L"RECV_BUFFER_BYTES", &number) || number < kMinRecvBufferBytes
+					|| number > NetworkLib::kMaxNetRecvBufferBytes)
+					return ConfigError(pFileName, L"RECV_BUFFER_BYTES must fit a full Net packet and the ring's cursor range");
+				config.m_recvBufferBytes = static_cast<int>(number);
+			}
 			if (!loader.Load(pSection, L"ACCOUNT_NO", &number) || number < 0)
 				return ConfigError(pFileName, L"ACCOUNT_NO is missing or invalid (0..INT64_MAX)");
 			// 0은 프로세스 ID 자동 선택. 같은 설정으로 여러 클라이언트를 실행한다.

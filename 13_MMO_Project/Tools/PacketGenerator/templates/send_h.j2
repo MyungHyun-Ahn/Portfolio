@@ -16,7 +16,11 @@ namespace Chatting
 		const S{{ packet.name }} &packet) noexcept;
 {% endfor %}
 
-	class C{{ side }}PacketSender
+{% if side == 'Client' %}
+	class CChatNetClient : public NetworkLib::CNetClient, private IClientPacketHandler
+{% else %}
+	class CServerPacketSender
+{% endif %}
 	{
 	public:
 {% for packet in packets %}
@@ -34,17 +38,18 @@ namespace Chatting
 
 {% endif %}
 	protected:
+{% if side == 'Client' %}
+		using NetworkLib::CNetClient::CNetClient;
+
+	private:
+		bool onRecv(NetworkLib::CSerializableBuffer<FALSE> &message) noexcept override final;
+{% else %}
 		virtual ~C{{ side }}PacketSender() = default;
-{% if side == 'Server' %}
 		// 직렬화된 버퍼를 받아 호출자 참조를 확보한 뒤 전송한다.
 		[[nodiscard]] NetworkLib::CSerializableBuffer<FALSE> *submitPreparedPacket(
 			UINT64 sessionId, EPacketType type, NetworkLib::CSerializableBuffer<FALSE> *pPacket) noexcept;
-{% endif %}
 
 	private:
-{% if side == 'Client' %}
-		virtual bool sendPacket(std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> spPacket) noexcept = 0;
-{% else %}
 		virtual void sendPacket(UINT64 sessionId, EPacketType type, NetworkLib::CSerializableBuffer<FALSE> &packet) noexcept = 0;
 {% endif %}
 	};

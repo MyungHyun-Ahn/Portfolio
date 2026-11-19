@@ -16,14 +16,14 @@ public:
 	{
 		m_pQueue = new char[m_capacity];
 	}
-	CRingBuffer(int size) noexcept
+	CRingBuffer(int size)
 		: m_capacity(size + 1)
 	{
 		m_pQueue = new char[m_capacity];
 	}
 	~CRingBuffer() noexcept
 	{
-		delete m_pQueue;
+		delete[] m_pQueue;
 	}
 
 	// 버퍼 최대 크기

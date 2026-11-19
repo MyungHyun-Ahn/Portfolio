@@ -8,6 +8,12 @@
 #include "CSerializableBuffer.h"
 #include "MHLib/serialization/ISerializable.h"
 #include "IncludePacketAll.g.h"
+{% if side == 'Client' %}
+#include "CNetClientManager.h"
+#include "CNetClient.h"
+#include "IClientPacketHandler.g.h"
+#include "ClientPacketDispatch.g.h"
+{% endif %}
 #include "{{ side }}PacketSend.g.h"
 
 namespace Chatting
@@ -49,10 +55,16 @@ namespace Chatting
 		sendPacket(sessionId, type, *pPacket);
 		return pPacket;
 	}
+{% else %}
+
+	bool CChatNetClient::onRecv(NetworkLib::CSerializableBuffer<FALSE> &message) noexcept
+	{
+		return DispatchClientPacket(message, *this);
+	}
 {% endif %}
 {% for packet in packets %}
 
-	{{ packet.send_result }}C{{ side }}PacketSender::{{ packet.send_name }}({% if packet.send_parameters %}{{ '\n' }}
+	{{ packet.send_result }}{{ 'CChatNetClient' if side == 'Client' else 'CServerPacketSender' }}::{{ packet.send_name }}({% if packet.send_parameters %}{{ '\n' }}
 {% for parameter in packet.send_parameters %}
 		{{ parameter }}{{ ',' if not loop.last else ') noexcept' }}
 {% endfor %}
@@ -77,7 +89,7 @@ namespace Chatting
 {% endif %}
 {% if side == 'Client' %}
 		auto spPacket = MakePacket{{ packet.name }}(packet);
-		return spPacket != nullptr && this->sendPacket(std::move(spPacket));
+		return spPacket != nullptr && sendNetworkPacket(std::move(spPacket));
 {% else %}
 		return this->submitPreparedPacket(sessionId, EPacketType::{{ packet.name }},
 			MakePacket{{ packet.name }}(packet));

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
-  <ItemGroup />
   <ItemGroup>
     <ClCompile Include="ClientSetting.cpp" />
     <ClCompile Include="CLanClient.cpp" />
     <ClCompile Include="CClientMailbox.cpp" />
+    <ClCompile Include="CNetClient.cpp" />
     <ClCompile Include="CNetClientManager.cpp" />
     <ClCompile Include="CNetSession.cpp" />
     <ClCompile Include="pch.cpp" />
@@ -13,6 +13,8 @@
     <ClInclude Include="ClientSetting.h" />
     <ClInclude Include="CLanClient.h" />
     <ClInclude Include="CClientMailbox.h" />
+    <ClInclude Include="ClientEvent.h" />
+    <ClInclude Include="CNetClient.h" />
     <ClInclude Include="CNetClientManager.h" />
     <ClInclude Include="CNetSession.h" />
     <ClInclude Include="pch.h" />

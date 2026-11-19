@@ -1,8 +1,10 @@
 #include "pch.h"
 #include "CSerializableBuffer.h"
+#include "ClientEvent.h"
 #include "CClientMailbox.h"
 #include "CNetClientManager.h"
 #include "NetworkLimits.h"
+#include "CRingBuffer.h"
 #include "CNetSession.h"
 
 namespace NetworkLib
@@ -15,10 +17,12 @@ namespace NetworkLib
 	}
 
 	// ClientManager 초기화
-	bool CNetClientManager::Init(DWORD workerCount) noexcept
+	bool CNetClientManager::Init(DWORD workerCount, int recvBufferBytes) noexcept
 	{
 		std::lock_guard lifecycleLock(m_lifecycleLock);
-		if (workerCount == 0 || m_iocpHandle != nullptr)
+		constexpr int kMinRecvBufferBytes = static_cast<int>(CSerializableBuffer<FALSE>::EBufferDefine::PacketMaxSize);
+		if (workerCount == 0 || m_iocpHandle != nullptr || recvBufferBytes < kMinRecvBufferBytes
+			|| recvBufferBytes > kMaxNetRecvBufferBytes)
 			return false;
 
 		WSADATA wsaData{};
@@ -70,26 +74,28 @@ namespace NetworkLib
 		std::lock_guard sessionTableLock(m_sessionTableLock);
 		m_pConnectEx = pConnectEx;
 		m_connectProtocol = connectProtocol;
+		m_recvBufferBytes = recvBufferBytes;
 		m_isAccepting = true;
 		return true;
 	}
 
-	SessionId CNetClientManager::Connect(const char *pIp, USHORT port, BYTE packetCode,
-		const std::shared_ptr<CClientMailbox> &spMailbox, DWORD timeoutMilliseconds) noexcept
+	SessionId CNetClientManager::Connect(const char *pIp, USHORT port, BYTE packetCode, DWORD timeoutMilliseconds) noexcept
 	{
 		SOCKADDR_IN address{};
 		address.sin_family = AF_INET;
 		address.sin_port = htons(port);
-		if (spMailbox == nullptr || pIp == nullptr || port == 0 || InetPtonA(AF_INET, pIp, &address.sin_addr) != 1)
+		if (pIp == nullptr || port == 0 || InetPtonA(AF_INET, pIp, &address.sin_addr) != 1)
 			return 0;
 
 		// Stop이 포트와 Winsock을 정리하기 전에 등록과 ConnectEx 제출을 마친다.
 		std::lock_guard sessionTableLock(m_sessionTableLock);
-		if (!m_isAccepting || m_lastSessionId == (std::numeric_limits<SessionId>::max)() || spMailbox->m_isBound.load())
+		if (!m_isAccepting || m_lastSessionId == (std::numeric_limits<SessionId>::max)())
 			return 0;
+		SessionId sessionId = 0;
 		try
 		{
-			auto spSession = std::make_shared<CNetSession>(packetCode, spMailbox);
+			auto spMailbox = std::make_shared<CClientMailbox>();
+			auto spSession = std::make_shared<CNetSession>(packetCode, spMailbox, m_recvBufferBytes);
 			// ConnectEx를 조회했던 공급자로 세션 소켓을 생성한다.
 			spSession->m_socket = WSASocketW(FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO,
 				&m_connectProtocol, 0, WSA_FLAG_OVERLAPPED);
@@ -98,28 +104,33 @@ namespace NetworkLib
 			if (spSession->m_socket == INVALID_SOCKET
 				|| bind(spSession->m_socket, reinterpret_cast<const sockaddr *>(&localAddress), sizeof(localAddress)) == SOCKET_ERROR)
 				return 0;
-			const SessionId sessionId = ++m_lastSessionId;
+			sessionId = ++m_lastSessionId;
 			if (CreateIoCompletionPort(reinterpret_cast<HANDLE>(spSession->m_socket), m_iocpHandle, sessionId, 0) == nullptr)
 				return 0;
 			m_sessions.emplace(sessionId, spSession);
-			if (spMailbox->m_isBound.exchange(true))
-			{
-				m_sessions.erase(sessionId);
-				return 0;
-			}
-			// 워커는 테이블 락이 풀린 뒤에만 세션을 가져올 수 있다.
-			if (!spSession->postConnectLocked(m_pConnectEx, address, timeoutMilliseconds))
-			{
-				spMailbox->m_isBound = false;
-				m_sessions.erase(sessionId);
-				return 0;
-			}
-			return sessionId;
+			m_mailboxes.emplace(sessionId, std::move(spMailbox));
+			// 두 항목을 등록한 뒤 제출한다. 워커는 테이블 락이 풀린 뒤에만 세션을 가져올 수 있다.
+			if (spSession->postConnectLocked(m_pConnectEx, address, timeoutMilliseconds))
+				return sessionId;
 		}
 		catch (const std::bad_alloc &)
 		{
-			return 0;
+			// 두 테이블 중 한쪽만 등록된 경우도 아래에서 되돌린다.
 		}
+		m_sessions.erase(sessionId);
+		m_mailboxes.erase(sessionId);
+		return 0;
+	}
+
+	bool CNetClientManager::TryPopEvent(SessionId sessionId, SClientEvent &outEvent) noexcept
+	{
+		std::lock_guard sessionTableLock(m_sessionTableLock);
+		const auto found = m_mailboxes.find(sessionId);
+		if (found == m_mailboxes.end() || !found->second->tryPop(outEvent))
+			return false;
+		if (outEvent.m_kind == EClientEvent::ConnectFailed || outEvent.m_kind == EClientEvent::Disconnected)
+			m_mailboxes.erase(found);
+		return true;
 	}
 
 	bool CNetClientManager::SendPacket(SessionId sessionId, std::shared_ptr<CSerializableBuffer<FALSE>> spMessage) noexcept
@@ -147,24 +158,16 @@ namespace NetworkLib
 		return isSent;
 	}
 
-	bool CNetClientManager::Disconnect(SessionId sessionId, DWORD drainMilliseconds) noexcept
+	bool CNetClientManager::Disconnect(SessionId sessionId) noexcept
 	{
 		auto spSession = findSession(sessionId);
 		if (spSession == nullptr)
 			return false;
 		bool isFinished;
 		{
-			std::unique_lock sessionStateLock(spSession->m_sessionStateLock);
+			std::lock_guard sessionStateLock(spSession->m_sessionStateLock);
 			if (spSession->m_state == CNetSession::EState::Closing)
 				return false;
-			if (drainMilliseconds != 0 && spSession->m_state == CNetSession::EState::Connected && !spSession->m_isDrainingSend)
-			{
-				spSession->m_isDrainingSend = true;
-				spSession->m_sendDrainedCv.wait_for(sessionStateLock, std::chrono::milliseconds(drainMilliseconds), [&spSession]
-				{
-					return (spSession->m_sendCount == 0 && spSession->m_sendQueue.empty()) || spSession->m_state == CNetSession::EState::Closing;
-				});
-			}
 			spSession->beginCloseLocked(ERROR_OPERATION_ABORTED);
 			isFinished = spSession->finishCloseLocked();
 		}
@@ -180,33 +183,13 @@ namespace NetworkLib
 		return found != m_sessions.end() ? found->second : nullptr;
 	}
 
-	bool CNetClientManager::copySessionSnapshot(std::vector<SSessionEntry> &outSessions, SessionId &outLastId) noexcept
+	void CNetClientManager::copySessionSnapshot(std::vector<SSessionEntry> &outSessions) noexcept
 	{
 		std::lock_guard sessionTableLock(m_sessionTableLock);
-		outLastId = m_lastSessionId;
-		try
-		{
-			outSessions.reserve(m_sessions.size());
-		}
-		catch (const std::bad_alloc &)
-		{
-			return false;
-		}
+		// 스냅샷 할당에 실패하면 순회를 건너뛰지 않고 프로세스를 종료한다.
+		outSessions.reserve(m_sessions.size());
 		for (const auto &entry : m_sessions)
 			outSessions.emplace_back(entry.first, entry.second);
-		return true;
-	}
-
-	CNetClientManager::SSessionEntry CNetClientManager::findNextSessionWithoutSnapshot(SessionId cursor, SessionId lastId) noexcept
-	{
-		std::lock_guard sessionTableLock(m_sessionTableLock);
-		SSessionEntry next{};
-		for (const auto &[sessionId, spSession] : m_sessions)
-		{
-			if (sessionId > cursor && sessionId <= lastId && (next.second == nullptr || sessionId < next.first))
-				next = { sessionId, spSession };
-		}
-		return next;
 	}
 
 	void CNetClientManager::retireSession(SessionId sessionId) noexcept
@@ -229,22 +212,9 @@ namespace NetworkLib
 				spSession->beginCloseLocked(WSAETIMEDOUT);
 		};
 		std::vector<SSessionEntry> sessions;
-		SessionId lastId;
-		if (copySessionSnapshot(sessions, lastId))
-		{
-			for (const auto &entry : sessions)
-				expireSession(entry);
-			return;
-		}
-		// 메모리가 부족해도 타임아웃 처리를 건너뛰지 않는다.
-		for (SessionId cursor = 0;;)
-		{
-			const auto entry = findNextSessionWithoutSnapshot(cursor, lastId);
-			if (entry.second == nullptr)
-				break;
-			cursor = entry.first;
+		copySessionSnapshot(sessions);
+		for (const auto &entry : sessions)
 			expireSession(entry);
-		}
 	}
 
 	void CNetClientManager::workerThread(bool isTimeoutWorker) noexcept
@@ -295,24 +265,9 @@ namespace NetworkLib
 		}
 		{
 			std::vector<SSessionEntry> sessions;
-			SessionId lastId;
-			if (copySessionSnapshot(sessions, lastId))
-			{
-				for (const auto &entry : sessions)
-					closeSessionForStop(entry);
-			}
-			else
-			{
-				// 스냅샷 할당이 실패해도 종료 요청을 모두 보낸다.
-				for (SessionId cursor = 0;;)
-				{
-					const auto entry = findNextSessionWithoutSnapshot(cursor, lastId);
-					if (entry.second == nullptr)
-						break;
-					cursor = entry.first;
-					closeSessionForStop(entry);
-				}
-			}
+			copySessionSnapshot(sessions);
+			for (const auto &entry : sessions)
+				closeSessionForStop(entry);
 		}
 		{
 			std::unique_lock sessionTableLock(m_sessionTableLock);

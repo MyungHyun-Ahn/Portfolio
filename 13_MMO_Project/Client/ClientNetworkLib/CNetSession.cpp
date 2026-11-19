@@ -2,18 +2,21 @@
 #include "NetHeaders.h"
 #include "CSerializableBuffer.h"
 #include "NetPacket.h"
+#include "ClientEvent.h"
 #include "CClientMailbox.h"
 #include "CNetClientManager.h"
 #include "NetworkLimits.h"
+#include "CRingBuffer.h"
 #include "CNetSession.h"
 
 namespace ClientNetworkLib
 {
 	using namespace NetworkLib;
 
-	CNetSession::CNetSession(BYTE packetCode, std::shared_ptr<CClientMailbox> spMailbox)
+	CNetSession::CNetSession(BYTE packetCode, std::shared_ptr<CClientMailbox> spMailbox, int recvBufferBytes)
 		: m_packetCode(packetCode)
 		, m_spMailbox(std::move(spMailbox))
+		, m_recvBuffer(recvBufferBytes)
 	{
 	}
 
@@ -26,19 +29,19 @@ namespace ClientNetworkLib
 	bool CNetSession::postConnectLocked(LPFN_CONNECTEX pConnectEx, const SOCKADDR_IN &address, DWORD timeoutMilliseconds) noexcept
 	{
 		m_connectDeadline = GetTickCount64() + timeoutMilliseconds;
-		++m_pendingIo;
+		++m_ioCount;
 		DWORD bytesSent = 0;
 		if (pConnectEx(m_socket, reinterpret_cast<const sockaddr *>(&address), sizeof(address),
 			nullptr, 0, &bytesSent, &m_connectOverlapped)
 			|| WSAGetLastError() == WSA_IO_PENDING)
 			return true;
-		--m_pendingIo;
+		--m_ioCount;
 		return false;
 	}
 
 	bool CNetSession::queueSendLocked(std::shared_ptr<CSerializableBuffer<FALSE>> spMessage) noexcept
 	{
-		if (m_state != EState::Connected || m_isDrainingSend || m_sendQueue.size() >= 512)
+		if (m_state != EState::Connected || m_sendQueue.size() >= 512)
 			return false;
 		try
 		{
@@ -58,10 +61,7 @@ namespace ClientNetworkLib
 			return true;
 
 		if (m_sendQueue.empty())
-		{
-			m_sendDrainedCv.notify_all();
 			return true;
-		}
 
 		WSABUF buffers[kWsasendMaxBufferCount];
 		while (m_sendCount < m_sendBatch.size() && !m_sendQueue.empty())
@@ -74,36 +74,45 @@ namespace ClientNetworkLib
 			++m_sendCount;
 		}
 		m_sendOverlapped = {};
-		++m_pendingIo;
+		++m_ioCount;
 		if (WSASend(m_socket, buffers, m_sendCount, nullptr, 0, &m_sendOverlapped, nullptr) == 0)
 			return true;
 		const int error = WSAGetLastError();
 		if (error == WSA_IO_PENDING)
 			return true;
-		--m_pendingIo;
+		--m_ioCount;
 		beginCloseLocked(error);
 		return false;
 	}
 
 	bool CNetSession::postRecvLocked() noexcept
 	{
+		const int freeBytes = m_recvBuffer.GetFreeSize();
+		if (freeBytes == 0)
+		{
+			beginCloseLocked(ERROR_INVALID_DATA);
+			return false;
+		}
+
 		m_recvOverlapped = {};
-		WSABUF buffer{ static_cast<ULONG>(m_recvBytes.size()), m_recvBytes.data() };
+		const auto firstBytes = static_cast<ULONG>(m_recvBuffer.DirectEnqueueSize());
+		const ULONG secondBytes = static_cast<ULONG>(freeBytes) - firstBytes;
+		WSABUF buffers[2]{ { firstBytes, m_recvBuffer.GetRearPtr() }, { secondBytes, m_recvBuffer.GetPQueuePtr() } };
 		DWORD flags = 0;
-		++m_pendingIo;
-		if (WSARecv(m_socket, &buffer, 1, nullptr, &flags, &m_recvOverlapped, nullptr) == 0)
+		++m_ioCount;
+		if (WSARecv(m_socket, buffers, secondBytes == 0 ? 1 : 2, nullptr, &flags, &m_recvOverlapped, nullptr) == 0)
 			return true;
 		const int error = WSAGetLastError();
 		if (error == WSA_IO_PENDING)
 			return true;
-		--m_pendingIo;
+		--m_ioCount;
 		beginCloseLocked(error);
 		return false;
 	}
 
 	void CNetSession::completeLocked(OVERLAPPED *pOverlapped, DWORD bytes, DWORD error) noexcept
 	{
-		--m_pendingIo;
+		--m_ioCount;
 		if (m_state == EState::Closing)
 			return;
 		if (pOverlapped == &m_connectOverlapped && GetTickCount64() >= m_connectDeadline)
@@ -116,20 +125,13 @@ namespace ClientNetworkLib
 			sendCompletedLocked();
 		else if (bytes == 0)
 			beginCloseLocked(0);
-		else if (!m_isDrainingSend)
+		else
 		{
-			try
-			{
-				const DWORD recvError = recvCompletedLocked(bytes);
-				if (recvError != 0)
-					beginCloseLocked(recvError);
-				else
-					(void)postRecvLocked();
-			}
-			catch (const std::bad_alloc &)
-			{
-				beginCloseLocked(ERROR_NOT_ENOUGH_MEMORY);
-			}
+			const DWORD recvError = recvCompletedLocked(bytes);
+			if (recvError != 0)
+				beginCloseLocked(recvError);
+			else
+				(void)postRecvLocked();
 		}
 	}
 
@@ -162,25 +164,28 @@ namespace ClientNetworkLib
 		m_sendCount = 0;
 	}
 
-	DWORD CNetSession::recvCompletedLocked(DWORD bytes)
+	DWORD CNetSession::recvCompletedLocked(DWORD bytes) noexcept
 	{
-		m_recvStream.insert(m_recvStream.end(), m_recvBytes.data(), m_recvBytes.data() + bytes);
-		size_t offset = 0;
-		while (m_recvStream.size() - offset >= sizeof(SNetHeader))
+		constexpr int kHeaderBytes = sizeof(SNetHeader);
+		constexpr int kMaxPacketBytes = static_cast<int>(CSerializableBuffer<FALSE>::EBufferDefine::PacketMaxSize);
+
+		if (bytes > static_cast<DWORD>(m_recvBuffer.GetFreeSize()))
+			return ERROR_INVALID_DATA;
+		m_recvBuffer.MoveRear(static_cast<int>(bytes));
+		while (m_recvBuffer.GetUseSize() >= kHeaderBytes)
 		{
 			SNetHeader header;
-			memcpy(&header, m_recvStream.data() + offset, sizeof(header));
-			constexpr int kMaxPacketBytes = static_cast<int>(CSerializableBuffer<FALSE>::EBufferDefine::PacketMaxSize);
-			if (header.code != m_packetCode || header.len > kMaxPacketBytes - sizeof(header))
+			m_recvBuffer.Peek(reinterpret_cast<char *>(&header), kHeaderBytes);
+			if (header.code != m_packetCode || header.len > kMaxPacketBytes - kHeaderBytes)
 				return ERROR_INVALID_DATA;
-			size_t packetBytes = sizeof(header) + header.len;
-			if (m_recvStream.size() - offset < packetBytes)
+			const int packetBytes = kHeaderBytes + header.len;
+			if (m_recvBuffer.GetUseSize() < packetBytes)
 				break;
 
 			auto spMessage = CSerializableBuffer<FALSE>::MakeShared();
 			if (spMessage == nullptr)
 				return ERROR_NOT_ENOUGH_MEMORY;
-			memcpy(spMessage->GetBufferPtr(), m_recvStream.data() + offset, packetBytes);
+			m_recvBuffer.Dequeue(spMessage->GetBufferPtr(), packetBytes);
 			spMessage->MoveWritePos(header.len);
 			CEncryption::Decoding(spMessage->GetBufferPtr() + 4, header.len + 1, header.randKey);
 			BYTE checksum = CEncryption::CalCheckSum(spMessage->GetContentBufferPtr(), header.len);
@@ -188,9 +193,7 @@ namespace ClientNetworkLib
 				return ERROR_INVALID_DATA;
 			if (!m_spMailbox->pushPacket(std::move(spMessage)))
 				return ERROR_NOT_ENOUGH_MEMORY;
-			offset += packetBytes;
 		}
-		m_recvStream.erase(m_recvStream.begin(), m_recvStream.begin() + offset);
 		return 0;
 	}
 
@@ -200,22 +203,20 @@ namespace ClientNetworkLib
 			return;
 		m_state = EState::Closing;
 		m_closeError = error;
-		if (m_wasConnected)
-			shutdown(m_socket, SD_BOTH);
+
 		// closesocket으로 취소해도 등록한 I/O의 완료는 모두 소비한다.
 		closesocket(m_socket);
 		m_socket = INVALID_SOCKET;
-		m_sendDrainedCv.notify_all();
 	}
 
 	bool CNetSession::finishCloseLocked() noexcept
 	{
-		if (m_state != EState::Closing || m_pendingIo != 0 || m_isFinalized)
+		if (m_state != EState::Closing || m_ioCount != 0 || m_isFinalized)
 			return false;
 		m_isFinalized = true;
 		releaseSendBatchLocked();
 		m_sendQueue.clear();
-		m_spMailbox->publishTerminal(m_wasConnected ? EClientEvent::Disconnected : EClientEvent::ConnectFailed, m_closeError);
+		m_spMailbox->publishTerminalEvent(m_wasConnected ? EClientEvent::Disconnected : EClientEvent::ConnectFailed, m_closeError);
 		return true;
 	}
 }

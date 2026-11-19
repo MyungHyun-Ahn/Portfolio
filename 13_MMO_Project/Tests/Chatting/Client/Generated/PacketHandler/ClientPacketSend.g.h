@@ -17,7 +17,7 @@ namespace Chatting
 	[[nodiscard]] std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> MakePacketHeartbeatNoti(
 		const SHeartbeatNoti &packet) noexcept;
 
-	class CClientPacketSender
+	class CChatNetClient : public NetworkLib::CNetClient, private IClientPacketHandler
 	{
 	public:
 		[[nodiscard]] bool SendReqMessage(
@@ -40,9 +40,9 @@ namespace Chatting
 			std::int64_t accountNo) noexcept;
 
 	protected:
-		virtual ~CClientPacketSender() = default;
+		using NetworkLib::CNetClient::CNetClient;
 
 	private:
-		virtual bool sendPacket(std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> spPacket) noexcept = 0;
+		bool onRecv(NetworkLib::CSerializableBuffer<FALSE> &message) noexcept override final;
 	};
 }

@@ -6,6 +6,8 @@ namespace Chatting
 	{
 		std::string m_ip = "127.0.0.1";
 		USHORT m_port = kDefaultPort;
+		DWORD m_connectTimeoutMilliseconds = 5000;
+		int m_recvBufferBytes = 4096;
 		INT64 m_accountNo = 0;
 		std::wstring m_name = L"player";
 		WORD m_sectorX = 10;
