@@ -32,6 +32,9 @@
     <ClInclude Include="includes\MHLib\containers\CLfQueue.h">
       <Filter>includes\MHLib\containers</Filter>
     </ClInclude>
+    <ClInclude Include="includes\MHLib\containers\CLFSpscQueue.h">
+      <Filter>includes\MHLib\containers</Filter>
+    </ClInclude>
     <ClInclude Include="includes\MHLib\containers\CLfStack.h">
       <Filter>includes\MHLib\containers</Filter>
     </ClInclude>
