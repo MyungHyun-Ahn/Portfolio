@@ -50,10 +50,10 @@ namespace NetworkLib
 		m_hasConnected = true;
 	}
 
-	// Á¾·á ÀÌº¥Æ®¸¦ ¹ßÇàÇÑ´Ù.
-	// - Disconnected¿Í ¿¬°á Àü Á¾·á½Ã¿¡ »ç¿ë
-	// - Mailbox¿¡ Á¾·á ÀÌº¥Æ®¸¦ ÀúÀåÇÏ°í
-	// - Tick()¿¡¼­ ÀÌ ÀÌº¥Æ®¸¦ ²¨³»¸é onDisconnect°¡ È£ÃâµÈ´Ù.
+	// ì¢…ë£Œ ì´ë²¤íŠ¸ë¥¼ ë°œí–‰í•œë‹¤.
+	// - Disconnectedì™€ ì—°ê²° ì „ ì¢…ë£Œì‹œì— ì‚¬ìš©
+	// - Mailboxì— ì¢…ë£Œ ì´ë²¤íŠ¸ë¥¼ ì €ì¥í•˜ê³ 
+	// - Tick()ì—ì„œ ì´ ì´ë²¤íŠ¸ë¥¼ êº¼ë‚´ë©´ onDisconnectê°€ í˜¸ì¶œëœë‹¤.
 	void CClientMailbox::publishTerminalEvent(EClientEvent kind, DWORD error) noexcept
 	{
 		std::lock_guard mailboxLock(m_mailboxLock);
