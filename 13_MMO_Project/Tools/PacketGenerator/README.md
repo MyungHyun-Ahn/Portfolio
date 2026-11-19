@@ -25,14 +25,14 @@ call Tools\PacketGenerator\GeneratePackets.bat
 | 출력 | 내용 |
 |---|---|
 | [`Common/Packet/Struct`](../../Common/Packet/Struct) | 공용 패킷 ID, 구조체와 직렬화, include 집계 헤더 |
-| [`Client/Generated/PacketHandler`](../../Tests/Chatting/Client/Generated/PacketHandler) | `CClientPacketSender`, 송신 빌더, 수신 디스패처, Handle 선언 |
+| [`Client/Generated/PacketHandler`](../../Tests/Chatting/Client/Generated/PacketHandler) | `CChatNetClient`, 송신 빌더, 수신 디스패처, Handle 선언 |
 | [`Server/Generated/PacketHandler`](../../Tests/Chatting/Server/Generated/PacketHandler) | `CServerPacketSender`, 송신 빌더, 수신 디스패처, Handle 선언 |
 
 `.g.h`, `.g.cpp`, `.packet-generator.json`은 함께 관리하고 손으로 편집하지 않는다. 내용이 같으면 다시 쓰지 않는다. 스키마가 바뀌면 일반 빌드가 생성물을 자동으로 갱신하지 않으므로 BAT를 먼저 실행한다.
 
 ## 생성된 송신 함수
 
-- `CClientPacketSender::SendReqMessage(accountNo, text)`처럼 패킷 필드만 받는다. 실제 클라이언트 객체의 현재 연결을 사용하며, `bool`은 송신 접수 결과이지 상대의 수신 확인이 아니다.
+- `CChatNetClient::SendReqMessage(accountNo, text)`처럼 패킷 필드만 받는다. 생성된 `CChatNetClient`는 `CNetClient`를 상속해 현재 연결을 사용하고, `IClientPacketHandler`는 비공개로 상속해 수신을 디스패치한다. 송신의 `bool`은 접수 결과이지 상대의 수신 확인이 아니다.
 - 서버의 `Send*`는 첫 인자로 `sessionId`를 받고, 준비에 실패하면 `nullptr`을 반환한다. 성공적으로 준비한 버퍼는 첫 전송의 접수 여부와 무관하게 호출자 소유 참조 하나와 함께 반환한다. 호출자는 필요하면 같은 버퍼를 주변 세션에도 넘긴 뒤 `DecreaseRef()` 결과가 0이면 `Free()`를 호출한다.
 - 응답 버퍼를 확보한 뒤 상태를 변경해야 하는 서버 처리에서는 `MakePacket*()`과 `submitPreparedPacket()`을 분리해 호출한다. 수신용 `Handle*` 인터페이스에는 송신 함수가 추가되지 않는다.
 
