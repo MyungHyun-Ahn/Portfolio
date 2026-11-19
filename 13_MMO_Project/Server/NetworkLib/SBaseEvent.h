@@ -5,7 +5,10 @@ namespace NetworkLib
 // Event 수행이 필요하다면 BaseEvent를 상속받고 execute 를 등록
 struct SBaseEvent
 {
-	SBaseEvent(bool isTimer = false) : m_isTimerEvent(isTimer) {}
+	SBaseEvent(bool isTimer = false)
+		: m_isTimerEvent(isTimer)
+	{
+	}
 	bool m_isTimerEvent;
 	virtual void Execute(int delayFrame) = 0;
 };

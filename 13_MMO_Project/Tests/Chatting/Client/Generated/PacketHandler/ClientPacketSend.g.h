@@ -8,12 +8,12 @@ namespace Chatting
 	struct SReqSectorMove;
 	struct SHeartbeatNoti;
 
-	[[nodiscard]] NetworkLib::CSerializableBuffer<FALSE> *MakePacketReqMessage(
+	[[nodiscard]] std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> MakePacketReqMessage(
 		const SReqMessage &packet) noexcept;
-	[[nodiscard]] NetworkLib::CSerializableBuffer<FALSE> *MakePacketReqLogin(
+	[[nodiscard]] std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> MakePacketReqLogin(
 		const SReqLogin &packet) noexcept;
-	[[nodiscard]] NetworkLib::CSerializableBuffer<FALSE> *MakePacketReqSectorMove(
+	[[nodiscard]] std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> MakePacketReqSectorMove(
 		const SReqSectorMove &packet) noexcept;
-	[[nodiscard]] NetworkLib::CSerializableBuffer<FALSE> *MakePacketHeartbeatNoti(
+	[[nodiscard]] std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> MakePacketHeartbeatNoti(
 		const SHeartbeatNoti &packet) noexcept;
 }

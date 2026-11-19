@@ -7,21 +7,24 @@
 namespace Chatting
 {
 {% for packet in packets %}
-	NetworkLib::CSerializableBuffer<FALSE> *MakePacket{{ packet.name }}(const S{{ packet.name }} &packet) noexcept
+{% set buffer = 'spBuffer' if side == 'Client' else 'pBuffer' %}
+	{{ 'std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> ' if side == 'Client' else 'NetworkLib::CSerializableBuffer<FALSE> *' }}MakePacket{{ packet.name }}(const S{{ packet.name }} &packet) noexcept
 	{
-		auto *pBuffer = NetworkLib::CSerializableBuffer<FALSE>::Alloc();
-		if (pBuffer == nullptr)
+		auto {{ '' if side == 'Client' else '*' }}{{ buffer }} = NetworkLib::CSerializableBuffer<FALSE>::{{ 'MakeShared' if side == 'Client' else 'Alloc' }}();
+		if ({{ buffer }} == nullptr)
 		{
 			return nullptr;
 		}
 
-		*pBuffer << static_cast<std::uint16_t>(EPacketType::{{ packet.name }}) << packet;
-		if (!pBuffer->IsValid())
+		*{{ buffer }} << static_cast<std::uint16_t>(EPacketType::{{ packet.name }}) << packet;
+		if (!{{ buffer }}->IsValid())
 		{
+{% if side == 'Server' %}
 			NetworkLib::CSerializableBuffer<FALSE>::Free(pBuffer);
+{% endif %}
 			return nullptr;
 		}
-		return pBuffer;
+		return {{ buffer }};
 	}
 {% if not loop.last %}
 

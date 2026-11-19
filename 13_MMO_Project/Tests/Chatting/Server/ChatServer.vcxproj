@@ -36,7 +36,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderOutputFile>$(IntDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\Common;$(ProjectDir)Generated\PacketHandler;$(ProjectDir)..\..\..\Common\Packet\Struct;$(ProjectDir)..\..\..\Server\NetworkLib;$(ProjectDir)..\..\..\Server\MHLib\includes;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\Common;$(ProjectDir)Generated\PacketHandler;$(ProjectDir)..\..\..\Common\Packet\Struct;$(ProjectDir)..\..\..\Common\NetworkCommon;$(ProjectDir)..\..\..\Server\NetworkLib;$(ProjectDir)..\..\..\Server\MHLib\includes;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <RuntimeLibrary Condition="'$(Configuration)' == 'Debug'">MultiThreadedDebugDLL</RuntimeLibrary>
       <RuntimeLibrary Condition="'$(Configuration)' == 'Release'">MultiThreadedDLL</RuntimeLibrary>
@@ -77,7 +77,10 @@
     <ClInclude Include="..\Common\Config.h" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\Server\NetworkLib\NetworkLib.vcxproj">
+    <ProjectReference Include="..\..\..\Common\NetworkCommon\NetworkCommon.vcxproj">
+      <Project>{71D436B7-5958-42E7-A5D6-117397ACE88B}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\Server\NetworkLib\ServerNetworkLib.vcxproj">
       <Project>{BABB7C61-118C-407C-A3D8-5C628A1C1B5D}</Project>
     </ProjectReference>
   </ItemGroup>

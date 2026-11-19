@@ -80,8 +80,14 @@ class CBaseContents;
 			sm_sessionPool.Free(pDelSession);
 		}
 
-		inline static LONG GetPoolCapacity() noexcept { return sm_sessionPool.GetCapacity(); }
-		inline static LONG GetPoolUsage() noexcept { return sm_sessionPool.GetUseCount(); }
+		inline static LONG GetPoolCapacity() noexcept
+		{
+			return sm_sessionPool.GetCapacity();
+		}
+		inline static LONG GetPoolUsage() noexcept
+		{
+			return sm_sessionPool.GetUseCount();
+		}
 
 	private:
 		// 패딩 계산해서 세션 크기 최적화
@@ -139,7 +145,10 @@ class CBaseContents;
 		BOOL Start(const CHAR *pOpenIp, const USHORT port) noexcept;
 		void Stop();
 
-		inline LONG GetSessionCount() const noexcept { return m_sessionCount; }
+		inline LONG GetSessionCount() const noexcept
+		{
+			return m_sessionCount;
+		}
 
 		void SendPacket(const UINT64 sessionId, CSerializableBuffer<FALSE> *pSBuffer) noexcept;
 		// Send 시도는 하지 않음

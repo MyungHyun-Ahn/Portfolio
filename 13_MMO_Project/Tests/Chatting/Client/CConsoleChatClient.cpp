@@ -1,8 +1,11 @@
 #include "pch.h"
+#include <memory>
+#include <condition_variable>
 #include "CSerializableBuffer.h"
 #include "CommonProtocol.h"
 #include "Config.h"
-#include "CNetClient.h"
+#include "CNetClientManager.h"
+#include "CClientMailbox.h"
 #include "MHLib/serialization/ISerializable.h"
 #include "IncludePacketAll.g.h"
 #include "IClientPacketHandler.g.h"
@@ -15,20 +18,73 @@ namespace Chatting
 	using MHLib::utils::ELogLevel;
 	using MHLib::utils::g_pLogger;
 
-	// SendPacket()이 송신 참조를 잡기 전에 실패할 수 있으므로 호출 중에는 버퍼 참조를 유지한다.
-	// 호출이 끝나면 자기 참조만 내리고, 마지막 참조였다면 버퍼를 풀에 반환한다
-	bool CConsoleChatClient::sendOwned(NetworkLib::CSerializableBuffer<FALSE> *pMessage) noexcept
+	bool CConsoleChatClient::Connect() noexcept
 	{
-		if (pMessage == nullptr)
+		if (IsActive())
 			return false;
-		pMessage->IncreaseRef();
-		bool isSent = SendPacket(pMessage);
-		if (pMessage->DecreaseRef() == 0)
-			NetworkLib::CSerializableBuffer<FALSE>::Free(pMessage);
-		return isSent;
+		try
+		{
+			auto spMailbox = std::make_shared<NetworkLib::CClientMailbox>();
+			m_sessionId = m_network.Connect(m_config.m_ip.c_str(), m_config.m_port, kPacketCode, spMailbox);
+			if (m_sessionId == 0)
+				return false;
+			m_spMailbox = std::move(spMailbox);
+			return true;
+		}
+		catch (const std::bad_alloc &)
+		{
+			return false;
+		}
 	}
 
-	bool CConsoleChatClient::Login() noexcept
+	void CConsoleChatClient::Disconnect() noexcept
+	{
+		m_isConnected = false;
+		if (IsActive())
+			m_network.Disconnect(m_sessionId, 2000);
+	}
+
+	// 클라이언트는 Tick을 가지고 매 프레임마다 이 함수를 호출한다.
+	void CConsoleChatClient::Tick() noexcept
+	{
+		if (m_spMailbox == nullptr)
+			return;
+		NetworkLib::SClientEvent event;
+		for (int count = 0; count < 64 && m_spMailbox->TryPop(event); ++count)
+		{
+			switch (event.m_kind)
+			{
+			case NetworkLib::EClientEvent::Connected:
+				onConnect();
+				break;
+			case NetworkLib::EClientEvent::Packet:
+				if (m_isConnected && !onRecv(*event.m_spPacket))
+				{
+					m_isConnected = false;
+					m_network.Disconnect(m_sessionId);
+				}
+				break;
+			case NetworkLib::EClientEvent::ConnectFailed:
+				g_pLogger->WriteLogConsole(ELogLevel::Error, L"ConnectEx completion failed: error=%lu", event.m_error);
+				[[fallthrough]];
+			case NetworkLib::EClientEvent::Disconnected:
+				onDisconnect();
+				return;
+			}
+		}
+	}
+
+	void CConsoleChatClient::onConnect() noexcept
+	{
+		m_isConnected = true;
+		if (!login())
+		{
+			m_isConnected = false;
+			m_network.Disconnect(m_sessionId);
+		}
+	}
+
+	bool CConsoleChatClient::login() noexcept
 	{
 		SReqLogin packet;
 		packet.m_accountNo = m_config.m_accountNo;
@@ -39,10 +95,10 @@ namespace Chatting
 			|| wcscpy_s(packet.m_nickname.data(), packet.m_nickname.size(), m_config.m_name.c_str()) != 0)
 			return false;
 		std::copy_n(kTestSessionKey, kSessionKeyBytes, packet.m_sessionKey.begin());
-		return sendOwned(MakePacketReqLogin(packet));
+		return m_network.SendPacket(m_sessionId, MakePacketReqLogin(packet));
 	}
 
-	bool CConsoleChatClient::SendMessage(const std::wstring &text) noexcept
+	bool CConsoleChatClient::SendReqMessage(const std::wstring &text) noexcept
 	{
 		if (!m_isReady || text.empty() || text.size() > kMaxMessageBytes / sizeof(WCHAR))
 			return false;
@@ -51,7 +107,7 @@ namespace Chatting
 			SReqMessage packet;
 			packet.m_accountNo = m_config.m_accountNo;
 			packet.m_message = text;
-			return sendOwned(MakePacketReqMessage(packet));
+			return m_network.SendPacket(m_sessionId, MakePacketReqMessage(packet));
 		}
 		catch (const std::bad_alloc &)
 		{
@@ -59,16 +115,16 @@ namespace Chatting
 		}
 	}
 
-	bool CConsoleChatClient::SendHeartbeat() noexcept
+	bool CConsoleChatClient::SendNotiHeartbeat() noexcept
 	{
 		if (!m_isReady)
 			return false;
 		SHeartbeatNoti packet;
 		packet.m_accountNo = m_config.m_accountNo;
-		return sendOwned(MakePacketHeartbeatNoti(packet));
+		return m_network.SendPacket(m_sessionId, MakePacketHeartbeatNoti(packet));
 	}
 
-	bool CConsoleChatClient::OnRecv(NetworkLib::CSerializableBuffer<FALSE> &message) noexcept
+	bool CConsoleChatClient::onRecv(NetworkLib::CSerializableBuffer<FALSE> &message) noexcept
 	{
 		return DispatchClientPacket(message, *this);
 	}
@@ -84,7 +140,7 @@ namespace Chatting
 		request.m_accountNo = packet.m_accountNo;
 		request.m_sectorX = m_config.m_sectorX;
 		request.m_sectorY = m_config.m_sectorY;
-		return sendOwned(MakePacketReqSectorMove(request));
+		return m_network.SendPacket(m_sessionId, MakePacketReqSectorMove(request));
 	}
 
 	bool CConsoleChatClient::HandleResSectorMove(const SResSectorMove &packet) noexcept
@@ -109,8 +165,11 @@ namespace Chatting
 		return true;
 	}
 
-	void CConsoleChatClient::OnDisconnect() noexcept
+	void CConsoleChatClient::onDisconnect() noexcept
 	{
+		m_sessionId = 0;
+		m_spMailbox.reset();
+		m_isConnected = false;
 		m_isReady = false;
 		m_isLogin = false;
 		g_pLogger->WriteLogConsole(ELogLevel::System, L"DISCONNECTED");

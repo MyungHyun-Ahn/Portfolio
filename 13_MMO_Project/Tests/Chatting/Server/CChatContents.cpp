@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "DefineServer.h"
+#include "NetworkLimits.h"
 #include "COverlappedAllocator.h"
 #include "CRingBuffer.h"
 #include "CSerializableBuffer.h"

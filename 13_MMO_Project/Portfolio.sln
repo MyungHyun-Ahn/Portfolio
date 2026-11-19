@@ -4,7 +4,11 @@ VisualStudioVersion = 18.0.0.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "MHLib", "Server\MHLib\MHLib.vcxproj", "{7BA54F60-794F-4CD8-93F9-85AAB6151031}"
 EndProject
-Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "NetworkLib", "Server\NetworkLib\NetworkLib.vcxproj", "{BABB7C61-118C-407C-A3D8-5C628A1C1B5D}"
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "ServerNetworkLib", "Server\NetworkLib\ServerNetworkLib.vcxproj", "{BABB7C61-118C-407C-A3D8-5C628A1C1B5D}"
+EndProject
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "NetworkCommon", "Common\NetworkCommon\NetworkCommon.vcxproj", "{71D436B7-5958-42E7-A5D6-117397ACE88B}"
+EndProject
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "ClientNetworkLib", "Client\ClientNetworkLib\ClientNetworkLib.vcxproj", "{78263CEC-71A0-4A0F-BA79-66BF5873E3E6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -30,5 +34,21 @@ Global
 		{BABB7C61-118C-407C-A3D8-5C628A1C1B5D}.Release|Win32.Build.0 = Release|Win32
 		{BABB7C61-118C-407C-A3D8-5C628A1C1B5D}.Release|x64.ActiveCfg = Release|x64
 		{BABB7C61-118C-407C-A3D8-5C628A1C1B5D}.Release|x64.Build.0 = Release|x64
+		{71D436B7-5958-42E7-A5D6-117397ACE88B}.Debug|Win32.ActiveCfg = Debug|Win32
+		{71D436B7-5958-42E7-A5D6-117397ACE88B}.Debug|Win32.Build.0 = Debug|Win32
+		{71D436B7-5958-42E7-A5D6-117397ACE88B}.Debug|x64.ActiveCfg = Debug|x64
+		{71D436B7-5958-42E7-A5D6-117397ACE88B}.Debug|x64.Build.0 = Debug|x64
+		{71D436B7-5958-42E7-A5D6-117397ACE88B}.Release|Win32.ActiveCfg = Release|Win32
+		{71D436B7-5958-42E7-A5D6-117397ACE88B}.Release|Win32.Build.0 = Release|Win32
+		{71D436B7-5958-42E7-A5D6-117397ACE88B}.Release|x64.ActiveCfg = Release|x64
+		{71D436B7-5958-42E7-A5D6-117397ACE88B}.Release|x64.Build.0 = Release|x64
+		{78263CEC-71A0-4A0F-BA79-66BF5873E3E6}.Debug|Win32.ActiveCfg = Debug|Win32
+		{78263CEC-71A0-4A0F-BA79-66BF5873E3E6}.Debug|Win32.Build.0 = Debug|Win32
+		{78263CEC-71A0-4A0F-BA79-66BF5873E3E6}.Debug|x64.ActiveCfg = Debug|x64
+		{78263CEC-71A0-4A0F-BA79-66BF5873E3E6}.Debug|x64.Build.0 = Debug|x64
+		{78263CEC-71A0-4A0F-BA79-66BF5873E3E6}.Release|Win32.ActiveCfg = Release|Win32
+		{78263CEC-71A0-4A0F-BA79-66BF5873E3E6}.Release|Win32.Build.0 = Release|Win32
+		{78263CEC-71A0-4A0F-BA79-66BF5873E3E6}.Release|x64.ActiveCfg = Release|x64
+		{78263CEC-71A0-4A0F-BA79-66BF5873E3E6}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 EndGlobal

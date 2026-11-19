@@ -39,7 +39,6 @@ public:
 
 	// 64
 
-	LONG m_recvTps = 0;
 	INT m_dummy01; // 패딩 계산용
 
 	ULARGE_INTEGER m_ftProcessLastKernel;
@@ -53,7 +52,6 @@ public:
 	
 	// 128
 
-	LONG m_sendTps = 0;
 	INT m_dummy02; // 패딩 계산용
 	// PDH
 	PDH_HCOUNTER m_networkSendKB1Counter;
@@ -74,7 +72,6 @@ public:
 	PDH_FMT_COUNTERVALUE m_networkSendKB1Val; // 48
 	PDH_FMT_COUNTERVALUE m_networkSendKB2Val; // 64
 
-	LONG m_maxSendCount = 0;
 	int m_dummy03;
 	PDH_FMT_COUNTERVALUE m_networkRecvKB1Val;
 	PDH_FMT_COUNTERVALUE m_networkRecvKB2Val;

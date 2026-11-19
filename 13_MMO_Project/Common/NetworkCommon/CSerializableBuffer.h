@@ -19,17 +19,31 @@ public:
 
 
 	CSerializableBuffer() noexcept
+		: CSerializableBuffer(static_cast<char *>(sm_pagePool.Alloc()), freePooledPage, freePooledBuffer)
 	{
-		m_pBuffer = (char *)sm_pagePool.Alloc();
-		m_maxSize = (int)EBufferDefine::PacketMaxSize;
-		m_headerFront = 0;
-		m_front = (int)EBufferDefine::HeaderSize;
-		m_rear = (int)EBufferDefine::HeaderSize;
 	}
 
 	virtual ~CSerializableBuffer() noexcept
 	{
-		sm_pagePool.Free(m_pBuffer);
+		m_releasePage(m_pBuffer);
+	}
+
+	[[nodiscard]] static std::shared_ptr<CSerializableBuffer> MakeShared() noexcept
+	{
+		try
+		{
+			auto upPage = std::make_unique_for_overwrite<char[]>(static_cast<int>(EBufferDefine::PacketMaxSize));
+			return std::shared_ptr<CSerializableBuffer>(new CSerializableBuffer(upPage.release(), freeHeapPage, freeHeapBuffer));
+		}
+		catch (const std::bad_alloc &)
+		{
+			return {};
+		}
+	}
+
+	[[nodiscard]] bool IsHeapAllocated() const noexcept
+	{
+		return m_releaseBuffer == freeHeapBuffer;
 	}
 
 
@@ -46,17 +60,41 @@ public:
 	bool Enqueue(char *pBuffer, int size) noexcept;
 	bool Dequeue(char *outBuffer, int size) noexcept;
 	// 실패 후 직렬화 연산은 Clear() 호출 전까지 버퍼를 변경하지 않는다.
-	[[nodiscard]] bool IsValid() const noexcept { return m_isValid; }
+	[[nodiscard]] bool IsValid() const noexcept
+	{
+		return m_isValid;
+	}
 
-	inline int GetBufferSize() const noexcept { return m_maxSize; }
-	inline int GetDataSize() const noexcept { return m_rear - m_front; }
-	inline int GetHeaderSize() const noexcept { return  (int)EBufferDefine::HeaderSize; }
-	inline int GetFullSize() const noexcept { return GetDataSize() + GetHeaderSize(); }
-	inline int GetIsEnqueueHeader() const noexcept { return m_isEnqueueHeader; }
+	inline int GetBufferSize() const noexcept
+	{
+		return m_maxSize;
+	}
+	inline int GetDataSize() const noexcept
+	{
+		return m_rear - m_front;
+	}
+	inline int GetHeaderSize() const noexcept
+	{
+		return  (int)EBufferDefine::HeaderSize;
+	}
+	inline int GetFullSize() const noexcept
+	{
+		return GetDataSize() + GetHeaderSize();
+	}
+	inline int GetIsEnqueueHeader() const noexcept
+	{
+		return m_isEnqueueHeader;
+	}
 
 	// 외부에서 버퍼를 직접 조작하기 위한 용도
-	inline char *GetBufferPtr() const noexcept { return m_pBuffer; }
-	inline char *GetContentBufferPtr() const noexcept { return m_pBuffer + m_front; }
+	inline char *GetBufferPtr() const noexcept
+	{
+		return m_pBuffer;
+	}
+	inline char *GetContentBufferPtr() const noexcept
+	{
+		return m_pBuffer + m_front;
+	}
 	int MoveWritePos(int sizeBytes) noexcept
 	{
 		if (sizeBytes < 0 || !canWrite(sizeBytes))
@@ -193,11 +231,17 @@ public:
 
 	inline static void Free(CSerializableBuffer *pDelSBuffer) noexcept
 	{
-		sm_sbufferPool.Free(pDelSBuffer);
+		pDelSBuffer->m_releaseBuffer(pDelSBuffer);
 	}
 
-	inline static LONG GetPoolCapacity() noexcept { return sm_sbufferPool.GetCapacity(); }
-	inline static LONG GetPoolUsage() noexcept { return sm_sbufferPool.GetUseCount(); }
+	inline static LONG GetPoolCapacity() noexcept
+	{
+		return sm_sbufferPool.GetCapacity();
+	}
+	inline static LONG GetPoolUsage() noexcept
+	{
+		return sm_sbufferPool.GetUseCount();
+	}
 
 	inline LONG IncreaseRef() noexcept 
 	{
@@ -212,10 +256,48 @@ public:
 		return back;
 	}
 
-	inline void SetSessionId(UINT64 id) noexcept { m_sessionId = id; }
-	inline UINT64 GetSessionId() noexcept { return m_sessionId; }
+	inline void SetSessionId(UINT64 id) noexcept
+	{
+		m_sessionId = id;
+	}
+	inline UINT64 GetSessionId() noexcept
+	{
+		return m_sessionId;
+	}
 
 private:
+	using PageRelease = void (*)(char *) noexcept;
+	using BufferRelease = void (*)(CSerializableBuffer *) noexcept;
+
+	CSerializableBuffer(char *pPage, PageRelease releasePage, BufferRelease releaseBuffer) noexcept
+		: m_pBuffer(pPage)
+		, m_releasePage(releasePage)
+		, m_releaseBuffer(releaseBuffer)
+		, m_front(static_cast<int>(EBufferDefine::HeaderSize))
+		, m_rear(static_cast<int>(EBufferDefine::HeaderSize))
+	{
+	}
+
+	static void freePooledPage(char *pPage) noexcept
+	{
+		sm_pagePool.Free(pPage);
+	}
+
+	static void freePooledBuffer(CSerializableBuffer *pBuffer) noexcept
+	{
+		sm_sbufferPool.Free(pBuffer);
+	}
+
+	static void freeHeapPage(char *pPage) noexcept
+	{
+		delete[] pPage;
+	}
+
+	static void freeHeapBuffer(CSerializableBuffer *pBuffer) noexcept
+	{
+		delete pBuffer;
+	}
+
 	bool fail() noexcept
 	{
 		m_isValid = false;
@@ -254,6 +336,9 @@ private:
 
 	bool m_isValid = true;
 	char *m_pBuffer;
+	// 마지막 참조를 놓는 스레드와 관계없이 원래 할당 경로로 반환한다.
+	PageRelease m_releasePage;
+	BufferRelease m_releaseBuffer;
 	int m_headerFront = 0;
 	int m_front = 0;
 	int m_rear = 0;
@@ -266,10 +351,8 @@ public:
 	BOOL			m_isEnqueueHeader = 0;
 	UINT64			m_sessionId = 0;
 
-	inline static MHLib::memory::CTlsMemoryPoolManager<CSerializableBuffer, 512, 2> sm_sbufferPool =
-		MHLib::memory::CTlsMemoryPoolManager<CSerializableBuffer, 512, 2>();
-	inline static MHLib::memory::CTlsPagePoolManager<(int)EBufferDefine::PacketMaxSize, 16, false> sm_pagePool =
-		MHLib::memory::CTlsPagePoolManager<(int)EBufferDefine::PacketMaxSize, 16, false>();
+	static MHLib::memory::CTlsMemoryPoolManager<CSerializableBuffer, 512, 2> sm_sbufferPool;
+	static MHLib::memory::CTlsPagePoolManager<(int)EBufferDefine::PacketMaxSize, 16, false> sm_pagePool;
 };
 
 template<bool isLanServer>

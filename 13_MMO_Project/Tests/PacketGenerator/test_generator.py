@@ -97,8 +97,18 @@ class GeneratorTests(unittest.TestCase):
             with self.subTest(side=side):
                 send = (root / f'{side}PacketSend.g.cpp').read_text()
                 dispatch = (root / f'{side}PacketDispatch.g.cpp').read_text()
-                self.assertIn(f'*pBuffer << static_cast<std::uint16_t>(EPacketType::{packet}) << packet;', send)
-                self.assertRegex(send, r'if \(!pBuffer->IsValid\(\)\)\s*\{\s*.*::Free\(pBuffer\);')
+                header = (root / f'{side}PacketSend.g.h').read_text()
+                if side == 'Client':
+                    self.assertIn('std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>>', header)
+                    self.assertIn('CSerializableBuffer<FALSE>::MakeShared()', send)
+                    self.assertIn(f'*spBuffer << static_cast<std::uint16_t>(EPacketType::{packet}) << packet;', send)
+                    self.assertRegex(send, r'if \(!spBuffer->IsValid\(\)\)\s*\{\s*return nullptr;')
+                    self.assertNotIn('::Free(', send)
+                else:
+                    self.assertIn('NetworkLib::CSerializableBuffer<FALSE> *MakePacket', header)
+                    self.assertIn('CSerializableBuffer<FALSE>::Alloc()', send)
+                    self.assertIn(f'*pBuffer << static_cast<std::uint16_t>(EPacketType::{packet}) << packet;', send)
+                    self.assertRegex(send, r'if \(!pBuffer->IsValid\(\)\)\s*\{\s*.*::Free\(pBuffer\);')
                 self.assertEqual(dispatch.count('message >> type;'), int(side == 'Client'))
                 self.assertRegex(dispatch, r'message >> packet;\s*return message.IsValid\(\)'
                                  r' && message.GetDataSize\(\) == 0\s*&& handler.Handle')

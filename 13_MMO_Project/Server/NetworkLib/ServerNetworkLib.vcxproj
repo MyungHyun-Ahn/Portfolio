@@ -26,7 +26,7 @@
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{babb7c61-118c-407c-a3d8-5c628a1c1b5d}</ProjectGuid>
-    <RootNamespace>NetworkLib</RootNamespace>
+    <RootNamespace>ServerNetworkLib</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -83,7 +83,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\MHLib\includes;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\MHLib\includes;$(ProjectDir)..\..\Common\NetworkCommon;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -104,7 +104,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <Optimization>Disabled</Optimization>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\MHLib\includes;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\MHLib\includes;$(ProjectDir)..\..\Common\NetworkCommon;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -124,7 +124,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\MHLib\includes;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\MHLib\includes;$(ProjectDir)..\..\Common\NetworkCommon;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -145,7 +145,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <Optimization>Disabled</Optimization>
       <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\MHLib\includes;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\MHLib\includes;$(ProjectDir)..\..\Common\NetworkCommon;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -173,13 +173,8 @@
   </ImportGroup>
   <ItemGroup>
     <ClCompile Include="CBaseContents.cpp" />
-    <ClCompile Include="CLanClient.cpp" />
-    <ClCompile Include="ClientSetting.cpp" />
     <ClCompile Include="CMonitor.cpp" />
-    <ClCompile Include="CNetClient.cpp" />
     <ClCompile Include="CNetServer.cpp" />
-    <ClCompile Include="NetPacket.cpp" />
-    <ClCompile Include="COverlappedAllocator.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
@@ -187,18 +182,8 @@
     <ClCompile Include="SystemEvent.cpp" />
     <ClInclude Include="CBaseContents.h" />
     <ClInclude Include="CContentsThread.h" />
-    <ClInclude Include="CLanClient.h" />
-    <ClInclude Include="ClientSetting.h" />
     <ClInclude Include="CMonitor.h" />
-    <ClInclude Include="CNetClient.h" />
     <ClInclude Include="CNetServer.h" />
-    <ClInclude Include="NetPacket.h" />
-    <ClInclude Include="COverlappedAllocator.h" />
-    <ClInclude Include="CRecvBuffer.h" />
-    <ClInclude Include="CRingBuffer.h" />
-    <ClInclude Include="CSerializableBuffer.h" />
-    <ClInclude Include="CSerializableBufferView.h" />
-    <ClInclude Include="DefineServer.h" />
     <ClInclude Include="NetPch.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="SBaseEvent.h" />
@@ -206,6 +191,10 @@
     <ClInclude Include="SystemEvent.h" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\Common\NetworkCommon\NetworkCommon.vcxproj">
+      <Project>{71D436B7-5958-42E7-A5D6-117397ACE88B}</Project>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
     <ProjectReference Include="..\MHLib\MHLib.vcxproj">
       <Project>{7BA54F60-794F-4CD8-93F9-85AAB6151031}</Project>
       <LinkLibraryDependencies>false</LinkLibraryDependencies>

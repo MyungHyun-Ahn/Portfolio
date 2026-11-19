@@ -9,8 +9,14 @@ class CContentsThread
 {
 public:
 	friend class NetworkLib::CNetServer;
-	CContentsThread() { InitializeSRWLock(&m_lockTimerEventQ); }
-	~CContentsThread() { CloseHandle(m_threadHandle); }
+	CContentsThread()
+	{
+		InitializeSRWLock(&m_timerEventQueueRWLock);
+	}
+	~CContentsThread()
+	{
+		CloseHandle(m_threadHandle);
+	}
 
 	bool Create() noexcept
 	{
@@ -85,7 +91,7 @@ private:
 
 				if (pEvent->m_isTimerEvent)
 				{
-					CLockGuard<ELockType::Exclusive> lock(m_lockTimerEventQ);
+					CLockGuard<ELockType::Exclusive> timerEventQueueLock(m_timerEventQueueRWLock);
 					m_timerEventQueue.push(static_cast<STimerEvent *>(pEvent));
 				}
 				else
@@ -124,22 +130,22 @@ private:
 			if (pThread == this)
 				continue;
 
-			AcquireSRWLockExclusive(&pThread->m_lockTimerEventQ);
+			AcquireSRWLockExclusive(&pThread->m_timerEventQueueRWLock);
 			if (pThread->m_timerEventQueue.size() != 0)
 			{
 				STimerEvent *pTimerEvent = pThread->m_timerEventQueue.top();
 				pThread->m_timerEventQueue.pop();
-				ReleaseSRWLockExclusive(&pThread->m_lockTimerEventQ);
+				ReleaseSRWLockExclusive(&pThread->m_timerEventQueueRWLock);
 
-				AcquireSRWLockExclusive(&m_lockTimerEventQ);
+				AcquireSRWLockExclusive(&m_timerEventQueueRWLock);
 				m_timerEventQueue.push(pTimerEvent);
-				ReleaseSRWLockExclusive(&m_lockTimerEventQ);
+				ReleaseSRWLockExclusive(&m_timerEventQueueRWLock);
 				
 				InterlockedIncrement(&g_monitor.m_stealWork);
 
 				return true;
 			}
-			ReleaseSRWLockExclusive(&pThread->m_lockTimerEventQ);
+			ReleaseSRWLockExclusive(&pThread->m_timerEventQueueRWLock);
 		}
 
 		return false;
@@ -151,7 +157,7 @@ private:
 	{
 		STimerEvent *pTimerEvent;
 		{
-			CLockGuard<ELockType::Exclusive> lock(m_lockTimerEventQ);
+			CLockGuard<ELockType::Exclusive> timerEventQueueLock(m_timerEventQueueRWLock);
 			if (m_timerEventQueue.empty())
 			{
 				return false;
@@ -171,7 +177,7 @@ private:
 		STimerEvent *pTimerEvent;
 		LONG dTime;
 		{
-			CLockGuard<ELockType::Exclusive> lock(m_lockTimerEventQ);
+			CLockGuard<ELockType::Exclusive> timerEventQueueLock(m_timerEventQueueRWLock);
 
 			if (m_timerEventQueue.empty())
 			{
@@ -212,7 +218,7 @@ private:
 			delegateWork();
 		}
 
-		CLockGuard<ELockType::Exclusive> lock(m_lockTimerEventQ);
+		CLockGuard<ELockType::Exclusive> timerEventQueueLock(m_timerEventQueueRWLock);
 		m_timerEventQueue.push(pTimerEvent);
 
 		return;
@@ -243,7 +249,7 @@ private:
 
 	// TimerEvent Queue
 	std::priority_queue<STimerEvent *, std::vector<STimerEvent *>, STimerEventComparator>	m_timerEventQueue;
-	SRWLOCK					m_lockTimerEventQ;
+	SRWLOCK					m_timerEventQueueRWLock;
 
 	// SleepTime이 모자르면 다른 스레드에 일감 넘김
 	DWORD					m_prevSleepTime = INFINITE;

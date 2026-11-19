@@ -35,10 +35,34 @@ private:
 		m_readHeaderSize = 0;
 	}
 
+	void init(const std::shared_ptr<CRecvBuffer> &spRecvBuffer, int offsetStart, int offsetEnd) noexcept
+	{
+		m_spSharedRecvBuffer = spRecvBuffer;
+		m_pBuffer = spRecvBuffer->GetOffsetPtr(offsetStart);
+		m_headerFront = 0;
+		m_front = (int)CSerializableBuffer<isLanServer>::EBufferDefine::HeaderSize;
+		m_rear = offsetEnd - offsetStart;
+		m_readHeaderSize = 0;
+	}
+
 	// 이거 하고서는 Copy를 꼭 해줘야함
 	inline void initAndAlloc(int size) noexcept
 	{
-		m_pBuffer = new char[size];
+		initStorage(new char[size], size);
+	}
+
+	[[nodiscard]] bool tryInitHeapStorage(int size) noexcept
+	{
+		m_upFragmentStorage.reset(new (std::nothrow) char[size]);
+		if (m_upFragmentStorage == nullptr)
+			return false;
+		initStorage(m_upFragmentStorage.get(), size);
+		return true;
+	}
+
+	void initStorage(char *pBuffer, int size) noexcept
+	{
+		m_pBuffer = pBuffer;
 		m_bufferSize = size;
 		m_headerFront = 0;
 		m_front = (int)CSerializableBuffer<isLanServer>::EBufferDefine::HeaderSize;
@@ -77,14 +101,32 @@ private:
 
 	bool getHeader(char *outBuffer, int size) noexcept;
 
-	inline int getHeaderSize() const noexcept { return  (int)CSerializableBuffer<isLanServer>::EBufferDefine::HeaderSize; }
-	inline int getFullSize() const noexcept { return GetDataSize() + getHeaderSize(); }
+	inline int getHeaderSize() const noexcept
+	{
+		return  (int)CSerializableBuffer<isLanServer>::EBufferDefine::HeaderSize;
+	}
+	inline int getFullSize() const noexcept
+	{
+		return GetDataSize() + getHeaderSize();
+	}
 
 	// 외부에서 버퍼를 직접 조작하기 위한 용도
-	inline char *getBufferPtr() const noexcept { return m_pBuffer; }
-	inline char *getContentBufferPtr() const noexcept { return m_pBuffer + m_front; }
-	inline int moveWritePos(int size) noexcept { m_rear += size; return m_rear; }
-	inline int moveReadPos(int size) { m_front += size; return m_front; }
+	inline char *getBufferPtr() const noexcept
+	{
+		return m_pBuffer;
+	}
+	inline char *getContentBufferPtr() const noexcept
+	{
+		return m_pBuffer + m_front;
+	}
+	inline int moveWritePos(int size) noexcept
+	{
+		m_rear += size; return m_rear;
+	}
+	inline int moveReadPos(int size)
+	{
+		m_front += size; return m_front;
+	}
 
 	// delayedHeader에 쓴다.
 	bool writeDelayedHeader(char *pBuffer, int size) noexcept;
@@ -97,11 +139,13 @@ private:
 	}
 
 public:
-	inline int GetDataSize() const noexcept { return m_rear - m_front; }
+	inline int GetDataSize() const noexcept
+	{
+		return m_rear - m_front;
+	}
 
 	inline static void Free(CSerializableBufferView *pDelSBuffer) noexcept
 	{
-		// 직접 할당 받은 버퍼가 아니라면 recv 버퍼는 nullptr이 아님
 		pDelSBuffer->clear();
 		sm_sbufferPool.Free(pDelSBuffer);
 	}
@@ -255,21 +299,35 @@ public:
 		return *this;
 	}
 
-	inline static LONG GetPoolCapacity() noexcept { return sm_sbufferPool.GetCapacity(); }
-	inline static LONG GetPoolUsage() noexcept { return sm_sbufferPool.GetUseCount(); }
+	inline static LONG GetPoolCapacity() noexcept
+	{
+		return sm_sbufferPool.GetCapacity();
+	}
+	inline static LONG GetPoolUsage() noexcept
+	{
+		return sm_sbufferPool.GetUseCount();
+	}
 
-	inline LONG IncreaseRef() noexcept { return InterlockedIncrement(&m_refCount); }
-	inline LONG DecreaseRef() noexcept { return InterlockedDecrement(&m_refCount); }
+	inline LONG IncreaseRef() noexcept
+	{
+		return InterlockedIncrement(&m_refCount);
+	}
+	inline LONG DecreaseRef() noexcept
+	{
+		return InterlockedDecrement(&m_refCount);
+	}
 
 
 private:
-	char *m_pBuffer;
+	char *m_pBuffer = nullptr;
 	int m_bufferSize = 0;
 	int m_headerFront = 0;
 	int m_front = 0;
 	int m_rear = 0;
 
 	MHLib::utils::CSmartPtr<CRecvBuffer> m_spRecvBuffer;
+	std::shared_ptr<CRecvBuffer> m_spSharedRecvBuffer;
+	std::unique_ptr<char[]> m_upFragmentStorage;
 	// 사이즈 헤더 조차도 밀림을 방지하기 위한 버퍼
 	char m_delayedHeader[(int)CSerializableBuffer<isLanServer>::EBufferDefine::HeaderSize];
 	USHORT m_readHeaderSize = 0;
@@ -277,9 +335,7 @@ private:
 	LONG			m_refCount = 0;
 	UINT64			m_sessionId = 0;
 
-	// inline static CLFMemoryPool<CSerializableBufferView> s_sbufferPool = CLFMemoryPool<CSerializableBufferView>(5000, false);
-	inline static MHLib::memory::CTlsMemoryPoolManager <CSerializableBufferView, 128, 4, false> sm_sbufferPool =
-		MHLib::memory::CTlsMemoryPoolManager <CSerializableBufferView, 128, 4, false>();
+	static MHLib::memory::CTlsMemoryPoolManager<CSerializableBufferView, 128, 4, false> sm_sbufferPool;
 };
 
 // offset은 거의 0만 쓸 듯?

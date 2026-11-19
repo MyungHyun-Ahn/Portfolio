@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "DefineServer.h"
+#include "NetHeaders.h"
 #include "CSerializableBuffer.h"
 #include "NetPacket.h"
 

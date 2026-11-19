@@ -16,7 +16,8 @@ public:
 	{
 		m_pQueue = new char[m_capacity];
 	}
-	CRingBuffer(int size) noexcept : m_capacity(size + 1)
+	CRingBuffer(int size) noexcept
+		: m_capacity(size + 1)
 	{
 		m_pQueue = new char[m_capacity];
 	}
@@ -26,7 +27,10 @@ public:
 	}
 
 	// 버퍼 최대 크기
-	inline int GetCapacity() const noexcept { return m_capacity - 1; }
+	inline int GetCapacity() const noexcept
+	{
+		return m_capacity - 1;
+	}
 
 	// 현재 사용중인 용량 얻기
 	inline int GetUseSize() const noexcept
@@ -45,10 +49,16 @@ public:
 	}
 
 	// 현재 버퍼에 남은 용량 얻기
-	inline int GetFreeSize() const noexcept { return m_capacity - GetUseSize() - 1; }
+	inline int GetFreeSize() const noexcept
+	{
+		return m_capacity - GetUseSize() - 1;
+	}
 
 	// 모든 데이터 삭제
-	inline void Clear() noexcept { m_front = 0; m_rear = 0; }
+	inline void Clear() noexcept
+	{
+		m_front = 0; m_rear = 0;
+	}
 
 	// 데이터 삽입
 	int				Enqueue(char *pData, int size) noexcept
@@ -182,16 +192,31 @@ public:
 	}
 
 	// Front, Rear 커서 이동
-	inline int				MoveRear(int size) noexcept { m_rear = (m_rear + size) % m_capacity; return m_rear; }
-	inline int				MoveFront(int size) noexcept { m_front = (m_front + size) % m_capacity; return m_front; }
+	inline int				MoveRear(int size) noexcept
+	{
+		m_rear = (m_rear + size) % m_capacity; return m_rear;
+	}
+	inline int				MoveFront(int size) noexcept
+	{
+		m_front = (m_front + size) % m_capacity; return m_front;
+	}
 
-	inline char *GetPQueuePtr() const noexcept { return m_pQueue; }
+	inline char *GetPQueuePtr() const noexcept
+	{
+		return m_pQueue;
+	}
 
 	// Front 포인터 얻기
-	inline char *GetFrontPtr() const noexcept { return m_pQueue + m_front; }
+	inline char *GetFrontPtr() const noexcept
+	{
+		return m_pQueue + m_front;
+	}
 
 	// Rear 포인터 얻기
-	inline char *GetRearPtr() const noexcept { return m_pQueue + m_rear; }
+	inline char *GetRearPtr() const noexcept
+	{
+		return m_pQueue + m_rear;
+	}
 
 private:
 	int				m_capacity = 4096; // 디폴트 1만 바이트 크기, + 1

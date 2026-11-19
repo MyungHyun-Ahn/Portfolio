@@ -1,9 +1,11 @@
 #include "pch.h"
+#include <memory>
+#include <condition_variable>
 #include "CSerializableBuffer.h"
 #include "CommonProtocol.h"
 #include "Config.h"
 #include "Console.h"
-#include "CNetClient.h"
+#include "CNetClientManager.h"
 #include "IClientPacketHandler.g.h"
 #include "CConsoleChatClient.h"
 
@@ -21,9 +23,18 @@ int main(void)
 
 	int exitCode = 0;
 	{
-		Chatting::CConsoleChatClient client(config);
+		NetworkLib::CNetClientManager network;
+		Chatting::CConsoleChatClient client(network, config);
 		MHLib::security::CEncryption::sm_packetKey = Chatting::kPacketKey;
-		if (!client.Connect(config.m_ip.c_str(), config.m_port, Chatting::kPacketCode) || !client.Login())
+		if (network.Init(1) && client.Connect())
+		{
+			while (client.IsActive() && !client.IsConnected())
+			{
+				client.Tick();
+				Sleep(10);
+			}
+		}
+		if (!client.IsConnected())
 		{
 			g_pLogger->WriteLogConsole(ELogLevel::Error, L"CONNECT FAILED ip=%hs port=%u", config.m_ip.c_str(), config.m_port);
 			exitCode = 1;
@@ -32,7 +43,10 @@ int main(void)
 		{
 			DWORD startTime = timeGetTime();
 			while (client.IsConnected() && !client.IsReady() && timeGetTime() - startTime < 5000)
+			{
+				client.Tick();
 				Sleep(10);
+			}
 			if (!client.IsReady())
 			{
 				g_pLogger->WriteLogConsole(ELogLevel::Error, L"LOGIN/SECTOR FAILED");
@@ -47,6 +61,9 @@ int main(void)
 				bool isUserExit = false;
 				while (client.IsConnected())
 				{
+					client.Tick();
+					if (!client.IsConnected())
+						break;
 					std::string line;
 					auto inputResult = Chatting::PollInput(pending, highSurrogate, line);
 					if (inputResult == Chatting::EInputResult::End || (inputResult == Chatting::EInputResult::Line && line == "/exit"))
@@ -57,14 +74,14 @@ int main(void)
 					if (inputResult == Chatting::EInputResult::Line && !line.empty())
 					{
 						std::wstring text;
-						if (!Chatting::Utf8ToWide(line, text) || !client.SendMessage(text))
+						if (!Chatting::Utf8ToWide(line, text) || !client.SendReqMessage(text))
 						{
 							g_pLogger->WriteLogConsole(ELogLevel::Error, L"MESSAGE REJECTED: use UTF-8, 1..256 UTF-16 code units");
 						}
 					}
 					if (timeGetTime() - prevHeartbeatTime >= Chatting::kHeartbeatMilliseconds)
 					{
-						client.SendHeartbeat();
+						client.SendNotiHeartbeat();
 						prevHeartbeatTime = timeGetTime();
 					}
 					Sleep(10);
@@ -74,6 +91,8 @@ int main(void)
 			}
 		}
 		client.Disconnect();
+		network.Stop();
+		client.Tick();
 	}
 	fflush(nullptr);
 	// 클라이언트 IO는 위에서 정리했다. 상속된 정적 풀 종료는 별도 범위다.

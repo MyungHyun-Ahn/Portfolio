@@ -17,8 +17,14 @@ enum class EIoOperation
 	None = 400
 };
 
-inline constexpr unsigned long long operator ""_kb(unsigned long long val) { return val * 1024; }
-inline constexpr unsigned long long operator ""_mb(unsigned long long val) { return val * 1024 * 1024; }
+inline constexpr unsigned long long operator ""_kb(unsigned long long val)
+{
+	return val * 1024;
+}
+inline constexpr unsigned long long operator ""_mb(unsigned long long val)
+{
+	return val * 1024 * 1024;
+}
 
 template<bool isPageLock>
 class COverlappedAllocator

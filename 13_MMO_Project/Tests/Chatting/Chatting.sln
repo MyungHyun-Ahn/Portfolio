@@ -4,13 +4,17 @@ VisualStudioVersion = 18.0.0.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "MHLib", "..\..\Server\MHLib\MHLib.vcxproj", "{7BA54F60-794F-4CD8-93F9-85AAB6151031}"
 EndProject
-Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "NetworkLib", "..\..\Server\NetworkLib\NetworkLib.vcxproj", "{BABB7C61-118C-407C-A3D8-5C628A1C1B5D}"
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "ServerNetworkLib", "..\..\Server\NetworkLib\ServerNetworkLib.vcxproj", "{BABB7C61-118C-407C-A3D8-5C628A1C1B5D}"
 EndProject
 Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "ChatClient", "Client\ChatClient.vcxproj", "{CE18A521-297B-4453-876E-702C7E7AD31F}"
 EndProject
 Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "ChatServer", "Server\ChatServer.vcxproj", "{3B071B4E-91C9-4F7F-82C2-53BEE4E73430}"
 EndProject
 Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "Generate", "..\..\Tools\PacketGenerator\Generate.vcxproj", "{B07A0594-6BB1-4C91-B4D9-EB0DE1FB6C69}"
+EndProject
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "NetworkCommon", "..\..\Common\NetworkCommon\NetworkCommon.vcxproj", "{71D436B7-5958-42E7-A5D6-117397ACE88B}"
+EndProject
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "ClientNetworkLib", "..\..\Client\ClientNetworkLib\ClientNetworkLib.vcxproj", "{78263CEC-71A0-4A0F-BA79-66BF5873E3E6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -31,6 +35,14 @@ Global
 		{7BA54F60-794F-4CD8-93F9-85AAB6151031}.Release|x64.Build.0 = Release|x64
 		{BABB7C61-118C-407C-A3D8-5C628A1C1B5D}.Release|x64.ActiveCfg = Release|x64
 		{BABB7C61-118C-407C-A3D8-5C628A1C1B5D}.Release|x64.Build.0 = Release|x64
+		{71D436B7-5958-42E7-A5D6-117397ACE88B}.Debug|x64.ActiveCfg = Debug|x64
+		{71D436B7-5958-42E7-A5D6-117397ACE88B}.Debug|x64.Build.0 = Debug|x64
+		{71D436B7-5958-42E7-A5D6-117397ACE88B}.Release|x64.ActiveCfg = Release|x64
+		{71D436B7-5958-42E7-A5D6-117397ACE88B}.Release|x64.Build.0 = Release|x64
+		{78263CEC-71A0-4A0F-BA79-66BF5873E3E6}.Debug|x64.ActiveCfg = Debug|x64
+		{78263CEC-71A0-4A0F-BA79-66BF5873E3E6}.Debug|x64.Build.0 = Debug|x64
+		{78263CEC-71A0-4A0F-BA79-66BF5873E3E6}.Release|x64.ActiveCfg = Release|x64
+		{78263CEC-71A0-4A0F-BA79-66BF5873E3E6}.Release|x64.Build.0 = Release|x64
 		{CE18A521-297B-4453-876E-702C7E7AD31F}.Release|x64.ActiveCfg = Release|x64
 		{CE18A521-297B-4453-876E-702C7E7AD31F}.Release|x64.Build.0 = Release|x64
 		{3B071B4E-91C9-4F7F-82C2-53BEE4E73430}.Release|x64.ActiveCfg = Release|x64

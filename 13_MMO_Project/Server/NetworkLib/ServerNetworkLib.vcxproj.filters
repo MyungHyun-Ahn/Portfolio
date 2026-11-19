@@ -3,13 +3,8 @@
   <ItemGroup />
   <ItemGroup>
     <ClCompile Include="CBaseContents.cpp" />
-    <ClCompile Include="CLanClient.cpp" />
-    <ClCompile Include="ClientSetting.cpp" />
     <ClCompile Include="CMonitor.cpp" />
-    <ClCompile Include="CNetClient.cpp" />
     <ClCompile Include="CNetServer.cpp" />
-    <ClCompile Include="NetPacket.cpp" />
-    <ClCompile Include="COverlappedAllocator.cpp" />
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="ServerSetting.cpp" />
     <ClCompile Include="SystemEvent.cpp" />
@@ -17,18 +12,8 @@
   <ItemGroup>
     <ClInclude Include="CBaseContents.h" />
     <ClInclude Include="CContentsThread.h" />
-    <ClInclude Include="CLanClient.h" />
-    <ClInclude Include="ClientSetting.h" />
     <ClInclude Include="CMonitor.h" />
-    <ClInclude Include="CNetClient.h" />
     <ClInclude Include="CNetServer.h" />
-    <ClInclude Include="NetPacket.h" />
-    <ClInclude Include="COverlappedAllocator.h" />
-    <ClInclude Include="CRecvBuffer.h" />
-    <ClInclude Include="CRingBuffer.h" />
-    <ClInclude Include="CSerializableBuffer.h" />
-    <ClInclude Include="CSerializableBufferView.h" />
-    <ClInclude Include="DefineServer.h" />
     <ClInclude Include="NetPch.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="SBaseEvent.h" />

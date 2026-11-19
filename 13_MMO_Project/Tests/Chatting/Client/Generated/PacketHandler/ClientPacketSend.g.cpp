@@ -7,71 +7,67 @@
 
 namespace Chatting
 {
-	NetworkLib::CSerializableBuffer<FALSE> *MakePacketReqMessage(const SReqMessage &packet) noexcept
+	std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> MakePacketReqMessage(const SReqMessage &packet) noexcept
 	{
-		auto *pBuffer = NetworkLib::CSerializableBuffer<FALSE>::Alloc();
-		if (pBuffer == nullptr)
+		auto spBuffer = NetworkLib::CSerializableBuffer<FALSE>::MakeShared();
+		if (spBuffer == nullptr)
 		{
 			return nullptr;
 		}
 
-		*pBuffer << static_cast<std::uint16_t>(EPacketType::ReqMessage) << packet;
-		if (!pBuffer->IsValid())
+		*spBuffer << static_cast<std::uint16_t>(EPacketType::ReqMessage) << packet;
+		if (!spBuffer->IsValid())
 		{
-			NetworkLib::CSerializableBuffer<FALSE>::Free(pBuffer);
 			return nullptr;
 		}
-		return pBuffer;
+		return spBuffer;
 	}
 
-	NetworkLib::CSerializableBuffer<FALSE> *MakePacketReqLogin(const SReqLogin &packet) noexcept
+	std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> MakePacketReqLogin(const SReqLogin &packet) noexcept
 	{
-		auto *pBuffer = NetworkLib::CSerializableBuffer<FALSE>::Alloc();
-		if (pBuffer == nullptr)
+		auto spBuffer = NetworkLib::CSerializableBuffer<FALSE>::MakeShared();
+		if (spBuffer == nullptr)
 		{
 			return nullptr;
 		}
 
-		*pBuffer << static_cast<std::uint16_t>(EPacketType::ReqLogin) << packet;
-		if (!pBuffer->IsValid())
+		*spBuffer << static_cast<std::uint16_t>(EPacketType::ReqLogin) << packet;
+		if (!spBuffer->IsValid())
 		{
-			NetworkLib::CSerializableBuffer<FALSE>::Free(pBuffer);
 			return nullptr;
 		}
-		return pBuffer;
+		return spBuffer;
 	}
 
-	NetworkLib::CSerializableBuffer<FALSE> *MakePacketReqSectorMove(const SReqSectorMove &packet) noexcept
+	std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> MakePacketReqSectorMove(const SReqSectorMove &packet) noexcept
 	{
-		auto *pBuffer = NetworkLib::CSerializableBuffer<FALSE>::Alloc();
-		if (pBuffer == nullptr)
+		auto spBuffer = NetworkLib::CSerializableBuffer<FALSE>::MakeShared();
+		if (spBuffer == nullptr)
 		{
 			return nullptr;
 		}
 
-		*pBuffer << static_cast<std::uint16_t>(EPacketType::ReqSectorMove) << packet;
-		if (!pBuffer->IsValid())
+		*spBuffer << static_cast<std::uint16_t>(EPacketType::ReqSectorMove) << packet;
+		if (!spBuffer->IsValid())
 		{
-			NetworkLib::CSerializableBuffer<FALSE>::Free(pBuffer);
 			return nullptr;
 		}
-		return pBuffer;
+		return spBuffer;
 	}
 
-	NetworkLib::CSerializableBuffer<FALSE> *MakePacketHeartbeatNoti(const SHeartbeatNoti &packet) noexcept
+	std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> MakePacketHeartbeatNoti(const SHeartbeatNoti &packet) noexcept
 	{
-		auto *pBuffer = NetworkLib::CSerializableBuffer<FALSE>::Alloc();
-		if (pBuffer == nullptr)
+		auto spBuffer = NetworkLib::CSerializableBuffer<FALSE>::MakeShared();
+		if (spBuffer == nullptr)
 		{
 			return nullptr;
 		}
 
-		*pBuffer << static_cast<std::uint16_t>(EPacketType::HeartbeatNoti) << packet;
-		if (!pBuffer->IsValid())
+		*spBuffer << static_cast<std::uint16_t>(EPacketType::HeartbeatNoti) << packet;
+		if (!spBuffer->IsValid())
 		{
-			NetworkLib::CSerializableBuffer<FALSE>::Free(pBuffer);
 			return nullptr;
 		}
-		return pBuffer;
+		return spBuffer;
 	}
 }

@@ -9,7 +9,7 @@ namespace Chatting
 
 {% endif %}
 {% for packet in packets %}
-	[[nodiscard]] NetworkLib::CSerializableBuffer<FALSE> *MakePacket{{ packet.name }}(
+	[[nodiscard]] {% if side == 'Client' %}std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> {% else %}NetworkLib::CSerializableBuffer<FALSE> *{% endif %}MakePacket{{ packet.name }}(
 		const S{{ packet.name }} &packet) noexcept;
 {% endfor %}
 }

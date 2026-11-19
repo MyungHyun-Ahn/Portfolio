@@ -2,26 +2,13 @@
 
 namespace NetworkLib
 {
-#pragma warning(disable : 6387) // ConnectEx Param 경고
-
 	class CLanClientManager;
 
-	class CLanSession
+	class CLanSession : public std::enable_shared_from_this<CLanSession>
 	{
 	public:
 		friend class CLanClient;
 		friend class CLanClientManager;
-
-		CLanSession() noexcept
-			: m_sessionSocket(INVALID_SOCKET)
-			, m_sessionId(0)
-		{
-			m_pMyOverlappedStartAddr = g_overlappedAllocator.Alloc();
-		}
-
-		~CLanSession() noexcept
-		{
-		}
 
 		void Init(UINT64 sessionId, INT clientMgrIndex) noexcept
 		{
@@ -46,27 +33,11 @@ namespace NetworkLib
 
 		void RecvCompleted(int size) noexcept;
 
-		bool SendPacket(CSerializableBuffer<TRUE> *pMessage) noexcept;
+		bool SendPacket(std::shared_ptr<CSerializableBuffer<TRUE>> spMessage) noexcept;
 		void SendCompleted(int size) noexcept;
 
 		bool PostRecv() noexcept;
 		bool PostSend(bool isPqcs = FALSE) noexcept;
-
-	public:
-		inline static CLanSession *Alloc() noexcept
-		{
-			CLanSession *pSession = sm_sessionPool.Alloc();
-			return pSession;
-		}
-
-		inline static void Free(CLanSession *pDelSession) noexcept
-		{
-			pDelSession->Clear();
-			sm_sessionPool.Free(pDelSession);
-		}
-
-		inline static LONG GetPoolCapacity() noexcept { return sm_sessionPool.GetCapacity(); }
-		inline static LONG GetPoolUsage() noexcept { return sm_sessionPool.GetUseCount(); }
 
 	private:
 		// 패딩 계산해서 세션 크기 최적화
@@ -74,9 +45,9 @@ namespace NetworkLib
 	// Release + IoCount
 		LONG m_ioCountAndRelease = sm_releaseFlag;
 		LONG m_sendCount = 0;
-		CRecvBuffer *m_pRecvBuffer = nullptr;
-		SOCKET m_sessionSocket;
-		UINT64 m_sessionId;
+		std::shared_ptr<CRecvBuffer> m_spRecvBuffer;
+		SOCKET m_sessionSocket = INVALID_SOCKET;
+		UINT64 m_sessionId = 0;
 		WCHAR		m_clientAddrBuffer[16];
 		// --- 64
 
@@ -87,21 +58,18 @@ namespace NetworkLib
 		USHORT		m_clientPort;
 		char		m_dummy01[2]; // 패딩 계산용
 		// 최대 무조건 1개 -> 있거나 없거나
-		CSerializableBufferView<TRUE> *m_pDelayedBuffer = nullptr;
-		MHLib::containers::CLfQueue<CSerializableBuffer<TRUE> *> m_lfSendBufferQueue;
-		// m_pMyOverlappedStartAddr
-		//  + 0 : ACCEPTEX
-		//  + 1 : RECV
-		//  + 2 : SEND
-		OVERLAPPED *m_pMyOverlappedStartAddr = nullptr;
-		CSerializableBuffer<TRUE> *m_pSendBuffers[kWsasendMaxBufferCount]; // 8 * 32 = 256
+		std::shared_ptr<CSerializableBufferView<TRUE>> m_spDelayedBuffer;
+		std::mutex m_sendStateLock;
+		std::deque<std::shared_ptr<CSerializableBuffer<TRUE>>> m_sendQueue;
+		// ConnectEx, Recv, Send 순서. 완료를 소비할 때까지 세션이 소유한다.
+		std::array<OVERLAPPED, 3> m_overlappeds{};
+		std::array<std::shared_ptr<CSerializableBuffer<TRUE>>, kWsasendMaxBufferCount> m_spSendBuffers;
 
 		LONG m_cancelIoCalled = FALSE;
+		bool m_isConnected = false;
 
 		INT m_clientMgrIndex;
 
-		inline static MHLib::memory::CTlsMemoryPoolManager<CLanSession, 16, 4> sm_sessionPool =
-			MHLib::memory::CTlsMemoryPoolManager<CLanSession, 16, 4>();
 		inline static LONG sm_releaseFlag = 0x80000000;
 	};
 
@@ -112,10 +80,14 @@ namespace NetworkLib
 
 		BOOL Init(INT maxSessionCount) noexcept;
 
-		inline LONG GetSessionCount() const noexcept { return m_sessionCount; }
+		inline LONG GetSessionCount() const noexcept
+		{
+			return m_sessionCount;
+		}
 
-		void SendPacket(const UINT64 sessionId, CSerializableBuffer<TRUE> *pSBuffer) noexcept;
-		void EnqueuePacket(const UINT64 sessionId, CSerializableBuffer<TRUE> *pSBuffer) noexcept;
+		// MakeShared()으로 만든 새 패킷을 넘긴다. 접수 후에는 내용이나 커서를 변경하지 않는다.
+		void SendPacket(const UINT64 sessionId, std::shared_ptr<CSerializableBuffer<TRUE>> spBuffer) noexcept;
+		void EnqueuePacket(const UINT64 sessionId, std::shared_ptr<CSerializableBuffer<TRUE>> spBuffer) noexcept;
 
 		BOOL Disconnect(const UINT64 sessionId, BOOL isPqcs = FALSE) noexcept;
 		BOOL ReleaseSession(CLanSession *pSession, BOOL isPqcs = FALSE) noexcept;
@@ -123,7 +95,7 @@ namespace NetworkLib
 
 		virtual void OnConnect(const UINT64 sessionId) noexcept = 0;
 		virtual void OnDisconnect(const UINT64 sessionId) noexcept = 0;
-		virtual void OnRecv(const UINT64 sessionId, CSerializableBufferView<TRUE> *pMessage) noexcept = 0;
+		virtual void OnRecv(const UINT64 sessionId, std::shared_ptr<CSerializableBufferView<TRUE>> spMessage) noexcept = 0;
 
 		BOOL PostConnectEx(const CHAR *pIp, const USHORT port) noexcept;
 		BOOL ConnectExCompleted(CLanSession *pSession) noexcept;
@@ -154,11 +126,15 @@ namespace NetworkLib
 
 		// Session
 		LONG					m_sessionCount = 0;
-		LONG64					m_currentId = 0;
-		CLfStack<USHORT>		m_stackDisconnectIndex;
+		LONG64 m_currentId = 0;
+		// 슬롯과 빈 인덱스는 같은 락으로 보호한다. 콜백은 락 밖에서 실행한다.
+		std::mutex m_sessionTableLock;
+		std::vector<USHORT> m_freeIndices;
+		std::vector<std::shared_ptr<CLanSession>> m_sessions;
 
-		INT			m_maxSessionCount;
-		CLanSession **m_pSessions;
+		std::shared_ptr<CLanSession> acquireSession(UINT64 sessionId) noexcept;
+		void retireSession(CLanSession &session, bool isNotify) noexcept;
+
 	};
 
 	class CLanClientManager
@@ -166,6 +142,7 @@ namespace NetworkLib
 	public:
 		friend class CLanSession;
 		friend class CLanClient;
+		friend class CClientLifecycleProbe;
 
 		// IOCP 핸들 생성 등
 		BOOL Init() noexcept;
@@ -180,11 +157,12 @@ namespace NetworkLib
 			m_arrNetClients.push_back(pClient);
 		}
 
-		inline void RegisterIoCompletionPort(SOCKET sock, ULONG_PTR sessionId);
+		[[nodiscard]] bool RegisterIoCompletionPort(SOCKET sock, ULONG_PTR sessionId) noexcept;
 
 		inline BOOL ConnectEx(SOCKET sock, sockaddr *pName, int nameLen, LPOVERLAPPED pOverlapped)
 		{
-			return m_pConnectEx(sock, pName, nameLen, nullptr, 0, nullptr, pOverlapped);
+			DWORD bytesSent;
+			return m_pConnectEx(sock, pName, nameLen, nullptr, 0, &bytesSent, pOverlapped);
 		}
 
 	public:

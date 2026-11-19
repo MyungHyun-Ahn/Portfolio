@@ -1,5 +1,7 @@
 #include "pch.h"
-#include "DefineServer.h"
+#include "SNetworkCounters.h"
+#include "NetworkLimits.h"
+#include "NetHeaders.h"
 #include "COverlappedAllocator.h"
 #include "CRingBuffer.h"
 #include "CSerializableBuffer.h"
@@ -7,10 +9,8 @@
 #include "CSerializableBufferView.h"
 #include "SBaseEvent.h"
 #include "ServerSetting.h"
-#include "ClientSetting.h"
 #include "CMonitor.h"
 #include "CNetServer.h"
-#include "CLanClient.h"
 #include "SystemEvent.h"
 #include "CBaseContents.h"
 #include "CContentsThread.h"
@@ -63,7 +63,7 @@ CNetServer *g_pNetServer = nullptr;
 			}
 
 			pView->IncreaseRef();
-			InterlockedIncrement(&g_monitor.m_recvTps);
+			InterlockedIncrement(&g_networkCounters.m_recvTps);
 			m_recvMsgQueue.Enqueue(pView);
 			currentUseSize = m_recvBuffer.GetUseSize();
 		}
@@ -75,7 +75,7 @@ CNetServer *g_pNetServer = nullptr;
 
 	void CNetSession::SendCompleted(int size) noexcept
 	{
-		InterlockedAdd(&g_monitor.m_sendTps, m_sendCount);
+		InterlockedAdd(&g_networkCounters.m_sendTps, m_sendCount);
 
 		for (int count = 0; count < m_sendCount; count++)
 		{
@@ -194,7 +194,7 @@ CNetServer *g_pNetServer = nullptr;
 		// WSASEND_MAX_BUFFER_COUNT 만큼 1초에 몇번 보내는지 카운트
 		// 이 수치가 높다면 더 늘릴 것
 		if (m_sendCount == kWsasendMaxBufferCount)
-			InterlockedIncrement(&g_monitor.m_maxSendCount);
+			InterlockedIncrement(&g_networkCounters.m_maxSendCount);
 
 		int count;
 		for (count = 0; count < m_sendCount; count++)

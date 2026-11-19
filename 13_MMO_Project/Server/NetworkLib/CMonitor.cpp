@@ -1,5 +1,6 @@
 #include "pch.h"
-#include "DefineServer.h"
+#include "SNetworkCounters.h"
+#include "NetworkLimits.h"
 #include "COverlappedAllocator.h"
 #include "CRingBuffer.h"
 #include "CSerializableBuffer.h"
@@ -7,10 +8,8 @@
 #include "CSerializableBufferView.h"
 #include "SBaseEvent.h"
 #include "ServerSetting.h"
-#include "ClientSetting.h"
 #include "CMonitor.h"
 #include "CNetServer.h"
-#include "CLanClient.h"
 #include "SystemEvent.h"
 #include "CBaseContents.h"
 #include "CContentsThread.h"
@@ -159,10 +158,10 @@ void CMonitor::UpdateServer() noexcept
 	InterlockedExchange(&m_stealWork, 0);
 	m_acceptTpsTotal += m_acceptTps;
 	InterlockedExchange(&m_acceptTps, 0);
-	m_recvTpsTotal += m_recvTps;
-	InterlockedExchange(&m_recvTps, 0);
-	m_sendTpsTotal += m_sendTps;
-	InterlockedExchange(&m_sendTps, 0);
+	m_recvTpsTotal += g_networkCounters.m_recvTps;
+	InterlockedExchange(&g_networkCounters.m_recvTps, 0);
+	m_sendTpsTotal += g_networkCounters.m_sendTps;
+	InterlockedExchange(&g_networkCounters.m_sendTps, 0);
 	m_updateTpsTotal += m_updateTps;
 	InterlockedExchange(&m_updateTps, 0);
 
@@ -171,7 +170,7 @@ void CMonitor::UpdateServer() noexcept
 	InterlockedExchange(&m_chatMsgReq, 0);
 	InterlockedExchange(&m_chatMsgRes, 0);
 
-	InterlockedExchange(&m_maxSendCount, 0);
+	InterlockedExchange(&g_networkCounters.m_maxSendCount, 0);
 	InterlockedExchange(&m_serverFrame, 0);
 }
 
@@ -239,10 +238,12 @@ void CMonitor::MonitoringConsole(INT sessionCount) noexcept
 		CRecvBuffer::GetPoolCapacity(), CRecvBuffer::GetPoolUsage());
 	g_pLogger->WriteLogConsole(ELogLevel::System, L"TPS");
 	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tAccept\t : %d \t Avr : %lf", m_acceptTps, (double)m_acceptTpsTotal / m_loopCount);
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tRecv\t : %d \t Avr : %lf", m_recvTps, (double)m_recvTpsTotal / m_loopCount);
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tSend\t : %d \t Avr : %lf", m_sendTps, (double)m_sendTpsTotal / m_loopCount);
+	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tRecv\t : %d \t Avr : %lf",
+		g_networkCounters.m_recvTps, (double)m_recvTpsTotal / m_loopCount);
+	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tSend\t : %d \t Avr : %lf",
+		g_networkCounters.m_sendTps, (double)m_sendTpsTotal / m_loopCount);
 	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tUpdate\t : %d \t Avr : %lf", m_updateTps, (double)m_updateTpsTotal / m_loopCount);
-	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tMaxSend\t : %d", m_maxSendCount);
+	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tMaxSend\t : %d", g_networkCounters.m_maxSendCount);
 	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tLoginReq\t : %d\t\tSectorMoveReq\t : %d", m_loginReq, m_sectorMoveReq);
 	g_pLogger->WriteLogConsole(ELogLevel::System, L"\tChatMsgReq\t : %d\t\tChatMsgRes\t : %d", m_chatMsgReq, m_chatMsgRes);
 	g_pLogger->WriteLogConsole(ELogLevel::System, L"----------------------------------------");
