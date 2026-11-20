@@ -32,11 +32,19 @@
 #include <algorithm>
 #include <type_traits>
 #include <concepts>
+#include <atomic>
+#include <optional>
+#include <limits>
+#include <stdexcept>
+#include <thread>
+#include <filesystem>
+#include <fstream>
 
 #include "MHLib/utils/CSingleton.h"
 #include "MHLib/utils/CProfileManager.h"
 #include "MHLib/utils/CSmartPtr.h"
 #include "MHLib/utils/CLockGuard.h"
+#include "MHLib/containers/CLFSpscQueue.h"
 #include "MHLib/utils/CLogger.h"
 #include "MHLib/utils/CFileLoader.h"
 #include "MHLib/diagnostics/CCrashDump.h"

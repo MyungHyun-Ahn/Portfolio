@@ -19,10 +19,15 @@ int main(void)
 	SetConsoleOutputCP(CP_UTF8);
 	SetConsoleCP(CP_UTF8);
 	g_pLogger = MHLib::utils::CLogger::GetInstance();
-	g_pLogger->SetMainDirectory(L"LogFile");
 	Chatting::SChatConfig config;
 	if (!Chatting::LoadConfig(L"ServerConfig.conf", true, config))
 		return 2;
+	if (!g_pLogger->Start(L"LogFile", config.m_consoleLogLevel, config.m_fileLogLevel, config.m_logPollInterval))
+	{
+		g_pLogger->WriteLogConsole(ELogLevel::Error, L"CLogger: cannot open the async log file");
+		return 2;
+	}
+	g_pLogger->RegisterLogProducer();
 
 	NetworkLib::serverSetting::openIp = config.m_ip;
 	NetworkLib::serverSetting::openPort = config.m_port;
@@ -42,6 +47,7 @@ int main(void)
 	std::atomic<bool> isStarted = false;
 	std::thread serverThread([&]()
 	{
+		g_pLogger->RegisterLogProducer();
 		isStarted = pServer->Start(config.m_ip.c_str(), config.m_port) != FALSE;
 		isReturned = true;
 	});
@@ -75,6 +81,9 @@ int main(void)
 		g_pLogger->WriteLog(ELogLevel::Error, L"ChatServer", 0, std::source_location::current(),
 			L"event=server_start_failed | 서버 시작에 실패했습니다.");
 	}
+	// 생산자가 남을 수 있는 부분 시작 실패와 /exit의 수명은 이 단계에서 바꾸지 않는다.
+	if (!pServer->HasStartedBackgroundWork())
+		g_pLogger->Stop();
 	fflush(nullptr);
 	ExitProcess(didStart ? 0 : 1);
 }

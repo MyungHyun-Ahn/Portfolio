@@ -5,6 +5,9 @@ namespace Chatting
 	struct SChatConfig
 	{
 		std::string m_ip = "127.0.0.1";
+		MHLib::utils::ELogLevel m_consoleLogLevel = MHLib::utils::ELogLevel::Info;
+		MHLib::utils::ELogLevel m_fileLogLevel = MHLib::utils::ELogLevel::Debug;
+		std::chrono::milliseconds m_logPollInterval{MHLib::utils::CLogger::kDefaultPollInterval};
 		USHORT m_port = kDefaultPort;
 		DWORD m_connectTimeoutMilliseconds = 5000;
 		int m_recvBufferBytes = 4096;

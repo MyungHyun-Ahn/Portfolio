@@ -329,6 +329,7 @@ CNetServer *g_pNetServer = nullptr;
 
 	unsigned int NetWorkerThreadFunc(LPVOID pParam) noexcept
 	{
+		g_pLogger->RegisterLogProducer();
 		return g_pNetServer->WorkerThread();
 	}
 
@@ -457,6 +458,7 @@ CNetServer *g_pNetServer = nullptr;
 		// AcceptEx 요청
 		FristPostAcceptEx();
 
+		m_hasStartedBackgroundWork = true;
 		for (int i = 0; i < serverSetting::contentsThreadCount; i++)
 		{
 			CContentsThread *pContentsThread = new CContentsThread;
@@ -471,9 +473,10 @@ CNetServer *g_pNetServer = nullptr;
 			HANDLE hWorkerThread = (HANDLE)_beginthreadex(nullptr, 0, NetWorkerThreadFunc, nullptr, 0, nullptr);
 			if (hWorkerThread == 0)
 			{
-				errVal = GetLastError();
-				g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", 0, std::source_location::current(),
-					L"event=worker_start_failed worker_index=%d error_code=%d | 네트워크 워커를 시작하지 못했습니다.", i, errVal);
+				const int workerError = errno;
+				g_pLogger->WriteEmergencyLogToStderr(
+					"[Error][NetworkLib] event=worker_start_failed worker_index=%d error_code=%d | 네트워크 워커를 시작하지 못했습니다.\n",
+					i, workerError);
 				return FALSE;
 			}
 

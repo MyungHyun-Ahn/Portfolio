@@ -143,6 +143,8 @@ class CBaseContents;
 		friend struct SContentsFrameEvent;
 
 		BOOL Start(const CHAR *pOpenIp, const USHORT port) noexcept;
+		// Start 호출 스레드가 반환하고 합류한 뒤에만 조회한다.
+		bool HasStartedBackgroundWork() const noexcept { return m_hasStartedBackgroundWork; }
 		void Stop();
 
 		inline LONG GetSessionCount() const noexcept
@@ -214,6 +216,7 @@ class CBaseContents;
 		SOCKET					m_listenSocket = INVALID_SOCKET;
 		UINT32					m_maxWorkerThreadCount;
 		BOOL					m_isWorkerRun = TRUE;
+		bool m_hasStartedBackgroundWork = false;
 		std::vector<HANDLE>		m_arrWorkerThreads;
 
 		// Accepter

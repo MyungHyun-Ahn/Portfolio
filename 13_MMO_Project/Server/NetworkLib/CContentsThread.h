@@ -72,6 +72,7 @@ private:
 	static unsigned __stdcall threadFunc(void *pThis) noexcept
 	{
 		CContentsThread *pThread = static_cast<CContentsThread *>(pThis);
+		g_pLogger->RegisterLogProducer();
 		pThread->run();
 		return 0;
 	}

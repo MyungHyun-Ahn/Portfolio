@@ -15,6 +15,23 @@ namespace Chatting
 			return false;
 		}
 
+		bool LoadLogLevel(MHLib::utils::CFileLoader &loader, const WCHAR *pKey, MHLib::utils::ELogLevel &outLevel)
+		{
+			using MHLib::utils::ELogLevel;
+			std::wstring value;
+			if (!loader.Load(L"Server", pKey, &value))
+				return true;
+			if (value == L"Debug")
+				outLevel = ELogLevel::Debug;
+			else if (value == L"Info")
+				outLevel = ELogLevel::Info;
+			else if (value == L"Error")
+				outLevel = ELogLevel::Error;
+			else
+				return false;
+			return true;
+		}
+
 		bool CheckConfigFile(const WCHAR *pPath)
 		{
 			// 기존 로더에 일반적인 파일/인코딩 오류만 넘기지 않는다.
@@ -59,6 +76,19 @@ namespace Chatting
 		if (!loader.Load(pSection, L"PORT", &number) || number < 1 || number > 65535)
 			return ConfigError(pFileName, L"PORT is missing or invalid (1..65535)");
 		config.m_port = static_cast<USHORT>(number);
+		if (isServer && (!LoadLogLevel(loader, L"CONSOLE_LOG_LEVEL", config.m_consoleLogLevel)
+			|| !LoadLogLevel(loader, L"FILE_LOG_LEVEL", config.m_fileLogLevel)))
+			return ConfigError(pFileName, L"log levels must be Debug, Info or Error");
+		if (isServer)
+		{
+			std::wstring logPollInterval;
+			if (loader.Load(pSection, L"LOG_POLL_INTERVAL_MS", &logPollInterval))
+			{
+				if (!loader.Load(pSection, L"LOG_POLL_INTERVAL_MS", &number) || number < 1 || number > 1000)
+					return ConfigError(pFileName, L"LOG_POLL_INTERVAL_MS must be an integer (1..1000)");
+				config.m_logPollInterval = std::chrono::milliseconds(number);
+			}
+		}
 		if (!isServer)
 		{
 			std::wstring connectTimeout;
