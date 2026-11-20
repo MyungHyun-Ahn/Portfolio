@@ -107,10 +107,10 @@ def bind_failure(base, configuration, levels=("Error", "Info"), log_interval=Non
             summary = event(server, "ChatServer", "Error", "-", "main",
                             r"event=server_start_failed \| 서버 시작에 실패했습니다\.")
             assert len(summary) == 1
-            assert len(event(server, "ChatServer", "Info", "-", "main",
-                             r"event=server_local_test \| .+", on_console=False)) == 1
+            event(server, "ChatServer", "Info", "-", "main",
+                  r"event=server_local_test \| .+", on_console=False, in_file=False)
             assert list((server[1].parent / "LogFile").rglob("*.txt")) == []
-            print(f"bind: exclusive port={port}, exit=1; identical Error stdout/file, Info in file only: {lines[0]}")
+            print(f"bind: exclusive port={port}, exit=1; identical Error stdout/file: {lines[0]}")
 
 
 def log_interval_config(base, configuration):
@@ -146,10 +146,15 @@ def chat(base, configuration):
         workers = event(server, "NetworkLib", "Info", "-", "Start",
                         r"event=worker_started worker_index=\d+ \| 네트워크 워커를 시작했습니다\.")
         assert len(workers) == 2
+        contents_workers = event(server, "NetworkLib", "Info", "-", "threadFunc",
+                                 r"event=contents_worker_started \| .+")
+        assert len(contents_workers) == 2
         for function, payload, count in (
+            ("OnAccept", r"event=session_accepted session_id=\2 \| .+", 2),
             (r"\w+", r"event=session_enter \| 세션이 콘텐츠에 진입했습니다\.", 2),
             ("Handle", r"event=login_accepted account_no=\d+ \| 테스트 로그인을 승인했습니다\.", 2),
             ("Handle", r"event=sector_entered account_no=\d+ sector_x=10 sector_y=10 \| 섹터에 입장했습니다\.", 2),
+            ("HandleReqMessage", r"event=chat_processed sector_x=10 sector_y=10 \| 채팅 요청을 처리했습니다\.", 2),
         ):
             lines = event(server, "ChatServer", "Debug", r"[1-9]\d*", function, payload, on_console=False)
             assert len(lines) == count
@@ -159,7 +164,7 @@ def chat(base, configuration):
         send(server, "/exit")
         assert server[0].wait(timeout=8) == 0
         print(f"chat: two client READY, A→B and B→A exact payloads, exits=0/0/0; {ready[0]}")
-        print("chat: session_enter=2, login_accepted=2, sector_entered=2; Debug in file only before /exit")
+        print("chat: contents_worker_started=2; session_accepted/enter, login, sector and chat Debug events in file only")
 
 
 if __name__ == "__main__":

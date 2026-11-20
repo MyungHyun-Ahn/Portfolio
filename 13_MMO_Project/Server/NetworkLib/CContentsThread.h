@@ -22,6 +22,13 @@ public:
 	{
 		m_runningFlag = TRUE;
 		m_threadHandle = (HANDLE)_beginthreadex(nullptr, 0, &CContentsThread::threadFunc, this, CREATE_SUSPENDED, nullptr);
+		if (m_threadHandle == nullptr)
+		{
+			const int workerError = errno;
+			g_pLogger->WriteEmergencyLogToStderr(
+				"[Error][NetworkLib] event=contents_worker_start_failed error_code=%d | 콘텐츠 워커를 생성하지 못했습니다.\n",
+				workerError);
+		}
 		sm_arrContentsThreads.push_back(this);
 		return m_threadHandle != nullptr;
 	}
@@ -73,6 +80,8 @@ private:
 	{
 		CContentsThread *pThread = static_cast<CContentsThread *>(pThis);
 		g_pLogger->RegisterLogProducer();
+		g_pLogger->WriteLog(MHLib::utils::ELogLevel::Info, L"NetworkLib", 0, std::source_location::current(),
+			L"event=contents_worker_started | 콘텐츠 워커를 시작했습니다.");
 		pThread->run();
 		return 0;
 	}

@@ -52,8 +52,6 @@ int main(void)
 		isReturned = true;
 	});
 
-	g_pLogger->WriteLog(ELogLevel::Info, L"ChatServer", 0, std::source_location::current(),
-		L"event=server_local_test | 로컬 테스트 전용입니다. /exit 또는 EOF로 서버 프로세스를 종료합니다.");
 	std::string pending;
 	WCHAR highSurrogate = 0;
 	while (!isReturned)

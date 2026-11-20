@@ -846,7 +846,9 @@ CNetServer *g_pNetServer = nullptr;
 			{
 				if (retVal == FALSE)
 				{
-					// GetQueuedCompletionStatus Fail
+					const DWORD errorCode = GetLastError();
+					g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", 0, std::source_location::current(),
+						L"event=iocp_wait_failed error_code=%lu | I/O 완료 대기에 실패해 워커를 종료합니다.", errorCode);
 					break;
 				}
 

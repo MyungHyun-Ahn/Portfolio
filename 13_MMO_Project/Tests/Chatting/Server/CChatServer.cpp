@@ -47,6 +47,8 @@ namespace Chatting
 
 	void CChatServer::OnAccept(UINT64 sessionId) noexcept
 	{
+		g_pLogger->WriteLog(ELogLevel::Debug, L"ChatServer", sessionId, std::source_location::current(),
+			L"event=session_accepted session_id=%llu | 세션의 접속을 수락했습니다.", sessionId);
 		m_pContents->MoveJobEnqueue(sessionId, nullptr);
 	}
 

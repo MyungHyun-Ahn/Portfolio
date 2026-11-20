@@ -140,6 +140,8 @@ namespace Chatting
 		InterlockedIncrement(&NetworkLib::g_monitor.m_chatMsgRes);
 		m_contents.SendSector(sessionId, pPlayer->m_sectorY, pPlayer->m_sectorX, pResponse);
 		ReleaseResponse(pResponse);
+		g_pLogger->WriteLog(ELogLevel::Debug, L"ChatServer", sessionId, std::source_location::current(),
+			L"event=chat_processed sector_x=%u sector_y=%u | 채팅 요청을 처리했습니다.", pPlayer->m_sectorX, pPlayer->m_sectorY);
 		return true;
 	}
 
