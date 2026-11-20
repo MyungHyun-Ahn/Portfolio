@@ -588,11 +588,6 @@ CNetServer *g_pNetServer = nullptr;
 		}
 	}
 
-	void CNetServer::SendPqcs(const CNetSession *pSession)
-	{
-		PostQueuedCompletionStatus(m_iocpHandle, 0, (ULONG_PTR)pSession, (LPOVERLAPPED)EIoOperation::SendPost);
-	}
-
 	void CNetServer::SendAll()
 	{
 		for (int i = 0; i < serverSetting::maxSessionCount; i++)
@@ -912,12 +907,6 @@ CNetServer *g_pNetServer = nullptr;
 				case EIoOperation::Send:
 				{
 					pSession->SendCompleted(dwTransferred);
-				}
-				break;
-				case EIoOperation::SendPost:
-				{
-					pSession->PostSend();
-					continue;
 				}
 				break;
 				case EIoOperation::SendAll:

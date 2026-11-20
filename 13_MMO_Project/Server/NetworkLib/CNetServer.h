@@ -155,7 +155,6 @@ class CBaseContents;
 		void SendPacket(const UINT64 sessionId, CSerializableBuffer<FALSE> *pSBuffer) noexcept;
 		// Send 시도는 하지 않음
 		void EnqueuePacket(const UINT64 sessionId, CSerializableBuffer<FALSE> *pSBuffer) noexcept;
-		void SendPqcs(const CNetSession *pSession);
 		void SendAll();
 		void SendAllPqcs();
 

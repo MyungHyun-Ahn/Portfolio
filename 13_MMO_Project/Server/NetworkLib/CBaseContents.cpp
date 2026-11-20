@@ -150,9 +150,6 @@ void CBaseContents::ProcessRecvMsg(int delayFrame) noexcept
 				CSerializableBuffer<FALSE>::Free(pMsg);
 		}
 
-		if (recvMsgCount != 0)
-			NetworkLib::g_pNetServer->SendPqcs(pSession);
-
 		if (InterlockedDecrement(&pSession->m_ioCountAndRelease) == 0)
 		{
 			NetworkLib::g_pNetServer->ReleaseSession(pSession);
