@@ -187,6 +187,10 @@ def chat(base, configuration):
                 f"{name}: {message}" for name, message in zip(nicknames, messages)
             ], text
         wait_text((server[0], server_log_path(server[1])), "event=session_leave")
+        # 모니터 타이머가 실행될 시간을 준 뒤 주기 콘솔 출력만 사라졌는지 확인한다.
+        time.sleep(2.2)
+        stdout = server[1].read_text(encoding="utf-8")
+        assert "Server monitoring info" not in stdout, "legacy monitor output appeared during chat"
         ready = event(server, "ChatServer", "Info", "-", "RegisterContentTimerEvent",
                       rf"event=server_ready port={port} \| 테스트 채팅 서버가 준비되었습니다\.")
         workers = event(server, "NetworkLib", "Info", "-", "Start",

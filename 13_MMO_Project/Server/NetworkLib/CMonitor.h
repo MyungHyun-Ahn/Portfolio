@@ -7,13 +7,11 @@ class CMonitor
 public:
 	CMonitor(HANDLE hProcess = INVALID_HANDLE_VALUE) noexcept;
 
-	void Update(INT sessionCount) noexcept;
+	void Update() noexcept;
 	void UpdateCpuTime() noexcept;
 	void UpdateServer() noexcept;
 	void UpdateMemory() noexcept;
 	void UpdatePdh() noexcept;
-
-	void MonitoringConsole(INT sessionCount) noexcept;
 
 public:
 	// Interlocked 사용 변수들 띄워놓음
