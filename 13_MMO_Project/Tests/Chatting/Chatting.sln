@@ -16,12 +16,18 @@ Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "NetworkCommon", "..\..\Comm
 EndProject
 Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "ClientNetworkLib", "..\..\Client\ClientNetworkLib\ClientNetworkLib.vcxproj", "{78263CEC-71A0-4A0F-BA79-66BF5873E3E6}"
 EndProject
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "DummyClient", "DummyClient\DummyClient.vcxproj", "{83FC9BDF-0CC6-4BE9-B403-8185916DAB5A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{83FC9BDF-0CC6-4BE9-B403-8185916DAB5A}.Debug|x64.ActiveCfg = Debug|x64
+		{83FC9BDF-0CC6-4BE9-B403-8185916DAB5A}.Debug|x64.Build.0 = Debug|x64
+		{83FC9BDF-0CC6-4BE9-B403-8185916DAB5A}.Release|x64.ActiveCfg = Release|x64
+		{83FC9BDF-0CC6-4BE9-B403-8185916DAB5A}.Release|x64.Build.0 = Release|x64
 		{7BA54F60-794F-4CD8-93F9-85AAB6151031}.Debug|x64.ActiveCfg = Debug|x64
 		{7BA54F60-794F-4CD8-93F9-85AAB6151031}.Debug|x64.Build.0 = Debug|x64
 		{BABB7C61-118C-407C-A3D8-5C628A1C1B5D}.Debug|x64.ActiveCfg = Debug|x64

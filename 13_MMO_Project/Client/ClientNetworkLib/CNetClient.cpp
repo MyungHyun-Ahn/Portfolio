@@ -43,7 +43,10 @@ namespace NetworkLib
 				break;
 			case EClientEvent::Packet:
 				if (m_isConnected && !onRecv(*event.m_spPacket))
+				{
+					onRecvRejected();
 					Disconnect();
+				}
 				break;
 			case EClientEvent::ConnectFailed:
 			case EClientEvent::Disconnected:

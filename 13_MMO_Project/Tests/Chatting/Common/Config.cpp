@@ -1,4 +1,5 @@
 #include "pch.h"
+#include <utility>
 #include "CSerializableBuffer.h"
 #include "NetworkLimits.h"
 #include "CommonProtocol.h"
@@ -31,35 +32,44 @@ namespace Chatting
 				return false;
 			return true;
 		}
-
-		bool CheckConfigFile(const WCHAR *pPath)
-		{
-			// 기존 로더에 일반적인 파일/인코딩 오류만 넘기지 않는다.
-			HANDLE file = CreateFileW(pPath, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-			if (file == INVALID_HANDLE_VALUE)
-				return false;
-			LARGE_INTEGER size{};
-			BYTE bom[2]{};
-			DWORD bytes = 0;
-			bool isValid = GetFileSizeEx(file, &size) && size.QuadPart >= 4 && size.QuadPart % 2 == 0
-				&& ReadFile(file, bom, sizeof(bom), &bytes, nullptr) && bytes == sizeof(bom) && bom[0] == 0xff && bom[1] == 0xfe;
-			CloseHandle(file);
-			return isValid;
-		}
 	}
 
-	bool LoadConfig(const WCHAR *pFileName, bool isServer, SChatConfig &outConfig)
+	bool CheckConfigFile(const WCHAR *pPath)
+	{
+		// 기존 로더에 일반적인 파일/인코딩 오류만 넘기지 않는다.
+		HANDLE file = CreateFileW(pPath, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+		if (file == INVALID_HANDLE_VALUE)
+			return false;
+		LARGE_INTEGER size{};
+		BYTE bom[2]{};
+		DWORD bytes = 0;
+		bool isValid = GetFileSizeEx(file, &size) && size.QuadPart >= 4 && size.QuadPart % 2 == 0
+			&& ReadFile(file, bom, sizeof(bom), &bytes, nullptr) && bytes == sizeof(bom) && bom[0] == 0xff && bom[1] == 0xfe;
+		CloseHandle(file);
+		return isValid;
+	}
+
+	bool GetExecutableDirectory(std::wstring &outDirectory)
 	{
 		constexpr DWORD kExecutablePathCapacity = 32768;
 		std::wstring path(kExecutablePathCapacity, L'\0');
 		DWORD length = GetModuleFileNameW(nullptr, path.data(), kExecutablePathCapacity);
 		if (length == 0 || length >= kExecutablePathCapacity)
-			return ConfigError(pFileName, L"cannot resolve executable directory");
+			return false;
 		path.resize(length);
 		size_t separator = path.find_last_of(L"\\/");
 		if (separator == std::wstring::npos)
-			return ConfigError(pFileName, L"cannot resolve executable directory");
+			return false;
 		path.resize(separator + 1);
+		outDirectory = std::move(path);
+		return true;
+	}
+
+	bool LoadConfig(const WCHAR *pFileName, bool isServer, SChatConfig &outConfig)
+	{
+		std::wstring path;
+		if (!GetExecutableDirectory(path))
+			return ConfigError(pFileName, L"cannot resolve executable directory");
 		path += pFileName;
 		if (!CheckConfigFile(path.c_str()))
 			return ConfigError(pFileName, L"missing/unreadable file or invalid UTF-16LE BOM encoding");

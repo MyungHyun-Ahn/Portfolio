@@ -17,6 +17,11 @@ namespace Chatting
 		WORD m_sectorY = 10;
 	};
 
+	[[nodiscard]] 
+	bool GetExecutableDirectory(std::wstring &outDirectory);
+	[[nodiscard]] 
+	bool CheckConfigFile(const WCHAR *pPath);
+
 	// 실행 파일 옆 설정을 읽는다. 실패하면 outConfig는 변경하지 않는다.
 	bool LoadConfig(const WCHAR *pFileName, bool isServer, SChatConfig &outConfig);
 }

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="DummyClient" />
+    <Filter Include="Client" />
+    <Filter Include="Client\Generated" />
+    <Filter Include="Client\Generated\PacketHandler" />
+    <Filter Include="Common" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="pch.cpp">
+      <Filter>DummyClient</Filter>
+    </ClCompile>
+    <ClCompile Include="Main.cpp">
+      <Filter>DummyClient</Filter>
+    </ClCompile>
+    <ClCompile Include="CDummyRunner.cpp">
+      <Filter>DummyClient</Filter>
+    </ClCompile>
+    <ClCompile Include="CChatDummyClient.cpp">
+      <Filter>DummyClient</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Client\CChatNetClientHandlers.cpp">
+      <Filter>Client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Common\Config.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Client\Generated\PacketHandler\CChatNetClient.g.cpp">
+      <Filter>Client\Generated\PacketHandler</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Client\Generated\PacketHandler\ClientPacketDispatch.g.cpp">
+      <Filter>Client\Generated\PacketHandler</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pch.h">
+      <Filter>DummyClient</Filter>
+    </ClInclude>
+    <ClInclude Include="SDummyConfig.h">
+      <Filter>DummyClient</Filter>
+    </ClInclude>
+    <ClInclude Include="CDummyRunner.h">
+      <Filter>DummyClient</Filter>
+    </ClInclude>
+    <ClInclude Include="CChatDummyClient.h">
+      <Filter>DummyClient</Filter>
+    </ClInclude>
+    <ClInclude Include="SDummyRunStats.h">
+      <Filter>DummyClient</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Client\Generated\PacketHandler\CChatNetClient.g.h">
+      <Filter>Client\Generated\PacketHandler</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Client\Generated\PacketHandler\ClientPacketDispatch.g.h">
+      <Filter>Client\Generated\PacketHandler</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Client\Generated\PacketHandler\IClientPacketHandler.g.h">
+      <Filter>Client\Generated\PacketHandler</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Client\ChatType.h">
+      <Filter>Client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\Config.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\CommonProtocol.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Client\CChatNetClientMembers.inc">
+      <Filter>Client</Filter>
+    </None>
+    <None Include="DummyClientConfig.conf">
+      <Filter>DummyClient</Filter>
+    </None>
+  </ItemGroup>
+</Project>

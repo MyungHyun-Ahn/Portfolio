@@ -280,8 +280,10 @@ namespace
 	class CTickClient : public CNetClient
 	{
 	public:
-		explicit CTickClient(CNetClientManager &network) noexcept
+		CTickClient(CNetClientManager &network, bool rejectsPacket, DWORD expectedError) noexcept
 			: CNetClient(network)
+			, m_rejectsPacket(rejectsPacket)
+			, m_expectedError(expectedError)
 		{
 		}
 
@@ -302,24 +304,35 @@ namespace
 			message >> value;
 			Check(value == 42, L"Tick passes the received packet to onRecv");
 			++m_callbackCount;
-			return true;
+			return !m_rejectsPacket;
+		}
+
+		void onRecvRejected() noexcept override
+		{
+			Check(m_rejectsPacket && GetCurrentThreadId() == m_appThreadId && m_callbackCount == 2,
+				L"Tick reports receive rejection synchronously on the app thread");
+			++m_callbackCount;
 		}
 
 		void onDisconnect(bool wasConnected, DWORD error) noexcept override
 		{
-			Check(GetCurrentThreadId() == m_appThreadId && m_callbackCount == 2, L"Tick dispatches Disconnected after Packet");
-			Check(wasConnected && error == 0 && !IsActive() && !IsConnected(), L"Tick clears connection state before onDisconnect");
+			Check(GetCurrentThreadId() == m_appThreadId && m_callbackCount == (m_rejectsPacket ? 3 : 2),
+				L"Tick dispatches Disconnected after Packet and any receive rejection");
+			Check(wasConnected && error == m_expectedError && !IsActive() && !IsConnected(),
+				L"Tick preserves the native terminal reason and clears connection state before onDisconnect");
 			++m_callbackCount;
 		}
 
 		DWORD m_appThreadId = GetCurrentThreadId();
+		bool m_rejectsPacket;
+		DWORD m_expectedError;
 	};
 
-	void VerifyClientTick()
+	void VerifyClientTick(bool rejectsPacket, bool sendsPeerEof)
 	{
 		constexpr BYTE kPacketCode = 0x77;
 		CNetClientManager network;
-		CTickClient client(network);
+		CTickClient client(network, rejectsPacket, sendsPeerEof ? ERROR_SUCCESS : ERROR_OPERATION_ABORTED);
 		Check(network.Init(1, kDefaultFixtureRecvBufferBytes), L"Tick fixture initializes the manager");
 		USHORT port = 0;
 		SOCKET listener = BindLoopback(port);
@@ -332,22 +345,32 @@ namespace
 		PrepareNetPacket(*spPacket, kPacketCode);
 		const int frameBytes = spPacket->GetFullSize();
 		Check(send(peer, spPacket->GetBufferPtr(), frameBytes, 0) == frameBytes, L"Tick peer sends a packet");
-		Check(shutdown(peer, SD_SEND) == 0, L"Tick peer sends EOF after the packet");
 		const auto deadline = GetTickCount64() + 7000;
-		while (CClientLifecycleProbe::GetFirstSessionEntry(network).second)
+		if (sendsPeerEof)
 		{
-			Check(GetTickCount64() < deadline, L"session retires before the app calls Tick");
-			Sleep(1);
+			Check(shutdown(peer, SD_SEND) == 0, L"Tick peer sends EOF after the packet");
+			while (CClientLifecycleProbe::GetFirstSessionEntry(network).second)
+			{
+				Check(GetTickCount64() < deadline, L"session retires before the app calls Tick");
+				Sleep(1);
+			}
 		}
 		Check(client.m_callbackCount == 0 && client.IsActive() && !client.IsConnected(), L"callbacks wait for the app's Tick");
+		while (client.IsActive())
+		{
+			Check(GetTickCount64() < deadline, L"Tick consumes the terminal event");
+			client.Tick();
+			if (client.IsActive())
+				Sleep(1);
+		}
 		client.Tick();
-		client.Tick();
-		Check(client.m_callbackCount == 3 && CClientLifecycleProbe::GetMailboxCount(network) == 0,
+		Check(client.m_callbackCount == (rejectsPacket ? 4 : 3) && CClientLifecycleProbe::GetMailboxCount(network) == 0,
 			L"Tick drains callbacks once and consumes the mailbox");
 		closesocket(peer);
 		closesocket(listener);
 		network.Stop();
-		g_pLogger->WriteLogConsole(ELogLevel::Info, L"PASS: Net Tick callback order, app thread and mailbox retirement");
+		g_pLogger->WriteLogConsole(ELogLevel::Info, L"PASS: Net Tick callback order (reject=%d, peer_eof=%d), app thread and mailbox retirement",
+			rejectsPacket, sendsPeerEof);
 	}
 
 	void VerifyNetSendBatch()
@@ -737,7 +760,9 @@ int main(void)
 	Check(WSAStartup(MAKEWORD(2, 2), &wsaData) == 0, L"fixture Winsock startup");
 	VerifyLifecycle(1);
 	VerifyLifecycle(2);
-	VerifyClientTick();
+	VerifyClientTick(false, true);
+	VerifyClientTick(true, true);
+	VerifyClientTick(true, false);
 	VerifyNetRecvRing();
 	VerifyNetSendBatch();
 	VerifyLanLoopback();
