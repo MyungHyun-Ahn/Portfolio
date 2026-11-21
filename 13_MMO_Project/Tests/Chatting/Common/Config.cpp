@@ -33,6 +33,22 @@ namespace Chatting
 				return false;
 			return true;
 		}
+
+		bool LoadServerNumber(MHLib::utils::CFileLoader &loader, const WCHAR *pFileName,
+			const WCHAR *pKey, int maxValue, int &outValue)
+		{
+			std::wstring text;
+			if (!loader.Load(L"Server", pKey, &text))
+				return true;
+			INT64 value = 0;
+			if (!loader.Load(L"Server", pKey, &value) || value < 1 || value > maxValue)
+			{
+				const std::wstring reason = std::wstring(pKey) + L" must be an integer (1.." + std::to_wstring(maxValue) + L")";
+				return ConfigError(pFileName, reason.c_str());
+			}
+			outValue = static_cast<int>(value);
+			return true;
+		}
 	}
 
 	bool CheckConfigFile(const WCHAR *pPath)
@@ -92,6 +108,18 @@ namespace Chatting
 			return ConfigError(pFileName, L"log levels must be Debug, Info or Error");
 		if (isServer)
 		{
+			constexpr int kMaxAcceptExCount = 65535;
+			constexpr int kMaxContentsWorkerCount = 64;
+			constexpr int kMaxLogQueueCapacity = 1024 * 1024;
+			if (!LoadServerNumber(loader, pFileName, L"ACCEPTEX_COUNT", kMaxAcceptExCount, config.m_acceptExCount)
+				|| !LoadServerNumber(loader, pFileName, L"IOCP_WORKER_COUNT", MAXIMUM_WAIT_OBJECTS, config.m_iocpWorkerCount)
+				|| !LoadServerNumber(loader, pFileName, L"IOCP_CONCURRENCY", config.m_iocpWorkerCount, config.m_iocpConcurrency)
+				|| !LoadServerNumber(loader, pFileName, L"CONTENTS_WORKER_COUNT", kMaxContentsWorkerCount, config.m_contentsWorkerCount)
+				|| !LoadServerNumber(loader, pFileName, L"LOG_QUEUE_CAPACITY", kMaxLogQueueCapacity, config.m_logQueueCapacity))
+				return false;
+			if (config.m_iocpConcurrency > config.m_iocpWorkerCount)
+				return ConfigError(pFileName, L"IOCP_CONCURRENCY must not exceed IOCP_WORKER_COUNT");
+
 			std::wstring maxSessionCount;
 			if (loader.Load(pSection, L"MAX_SESSION_COUNT", &maxSessionCount))
 			{

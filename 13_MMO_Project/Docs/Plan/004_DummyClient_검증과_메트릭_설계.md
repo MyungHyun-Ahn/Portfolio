@@ -60,8 +60,9 @@ EXE 옆 `DummyClientConfig.conf`를 `CFileLoader`로 읽는다(UTF-16LE BOM). `I
 |---|---|
 | 리슨 주소 | `openIp`, `openPort`는 기존 `IP`, `PORT` 설정을 유지한다. 이번 테스트 범위는 루프백이다. |
 | 서버 세션 슬롯 | `MAX_SESSION_COUNT` 적용 완료. `1..65535` 정수를 받고 생략하면 `256`을 사용한다. 이 범위는 16비트 슬롯 개수의 표현 범위이며 실제 동시 접속 용량을 보장하지 않는다. |
-| 접속·IOCP 후속 | `acceptexCount`, `iocpWorkerThread`, `iocpActiveThread`, `useZeroCopy`는 이번 변경에서 제외한다. 설정화할 때 AcceptEx 수·워커 수·동시성 값의 제약을 시작 전에 확인한다. |
-| 콘텐츠 스레드 | `contentsThreadCount`, `maxContentsFps`, `delayFrame`. 콘텐츠 스레드 수와 FPS는 0을 거부하고, 프레임 지연 계산이 오버플로하지 않는 범위를 확인한다. |
+| 접속·IOCP | `ACCEPTEX_COUNT`는 기본 `4` (`1..65535`), `IOCP_WORKER_COUNT`는 기본 `2` (`1..64`), `IOCP_CONCURRENCY`는 기본 `2` (`1..IOCP_WORKER_COUNT`)다. `useZeroCopy`는 이 설정화 범위에 포함하지 않는다. |
+| 콘텐츠 스레드 | `CONTENTS_WORKER_COUNT`는 기본 `2` (`1..64`)다. `maxContentsFps`, `delayFrame`은 후속 설정화 대상이다. |
+| 로그 큐 | `LOG_QUEUE_CAPACITY`는 생산자 스레드당 기본 `1024`건 (`1..1048576`)이다. |
 | Net 패킷 호환 | `packetCode`, `packetKey`는 서버 단독 튜닝 값이 아니다. 설정으로 노출하려면 콘솔·더미도 동일한 값을 사용하게 하고, 서버의 프레이밍·수신 검사·인코딩이 모두 검증된 같은 설정에서 읽도록 연결한다. 그 전에는 기존 공용 값을 유지한다. 키 값은 로그나 실행 요약에 남기지 않는다. |
 
 기본 설정의 기존 채팅, 별도 설정으로 서버 슬롯·워커 수가 실제로 적용되는 경우, 범위를 벗어난 설정의 시작 거부를 검증한다. 현재 슬롯 수 이내의 로컬 실행에는 선행 조건이 아니며, 포트 범위 규모의 부하 시험 전에 완료한다.

@@ -22,7 +22,8 @@ int main(void)
 	Chatting::SChatConfig config;
 	if (!Chatting::LoadConfig(L"ServerConfig.conf", true, config))
 		return 2;
-	if (!g_pLogger->Start(L"LogFile", config.m_consoleLogLevel, config.m_fileLogLevel, config.m_logPollInterval))
+	if (!g_pLogger->Start(L"LogFile", config.m_consoleLogLevel, config.m_fileLogLevel,
+		config.m_logPollInterval, static_cast<std::size_t>(config.m_logQueueCapacity)))
 	{
 		g_pLogger->WriteLogConsole(ELogLevel::Error, L"CLogger: cannot open the async log file");
 		return 2;
@@ -32,14 +33,18 @@ int main(void)
 	NetworkLib::serverSetting::openIp = config.m_ip;
 	NetworkLib::serverSetting::openPort = config.m_port;
 	NetworkLib::serverSetting::maxSessionCount = config.m_maxSessionCount;
-	NetworkLib::serverSetting::acceptexCount = 4;
-	NetworkLib::serverSetting::iocpWorkerThread = 2;
-	NetworkLib::serverSetting::iocpActiveThread = 2;
-	NetworkLib::serverSetting::contentsThreadCount = 2;
+	NetworkLib::serverSetting::acceptexCount = config.m_acceptExCount;
+	NetworkLib::serverSetting::iocpWorkerThread = config.m_iocpWorkerCount;
+	NetworkLib::serverSetting::iocpActiveThread = config.m_iocpConcurrency;
+	NetworkLib::serverSetting::contentsThreadCount = config.m_contentsWorkerCount;
 	NetworkLib::serverSetting::packetCode = Chatting::kPacketCode;
 	NetworkLib::serverSetting::packetKey = Chatting::kPacketKey;
 	MHLib::security::CEncryption::sm_packetKey = Chatting::kPacketKey;
 	MHLib::utils::g_pProfileManager = MHLib::utils::CProfileManager::GetInstance();
+	g_pLogger->WriteLog(ELogLevel::Info, L"ChatServer", 0, std::source_location::current(),
+		L"event=server_config acceptex_count=%d iocp_worker_count=%d iocp_concurrency=%d contents_worker_count=%d log_queue_capacity=%d"
+		L" | 서버 시작 설정을 적용했습니다.", config.m_acceptExCount, config.m_iocpWorkerCount, config.m_iocpConcurrency,
+		config.m_contentsWorkerCount, config.m_logQueueCapacity);
 
 	auto *pServer = new Chatting::CChatServer;
 	NetworkLib::g_pNetServer = pServer;

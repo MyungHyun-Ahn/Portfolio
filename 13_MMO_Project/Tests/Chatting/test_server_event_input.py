@@ -1,4 +1,4 @@
-"""Run against the built x64 Chatting solution: python test_server_event_input.py bind|chat|log-interval|session-limit [Release|Debug]."""
+"""Run against the built x64 Chatting solution: python test_server_event_input.py bind|chat|log-interval|session-limit|server-options [Release|Debug]."""
 
 from contextlib import ExitStack, contextmanager
 from pathlib import Path
@@ -16,7 +16,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 @contextmanager
-def launch(base, configuration, side, label, port, levels=None, log_interval=None, nickname=None, *, session_limit=None):
+def launch(base, configuration, side, label, port, levels=None, log_interval=None, nickname=None, *, session_limit=None,
+           server_options=None):
     folder = base / label
     folder.mkdir()
     source = ROOT / "Build" / configuration / f"Chat{side}"
@@ -41,6 +42,9 @@ def launch(base, configuration, side, label, port, levels=None, log_interval=Non
     if session_limit is not None:
         text = re.sub(r"(?m)^[ \t]*-[ \t]*MAX_SESSION_COUNT[ \t]*=[^\n]*\n?", "", text)
         text += f"\n\t- MAX_SESSION_COUNT = {session_limit};"
+    for key, value in (server_options or {}).items():
+        text = re.sub(rf"(?m)^[ \t]*-[ \t]*{re.escape(key)}[ \t]*=[^\n]*\n?", "", text)
+        text += f"\n\t- {key} = {value};"
     (folder / config).write_text(text, encoding="utf-16")
     stdout = folder / "stdout.txt"
     with stdout.open("wb") as output, subprocess.Popen(
@@ -157,6 +161,42 @@ def session_limit_config(base, configuration):
     print("session limit: one connection admitted, second closed; invalid values rejected before startup")
 
 
+def server_options_config(base, configuration):
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    options = {"ACCEPTEX_COUNT": 8, "IOCP_WORKER_COUNT": 3, "IOCP_CONCURRENCY": 2,
+               "CONTENTS_WORKER_COUNT": 1, "LOG_QUEUE_CAPACITY": 2048}
+    with launch(base, configuration, "Server", "custom-server", port, server_options=options) as server:
+        wait_text(server, f"event=server_ready port={port}")
+        wait_text(server, "event=server_config acceptex_count=8 iocp_worker_count=3 iocp_concurrency=2"
+                  " contents_worker_count=1 log_queue_capacity=2048")
+        wait_text(server, "event=worker_started worker_index=3")
+        wait_text(server, "event=contents_worker_started")
+        workers = event(server, "NetworkLib", "Info", "-", "Start", r"event=worker_started worker_index=\d+ \| .+")
+        contents = event(server, "NetworkLib", "Info", "-", "threadFunc", r"event=contents_worker_started \| .+")
+        assert len(workers) == 3 and len(contents) == 1
+        with launch(base, configuration, "Client", "custom-client", port) as client:
+            wait_text(client, "READY account=")
+            send(client, "custom server config")
+            wait_text(client, ": custom server config")
+            send(client, "/exit")
+            assert client[0].wait(timeout=8) == 0
+        send(server, "/exit")
+        assert server[0].wait(timeout=8) == 0
+
+    invalid = [("ACCEPTEX_COUNT", 0), ("ACCEPTEX_COUNT", 65536), ("IOCP_WORKER_COUNT", 65),
+               ("IOCP_CONCURRENCY", 0), ("IOCP_CONCURRENCY", 4), ("CONTENTS_WORKER_COUNT", 0),
+               ("LOG_QUEUE_CAPACITY", 0), ("LOG_QUEUE_CAPACITY", "1024items"), ("LOG_QUEUE_CAPACITY", 1048577)]
+    for index, (key, value) in enumerate(invalid):
+        with launch(base, configuration, "Server", f"invalid-option-{index}", port,
+                    server_options={**options, key: value}) as server:
+            assert server[0].wait(timeout=5) == 2, f"{key}={value} was not rejected"
+            wait_text(server, key)
+            assert not (server[1].parent / "LogFile").exists()
+    print("server options: custom worker counts and loopback echo verified; invalid settings rejected")
+
+
 def chat(base, configuration):
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
@@ -222,7 +262,8 @@ if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
     mode = sys.argv[1]
     configuration = sys.argv[2] if len(sys.argv) > 2 else "Release"
-    case = {"bind": bind_failure, "chat": chat, "log-interval": log_interval_config, "session-limit": session_limit_config}[mode]
+    case = {"bind": bind_failure, "chat": chat, "log-interval": log_interval_config,
+            "session-limit": session_limit_config, "server-options": server_options_config}[mode]
     evidence = os.environ.get("MMO_SERVER_EVENT_EVIDENCE")
     if evidence:
         output = Path(evidence) / f"{configuration}-{mode}"
