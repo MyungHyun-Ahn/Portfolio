@@ -31,7 +31,7 @@ int main(void)
 
 	NetworkLib::serverSetting::openIp = config.m_ip;
 	NetworkLib::serverSetting::openPort = config.m_port;
-	NetworkLib::serverSetting::maxSessionCount = 256;
+	NetworkLib::serverSetting::maxSessionCount = config.m_maxSessionCount;
 	NetworkLib::serverSetting::acceptexCount = 4;
 	NetworkLib::serverSetting::iocpWorkerThread = 2;
 	NetworkLib::serverSetting::iocpActiveThread = 2;

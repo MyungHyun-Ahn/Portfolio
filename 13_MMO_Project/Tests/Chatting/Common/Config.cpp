@@ -1,4 +1,5 @@
 #include "pch.h"
+#include <limits>
 #include <utility>
 #include "CSerializableBuffer.h"
 #include "NetworkLimits.h"
@@ -91,6 +92,14 @@ namespace Chatting
 			return ConfigError(pFileName, L"log levels must be Debug, Info or Error");
 		if (isServer)
 		{
+			std::wstring maxSessionCount;
+			if (loader.Load(pSection, L"MAX_SESSION_COUNT", &maxSessionCount))
+			{
+				constexpr auto kMaxSessionCount = (std::numeric_limits<USHORT>::max)();
+				if (!loader.Load(pSection, L"MAX_SESSION_COUNT", &number) || number < 1 || number > kMaxSessionCount)
+					return ConfigError(pFileName, L"MAX_SESSION_COUNT must be an integer (1..65535)");
+				config.m_maxSessionCount = static_cast<USHORT>(number);
+			}
 			std::wstring logPollInterval;
 			if (loader.Load(pSection, L"LOG_POLL_INTERVAL_MS", &logPollInterval))
 			{

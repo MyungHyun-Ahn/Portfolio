@@ -1,4 +1,4 @@
-"""Run against the built x64 Chatting solution: python test_server_event_input.py bind|chat [Release|Debug]."""
+"""Run against the built x64 Chatting solution: python test_server_event_input.py bind|chat|log-interval|session-limit [Release|Debug]."""
 
 from contextlib import ExitStack, contextmanager
 from pathlib import Path
@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 @contextmanager
-def launch(base, configuration, side, label, port, levels=None, log_interval=None, nickname=None):
+def launch(base, configuration, side, label, port, levels=None, log_interval=None, nickname=None, *, session_limit=None):
     folder = base / label
     folder.mkdir()
     source = ROOT / "Build" / configuration / f"Chat{side}"
@@ -38,6 +38,9 @@ def launch(base, configuration, side, label, port, levels=None, log_interval=Non
         text, count = re.subn(r"\bLOG_POLL_INTERVAL_MS\s*=\s*[^;]*;", f"LOG_POLL_INTERVAL_MS = {log_interval};", text)
         if not count:
             text += f"\n\t- LOG_POLL_INTERVAL_MS = {log_interval};"
+    if session_limit is not None:
+        text = re.sub(r"(?m)^[ \t]*-[ \t]*MAX_SESSION_COUNT[ \t]*=[^\n]*\n?", "", text)
+        text += f"\n\t- MAX_SESSION_COUNT = {session_limit};"
     (folder / config).write_text(text, encoding="utf-16")
     stdout = folder / "stdout.txt"
     with stdout.open("wb") as output, subprocess.Popen(
@@ -126,6 +129,34 @@ def log_interval_config(base, configuration):
     print("log interval: rejected invalid values before logger startup; accepted 25 ms")
 
 
+def session_limit_config(base, configuration):
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+
+    with launch(base, configuration, "Server", "one-slot", port, levels=("Debug", "Debug"), session_limit="1") as server:
+        wait_text(server, f"event=server_ready port={port}")
+        with socket.create_connection(("127.0.0.1", port), timeout=5):
+            wait_text(server, "event=session_accepted")
+            with socket.create_connection(("127.0.0.1", port), timeout=5) as excess:
+                try:
+                    assert excess.recv(1) == b"", "excess connection was not closed"
+                except ConnectionResetError:
+                    pass
+                except TimeoutError as exc:
+                    raise AssertionError("MAX_SESSION_COUNT=1 did not close the second connection") from exc
+            wait_text(server, "event=session_slot_pop_failed")
+        send(server, "/exit")
+        assert server[0].wait(timeout=8) == 0
+
+    for index, value in enumerate(("0", "-1", "65536", "1slot")):
+        with launch(base, configuration, "Server", f"invalid-limit-{index}", port, session_limit=value) as server:
+            assert server[0].wait(timeout=5) == 2, f"MAX_SESSION_COUNT={value} was not rejected"
+            wait_text(server, "MAX_SESSION_COUNT")
+            assert not (server[1].parent / "LogFile").exists()
+    print("session limit: one connection admitted, second closed; invalid values rejected before startup")
+
+
 def chat(base, configuration):
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
@@ -187,7 +218,7 @@ if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
     mode = sys.argv[1]
     configuration = sys.argv[2] if len(sys.argv) > 2 else "Release"
-    case = {"bind": bind_failure, "chat": chat, "log-interval": log_interval_config}[mode]
+    case = {"bind": bind_failure, "chat": chat, "log-interval": log_interval_config, "session-limit": session_limit_config}[mode]
     evidence = os.environ.get("MMO_SERVER_EVENT_EVIDENCE")
     if evidence:
         output = Path(evidence) / f"{configuration}-{mode}"

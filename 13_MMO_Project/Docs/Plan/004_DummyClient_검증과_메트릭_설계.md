@@ -50,7 +50,7 @@ EXE 옆 `DummyClientConfig.conf`를 `CFileLoader`로 읽는다(UTF-16LE BOM). `I
 | `RECONNECT_PROBABILITY_BPS` | `0`. 동작 완료마다 `0..10000` 만분율 적용. 초기 진입·heartbeat에는 적용하지 않는다. |
 | `HEARTBEAT_INTERVAL_MS`, `DELIVERY_TIMEOUT_MS`, `DRAIN_TIMEOUT_MS` | `30000`, `3000`, `5000`. Heartbeat 주기는 서버 수신 제한인 40초 미만의 양수. 전달 기한은 자기 echo에 적용한다. |
 
-- 현재 **256은 테스트용 `ChatServer`의 `Main.cpp`가 설정한 서버 세션 슬롯 수**다. 클라이언트 PC의 포트 수나 더미의 입력 한도가 아니다. 용량 시험은 더미에 256 한도를 두지 않고, 해당 PC에서 테스트에 실제로 사용할 수 있는 클라이언트 TCP 포트 수까지 동시 접속하는 것을 목표로 한다. 서버 슬롯 설정과 16비트 슬롯 인덱스·개수 표현 범위를 먼저 확인하고, 포트 고갈·재접속 중 잔류 연결·서버 슬롯 부족을 구분해 목표 수와 실제 TCP 연결 수·Ready 수를 기록한다. 포트 범위 크기만으로 같은 수의 동시 연결을 보장하지 않는다. Windows에서는 `netsh int ipv4 show dynamicport tcp`로 설정 범위를 확인한다.
+- **256은 `ServerConfig.conf`의 `MAX_SESSION_COUNT` 기본값**이다. 클라이언트 PC의 포트 수나 더미의 입력 한도가 아니다. 용량 시험은 더미에 256 한도를 두지 않고, 해당 PC에서 테스트에 실제로 사용할 수 있는 클라이언트 TCP 포트 수까지 동시 접속하는 것을 목표로 한다. 서버 슬롯 설정을 먼저 확인하고, 포트 고갈·재접속 중 잔류 연결·서버 슬롯 부족을 구분해 목표 수와 실제 TCP 연결 수·Ready 수를 기록한다. 설정 범위나 포트 범위 크기만으로 같은 수의 동시 연결을 보장하지 않는다. Windows에서는 `netsh int ipv4 show dynamicport tcp`로 설정 범위를 확인한다.
 
 ### 서버 설정 외부화
 
@@ -59,7 +59,8 @@ EXE 옆 `DummyClientConfig.conf`를 `CFileLoader`로 읽는다(UTF-16LE BOM). `I
 | 대상 | 설정화 범위 |
 |---|---|
 | 리슨 주소 | `openIp`, `openPort`는 기존 `IP`, `PORT` 설정을 유지한다. 이번 테스트 범위는 루프백이다. |
-| 접속·IOCP | `maxSessionCount`, `acceptexCount`, `iocpWorkerThread`, `iocpActiveThread`, `useZeroCopy`. `maxSessionCount`를 `MAX_SESSION_COUNT`로 노출하고 `Main.cpp`의 256 고정 대입을 없앤다. 슬롯 개수와 인덱스 타입이 표현할 수 없는 값은 거부하고, AcceptEx 수·워커 수·동시성 값의 제약을 시작 전에 확인한다. |
+| 서버 세션 슬롯 | `MAX_SESSION_COUNT` 적용 완료. `1..65535` 정수를 받고 생략하면 `256`을 사용한다. 이 범위는 16비트 슬롯 개수의 표현 범위이며 실제 동시 접속 용량을 보장하지 않는다. |
+| 접속·IOCP 후속 | `acceptexCount`, `iocpWorkerThread`, `iocpActiveThread`, `useZeroCopy`는 이번 변경에서 제외한다. 설정화할 때 AcceptEx 수·워커 수·동시성 값의 제약을 시작 전에 확인한다. |
 | 콘텐츠 스레드 | `contentsThreadCount`, `maxContentsFps`, `delayFrame`. 콘텐츠 스레드 수와 FPS는 0을 거부하고, 프레임 지연 계산이 오버플로하지 않는 범위를 확인한다. |
 | Net 패킷 호환 | `packetCode`, `packetKey`는 서버 단독 튜닝 값이 아니다. 설정으로 노출하려면 콘솔·더미도 동일한 값을 사용하게 하고, 서버의 프레이밍·수신 검사·인코딩이 모두 검증된 같은 설정에서 읽도록 연결한다. 그 전에는 기존 공용 값을 유지한다. 키 값은 로그나 실행 요약에 남기지 않는다. |
 
