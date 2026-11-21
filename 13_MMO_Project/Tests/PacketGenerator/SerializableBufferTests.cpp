@@ -5,6 +5,9 @@
 #include <limits>
 #include "MHLib/serialization/ISerializable.h"
 #include "CSerializableBuffer.h"
+#include "../../Common/Packet/Struct/Chatting/Login.g.h"
+#include "../../Common/Packet/Struct/Chatting/Chatting.g.h"
+#include "../Chatting/Common/CommonProtocol.h"
 
 #ifdef NDEBUG
 #error SerializableBufferTests requires active assertions.
@@ -164,6 +167,60 @@ void TestInvalidUtf16StringPreservesField()
 	assert(!buffer.IsValid() && buffer.GetDataSize() == 0);
 }
 
+void TestChatNameBounds()
+{
+	assert(Chatting::IsValidString(L"AB", 2));
+	assert(!Chatting::IsValidString(L"AB", 1));
+	assert(Chatting::IsValidString(L"\uac00", Chatting::kMaxNameCodeUnits));
+	assert(Chatting::IsValidString(std::wstring(17, L'\ub098') + L"\U0001f600", Chatting::kMaxNameCodeUnits));
+	assert(!Chatting::IsValidString(L"", Chatting::kMaxNameCodeUnits));
+	assert(!Chatting::IsValidString(std::wstring(18, L'\ub098') + L"\U0001f600", Chatting::kMaxNameCodeUnits));
+	assert(!Chatting::IsValidString(std::wstring{L'A', L'\0', L'B'}, Chatting::kMaxNameCodeUnits));
+}
+
+void TestChatNameWire()
+{
+	constexpr unsigned char kWirePrefix[]{
+		1, 0, 0, 0, 0, 0, 0, 0, // accountNo
+		1, 0, 0, 0, 0x41, 0, // id: A
+		3, 0, 0, 0, 0, 0xac, 0x3d, 0xd8, 0, 0xde // nickname: 가😀
+	};
+	CBuffer buffer;
+	Chatting::SReqLogin login;
+	login.m_accountNo = 1;
+	login.m_id = L"A";
+	login.m_nickname = L"\uac00\U0001f600";
+	login.m_sessionKey.fill('k');
+	assert(login.Serialize(buffer));
+	assert(static_cast<std::size_t>(buffer.GetDataSize()) == sizeof(kWirePrefix) + login.m_sessionKey.size());
+	assert(std::memcmp(buffer.GetContentBufferPtr(), kWirePrefix, sizeof(kWirePrefix)) == 0);
+	assert(std::memcmp(buffer.GetContentBufferPtr() + sizeof(kWirePrefix), login.m_sessionKey.data(), login.m_sessionKey.size()) == 0);
+	Chatting::SReqLogin receivedLogin;
+	assert(receivedLogin.Deserialize(buffer) && buffer.GetDataSize() == 0);
+	assert(receivedLogin.m_accountNo == 1 && receivedLogin.m_id == login.m_id && receivedLogin.m_nickname == login.m_nickname);
+	assert(receivedLogin.m_sessionKey == login.m_sessionKey);
+
+	buffer.Clear();
+	Chatting::SResMessage chat;
+	chat.m_accountNo = 1;
+	chat.m_id = login.m_id;
+	chat.m_nickname = login.m_nickname;
+	chat.m_message = L"B";
+	constexpr unsigned char kMessage[]{1, 0, 0, 0, 0x42, 0};
+	assert(chat.Serialize(buffer));
+	assert(static_cast<std::size_t>(buffer.GetDataSize()) == sizeof(kWirePrefix) + sizeof(kMessage));
+	assert(std::memcmp(buffer.GetContentBufferPtr(), kWirePrefix, sizeof(kWirePrefix)) == 0);
+	assert(std::memcmp(buffer.GetContentBufferPtr() + sizeof(kWirePrefix), kMessage, sizeof(kMessage)) == 0);
+	Chatting::SResMessage receivedChat;
+	assert(receivedChat.Deserialize(buffer) && buffer.GetDataSize() == 0);
+	assert(receivedChat.m_accountNo == 1 && receivedChat.m_id == chat.m_id && receivedChat.m_nickname == chat.m_nickname);
+	assert(receivedChat.m_message == chat.m_message);
+
+	buffer.Clear();
+	buffer << std::int64_t{1} << login.m_id << std::uint32_t{3} << std::uint16_t{0xac00};
+	assert(!receivedChat.Deserialize(buffer) && !buffer.IsValid());
+}
+
 void TestPoolReset()
 {
 	const LONG usage = CBuffer::GetPoolUsage();
@@ -207,6 +264,8 @@ int main(void)
 	TestFixedArrays();
 	TestUtf16StringWire();
 	TestInvalidUtf16StringPreservesField();
+	TestChatNameBounds();
+	TestChatNameWire();
 	TestPoolReset();
 	TestRawBufferBoundaries();
 }

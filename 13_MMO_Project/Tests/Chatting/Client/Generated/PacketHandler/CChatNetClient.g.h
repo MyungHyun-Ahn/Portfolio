@@ -27,8 +27,8 @@ namespace Chatting
 		[[nodiscard]] bool SendReqLogin(
 
 			std::int64_t accountNo,
-			const std::array<WCHAR, 20> &id,
-			const std::array<WCHAR, 20> &nickname,
+			const std::wstring &id,
+			const std::wstring &nickname,
 			const std::array<char, 64> &sessionKey) noexcept;
 		[[nodiscard]] bool SendReqSectorMove(
 
@@ -44,5 +44,11 @@ namespace Chatting
 
 	private:
 		bool onRecv(NetworkLib::CSerializableBuffer<FALSE> &message) noexcept override final;
+		bool HandleResMessage(const SResMessage &packet) noexcept override final;
+		bool HandleMessageNoti(const SMessageNoti &packet) noexcept override final;
+		bool HandleResLogin(const SResLogin &packet) noexcept override final;
+		bool HandleResSectorMove(const SResSectorMove &packet) noexcept override final;
+
+#include "CChatNetClientMembers.inc"
 	};
 }

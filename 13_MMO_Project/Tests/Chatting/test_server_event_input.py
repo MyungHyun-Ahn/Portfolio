@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 @contextmanager
-def launch(base, configuration, side, label, port, levels=None, log_interval=None):
+def launch(base, configuration, side, label, port, levels=None, log_interval=None, nickname=None):
     folder = base / label
     folder.mkdir()
     source = ROOT / "Build" / configuration / f"Chat{side}"
@@ -26,6 +26,9 @@ def launch(base, configuration, side, label, port, levels=None, log_interval=Non
     text = (source / config).read_text(encoding="utf-16")
     text, count = re.subn(r"(\bPORT\s*=\s*)\d+", rf"\g<1>{port}", text)
     assert count == 1
+    if nickname is not None:
+        text, count = re.subn(r"(\bNICKNAME\s*=\s*)[^;]*", lambda match: match[1] + nickname, text)
+        assert count == 1
     if levels is not None:
         for key, value in zip(("CONSOLE_LOG_LEVEL", "FILE_LOG_LEVEL"), levels):
             text, count = re.subn(rf"(\b{key}\s*=\s*)\w+", rf"\g<1>{value}", text)
@@ -130,16 +133,28 @@ def chat(base, configuration):
     with ExitStack() as cleanup:
         server = cleanup.enter_context(launch(base, configuration, "Server", "server", port))
         wait_text(server, f"event=server_ready port={port}", legacy=f"READY chat test-only port={port}")
-        clients = [cleanup.enter_context(launch(base, configuration, "Client", label, port)) for label in ("a", "b")]
+        nicknames = ("가", "나" * 17 + "😀")
+        assert [len(name.encode("utf-16-le")) // 2 for name in nicknames] == [1, 19]
+        with launch(base, configuration, "Client", "over-limit", port, nickname=nicknames[1] + "가") as invalid:
+            assert invalid[0].wait(timeout=8) == 2
+            wait_text(invalid, "NICKNAME is missing or invalid")
+        clients = [cleanup.enter_context(launch(base, configuration, "Client", label, port, nickname=nickname))
+                   for label, nickname in zip(("a", "b"), nicknames)]
         for client in clients:
             wait_text(client, "READY account=")
-        for sender, receiver, message in ((clients[0], clients[1], "로그 A→B 😀 100%"),
-                                          (clients[1], clients[0], "로그 B→A 😀 %ls")):
+        messages = ("로그 A→B 😀 100%", "로그 B→A 😀 %ls")
+        for index, message in enumerate(messages):
+            sender, receiver = clients[index], clients[1 - index]
             send(sender, message)
-            wait_text(receiver, f"name=player: {message}")
+            for client in (sender, receiver):
+                wait_text(client, f"name={nicknames[index]}: {message}")
         for client in clients:
             send(client, "/exit")
             assert client[0].wait(timeout=8) == 0
+            text = client[1].read_text(encoding="utf-8")
+            assert [line.split(" name=", 1)[1] for line in text.splitlines() if "CHAT account=" in line] == [
+                f"{name}: {message}" for name, message in zip(nicknames, messages)
+            ], text
         wait_text((server[0], server_log_path(server[1])), "event=session_leave")
         ready = event(server, "ChatServer", "Info", "-", "RegisterContentTimerEvent",
                       rf"event=server_ready port={port} \| 테스트 채팅 서버가 준비되었습니다\.")
@@ -163,8 +178,9 @@ def chat(base, configuration):
         assert len(ready) == 1
         send(server, "/exit")
         assert server[0].wait(timeout=8) == 0
-        print(f"chat: two client READY, A→B and B→A exact payloads, exits=0/0/0; {ready[0]}")
+        print(f"chat: two clients READY, one self echo and one peer delivery per message, exits=0/0/0; {ready[0]}")
         print("chat: contents_worker_started=2; session_accepted/enter, login, sector and chat Debug events in file only")
+        print("chat: 1/19-code-unit nicknames preserved, including Korean and emoji; 20-code-unit config rejected")
 
 
 if __name__ == "__main__":

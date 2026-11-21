@@ -17,8 +17,8 @@ namespace Chatting
 			m_sectorX = 0xff;
 			m_accountNo = 0;
 			m_prevRecvTime = timeGetTime();
-			ZeroMemory(m_id, sizeof(m_id));
-			ZeroMemory(m_nickname, sizeof(m_nickname));
+			m_id.clear();
+			m_nickname.clear();
 		}
 
 		static CPlayer *Alloc() noexcept
@@ -38,8 +38,8 @@ namespace Chatting
 		DWORD m_prevRecvTime;
 		WORD m_sectorY;
 		WORD m_sectorX;
-		WCHAR m_id[kNameLength];
-		WCHAR m_nickname[kNameLength];
+		std::wstring m_id;
+		std::wstring m_nickname;
 		inline static MHLib::memory::CTlsMemoryPoolManager<CPlayer> sm_playerPool;
 	};
 }

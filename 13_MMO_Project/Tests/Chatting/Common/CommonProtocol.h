@@ -2,7 +2,7 @@
 
 namespace Chatting
 {
-	constexpr int kNameLength = 20; // null 포함
+	constexpr int kMaxNameCodeUnits = 19;
 	constexpr int kSessionKeyBytes = 64;
 	constexpr int kMaxMessageBytes = 512; // null 미포함
 	constexpr int kMaxSectorX = 50;
@@ -17,6 +17,11 @@ namespace Chatting
 	constexpr DWORD kReceiveTimeoutMilliseconds = 40000;
 	// 로컬 테스트 전용. 운영 인증으로 사용하지 않는다.
 	constexpr char kTestSessionKey[kSessionKeyBytes] = "LOCAL_CHAT_TEST_ONLY";
+
+	[[nodiscard]] inline bool IsValidString(const std::wstring &value, std::size_t maxCodeUnits) noexcept
+	{
+		return !value.empty() && value.size() <= maxCodeUnits && value.find(L'\0') == std::wstring::npos;
+	}
 
 	static_assert(sizeof(WCHAR) == 2);
 }

@@ -6,6 +6,8 @@
 #include <mutex>
 #include <atomic>
 #include <memory>
+#include <optional>
+#include <utility>
 #include <array>
 #include <charconv>
 #include <io.h>
@@ -13,3 +15,4 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include "ChatType.h"

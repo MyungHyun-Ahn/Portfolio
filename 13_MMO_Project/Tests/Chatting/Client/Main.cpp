@@ -8,7 +8,7 @@
 #include "CNetClientManager.h"
 #include "CNetClient.h"
 #include "IClientPacketHandler.g.h"
-#include "ClientPacketSend.g.h"
+#include "CChatNetClient.g.h"
 #include "CConsoleChatClient.h"
 
 int main(void)
@@ -45,12 +45,12 @@ int main(void)
 		else
 		{
 			DWORD startTime = timeGetTime();
-			while (client.IsConnected() && !client.IsReady() && timeGetTime() - startTime < 5000)
+			while (client.IsConnected() && !client.IsChatReady() && timeGetTime() - startTime < 5000)
 			{
 				client.Tick();
 				Sleep(10);
 			}
-			if (!client.IsReady())
+			if (!client.IsChatReady())
 			{
 				g_pLogger->WriteLogConsole(ELogLevel::Error, L"LOGIN/SECTOR FAILED");
 				exitCode = 1;
@@ -77,7 +77,7 @@ int main(void)
 					if (inputResult == Chatting::EInputResult::Line && !line.empty())
 					{
 						std::wstring text;
-						if (!client.IsReady() || !Chatting::Utf8ToWide(line, text) || text.empty()
+						if (!client.IsChatReady() || !Chatting::Utf8ToWide(line, text) || text.empty()
 							|| text.size() > Chatting::kMaxMessageBytes / sizeof(WCHAR)
 							|| !client.SendReqMessage(config.m_accountNo, text))
 						{
@@ -86,7 +86,7 @@ int main(void)
 					}
 					if (timeGetTime() - prevHeartbeatTime >= Chatting::kHeartbeatMilliseconds)
 					{
-						if (client.IsReady())
+						if (client.IsChatReady())
 							(void)client.SendNotiHeartbeat(config.m_accountNo);
 						prevHeartbeatTime = timeGetTime();
 					}

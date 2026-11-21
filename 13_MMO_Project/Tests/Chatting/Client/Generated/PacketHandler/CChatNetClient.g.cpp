@@ -9,7 +9,7 @@
 #include "CNetClient.h"
 #include "IClientPacketHandler.g.h"
 #include "ClientPacketDispatch.g.h"
-#include "ClientPacketSend.g.h"
+#include "CChatNetClient.g.h"
 
 namespace Chatting
 {
@@ -97,24 +97,29 @@ namespace Chatting
 		{
 			return false;
 		}
-		auto spPacket = MakePacketReqMessage(packet);
-		return spPacket != nullptr && sendNetworkPacket(std::move(spPacket));
+		return this->sendNetworkPacket(MakePacketReqMessage(packet));
 	}
 
 	bool CChatNetClient::SendReqLogin(
 
 		std::int64_t accountNo,
-		const std::array<WCHAR, 20> &id,
-		const std::array<WCHAR, 20> &nickname,
+		const std::wstring &id,
+		const std::wstring &nickname,
 		const std::array<char, 64> &sessionKey) noexcept
 	{
 		SReqLogin packet;
 		packet.m_accountNo = accountNo;
-		packet.m_id = id;
-		packet.m_nickname = nickname;
 		packet.m_sessionKey = sessionKey;
-		auto spPacket = MakePacketReqLogin(packet);
-		return spPacket != nullptr && sendNetworkPacket(std::move(spPacket));
+		try
+		{
+			packet.m_id = id;
+			packet.m_nickname = nickname;
+		}
+		catch (const std::bad_alloc &)
+		{
+			return false;
+		}
+		return this->sendNetworkPacket(MakePacketReqLogin(packet));
 	}
 
 	bool CChatNetClient::SendReqSectorMove(
@@ -127,8 +132,7 @@ namespace Chatting
 		packet.m_accountNo = accountNo;
 		packet.m_sectorX = sectorX;
 		packet.m_sectorY = sectorY;
-		auto spPacket = MakePacketReqSectorMove(packet);
-		return spPacket != nullptr && sendNetworkPacket(std::move(spPacket));
+		return this->sendNetworkPacket(MakePacketReqSectorMove(packet));
 	}
 
 	bool CChatNetClient::SendNotiHeartbeat(
@@ -137,7 +141,6 @@ namespace Chatting
 	{
 		SHeartbeatNoti packet;
 		packet.m_accountNo = accountNo;
-		auto spPacket = MakePacketHeartbeatNoti(packet);
-		return spPacket != nullptr && sendNetworkPacket(std::move(spPacket));
+		return this->sendNetworkPacket(MakePacketHeartbeatNoti(packet));
 	}
 }

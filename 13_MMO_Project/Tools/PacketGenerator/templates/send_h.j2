@@ -43,6 +43,11 @@ namespace Chatting
 
 	private:
 		bool onRecv(NetworkLib::CSerializableBuffer<FALSE> &message) noexcept override final;
+{% for packet in receive %}
+		bool Handle{{ packet.name }}(const S{{ packet.name }} &packet) noexcept override final;
+{% endfor %}
+
+#include "CChatNetClientMembers.inc"
 {% else %}
 		virtual ~C{{ side }}PacketSender() = default;
 		// 직렬화된 버퍼를 받아 호출자 참조를 확보한 뒤 전송한다.

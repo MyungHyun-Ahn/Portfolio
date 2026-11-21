@@ -5,11 +5,14 @@ namespace Chatting
 {
 	enum class EPacketType : std::uint16_t;
 	struct SResMessage;
+	struct SMessageNoti;
 	struct SResLogin;
 	struct SResSectorMove;
 
 	[[nodiscard]] NetworkLib::CSerializableBuffer<FALSE> *MakePacketResMessage(
 		const SResMessage &packet) noexcept;
+	[[nodiscard]] NetworkLib::CSerializableBuffer<FALSE> *MakePacketMessageNoti(
+		const SMessageNoti &packet) noexcept;
 	[[nodiscard]] NetworkLib::CSerializableBuffer<FALSE> *MakePacketResLogin(
 		const SResLogin &packet) noexcept;
 	[[nodiscard]] NetworkLib::CSerializableBuffer<FALSE> *MakePacketResSectorMove(
@@ -23,8 +26,16 @@ namespace Chatting
 
 			UINT64 sessionId,
 			std::int64_t accountNo,
-			const std::array<WCHAR, 20> &id,
-			const std::array<WCHAR, 20> &nickname,
+			const std::wstring &id,
+			const std::wstring &nickname,
+			const std::wstring &message) noexcept;
+		// 준비 실패 시 nullptr. 반환한 참조 1개는 호출자가 반환한다. 첫 전송 성공을 뜻하지 않는다.
+		[[nodiscard]] NetworkLib::CSerializableBuffer<FALSE> *SendNotiMessage(
+
+			UINT64 sessionId,
+			std::int64_t accountNo,
+			const std::wstring &id,
+			const std::wstring &nickname,
 			const std::wstring &message) noexcept;
 		// 준비 실패 시 nullptr. 반환한 참조 1개는 호출자가 반환한다. 첫 전송 성공을 뜻하지 않는다.
 		[[nodiscard]] NetworkLib::CSerializableBuffer<FALSE> *SendResLogin(

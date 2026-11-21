@@ -5,5 +5,6 @@ if not defined PACKET_GENERATOR_PYTHON set "PACKET_GENERATOR_PYTHON=python"
   --schema-dir "%~dp0..\..\Common\Packet\Schema" ^
   --common-out "%~dp0..\..\Common\Packet\Struct" ^
   --client-out "%~dp0..\..\Tests\Chatting\Client\Generated\PacketHandler" ^
-  --server-out "%~dp0..\..\Tests\Chatting\Server\Generated\PacketHandler"
+  --server-out "%~dp0..\..\Tests\Chatting\Server\Generated\PacketHandler" ^
+  --client-members-out "%~dp0..\..\Tests\Chatting\Client\CChatNetClientMembers.inc"
 exit /b %errorlevel%

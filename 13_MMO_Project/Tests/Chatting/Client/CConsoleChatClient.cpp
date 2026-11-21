@@ -1,4 +1,5 @@
 #include "pch.h"
+#include <new>
 #include <memory>
 #include <condition_variable>
 #include "CSerializableBuffer.h"
@@ -9,7 +10,7 @@
 #include "MHLib/serialization/ISerializable.h"
 #include "IncludePacketAll.g.h"
 #include "IClientPacketHandler.g.h"
-#include "ClientPacketSend.g.h"
+#include "CChatNetClient.g.h"
 #include "CConsoleChatClient.h"
 
 namespace Chatting
@@ -19,60 +20,58 @@ namespace Chatting
 
 	bool CConsoleChatClient::onConnect() noexcept
 	{
-		return login();
-	}
-
-	bool CConsoleChatClient::login() noexcept
-	{
-		std::array<WCHAR, kNameLength> id{};
-		std::array<WCHAR, kNameLength> nickname{};
 		std::array<char, kSessionKeyBytes> sessionKey{};
-		if (m_config.m_accountNo <= 0 || _i64tow_s(m_config.m_accountNo, id.data(), id.size(), 10) != 0
-			|| m_config.m_name.size() >= nickname.size()
-			|| wcscpy_s(nickname.data(), nickname.size(), m_config.m_name.c_str()) != 0)
-			return false;
 		std::copy_n(kTestSessionKey, kSessionKeyBytes, sessionKey.begin());
-		return SendReqLogin(m_config.m_accountNo, id, nickname, sessionKey);
+		try
+		{
+			return ReqLogin(m_config.m_accountNo, std::to_wstring(m_config.m_accountNo), m_config.m_name, sessionKey);
+		}
+		catch (const std::bad_alloc &)
+		{
+			return false;
+		}
 	}
 
-	bool CConsoleChatClient::HandleResLogin(const SResLogin &packet) noexcept
+	void CConsoleChatClient::onLoginAccepted(const SResLogin &packet) noexcept
 	{
-		if (m_isLogin || packet.m_status != TRUE || packet.m_accountNo != m_config.m_accountNo)
-			return false;
-		m_isLogin = true;
 		g_pLogger->WriteLogConsole(ELogLevel::Info, L"LOGIN OK account=%lld", packet.m_accountNo);
-		// 로그인 응답을 받은 다음 섹터에 등록한다.
-		return SendReqSectorMove(packet.m_accountNo, m_config.m_sectorX, m_config.m_sectorY);
+		if (!ReqSectorMove(m_config.m_sectorX, m_config.m_sectorY))
+		{
+			g_pLogger->WriteLogConsole(ELogLevel::Error, L"최초 섹터 진입 요청 실패: account=%lld", packet.m_accountNo);
+			Disconnect();
+		}
 	}
 
-	bool CConsoleChatClient::HandleResSectorMove(const SResSectorMove &packet) noexcept
+	void CConsoleChatClient::onSectorEntered(const SResSectorMove &packet) noexcept
 	{
-		if (!m_isLogin || packet.m_accountNo != m_config.m_accountNo
-			|| packet.m_sectorX != m_config.m_sectorX || packet.m_sectorY != m_config.m_sectorY)
-			return false;
 		g_pLogger->WriteLogConsole(ELogLevel::Info, L"READY account=%lld sector=%u,%u",
 			packet.m_accountNo, packet.m_sectorX, packet.m_sectorY);
-		m_isReady = true;
-		return true;
 	}
 
-	bool CConsoleChatClient::HandleResMessage(const SResMessage &packet) noexcept
+	namespace
 	{
-		if (!m_isReady || packet.m_message.empty() || packet.m_message.size() > kMaxMessageBytes / sizeof(WCHAR)
-			|| wmemchr(packet.m_id.data(), L'\0', packet.m_id.size()) == nullptr
-			|| wmemchr(packet.m_nickname.data(), L'\0', packet.m_nickname.size()) == nullptr)
-			return false;
-		g_pLogger->WriteLogConsole(ELogLevel::Info, L"CHAT account=%lld name=%ls: %ls",
-			packet.m_accountNo, packet.m_nickname.data(), packet.m_message.c_str());
-		return true;
+		void PrintChatMessage(std::int64_t accountNo, const std::wstring &nickname, const std::wstring &message) noexcept
+		{
+			g_pLogger->WriteLogConsole(ELogLevel::Info, L"CHAT account=%lld name=%ls: %ls",
+				accountNo, nickname.c_str(), message.c_str());
+		}
 	}
 
-	void CConsoleChatClient::onDisconnect(bool wasConnected, DWORD error) noexcept
+	void CConsoleChatClient::onChatMessageEcho(const SResMessage &packet) noexcept
+	{
+		PrintChatMessage(packet.m_accountNo, packet.m_nickname, packet.m_message);
+	}
+
+	void CConsoleChatClient::onChatMessageNoti(const SMessageNoti &packet) noexcept
+	{
+		PrintChatMessage(packet.m_accountNo, packet.m_nickname, packet.m_message);
+	}
+
+	void CConsoleChatClient::onChatDisconnected(bool wasConnected, DWORD error) noexcept
 	{
 		if (!wasConnected)
 			g_pLogger->WriteLogConsole(ELogLevel::Error, L"ConnectEx completion failed: error=%lu", error);
-		m_isReady = false;
-		m_isLogin = false;
+
 		g_pLogger->WriteLogConsole(ELogLevel::Info, L"DISCONNECTED");
 	}
 }

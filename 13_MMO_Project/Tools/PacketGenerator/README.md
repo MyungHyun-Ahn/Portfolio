@@ -33,6 +33,7 @@ call Tools\PacketGenerator\GeneratePackets.bat
 ## 생성된 송신 함수
 
 - `CChatNetClient::SendReqMessage(accountNo, text)`처럼 패킷 필드만 받는다. 생성된 `CChatNetClient`는 `CNetClient`를 상속해 현재 연결을 사용하고, `IClientPacketHandler`는 비공개로 상속해 수신을 디스패치한다. 송신의 `bool`은 접수 결과이지 상대의 수신 확인이 아니다.
+- `CChatNetClient.g.h`는 생성된 클래스 안에 수동 `CChatNetClientMembers.inc`를 삽입한다. BAT는 생성이 성공한 뒤 이 파일이 없을 때만 기본 선언을 만들어 준다. 이미 있으면 빈 파일이어도 덮어쓰지 않는다. 이후 상태와 앱 콜백 선언은 `.inc`에서 직접 편집하고, 생성된 `Handle*()`의 본체는 `CChatNetClientHandlers.cpp`에서 구현한다. 두 수동 파일은 manifest 관리 대상이 아니다.
 - 서버의 `Send*`는 첫 인자로 `sessionId`를 받고, 준비에 실패하면 `nullptr`을 반환한다. 성공적으로 준비한 버퍼는 첫 전송의 접수 여부와 무관하게 호출자 소유 참조 하나와 함께 반환한다. 호출자는 필요하면 같은 버퍼를 주변 세션에도 넘긴 뒤 `DecreaseRef()` 결과가 0이면 `Free()`를 호출한다.
 - 응답 버퍼를 확보한 뒤 상태를 변경해야 하는 서버 처리에서는 `MakePacket*()`과 `submitPreparedPacket()`을 분리해 호출한다. 수신용 `Handle*` 인터페이스에는 송신 함수가 추가되지 않는다.
 

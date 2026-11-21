@@ -1,10 +1,10 @@
 {
   "files": {
-    "ClientPacketDispatch.g.cpp": "8c1bb499da9878140652cfac0b1e148f1c9ce65c8b451d6e4f689c2b463d3c85",
+    "CChatNetClient.g.cpp": "37b6d88fbeb155d2ec8510446c2facb3d22858eec5905a1817e9d47c6ebcb66d",
+    "CChatNetClient.g.h": "97a31e1a9478b700ad1bca0e6c94ffbaca899a3239f39e3a65eefa8c148c0f99",
+    "ClientPacketDispatch.g.cpp": "a19ade80ef5a13a948ef9e5eac7f1cf544a598700e49a3aa4524f1a2eea07836",
     "ClientPacketDispatch.g.h": "19ad875636bc774c66a87214d69cb493569b743cab89d1a3af49cfc27bab1183",
-    "ClientPacketSend.g.cpp": "745e9fcc83e1308083b355db4ca988d4851ee7f682e4b48a371f56eb91936195",
-    "ClientPacketSend.g.h": "7f14eebc27126bee17686fc4f5477ac6f7dabe758e55bc7b9ae4efd5ad09d0e8",
-    "IClientPacketHandler.g.h": "a75fee480d06b5d8a9cc8ec125cd7262a158d4a9633dcf64f560892939aca8ec"
+    "IClientPacketHandler.g.h": "7d3d901ceb08fa0174074d05def95719b518d4e296657aa206e38f52e7eb6227"
   },
   "role": "Client",
   "version": 1

@@ -25,6 +25,23 @@ namespace Chatting
 		return pBuffer;
 	}
 
+	NetworkLib::CSerializableBuffer<FALSE> *MakePacketMessageNoti(const SMessageNoti &packet) noexcept
+	{
+		auto *pBuffer = NetworkLib::CSerializableBuffer<FALSE>::Alloc();
+		if (pBuffer == nullptr)
+		{
+			return nullptr;
+		}
+
+		*pBuffer << static_cast<std::uint16_t>(EPacketType::MessageNoti) << packet;
+		if (!pBuffer->IsValid())
+		{
+			NetworkLib::CSerializableBuffer<FALSE>::Free(pBuffer);
+			return nullptr;
+		}
+		return pBuffer;
+	}
+
 	NetworkLib::CSerializableBuffer<FALSE> *MakePacketResLogin(const SResLogin &packet) noexcept
 	{
 		auto *pBuffer = NetworkLib::CSerializableBuffer<FALSE>::Alloc();
@@ -75,16 +92,16 @@ namespace Chatting
 
 		UINT64 sessionId,
 		std::int64_t accountNo,
-		const std::array<WCHAR, 20> &id,
-		const std::array<WCHAR, 20> &nickname,
+		const std::wstring &id,
+		const std::wstring &nickname,
 		const std::wstring &message) noexcept
 	{
 		SResMessage packet;
 		packet.m_accountNo = accountNo;
-		packet.m_id = id;
-		packet.m_nickname = nickname;
 		try
 		{
+			packet.m_id = id;
+			packet.m_nickname = nickname;
 			packet.m_message = message;
 		}
 		catch (const std::bad_alloc &)
@@ -93,6 +110,30 @@ namespace Chatting
 		}
 		return this->submitPreparedPacket(sessionId, EPacketType::ResMessage,
 			MakePacketResMessage(packet));
+	}
+
+	NetworkLib::CSerializableBuffer<FALSE> *CServerPacketSender::SendNotiMessage(
+
+		UINT64 sessionId,
+		std::int64_t accountNo,
+		const std::wstring &id,
+		const std::wstring &nickname,
+		const std::wstring &message) noexcept
+	{
+		SMessageNoti packet;
+		packet.m_accountNo = accountNo;
+		try
+		{
+			packet.m_id = id;
+			packet.m_nickname = nickname;
+			packet.m_message = message;
+		}
+		catch (const std::bad_alloc &)
+		{
+			return nullptr;
+		}
+		return this->submitPreparedPacket(sessionId, EPacketType::MessageNoti,
+			MakePacketMessageNoti(packet));
 	}
 
 	NetworkLib::CSerializableBuffer<FALSE> *CServerPacketSender::SendResLogin(

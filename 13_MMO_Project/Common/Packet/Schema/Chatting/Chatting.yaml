@@ -10,6 +10,15 @@ packets:
     id: 6
     fields:
       - {name: account_no, type: int64}
-      - {name: id, type: utf16_fixed, code_units: 20}
-      - {name: nickname, type: utf16_fixed, code_units: 20}
+      - {name: id, type: utf16}
+      - {name: nickname, type: utf16}
+      - {name: message, type: utf16}
+  - name: MessageNoti
+    kind: noti
+    id: 8
+    direction: server_to_client
+    fields:
+      - {name: account_no, type: int64}
+      - {name: id, type: utf16}
+      - {name: nickname, type: utf16}
       - {name: message, type: utf16}

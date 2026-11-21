@@ -55,8 +55,11 @@ CPP_PARAMETER_RESERVED = set('''
     switch template this thread_local throw true try typedef typeid typename union unsigned using virtual void
     volatile wchar_t while xor xor_eq interface near far small pascal cdecl std
 '''.split()) | {'packet', 'sessionId', 'spPacket'}
-SIDE_OUTPUTS = {side: {f'{side}Packet{kind}.g.{ext}' for kind in ('Send', 'Dispatch') for ext in ('h', 'cpp')}
-                | {f'I{side}PacketHandler.g.h'} for side in ('Client', 'Server')}
+SEND_STEMS = {'Client': 'CChatNetClient', 'Server': 'ServerPacketSend'}
+SIDE_OUTPUTS = {side: {f'{stem}.g.{ext}' for stem in (SEND_STEMS[side], f'{side}PacketDispatch') for ext in ('h', 'cpp')}
+                | {f'I{side}PacketHandler.g.h'} for side in SEND_STEMS}
+# 이전 manifest가 소유한 클라이언트 파일만 이름 변경 시 정리할 수 있다.
+SIDE_OUTPUTS['Client'].update(f'ClientPacketSend.g.{ext}' for ext in ('h', 'cpp'))
 
 
 def sender_name(name, kind):
@@ -275,7 +278,9 @@ def render_protocol(contents, packets, reserved):
     for side, send_direction in (('Client', 'client_to_server'), ('Server', 'server_to_client')):
         send = [packet for packet in packets if packet['direction'] == send_direction]
         receive = [packet for packet in packets if packet['direction'] != send_direction]
-        sides.append({f'{side}PacketSend.g.{ext}': render(f'send_{ext}.j2', side=side, packets=send)
+        send_stem = SEND_STEMS[side]
+        sides.append({f'{send_stem}.g.{ext}': render(f'send_{ext}.j2', side=side, packets=send,
+                                                   receive=receive, send_stem=send_stem)
                       for ext in ('h', 'cpp')} |
                      {f'{side}PacketDispatch.g.{ext}': render(f'dispatch_{ext}.j2', side=side, packets=receive)
                       for ext in ('h', 'cpp')} |
@@ -382,7 +387,18 @@ def publish(plans):
             path.unlink(missing_ok=True)
 
 
-def generate(schema, common, client, server):
+def create_client_members(path):
+    data = (Path(__file__).parent / 'templates' / path.name).read_bytes()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        file = path.open('xb')
+    except FileExistsError:
+        return
+    with file:
+        file.write(data)
+
+
+def generate(schema, common, client, server, client_members=None):
     paths = [path.absolute() for path in (schema, common, client, server)]
     for path in paths:
         if any(is_link(parent) for parent in (path, *path.parents)):
@@ -393,18 +409,30 @@ def generate(schema, common, client, server):
             raise GenerationError(f'generation roots overlap: {path}')
     if not paths[0].is_dir():
         raise GenerationError(f'schema directory not found: {paths[0]}')
+    if client_members is not None:
+        client_members = client_members.absolute()
+        if client_members.name != 'CChatNetClientMembers.inc' or any(
+            is_link(parent) for parent in (client_members, *client_members.parents)
+        ):
+            raise GenerationError(f'invalid client members path: {client_members}')
+        client_members = client_members.resolve()
+        if client_members.is_dir() or any(client_members.is_relative_to(root) for root in paths):
+            raise GenerationError(f'client members must be outside generation roots: {client_members}')
     outputs = render_protocol(*load_protocol(paths[0]))
     plans = [plan_output(root, role, files) for root, role, files in zip(paths[1:], ('Common', 'Client', 'Server'), outputs)]
     publish(plans)
+    if client_members is not None and not client_members.exists():
+        create_client_members(client_members)
 
 
 def main():
     parser = argparse.ArgumentParser(description='Generate C++ packet DTOs, builders and dispatchers from YAML.')
     for option in ('schema-dir', 'common-out', 'client-out', 'server-out'):
         parser.add_argument(f'--{option}', type=Path, required=True)
+    parser.add_argument('--client-members-out', type=Path, help='Create the handwritten client scaffold if missing.')
     args = parser.parse_args()
     try:
-        generate(args.schema_dir, args.common_out, args.client_out, args.server_out)
+        generate(args.schema_dir, args.common_out, args.client_out, args.server_out, args.client_members_out)
     except (GenerationError, OSError) as error:
         parser.exit(1, f'Packet generator: {error}\n')
 

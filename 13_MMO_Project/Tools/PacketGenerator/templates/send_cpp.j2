@@ -14,7 +14,7 @@
 #include "IClientPacketHandler.g.h"
 #include "ClientPacketDispatch.g.h"
 {% endif %}
-#include "{{ side }}PacketSend.g.h"
+#include "{{ send_stem }}.g.h"
 
 namespace Chatting
 {
@@ -88,8 +88,7 @@ namespace Chatting
 		}
 {% endif %}
 {% if side == 'Client' %}
-		auto spPacket = MakePacket{{ packet.name }}(packet);
-		return spPacket != nullptr && sendNetworkPacket(std::move(spPacket));
+		return this->sendNetworkPacket(MakePacket{{ packet.name }}(packet));
 {% else %}
 		return this->submitPreparedPacket(sessionId, EPacketType::{{ packet.name }},
 			MakePacket{{ packet.name }}(packet));

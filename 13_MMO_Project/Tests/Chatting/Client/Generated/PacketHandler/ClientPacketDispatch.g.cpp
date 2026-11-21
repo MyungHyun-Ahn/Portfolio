@@ -26,6 +26,13 @@ namespace Chatting
 			return message.IsValid() && message.GetDataSize() == 0
 				&& handler.HandleResMessage(packet);
 		}
+		case EPacketType::MessageNoti:
+		{
+			SMessageNoti packet;
+			message >> packet;
+			return message.IsValid() && message.GetDataSize() == 0
+				&& handler.HandleMessageNoti(packet);
+		}
 		case EPacketType::ResLogin:
 		{
 			SResLogin packet;

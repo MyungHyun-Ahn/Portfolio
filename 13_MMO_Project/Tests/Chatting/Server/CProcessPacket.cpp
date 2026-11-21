@@ -1,4 +1,6 @@
 #include "pch.h"
+#include <new>
+#include <utility>
 #include "NetworkLimits.h"
 #include "COverlappedAllocator.h"
 #include "CRingBuffer.h"
@@ -52,9 +54,7 @@ namespace Chatting
 
 		const INT64 accountNo = packet.m_accountNo;
 		// 로컬 테스트 전용 인증이다.
-		if (accountNo <= 0 || packet.m_id.front() == L'\0' || packet.m_nickname.front() == L'\0'
-			|| wmemchr(packet.m_id.data(), L'\0', packet.m_id.size()) == nullptr
-			|| wmemchr(packet.m_nickname.data(), L'\0', packet.m_nickname.size()) == nullptr
+		if (accountNo <= 0 || !IsValidString(packet.m_id, kMaxNameCodeUnits) || !IsValidString(packet.m_nickname, kMaxNameCodeUnits)
 			|| std::memcmp(packet.m_sessionKey.data(), kTestSessionKey, kSessionKeyBytes) != 0)
 		{
 			ReleaseResponse(SendResLogin(sessionId, FALSE, accountNo));
@@ -66,6 +66,19 @@ namespace Chatting
 				return false;
 		}
 
+		// 문자열 복사가 끝나기 전에는 플레이어와 로그인 상태를 변경하지 않는다.
+		std::wstring id;
+		std::wstring nickname;
+		try
+		{
+			id = packet.m_id;
+			nickname = packet.m_nickname;
+		}
+		catch (const std::bad_alloc &)
+		{
+			return false;
+		}
+
 		SResLogin response;
 		response.m_status = TRUE;
 		response.m_accountNo = accountNo;
@@ -75,8 +88,8 @@ namespace Chatting
 		CPlayer *pPlayer = it->second;
 		pPlayer->m_accountNo = accountNo;
 		pPlayer->m_prevRecvTime = timeGetTime();
-		std::copy(packet.m_id.begin(), packet.m_id.end(), pPlayer->m_id);
-		std::copy(packet.m_nickname.begin(), packet.m_nickname.end(), pPlayer->m_nickname);
+		pPlayer->m_id = std::move(id);
+		pPlayer->m_nickname = std::move(nickname);
 		m_contents.m_umapNonLoginPlayer.erase(it);
 		m_contents.m_umapLoginPlayer.emplace(sessionId, pPlayer);
 		ReleaseResponse(submitPreparedPacket(sessionId, EPacketType::ResLogin, pResponse));
@@ -129,17 +142,36 @@ namespace Chatting
 			|| packet.m_message.empty() || packet.m_message.size() > kMaxMessageBytes / sizeof(WCHAR))
 			return false;
 
-		std::array<WCHAR, kNameLength> id{};
-		std::array<WCHAR, kNameLength> nickname{};
-		std::copy_n(pPlayer->m_id, id.size(), id.begin());
-		std::copy_n(pPlayer->m_nickname, nickname.size(), nickname.begin());
-		auto *pResponse = SendResMessage(sessionId, packet.m_accountNo, id, nickname, packet.m_message);
+		SResMessage response;
+		response.m_accountNo = packet.m_accountNo;
+		response.m_id = pPlayer->m_id;
+		response.m_nickname = pPlayer->m_nickname;
+		response.m_message = packet.m_message;
+		auto *pResponse = MakePacketResMessage(response);
 		if (pResponse == nullptr)
 			return false;
+
+		// 송신 전에 두 패킷을 모두 만든다. 이미 직렬화한 응답의 문자열은 알림에 옮긴다.
+		SMessageNoti notification;
+		notification.m_accountNo = response.m_accountNo;
+		notification.m_id = std::move(response.m_id);
+		notification.m_nickname = std::move(response.m_nickname);
+		notification.m_message = std::move(response.m_message);
+		auto *pNotification = MakePacketMessageNoti(notification);
+		if (pNotification == nullptr)
+		{
+			NetworkLib::CSerializableBuffer<FALSE>::Free(pResponse);
+			return false;
+		}
+
+		ReleaseResponse(submitPreparedPacket(sessionId, EPacketType::ResMessage, pResponse));
 		pPlayer->m_prevRecvTime = timeGetTime();
 		InterlockedIncrement(&NetworkLib::g_monitor.m_chatMsgRes);
-		m_contents.SendSector(sessionId, pPlayer->m_sectorY, pPlayer->m_sectorX, pResponse);
-		ReleaseResponse(pResponse);
+		// 전파가 끝날 때까지 호출자 참조를 유지한다.
+		pNotification->IncreaseRef();
+		NetworkLib::PrepareNetPacket(*pNotification, kPacketCode);
+		m_contents.SendSector(sessionId, pPlayer->m_sectorY, pPlayer->m_sectorX, pNotification);
+		ReleaseResponse(pNotification);
 		g_pLogger->WriteLog(ELogLevel::Debug, L"ChatServer", sessionId, std::source_location::current(),
 			L"event=chat_processed sector_x=%u sector_y=%u | 채팅 요청을 처리했습니다.", pPlayer->m_sectorX, pPlayer->m_sectorY);
 		return true;

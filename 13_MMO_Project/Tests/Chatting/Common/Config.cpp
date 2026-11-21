@@ -112,7 +112,7 @@ namespace Chatting
 			// 0은 프로세스 ID 자동 선택. 같은 설정으로 여러 클라이언트를 실행한다.
 			config.m_accountNo = number == 0 ? static_cast<INT64>(GetCurrentProcessId()) : number;
 			if (!loader.Load(pSection, L"NICKNAME", &config.m_name)
-				|| config.m_name.empty() || config.m_name.size() >= kNameLength)
+				|| !IsValidString(config.m_name, kMaxNameCodeUnits))
 				return ConfigError(pFileName, L"NICKNAME is missing or invalid (1..19 UTF-16 code units)");
 			if (!loader.Load(pSection, L"SECTOR_X", &number) || number < 0 || number >= kMaxSectorX)
 				return ConfigError(pFileName, L"SECTOR_X is missing or invalid (0..49)");

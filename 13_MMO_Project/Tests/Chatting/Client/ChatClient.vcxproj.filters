@@ -16,7 +16,10 @@
     <ClCompile Include="CConsoleChatClient.cpp">
       <Filter>Client</Filter>
     </ClCompile>
-    <ClCompile Include="Generated\PacketHandler\ClientPacketSend.g.cpp">
+    <ClCompile Include="CChatNetClientHandlers.cpp">
+      <Filter>Client</Filter>
+    </ClCompile>
+    <ClCompile Include="Generated\PacketHandler\CChatNetClient.g.cpp">
       <Filter>Generated\PacketHandler</Filter>
     </ClCompile>
     <ClCompile Include="Generated\PacketHandler\ClientPacketDispatch.g.cpp">
@@ -36,7 +39,13 @@
     <ClInclude Include="CConsoleChatClient.h">
       <Filter>Client</Filter>
     </ClInclude>
-    <ClInclude Include="Generated\PacketHandler\ClientPacketSend.g.h">
+    <ClInclude Include="CChatNetClientMembers.inc">
+      <Filter>Client</Filter>
+    </ClInclude>
+    <ClInclude Include="ChatType.h">
+      <Filter>Client</Filter>
+    </ClInclude>
+    <ClInclude Include="Generated\PacketHandler\CChatNetClient.g.h">
       <Filter>Generated\PacketHandler</Filter>
     </ClInclude>
     <ClInclude Include="Generated\PacketHandler\ClientPacketDispatch.g.h">

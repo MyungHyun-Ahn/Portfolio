@@ -13,5 +13,6 @@ namespace Chatting
 		ReqMessage = 5,
 		ResMessage = 6,
 		HeartbeatNoti = 7,
+		MessageNoti = 8,
 	};
 }
