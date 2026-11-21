@@ -6,13 +6,13 @@ namespace Chatting
 	{
 	public:
 		[[nodiscard]]
-		int Run();
+		int Run(std::chrono::steady_clock::time_point processStart);
 
 	private:
 		[[nodiscard]]
 		const char 		*loadConfig(const std::filesystem::path &path);
 
-		void 			runClients(const std::wstring &runMarker);
+		void 			runClients(const std::wstring &runMarker, std::chrono::steady_clock::time_point deadline);
 
 		[[nodiscard]]
 		bool 			saveSummary(const std::filesystem::path &path, const std::string &runId, long long startUnixMilliseconds, int exitCode) const;

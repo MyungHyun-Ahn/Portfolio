@@ -1,6 +1,7 @@
 #include "pch.h"
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <new>
 #include <random>
 #include <shared_mutex>
@@ -92,6 +93,9 @@ namespace Chatting
 			|| !LoadNumber(loader, L"APP_WORKER_COUNT", 1, 16, config.m_appWorkerCount)
 			|| !LoadNumber(loader, L"RECV_BUFFER_BYTES", kMinRecvBufferBytes, NetworkLib::kMaxNetRecvBufferBytes, config.m_recvBufferBytes))
 			return "config_network_limits_invalid";
+		if (!LoadNumber(loader, L"CONNECT_INTERVAL_MS", 1, MAXDWORD, config.m_connectIntervalMilliseconds)
+			|| !LoadNumber(loader, L"CONNECT_ATTEMPTS_PER_INTERVAL", 1, MAXDWORD, config.m_connectAttemptsPerInterval))
+			return "config_connect_schedule_invalid";
 		if (!LoadNumber(loader, L"CONNECT_TIMEOUT_MS", 1, MAXDWORD, config.m_connectTimeoutMilliseconds)
 			|| !LoadNumber(loader, L"LOGIN_TIMEOUT_MS", 1, MAXDWORD, config.m_loginTimeoutMilliseconds)
 			|| !LoadNumber(loader, L"SECTOR_TIMEOUT_MS", 1, MAXDWORD, config.m_sectorTimeoutMilliseconds)
@@ -113,7 +117,7 @@ namespace Chatting
 		return nullptr;
 	}
 
-	void CDummyRunner::runClients(const std::wstring &runMarker)
+	void CDummyRunner::runClients(const std::wstring &runMarker, TClock::time_point deadline)
 	{
 		struct SAppWork
 		{
@@ -160,15 +164,39 @@ namespace Chatting
 
 		enum class ELaunch { Preparing, Start, Abort };
 		std::atomic<ELaunch> launch{ELaunch::Preparing};
-		std::atomic<size_t> firstReady{0};
 		std::atomic<bool> hasFailed{false};
-		std::atomic<TClock::time_point> runDeadline{TClock::time_point{}};
 		std::shared_mutex admissionRWLock;
 		bool isAdmissionClosed = false;
+		std::mutex connectScheduleLock;
+		TClock::time_point nextConnectInterval{};
+		DWORD remainingConnectAttempts = 0;
+		const TMilliseconds connectInterval(m_config.m_connectIntervalMilliseconds);
 		const TMilliseconds actionInterval(m_config.m_actionIntervalMilliseconds);
 		const TMilliseconds heartbeatInterval(m_config.m_heartbeatIntervalMilliseconds);
 		const TMilliseconds drainTimeout(m_config.m_drainTimeoutMilliseconds);
 		const auto pause = [&] { std::this_thread::sleep_for(TMilliseconds(m_config.m_tickIntervalMilliseconds)); };
+
+		// 접속 시도 함수
+		const auto tryStartConnection = [&](CChatDummyClient &client)
+		{
+			// 실제 접속 제출까지 한도를 공유한다. 응답 대기나 Tick은 락 밖에서 처리한다.
+			std::lock_guard scheduleLock(connectScheduleLock);
+			const auto now = TClock::now();
+			if (hasFailed || now >= deadline)
+				return false;
+			if (now >= nextConnectInterval)
+			{
+				nextConnectInterval = now + connectInterval;
+				remainingConnectAttempts = m_config.m_connectAttemptsPerInterval;
+			}
+			if (remainingConnectAttempts == 0)
+				return false;
+			--remainingConnectAttempts;
+			if (client.Start())
+				return true;
+			hasFailed = true;
+			return false;
+		};
 
 		const auto runWorker = [&](size_t workerIndex) noexcept
 		{
@@ -197,13 +225,13 @@ namespace Chatting
 					if (wasReady || !client.IsReady())
 						continue;
 					const auto now = TClock::now();
-					slot.m_nextAction = now + actionInterval;
+					slot.m_nextAction = slot.m_wasInitiallyReady ? now + actionInterval : now;
 					slot.m_nextHeartbeat = now + heartbeatInterval;
 					if (!slot.m_wasInitiallyReady)
 					{
 						slot.m_wasInitiallyReady = true;
 						++result.m_firstReady;
-						++firstReady;
+
 					}
 					else if (slot.m_isReconnecting)
 					{
@@ -222,35 +250,17 @@ namespace Chatting
 					slot.m_nextHeartbeat = now + heartbeatInterval;
 				}
 			};
-			for (auto &slot : slots)
-				(void)slot.m_client->Start();
-			if (stats.m_failureCount != 0)
-				hasFailed = true;
-
-			auto deadline = runDeadline.load();
-			while (deadline == TClock::time_point{} && !hasFailed)
-			{
-				pump();
-				for (auto &slot : slots)
-				{
-					std::shared_lock admissionLock(admissionRWLock);
-					if (isAdmissionClosed || hasFailed || runDeadline.load() != TClock::time_point{})
-						break;
-					heartbeat(slot, TClock::now());
-					if (stats.m_failureCount != 0)
-						hasFailed = true;
-				}
-				if (!hasFailed)
-					pause();
-				deadline = runDeadline.load();
-			}
-
-			const auto firstAction = deadline - TMilliseconds(m_config.m_runDurationMilliseconds) + actionInterval;
-			for (auto &slot : slots)
-				slot.m_nextAction = firstAction;
+			size_t nextInitialConnect = 0;
 			while (!hasFailed && TClock::now() < deadline)
 			{
 				pump();
+				while (nextInitialConnect < slots.size())
+				{
+					std::shared_lock admissionLock(admissionRWLock);
+					if (isAdmissionClosed || !tryStartConnection(*slots[nextInitialConnect].m_client))
+						break;
+					++nextInitialConnect;
+				}
 				for (auto &slot : slots)
 				{
 					// 제출 호출까지 공유 락 안에서 끝낸다. Tick과 drain은 이 락을 잡지 않는다.
@@ -261,14 +271,12 @@ namespace Chatting
 					auto &client = *slot.m_client;
 					if (slot.m_isWaitingToReconnect && !client.IsActive())
 					{
-						slot.m_isWaitingToReconnect = false;
-						if (client.Start())
+						if (tryStartConnection(client))
 						{
+							slot.m_isWaitingToReconnect = false;
 							slot.m_isReconnecting = true;
 							++stats.m_reconnectStarted;
 						}
-						else
-							hasFailed = true;
 						continue;
 					}
 					if (!client.IsReady())
@@ -358,15 +366,8 @@ namespace Chatting
 
 		if (launch.load() == ELaunch::Start)
 		{
-			while (!hasFailed && firstReady.load() < m_config.m_clientCount)
+			while (!hasFailed && TClock::now() < deadline)
 				pause();
-			if (!hasFailed)
-			{
-				const auto deadline = TClock::now() + TMilliseconds(m_config.m_runDurationMilliseconds);
-				runDeadline.store(deadline);
-				while (!hasFailed && TClock::now() < deadline)
-					pause();
-			}
 			{
 				// cutoff 전에 진입한 제출까지 반환한 뒤 새 작업이 없음을 알린다.
 				std::unique_lock admissionLock(admissionRWLock);
@@ -395,6 +396,8 @@ namespace Chatting
 			<< ", \"sector\": [" << m_config.m_sectorX << ", " << m_config.m_sectorY << "]"
 			<< ", \"workers\": " << m_config.m_workerCount << ", \"recv_buffer_bytes\": " << m_config.m_recvBufferBytes
 			<< ", \"app_worker_count\": " << m_config.m_appWorkerCount
+			<< ", \"connect_interval_ms\": " << m_config.m_connectIntervalMilliseconds
+			<< ", \"connect_attempts_per_interval\": " << m_config.m_connectAttemptsPerInterval
 			<< ", \"connect_timeout_ms\": " << m_config.m_connectTimeoutMilliseconds
 			<< ", \"login_timeout_ms\": " << m_config.m_loginTimeoutMilliseconds
 			<< ", \"sector_timeout_ms\": " << m_config.m_sectorTimeoutMilliseconds
@@ -434,7 +437,7 @@ namespace Chatting
 		return static_cast<bool>(file);
 	}
 
-	int CDummyRunner::Run()
+	int CDummyRunner::Run(TClock::time_point processStart)
 	{
 		m_appWorkers.clear();
 		m_stats = {};
@@ -465,7 +468,8 @@ namespace Chatting
 		}
 		else
 		{
-			runClients(L"dummy:" + std::wstring(runId.begin(), runId.end()) + L":");
+			const auto deadline = processStart + TMilliseconds(m_config.m_runDurationMilliseconds);
+			runClients(L"dummy:" + std::wstring(runId.begin(), runId.end()) + L":", deadline);
 			exitCode = m_stats.m_failureCount == 0 ? 0 : 1;
 		}
 		if (!saveSummary(report, runId, start, exitCode))
