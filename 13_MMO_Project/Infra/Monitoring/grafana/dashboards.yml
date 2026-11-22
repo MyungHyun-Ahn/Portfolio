@@ -1,0 +1,9 @@
+apiVersion: 1
+
+providers:
+  - name: ChatServer
+    type: file
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards

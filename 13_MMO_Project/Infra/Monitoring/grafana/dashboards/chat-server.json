@@ -1,0 +1,267 @@
+{
+  "uid": "chat-server-prometheus",
+  "title": "ChatServer - Prometheus",
+  "tags": ["chat-server", "load-test"],
+  "timezone": "browser",
+  "schemaVersion": 41,
+  "refresh": "10s",
+  "time": {"from": "now-6h", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Scrape 상태 (1 = 정상)",
+      "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
+      "datasource": {"type": "prometheus", "uid": "portfolio-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "none"}, "overrides": []},
+      "targets": [
+        {"refId": "A", "expr": "up{job=\"chat_server\"}", "legendFormat": "상태", "instant": true, "range": false}
+      ],
+      "options": {"graphMode": "none", "textMode": "value"}
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "마지막 게시 경과 시간",
+      "gridPos": {"x": 6, "y": 0, "w": 6, "h": 4},
+      "datasource": {"type": "prometheus", "uid": "portfolio-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "targets": [
+        {"refId": "A", "expr": "time() - game_observability_snapshot_timestamp_seconds{job=\"chat_server\"}", "legendFormat": "경과 시간", "instant": true, "range": false}
+      ],
+      "options": {"graphMode": "none", "textMode": "value"}
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "현재 세션",
+      "gridPos": {"x": 12, "y": 0, "w": 6, "h": 4},
+      "datasource": {"type": "prometheus", "uid": "portfolio-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "none"}, "overrides": []},
+      "targets": [
+        {"refId": "A", "expr": "game_net_sessions{job=\"chat_server\"}", "legendFormat": "세션", "instant": true, "range": false}
+      ],
+      "options": {"graphMode": "none", "textMode": "value"}
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "서버 프로세스",
+      "gridPos": {"x": 18, "y": 0, "w": 6, "h": 4},
+      "datasource": {"type": "prometheus", "uid": "portfolio-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "none"}, "overrides": []},
+      "targets": [
+        {"refId": "A", "expr": "game_process_info{job=\"chat_server\"}", "legendFormat": "{{process}}", "instant": true, "range": false}
+      ],
+      "options": {"graphMode": "none", "textMode": "name"}
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "활성 세션 추이",
+      "gridPos": {"x": 0, "y": 4, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "portfolio-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "none"}, "overrides": []},
+      "targets": [
+        {"refId": "A", "expr": "game_net_sessions{job=\"chat_server\"}", "legendFormat": "활성 세션", "instant": false, "range": true}
+      ],
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}}
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "콘텐츠 수신 TPS · 1분 평균/초",
+      "gridPos": {"x": 6, "y": 4, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "portfolio-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "targets": [
+        {"refId": "A", "expr": "rate(game_chat_content_updates_total{job=\"chat_server\"}[1m])", "legendFormat": "OnRecv", "instant": false, "range": true}
+      ],
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}},
+      "description": "CChatContents::OnRecv 진입 횟수/초. 성공 처리 건수나 프레임 FPS가 아니다."
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "채팅·이동·로그인 요청 · 1분 평균/초",
+      "gridPos": {"x": 12, "y": 4, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "portfolio-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "targets": [
+        {"refId": "A", "expr": "rate(game_chat_message_requests_total{job=\"chat_server\"}[1m])", "legendFormat": "채팅", "instant": false, "range": true},
+        {"refId": "B", "expr": "rate(game_chat_sector_move_requests_total{job=\"chat_server\"}[1m])", "legendFormat": "이동", "instant": false, "range": true},
+        {"refId": "C", "expr": "rate(game_chat_login_requests_total{job=\"chat_server\"}[1m])", "legendFormat": "로그인", "instant": false, "range": true}
+      ],
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}}
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "채팅 송신 요청 · 1분 평균/초",
+      "gridPos": {"x": 18, "y": 4, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "portfolio-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "targets": [
+        {"refId": "A", "expr": "rate(game_chat_message_send_requests_total{job=\"chat_server\"}[1m])", "legendFormat": "송신 요청", "instant": false, "range": true}
+      ],
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}}
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "수신·송신 패킷 · 1분 평균/초",
+      "gridPos": {"x": 0, "y": 10, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "portfolio-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "targets": [
+        {"refId": "A", "expr": "rate(game_net_received_packets_total{job=\"chat_server\"}[1m])", "legendFormat": "수신", "instant": false, "range": true},
+        {"refId": "B", "expr": "rate(game_net_sent_packets_total{job=\"chat_server\"}[1m])", "legendFormat": "송신", "instant": false, "range": true}
+      ],
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}}
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "접속 수락·세션 등록 · 1분 평균/초",
+      "gridPos": {"x": 6, "y": 10, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "portfolio-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "targets": [
+        {"refId": "A", "expr": "rate(game_net_accept_completions_total{job=\"chat_server\"}[1m])", "legendFormat": "수락 완료", "instant": false, "range": true},
+        {"refId": "B", "expr": "rate(game_net_sessions_accepted_total{job=\"chat_server\"}[1m])", "legendFormat": "등록 세션", "instant": false, "range": true}
+      ],
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}}
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "작업 분배·스틸 · 1분 평균/초",
+      "gridPos": {"x": 12, "y": 10, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "portfolio-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "targets": [
+        {"refId": "A", "expr": "rate(game_chat_work_delegations_total{job=\"chat_server\"}[1m])", "legendFormat": "분배", "instant": false, "range": true},
+        {"refId": "B", "expr": "rate(game_chat_work_steals_total{job=\"chat_server\"}[1m])", "legendFormat": "스틸", "instant": false, "range": true}
+      ],
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}}
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "송신 배치 한도 도달 · 1분 평균/초",
+      "gridPos": {"x": 18, "y": 10, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "portfolio-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "targets": [
+        {"refId": "A", "expr": "rate(game_net_send_batch_limit_hits_total{job=\"chat_server\"}[1m])", "legendFormat": "한도 도달", "instant": false, "range": true}
+      ],
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}}
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "WSASend 호출·Pending · 1분 평균/초",
+      "gridPos": {"x": 0, "y": 16, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "portfolio-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "targets": [
+        {"refId": "A", "expr": "rate(game_net_wsasend_calls_total{job=\"chat_server\"}[1m])", "legendFormat": "호출", "instant": false, "range": true},
+        {"refId": "B", "expr": "rate(game_net_wsasend_pending_total{job=\"chat_server\"}[1m])", "legendFormat": "Pending", "instant": false, "range": true}
+      ],
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}}
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "CPU 사용률",
+      "gridPos": {"x": 6, "y": 16, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "portfolio-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "percentunit"}, "overrides": []},
+      "targets": [
+        {"refId": "A", "expr": "game_host_cpu_usage_ratio{job=\"chat_server\"}", "legendFormat": "호스트 {{mode}}", "instant": false, "range": true},
+        {"refId": "B", "expr": "game_process_cpu_usage_ratio{job=\"chat_server\"}", "legendFormat": "프로세스 {{mode}}", "instant": false, "range": true}
+      ],
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}}
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "호스트 NIC 트래픽",
+      "gridPos": {"x": 12, "y": 16, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "portfolio-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "Bps"}, "overrides": []},
+      "targets": [
+        {"refId": "A", "expr": "game_host_nic_total_bytes_per_second{job=\"chat_server\"}", "legendFormat": "{{interface}}", "instant": false, "range": true}
+      ],
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}}
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "호스트 TCPv4 재전송 / 초",
+      "gridPos": {"x": 18, "y": 16, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "portfolio-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "targets": [
+        {"refId": "A", "expr": "game_host_tcpv4_retransmitted_segments_per_second{job=\"chat_server\"}", "legendFormat": "재전송", "instant": false, "range": true}
+      ],
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}}
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "프로세스 메모리",
+      "gridPos": {"x": 0, "y": 22, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "portfolio-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "bytes"}, "overrides": []},
+      "targets": [
+        {"refId": "A", "expr": "game_process_working_set_bytes{job=\"chat_server\"}", "legendFormat": "Working set", "instant": false, "range": true},
+        {"refId": "B", "expr": "game_process_peak_working_set_bytes{job=\"chat_server\"}", "legendFormat": "Peak working set", "instant": false, "range": true},
+        {"refId": "C", "expr": "game_process_private_bytes{job=\"chat_server\"}", "legendFormat": "Private", "instant": false, "range": true},
+        {"refId": "D", "expr": "game_process_commit_bytes{job=\"chat_server\"}", "legendFormat": "Commit", "instant": false, "range": true},
+        {"refId": "E", "expr": "game_process_peak_commit_bytes{job=\"chat_server\"}", "legendFormat": "Peak commit", "instant": false, "range": true}
+      ],
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}}
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "프로세스 메모리 풀",
+      "gridPos": {"x": 6, "y": 22, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "portfolio-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "bytes"}, "overrides": []},
+      "targets": [
+        {"refId": "A", "expr": "game_process_paged_pool_bytes{job=\"chat_server\"}", "legendFormat": "Paged", "instant": false, "range": true},
+        {"refId": "B", "expr": "game_process_peak_paged_pool_bytes{job=\"chat_server\"}", "legendFormat": "Peak paged", "instant": false, "range": true},
+        {"refId": "C", "expr": "game_process_nonpaged_pool_bytes{job=\"chat_server\"}", "legendFormat": "Nonpaged", "instant": false, "range": true},
+        {"refId": "D", "expr": "game_process_peak_nonpaged_pool_bytes{job=\"chat_server\"}", "legendFormat": "Peak nonpaged", "instant": false, "range": true}
+      ],
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}}
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "호스트 메모리",
+      "gridPos": {"x": 12, "y": 22, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "portfolio-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "bytes"}, "overrides": []},
+      "targets": [
+        {"refId": "A", "expr": "game_host_available_memory_bytes{job=\"chat_server\"}", "legendFormat": "가용 메모리", "instant": false, "range": true},
+        {"refId": "B", "expr": "game_host_nonpaged_pool_bytes{job=\"chat_server\"}", "legendFormat": "Nonpaged pool", "instant": false, "range": true}
+      ],
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}}
+    },
+    {
+      "id": 24,
+      "type": "timeseries",
+      "title": "프로세스 페이지 폴트 · 1분 평균/초",
+      "gridPos": {"x": 18, "y": 22, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "portfolio-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "targets": [
+        {"refId": "A", "expr": "rate(game_process_page_faults_total{job=\"chat_server\"}[1m])", "legendFormat": "페이지 폴트", "instant": false, "range": true}
+      ],
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}}
+    }
+  ]
+}

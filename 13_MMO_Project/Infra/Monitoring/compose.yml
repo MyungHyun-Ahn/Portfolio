@@ -16,6 +16,8 @@ services:
       - "127.0.0.1:3000:3000"
     volumes:
       - ./grafana/datasources.yml:/etc/grafana/provisioning/datasources/prometheus.yml:ro
+      - ./grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/chat-server.yml:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
     restart: unless-stopped
 
