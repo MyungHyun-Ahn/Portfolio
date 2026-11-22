@@ -1,6 +1,6 @@
-# DummyClient 검증과 메트릭 설계
+# DummyClient 검증
 
-상태: [공통 클라이언트 응답 핸들러](#공통-클라이언트-응답-핸들러)와 이를 사용하는 다중 앱 워커 [`CDummyRunner`](#단일-dummyrunner-실행과-검증)는 구현·루프백 검증·사용자 검수를 마쳤다. 추가 전달 검증·대규모 부하·외부 메트릭 연동은 별도 작업이다. 전송 계층은 [클라이언트 네트워크 분리 계획](003_클라이언트_네트워크_분리_계획.md), 패킷 흐름은 [채팅 패킷 송수신 흐름](../Server/002_채팅_패킷_송수신_흐름.md)을 기준으로 한다.
+상태: [공통 클라이언트 응답 핸들러](#공통-클라이언트-응답-핸들러)와 이를 사용하는 다중 앱 워커 [`CDummyRunner`](#단일-dummyrunner-실행과-검증)는 구현·루프백 검증·사용자 검수를 마쳤다. 추가 전달 검증·대규모 부하·[외부 메트릭 연동](006_프로메테우스_메트릭_설계.md)은 별도 작업이다. 전송 계층은 [클라이언트 네트워크 분리 계획](003_클라이언트_네트워크_분리_계획.md), 패킷 흐름은 [채팅 패킷 송수신 흐름](../../Server/002_채팅_패킷_송수신_흐름.md)을 기준으로 한다.
 
 ## 1. 더미 동작과 책임
 
@@ -57,7 +57,7 @@ EXE 옆 `DummyClientConfig.conf`를 `CFileLoader`로 읽는다(UTF-16LE BOM). `I
 
 ### 서버 설정 외부화
 
-대규모 동시 접속 시험 전에 `serverSetting`에서 실행 시 조정 가능한 값을 EXE 옆 `ServerConfig.conf`로 옮긴다. `ChatServer`가 기존 `CFileLoader`로 읽고 검증한 뒤 서버를 시작한다. 네트워크 라이브러리가 채팅 앱의 설정 파일을 직접 읽지는 않는다. 설정 누락 시 현재 채팅 서버의 유효 기본값을 유지하고, 명시한 값이 잘못됐으면 서버를 시작하지 않는다.
+채팅 서버의 세션·접속·IOCP·콘텐츠 워커·로그 큐 설정은 EXE 옆 `ServerConfig.conf`에서 조정할 수 있다. `ChatServer`가 기존 `CFileLoader`로 읽고 검증한 뒤 서버를 시작한다. 네트워크 라이브러리가 채팅 앱의 설정 파일을 직접 읽지는 않는다. 설정 누락 시 현재 채팅 서버의 유효 기본값을 유지하고, 명시한 값이 잘못됐으면 서버를 시작하지 않는다.
 
 | 대상 | 설정화 범위 |
 |---|---|
@@ -68,48 +68,11 @@ EXE 옆 `DummyClientConfig.conf`를 `CFileLoader`로 읽는다(UTF-16LE BOM). `I
 | 로그 큐 | `LOG_QUEUE_CAPACITY`는 생산자 스레드당 기본 `1024`건 (`1..1048576`)이다. |
 | Net 패킷 호환 | `packetCode`, `packetKey`는 서버 단독 튜닝 값이 아니다. 설정으로 노출하려면 콘솔·더미도 동일한 값을 사용하게 하고, 서버의 프레이밍·수신 검사·인코딩이 모두 검증된 같은 설정에서 읽도록 연결한다. 그 전에는 기존 공용 값을 유지한다. 키 값은 로그나 실행 요약에 남기지 않는다. |
 
-기본 설정의 기존 채팅, 별도 설정으로 서버 슬롯·워커 수가 실제로 적용되는 경우, 범위를 벗어난 설정의 시작 거부를 검증한다. 현재 슬롯 수 이내의 로컬 실행에는 선행 조건이 아니며, 포트 범위 규모의 부하 시험 전에 완료한다.
+기본 채팅, 비기본 세션 슬롯·워커·로그 설정, 잘못된 설정의 시작 거부는 x64 Debug·Release 루프백에서 확인했다.
 
-## 4. 서버 모니터링: 지금 되는 것과 안 되는 것
+## 4. 구현과 검증 이력
 
-현재 `Server/NetworkLib/SystemEvent.cpp`의 `SMonitorTimerEvent`가 약 1초마다 `CMonitor::Update()`를 호출한다. 현재 구간 카운터는 출력 뒤 리셋된다. 타이머 지연 가능성이 있으므로 한 번 읽은 값을 정확한 초당 값이나 Prometheus 누적 카운터로 쓰지 않는다. 특히 `Accept TPS`는 `AcceptExCompleted()` 진입, `acceptTotal`은 세션 초기화·등록 경로의 집계, `m_chatMsgRes`는 송신 경로 호출 건수다. 어떤 항목도 상대 앱 수신 건수를 뜻하지 않는다.
-
-| 분류 | 항목·근거 | 계획 |
-|---|---|---|
-| PDH 비의존 | `GetSystemTimes`·`GetProcessTimes` CPU, `GetProcessMemoryInfo` private bytes. 앱의 세션 수·버퍼/뷰/수신/세션 풀 사용·용량, Accept/Recv/Send, 로그인/섹터/채팅, 작업 이전/훔치기도 별도 계측 경로다. | 이관 중에는 기존 콘솔을 유지하고, Grafana 패널에서 대체 지표를 확인한 뒤 주기 출력을 끈다. OS API 실패, 첫 CPU 샘플, 구간 분모가 0인 경우는 유효 수치로 내보내지 않는다. 풀은 사용량과 capacity를 구분한다. |
-| PDH TODO이면서 이 호스트에서 미동작 확인 | `Process(IOCP_CHAT_SERVER)`의 nonpaged pool, 하드코딩된 Realtek NIC 2개의 경로. 로컬 PDH 프로브에서 옛 프로세스와 NIC 1 송신·NIC 2 수신 대표 경로는 추가에 성공했지만 두 샘플 후 `PDH_INVALID_DATA / PDH_CSTATUS_NO_INSTANCE`. 기존 API와 영어 경로 API 모두 동일했다. 나머지 방향의 개별 호출은 미검증. | 로컬 콘솔에서 꼭 필요하면 프로세스 PID로 인스턴스를 확인하거나 OS API로 직접 읽고, NIC는 실제 인터페이스 목록/설정으로 선택한다. 다른 호스트 정상 여부는 별도 확인한다. |
-| PDH에서 유효 샘플 확인 | 시스템 nonpaged pool, Available MBytes, 호스트 TCPv4 retransmit/sec는 이 호스트의 두 샘플 프로브에서 유효했다. retransmit `0`도 유효 상태였으며, 서버별 재전송이나 루프백 성능을 입증하지 않는다. | 호스트 지표는 외부 exporter가 기본 소유자다. 물리 NIC·호스트 TCP 값의 범위를 대시보드에 명시한다. |
-| 구현상 신뢰 불가 | `CMonitor.cpp`는 query open/add/collect/format 반환값과 `CStatus`를 해석하지 않아 없는 인스턴스·워밍업·정상 0을 구분하지 않는다. | 영어 이름은 `PdhAddEnglishCounterW`, 초기 2샘플 필요 항목 워밍업, 반환값·`CStatus`별 `available/warming_up/unavailable` 표시, 실패 전환만 로그. 유효하지 않은 샘플은 누락 또는 `N/A`; 0으로 채우거나 오래된 값을 최신으로 내보내지 않는다. |
-| 현재 계측하지 않거나 다른 계층이 필요 | 서버별 wire 바이트, 큐 깊이·in-flight, 원인별 종료, 애플리케이션 수신 지연·오전달. | 앱 카운터/스냅샷 또는 더미 오라클에서 신설한다. NIC·TCP 호스트 카운터로 대신하지 않는다. 콘솔 `pending` 송신 집계는 실제 현재 pending 개수와 구분한다. |
-
-## 5. 메트릭 수집과 재사용
-
-```text
-Windows host → windows_exporter ────────────┐
-Server/Dummy counters → snapshot → /metrics ┼→ Prometheus → Grafana
-Dummy final summary → RunSummary.json (관측 스택과 독립)
-```
-
-- `windows_exporter`는 호스트 CPU/메모리/NIC/TCP 및 필요한 경우 대상 프로세스 CPU·메모리·스레드·핸들을 수집한다. 프로세스 collector는 대상 필터와 실제 호스트 지원을 확인한다. 앱은 Windows OS 지표를 이중으로 내보내지 않는다. PDH 콘솔 개선과 외부 exporter 연동은 별도 작업으로 진행할 수 있다.
-- 앱 exporter는 서버와 더미에서 같은 HTTP 노출/샘플 검증 코드를 재사용하되, `NetworkLib`·채팅 구조·Loki SDK를 의존하지 않는다. 각 앱의 어댑터만 현재 상태를 읽어 **불변 스냅샷**을 공개한다. HTTP 핸들러는 이미 공개된 스냅샷만 읽고 세션/콘텐츠 락을 잡거나 PDH를 조회하지 않는다. SDK/HTTP 라이브러리 선택은 구현 시 검토하며, 기본 비활성·로컬 바인딩·게임 포트와 분리한다. 관측 서비스가 중단돼도 채팅과 로컬 검증은 계속한다. 원격 수집이 필요할 때만 별도 주소·권한·방화벽을 정한다.
-- Counter는 프로세스 시작 이후 누적값이다. `CMonitor`가 매 주기 리셋하는 기존 TPS 필드 자체를 내보내지 않는다. 동일 이벤트의 누적 계측을 추가하거나, 공용 집계기가 단일 소유자가 되도록 원자적 교환의 값을 누적하는 경로를 먼저 확정한다. Gauge는 현재 상태, Histogram은 성공 응답 지연과 부하 발생 지연에 공통 버킷을 사용한다. Prometheus는 `rate`/`increase`로 처리량을 계산한다. 짧은 로컬 실행은 scrape 없이 끝날 수 있으므로 pass/fail은 로컬 요약이 기준이다.
-
-| 초기 메트릭 후보 | 의미 |
-|---|---|
-| `game_net_sessions`, `game_net_session_limit`, `game_net_pool_in_use`, `game_net_pool_capacity` | 활성 세션 및 슬롯 한도, 종류별 풀 사용량/용량. 풀 종류는 소수 고정값. |
-| `game_net_accept_outcomes_total{result}`, `game_net_packets_total{direction}`, `game_net_wire_bytes_total{direction}` | 서버 수락 결과, 유효 수신 및 성공 송신 완료 패킷 수, IOCP 완료 기준 TCP 페이로드 바이트(패킷 헤더 포함, IP/TCP 헤더 제외). 바이트와 패킷 집계 위치를 명시한다. |
-| `game_net_disconnects_total{reason}`, `game_net_send_batches_total{result}` | 종료 원인과 배치 결과. `reason`은 제한된 enum, 원본 Winsock 코드는 로그. 큐 깊이·in-flight 계측은 오버헤드를 확인한 뒤 추가. |
-| `game_chat_requests_total{operation,result}`, `game_chat_delivery_attempts_total` | 로그인·섹터·메시지·heartbeat 처리 결과 및 채팅 대상 송신 시도 수. 누가 실제 받았는지는 더미가 측정. 채팅 도메인 전용. |
-| `dummy_clients{phase}`, `dummy_phase_outcomes_total{phase,result}`, `dummy_deliveries_total{result}` | 단계별 현재 클라 수, 단계 결과, 기대 수신자별 검증 결과. 송신 제출 수와 별도. |
-| `dummy_chat_delivery_duration_seconds`, `dummy_phase_duration_seconds{phase}`, `dummy_tick_interval_seconds` | 최초 정상 수신과 단계 지연, 발생기 루프 지연의 histogram. |
-| `game_observability_snapshot_timestamp_seconds` | 최근 게시 시각. Prometheus의 `up`은 scrape 연결 상태이며, 오래된 스냅샷·Ready 수와는 독립이다. |
-
-- 공통 라벨은 `service`, `environment`, `instance` 중심으로 제한하고, 메트릭별 `phase`, `direction`, `result`는 고정 집합만 쓴다. `run_id`, 두 종류의 세션 ID, 계정·메시지 ID는 라벨이 아니라 로그 필드로 둔다. 환경별 대상을 설정으로 바꾸고 공통 대시보드 JSON·알림은 재사용한다.
-- Grafana는 공통 Windows/전송 대시보드, 채팅 도메인 대시보드, 더미 검증 대시보드로 나눈다. 첫 화면에서 목표 대비 Ready, 실제 제출률/전달률, 누락·중복·오전달, 지연, 세션/풀·호스트 자원을 같은 시간축에 배치한다. 로그는 `service`와 시간 범위로 이동해 `run_id`를 쿼리한다. 초기 알림은 `up` 실패·스냅샷 정체·검증 오류 증가를 구분하고, 선택 지표 미수집을 정상 0이나 회귀로 해석하지 않는다. 재사용 완료 기준은 채팅 코드 없이 두 번째 서버의 스냅샷 어댑터와 설정만으로 공통 전송 패널이 뜨는 것이다.
-
-## 6. 구현 순서와 확인 기준
-
-각 작업의 결과를 사용자 검토한 뒤 다음으로 진행한다. 구현 상태는 [로드맵](../ROADMAP.md)을 따른다.
+각 작업의 결과를 사용자 검토한 뒤 다음으로 진행한다. 구현 상태는 [로드맵](../../ROADMAP.md)을 따른다.
 
 ### 공통 클라이언트 응답 핸들러
 
@@ -137,18 +100,22 @@ x64 Debug·Release에서 구현을 검증했다. `Tests/Chatting/Chatting.sln`�
 - 1·2·4개 계정, 메시지/이동 단독 가중치와 재접속 확률 0%·100%를 확인했다. 앱 워커 2개와 IOCP 워커 최대 3개로 실행해 진행 중인 재접속을 정리한 뒤 종료 이벤트와 최종 집계를 대조했다.
 - `RunSummary.json`과 종료 코드로 판정한다. 서버의 `/exit`는 fixture의 프로세스 종료용이며 서버 `Stop()`의 검증은 아니다.
 
+### 부하 실행 결과
+
+사용자가 공유한 500·750명 실행은 설정 시간 60초, IOCP/앱 워커 4/4, 접속 100ms당 최대 50회, 이동/채팅 가중치 1/9였다.
+
+| 더미 수 | 관찰 결과 |
+|---|---|
+| 500 | 60.053초, exit 0, 실패 0건. 자기 메시지 응답 26,502/26,502건, 피어 공지 1,096,648건 관측. |
+| 750 | 60.079초, exit 0, 실패 0건. 자기 메시지 응답 35,267/35,267건, 피어 공지 2,456,189건 관측. |
+| 875 | 실패 보고. 상세 실행 요약 미확보. |
+| 1,000 | 앱 워커 2개와 4개 실행 모두 전원이 최초 Ready를 거쳤으나 `message_echo_timeout`으로 조기 종료. |
+
+피어 공지는 관측값이며 전달 완전성 판정이 아니다. 이 결과만으로 서버의 접속 상한이나 병목 위치를 단정하지 않는다.
+
+Jenkins는 더미 종료 코드를 반영하고 생성된 `RunSummary.json`을 아티팩트로 보관한다. 실행 시간 단위와 외부 타임아웃은 [채팅 서버 Jenkins 잡](../../Infra/001_채팅서버_젠킨스.md#더미-실행-시간과-jenkins-타임아웃)을 참고한다.
+
 ### 추가 전달 검증과 대규모 부하
 
 - 범위 밖 수신 금지, heartbeat 없는 대조군, 섹터 위치를 고정한 배치의 누락·중복·오전달은 별도로 검증한다. 랜덤 부하에서는 자기 `ResMessage`만 대조하고 상대 `MessageNoti`는 관측 건수로 집계한다. 이동과 채팅이 겹칠 때의 전체 수신자 판정은 범위에서 제외한다.
-- 포트 범위 규모의 후속 접속 시험 전에 [서버 설정 외부화](#서버-설정-외부화)를 완료한다. 본격적인 서버 부하 한계 시험, 언리얼, 운영 배포, 기존 서버 동시성 개편은 여기의 완료 조건이 아니다.
-
-### 메트릭과 검증 결과 연동
-
-- 서버 지표의 의미·단위와 PDH 유효성을 대조하고, 서버·더미 스냅샷과 `/metrics`를 연결한다. Prometheus 수집과 Grafana 대체 패널을 확인한 뒤 기존 서버의 `MonitoringConsole()` 주기 출력과 콘솔 크기 강제 변경을 끈다. 이벤트 로그는 유지한다.
-- Jenkins 연동 시 프로세스 종료 코드로 판정하고 `RunSummary.json`과 테스트에 해당하는 원본 로그를 아티팩트로 보관한다. Jenkins 자체 지표는 C++ 계측과 별개다.
-- 외부 관측 중단 중에도 채팅과 로컬 판정이 동작하는지, 채팅 코드 없이 두 번째 서버에서 공통 전송 패널을 재사용할 수 있는지 확인한다. 로그 수집 연결은 서버 로그 설계의 [외부 로그 수집](005_서버_비동기_로그_설계.md#외부-로그-수집)을 따른다.
-
-### 외부 근거
-
-- Microsoft Learn: [PDH 수집](https://learn.microsoft.com/en-us/windows/win32/perfctrs/collecting-performance-data), [반환값과 CStatus](https://learn.microsoft.com/en-us/windows/win32/perfctrs/checking-pdh-interface-return-values).
-- Prometheus: [계측 원칙](https://prometheus.io/docs/practices/instrumentation/), [이름과 라벨](https://prometheus.io/docs/practices/naming/), [windows_exporter collector 목록](https://github.com/prometheus-community/windows_exporter/blob/main/docs/README.md).
+- 포트 범위 규모의 후속 접속 시험 전에 [서버 설정](#서버-설정-외부화)과 실제 사용 가능한 TCP 포트를 확인한다. 본격적인 서버 부하 한계 시험, 언리얼, 운영 배포, 기존 서버 동시성 개편은 여기의 완료 조건이 아니다.
