@@ -128,11 +128,13 @@ namespace Chatting
 
 			constexpr int kMaxAcceptExCount = 65535;
 			constexpr int kMaxContentsWorkerCount = 64;
+			constexpr int kMaxContentsFps = 1000; // 타이머 간격은 최소 1ms를 유지한다.
 			constexpr int kMaxLogQueueCapacity = 1024 * 1024;
 			if (!LoadServerNumber(loader, pFileName, L"ACCEPTEX_COUNT", kMaxAcceptExCount, config.m_acceptExCount)
 				|| !LoadServerNumber(loader, pFileName, L"IOCP_WORKER_COUNT", MAXIMUM_WAIT_OBJECTS, config.m_iocpWorkerCount)
 				|| !LoadServerNumber(loader, pFileName, L"IOCP_CONCURRENCY", config.m_iocpWorkerCount, config.m_iocpConcurrency)
 				|| !LoadServerNumber(loader, pFileName, L"CONTENTS_WORKER_COUNT", kMaxContentsWorkerCount, config.m_contentsWorkerCount)
+				|| !LoadServerNumber(loader, pFileName, L"CONTENTS_FPS", kMaxContentsFps, config.m_contentsFps)
 				|| !LoadServerNumber(loader, pFileName, L"LOG_QUEUE_CAPACITY", kMaxLogQueueCapacity, config.m_logQueueCapacity))
 				return false;
 			if (config.m_iocpConcurrency > config.m_iocpWorkerCount)

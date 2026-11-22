@@ -6,6 +6,16 @@
 
 namespace Chatting
 {
+	namespace
+	{
+		std::atomic<std::uint64_t> g_completedChatFrames{0};
+	}
+
+	void RecordCompletedChatFrame() noexcept
+	{
+		++g_completedChatFrames;
+	}
+
 	std::function<bool(MetricsLib::SMetricsSnapshot &)> MakeChatMetricsCollector()
 	{
 		return [lastSampleMilliseconds = ULONGLONG{0}, nextCheck = std::chrono::steady_clock::time_point{}]
@@ -31,6 +41,8 @@ namespace Chatting
 			AppendIntervalMetric(sample, EMonitorInterval::SectorMoveRequests, "game_chat_sector_move_requests", outMetrics);
 			AppendIntervalMetric(sample, EMonitorInterval::MessageRequests, "game_chat_message_requests", outMetrics);
 			AppendIntervalMetric(sample, EMonitorInterval::MessageSendRequests, "game_chat_message_send_requests", outMetrics);
+			outMetrics.m_counters.push_back({"game_chat_content_frames_total", g_completedChatFrames.load(), {}});
+
 			return true;
 		};
 	}

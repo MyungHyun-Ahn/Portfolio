@@ -16,6 +16,7 @@ namespace Chatting
 		int m_iocpWorkerCount = 2;
 		int m_iocpConcurrency = 2;
 		int m_contentsWorkerCount = 2;
+		int m_contentsFps = 25;
 		int m_logQueueCapacity = 1024;
 		DWORD m_connectTimeoutMilliseconds = 5000;
 		int m_recvBufferBytes = 4096;

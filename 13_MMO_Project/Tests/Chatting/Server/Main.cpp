@@ -62,6 +62,7 @@ int main(void)
 	NetworkLib::serverSetting::iocpWorkerThread = config.m_iocpWorkerCount;
 	NetworkLib::serverSetting::iocpActiveThread = config.m_iocpConcurrency;
 	NetworkLib::serverSetting::contentsThreadCount = config.m_contentsWorkerCount;
+	NetworkLib::serverSetting::maxContentsFps = config.m_contentsFps;
 	NetworkLib::serverSetting::packetCode = Chatting::kPacketCode;
 	NetworkLib::serverSetting::packetKey = Chatting::kPacketKey;
 	MHLib::security::CEncryption::sm_packetKey = Chatting::kPacketKey;

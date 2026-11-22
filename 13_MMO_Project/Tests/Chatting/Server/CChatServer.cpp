@@ -19,6 +19,7 @@
 #include "CProcessPacket.h"
 #include "CChatContents.h"
 #include "CChatServer.h"
+#include "ChatMetrics.h"
 
 namespace Chatting
 {
@@ -31,6 +32,7 @@ namespace Chatting
 		{
 			NetworkLib::SContentsFrameEvent::Execute(delayFrame);
 			m_pBaseContent->OnLoopEnd();
+			RecordCompletedChatFrame();
 		}
 	};
 
@@ -72,7 +74,7 @@ namespace Chatting
 	void CChatServer::RegisterContentTimerEvent() noexcept
 	{
 		auto *pEvent = new SChatFrameEvent;
-		pEvent->SetEvent(m_pContents, 25);
+		pEvent->SetEvent(m_pContents, NetworkLib::serverSetting::maxContentsFps);
 		NetworkLib::CContentsThread::EnqueueEvent(pEvent);
 		g_pLogger->WriteLog(ELogLevel::Info, L"ChatServer", 0, std::source_location::current(),
 			L"event=server_ready port=%u | 테스트 채팅 서버가 준비되었습니다.", NetworkLib::serverSetting::openPort);

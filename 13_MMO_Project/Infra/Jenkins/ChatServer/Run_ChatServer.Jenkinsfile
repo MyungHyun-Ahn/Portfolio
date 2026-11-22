@@ -3,7 +3,7 @@ def notifySlack(String status, String color) {
         message: "*${status}*\nJob: ${env.JOB_NAME}\nBuild: #${env.BUILD_NUMBER}\nURL: ${env.BUILD_URL}"
 }
 
-def configured = params.containsKey('METRICS_PORT') && params.containsKey('METRICS_BIND_ADDRESS')
+def configured = params.containsKey('METRICS_PORT') && params.containsKey('METRICS_BIND_ADDRESS') && params.containsKey('CONTENTS_FPS')
 properties([disableConcurrentBuilds(), parameters([
     string(name: 'PORT', defaultValue: '6000', description: '서버 포트 (1~65535). 더미 잡과 같은 값.', trim: true),
     string(name: 'LOG_POLL_INTERVAL_MS', defaultValue: '10', description: '로그 스레드 확인 주기 (1~1000 ms).', trim: true),
@@ -12,6 +12,7 @@ properties([disableConcurrentBuilds(), parameters([
     string(name: 'IOCP_WORKER_COUNT', defaultValue: '2', description: '네트워크 IOCP 워커 수 (1~64).', trim: true),
     string(name: 'IOCP_CONCURRENCY', defaultValue: '2', description: 'IOCP 완료 처리 동시성 (1~IOCP_WORKER_COUNT).', trim: true),
     string(name: 'CONTENTS_WORKER_COUNT', defaultValue: '2', description: '콘텐츠 워커 수 (1~64).', trim: true),
+    string(name: 'CONTENTS_FPS', defaultValue: '25', description: '콘텐츠 프레임의 초당 실행 목표 (1~1000).', trim: true),
     string(name: 'LOG_QUEUE_CAPACITY', defaultValue: '1024', description: '로그 생산자 스레드당 큐 용량 (1~1048576건).', trim: true),
     string(name: 'METRICS_PORT', defaultValue: '0', description: 'Prometheus /metrics 포트 (0이면 꺼짐).', trim: true),
     string(name: 'METRICS_BIND_ADDRESS', defaultValue: '', description: '메트릭을 켤 때 Windows 빌드 노드가 소유한 IPv4 주소.', trim: true)
@@ -55,6 +56,7 @@ $acceptEx = Read-Number ACCEPTEX_COUNT 1 65535
 $iocpWorkers = Read-Number IOCP_WORKER_COUNT 1 64
 $iocpConcurrency = Read-Number IOCP_CONCURRENCY 1 $iocpWorkers
 $contentsWorkers = Read-Number CONTENTS_WORKER_COUNT 1 64
+$contentsFps = Read-Number CONTENTS_FPS 1 1000
 $logQueueCapacity = Read-Number LOG_QUEUE_CAPACITY 1 1048576
 $metricsPort = Read-Number METRICS_PORT 0 65535
 $metricsAddress = $env:METRICS_BIND_ADDRESS
@@ -81,6 +83,7 @@ $config = Set-ConfigNumber $config ACCEPTEX_COUNT $acceptEx
 $config = Set-ConfigNumber $config IOCP_WORKER_COUNT $iocpWorkers
 $config = Set-ConfigNumber $config IOCP_CONCURRENCY $iocpConcurrency
 $config = Set-ConfigNumber $config CONTENTS_WORKER_COUNT $contentsWorkers
+$config = Set-ConfigNumber $config CONTENTS_FPS $contentsFps
 $config = Set-ConfigNumber $config LOG_QUEUE_CAPACITY $logQueueCapacity
 $config = Set-MetricsConfigEntry $config METRICS_PORT $metricsPort
 if ($metricsPort -ne 0) { $config = Set-MetricsConfigEntry $config METRICS_BIND_ADDRESS $metricsAddress }

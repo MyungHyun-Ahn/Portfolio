@@ -191,7 +191,8 @@ def server_options_config(base, configuration):
 
     invalid = [("ACCEPTEX_COUNT", 0), ("ACCEPTEX_COUNT", 65536), ("IOCP_WORKER_COUNT", 65),
                ("IOCP_CONCURRENCY", 0), ("IOCP_CONCURRENCY", 4), ("CONTENTS_WORKER_COUNT", 0),
-               ("LOG_QUEUE_CAPACITY", 0), ("LOG_QUEUE_CAPACITY", "1024items"), ("LOG_QUEUE_CAPACITY", 1048577)]
+               ("LOG_QUEUE_CAPACITY", 0), ("LOG_QUEUE_CAPACITY", "1024items"), ("LOG_QUEUE_CAPACITY", 1048577),
+               ("CONTENTS_FPS", 0), ("CONTENTS_FPS", 1001), ("CONTENTS_FPS", "25fps")]
     for index, (key, value) in enumerate(invalid):
         with launch(base, configuration, "Server", f"invalid-option-{index}", port,
                     server_options={**options, key: value}) as server:
@@ -349,6 +350,7 @@ def check_monitor_series(samples, process_series, *, has_rates=True):
     )}
     publish_time = "game_observability_snapshot_timestamp_seconds"
     required.update(("game_process_page_faults_total", process_series, publish_time))
+    required.add("game_chat_content_frames_total")
     cpu = {f'game_{scope}_cpu_usage_ratio{{mode="{mode}"}}' for scope in ("host", "process")
            for mode in ("total", "user", "kernel")}
     pdh = {name for name in samples if re.fullmatch(rf'{NIC_PREFIX}\{{interface="(?:[^"\\]|\\["\\n])+"\}}', name)}
@@ -373,7 +375,7 @@ def metrics(base, configuration):
         chat_port = chat_probe.getsockname()[1]
         metrics_port = metrics_probe.getsockname()[1]
     options = {"METRICS_BIND_ADDRESS": address, "METRICS_PORT": metrics_port}
-    with launch(base, configuration, "Server", "metrics", chat_port, server_options=options,
+    with launch(base, configuration, "Server", "metrics", chat_port, server_options={**options, "CONTENTS_FPS": 5},
                 executable_name=executable_name) as server:
         wait_text(server, f"event=metrics_started port={metrics_port}")
         initial = wait_metrics(address, metrics_port, bool)
@@ -394,6 +396,12 @@ def metrics(base, configuration):
                                   lambda values: "game_net_accept_completions_per_second" in values)
         check_monitor_series(idle_rates, process_series)
         assert idle_rates["game_net_received_packets_per_second"] == idle_rates["game_net_sent_packets_per_second"] == 0
+        frame_count = idle_rates.get("game_chat_content_frames_total", 0)
+        assert frame_count > 0, "no completed content frames while idle"
+        publish_time = "game_observability_snapshot_timestamp_seconds"
+        later = wait_metrics(address, metrics_port, lambda values: values.get(publish_time, 0) - idle_rates[publish_time] >= 1)
+        measured_fps = (later["game_chat_content_frames_total"] - frame_count) / (later[publish_time] - idle_rates[publish_time])
+        assert 2 <= measured_fps <= 10, f"configured 5 FPS, observed {measured_fps:.2f} FPS while idle"
         with socket.socket() as wrong_address:
             wrong_address.settimeout(3)
             assert wrong_address.connect_ex(("127.0.0.1", metrics_port)) in (10060, 10061), "unexpected metrics listener"
