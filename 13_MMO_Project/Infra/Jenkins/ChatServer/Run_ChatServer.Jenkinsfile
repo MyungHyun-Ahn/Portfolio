@@ -3,7 +3,7 @@ def notifySlack(String status, String color) {
         message: "*${status}*\nJob: ${env.JOB_NAME}\nBuild: #${env.BUILD_NUMBER}\nURL: ${env.BUILD_URL}"
 }
 
-def configured = params.containsKey('LOG_QUEUE_CAPACITY')
+def configured = params.containsKey('METRICS_PORT') && params.containsKey('METRICS_BIND_ADDRESS')
 properties([disableConcurrentBuilds(), parameters([
     string(name: 'PORT', defaultValue: '6000', description: '서버 포트 (1~65535). 더미 잡과 같은 값.', trim: true),
     string(name: 'LOG_POLL_INTERVAL_MS', defaultValue: '10', description: '로그 스레드 확인 주기 (1~1000 ms).', trim: true),
@@ -12,7 +12,9 @@ properties([disableConcurrentBuilds(), parameters([
     string(name: 'IOCP_WORKER_COUNT', defaultValue: '2', description: '네트워크 IOCP 워커 수 (1~64).', trim: true),
     string(name: 'IOCP_CONCURRENCY', defaultValue: '2', description: 'IOCP 완료 처리 동시성 (1~IOCP_WORKER_COUNT).', trim: true),
     string(name: 'CONTENTS_WORKER_COUNT', defaultValue: '2', description: '콘텐츠 워커 수 (1~64).', trim: true),
-    string(name: 'LOG_QUEUE_CAPACITY', defaultValue: '1024', description: '로그 생산자 스레드당 큐 용량 (1~1048576건).', trim: true)
+    string(name: 'LOG_QUEUE_CAPACITY', defaultValue: '1024', description: '로그 생산자 스레드당 큐 용량 (1~1048576건).', trim: true),
+    string(name: 'METRICS_PORT', defaultValue: '0', description: 'Prometheus /metrics 포트 (0이면 꺼짐).', trim: true),
+    string(name: 'METRICS_BIND_ADDRESS', defaultValue: '', description: '메트릭을 켤 때 Windows 빌드 노드가 소유한 IPv4 주소.', trim: true)
 ])])
 if (!configured) {
     echo 'Parameters registered. No executable was started.'
@@ -37,6 +39,15 @@ function Set-ConfigNumber([string]$text, [string]$name, [long]$value) {
     if ([regex]::Matches($text, $pattern).Count -ne 1) { throw "Expected exactly one $name config entry." }
     return [regex]::Replace($text, $pattern, ('${1}' + $value))
 }
+function Set-MetricsConfigEntry([string]$text, [string]$name, [string]$value) {
+    $pattern = '(?m)^([ \t]*-[ \t]*' + $name + '[ \t]*=[ \t]*)[^;\\r\\n]*(?=;)'
+    $count = [regex]::Matches($text, $pattern).Count
+    if ($count -gt 1) { throw "Expected at most one $name config entry." }
+    if ($count -eq 1) { return [regex]::Replace($text, $pattern, ('${1}' + $value)) }
+    $section = '(?m)^Server:[ \t]*(\\r?\\n)'
+    if ([regex]::Matches($text, $section).Count -ne 1) { throw 'Expected exactly one Server section.' }
+    return [regex]::Replace($text, $section, ('$0' + "`t- $name = $value;" + '$1'))
+}
 $port = Read-Number PORT 1 65535
 $poll = Read-Number LOG_POLL_INTERVAL_MS 1 1000
 $maxSessions = Read-Number MAX_SESSION_COUNT 1 65535
@@ -45,6 +56,16 @@ $iocpWorkers = Read-Number IOCP_WORKER_COUNT 1 64
 $iocpConcurrency = Read-Number IOCP_CONCURRENCY 1 $iocpWorkers
 $contentsWorkers = Read-Number CONTENTS_WORKER_COUNT 1 64
 $logQueueCapacity = Read-Number LOG_QUEUE_CAPACITY 1 1048576
+$metricsPort = Read-Number METRICS_PORT 0 65535
+$metricsAddress = $env:METRICS_BIND_ADDRESS
+if ($metricsPort -ne 0) {
+    $ip = $null
+    if (-not [Net.IPAddress]::TryParse($metricsAddress, [ref]$ip) -or $ip.AddressFamily -ne 'InterNetwork' -or
+        $ip.ToString() -cne $metricsAddress -or $ip.Equals([Net.IPAddress]::Any)) {
+        throw 'METRICS_BIND_ADDRESS must be a specific IPv4 address when metrics are enabled.'
+    }
+    if ($metricsPort -eq $port -and $metricsAddress -eq '127.0.0.1') { throw 'Chat and metrics must not share the same listener address and port.' }
+}
 $source = 'C:/MyServer/Portfolio/13_MMO_Project/Build/Release/ChatServer'
 $run = Join-Path $env:WORKSPACE ('server-' + $env:BUILD_NUMBER)
 if (Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue) { throw "Port $port already has a listener. No process was stopped." }
@@ -61,6 +82,8 @@ $config = Set-ConfigNumber $config IOCP_WORKER_COUNT $iocpWorkers
 $config = Set-ConfigNumber $config IOCP_CONCURRENCY $iocpConcurrency
 $config = Set-ConfigNumber $config CONTENTS_WORKER_COUNT $contentsWorkers
 $config = Set-ConfigNumber $config LOG_QUEUE_CAPACITY $logQueueCapacity
+$config = Set-MetricsConfigEntry $config METRICS_PORT $metricsPort
+if ($metricsPort -ne 0) { $config = Set-MetricsConfigEntry $config METRICS_BIND_ADDRESS $metricsAddress }
 [IO.File]::WriteAllText($configPath, $config, [Text.Encoding]::Unicode)
 $supervisor = Join-Path $run 'run-server.ps1'
 @'
@@ -99,6 +122,12 @@ try {
         if (Test-Path -LiteralPath $pidFile) {
             $serverPid = 0
             if ([int]::TryParse((Get-Content -LiteralPath $pidFile -Raw), [ref]$serverPid) -and (Get-NetTCPConnection -State Listen -LocalAddress 127.0.0.1 -LocalPort $port -OwningProcess $serverPid -ErrorAction SilentlyContinue)) {
+                if ($metricsPort -ne 0) {
+                    if (-not (Get-NetTCPConnection -State Listen -LocalAddress $metricsAddress -LocalPort $metricsPort -OwningProcess $serverPid -ErrorAction SilentlyContinue)) {
+                        throw ('ChatServer metrics listener did not start on ' + $metricsAddress + ':' + $metricsPort)
+                    }
+                    Write-Output ('ChatServer metrics: http://' + $metricsAddress + ':' + $metricsPort + '/metrics')
+                }
                 Write-Output ('ChatServer listening on 127.0.0.1:' + $port + '; PID=' + $serverPid + '; stop with Stop_ChatServer; logs: ' + $run)
                 return
             }
