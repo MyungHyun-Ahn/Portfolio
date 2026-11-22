@@ -262,6 +262,18 @@
         {"refId": "A", "expr": "rate(game_process_page_faults_total{job=\"chat_server\"}[1m])", "legendFormat": "페이지 폴트", "instant": false, "range": true}
       ],
       "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}}
+    },
+    {
+      "id": 25,
+      "type": "timeseries",
+      "title": "실제 콘텐츠 FPS · 1분 평균",
+      "gridPos": {"x": 0, "y": 28, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "portfolio-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "suffix: FPS", "decimals": 1}, "overrides": []},
+      "targets": [
+        {"refId": "A", "expr": "rate(game_chat_content_frames_total{job=\"chat_server\"}[1m])", "legendFormat": "실제 FPS", "instant": false, "range": true}
+      ],
+      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": false}}
     }
   ]
 }
