@@ -7,6 +7,7 @@
 #include <psapi.h>
 #include <thread>
 #include <mutex>
+#include <memory>
 #include <atomic>
 #include <array>
 #include <bit>

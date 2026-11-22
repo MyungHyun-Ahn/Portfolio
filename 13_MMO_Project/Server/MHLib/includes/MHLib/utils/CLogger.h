@@ -50,6 +50,14 @@ namespace MHLib::utils
 	public:
 		static constexpr std::chrono::milliseconds kDefaultPollInterval{10};
 
+		// 수명 관리 스레드 전용. 빈 콜백으로 해제하면 진행 중인 호출까지 기다린다.
+		// 콜백은 로그 스레드에서만 실행되며 스스로 등록/해제하거나 Stop을 호출하지 않는다.
+		void SetPeriodicCallback(std::function<void()> callback)
+		{
+			CLockGuard<ELockType::Exclusive> periodicCallbackLock(m_periodicCallbackLock);
+			m_periodicCallback = std::move(callback);
+		}
+
 		// 로그 스레드를 시작한다.
 		// 1. 파일을 연다. (동기)
 		// 2. 로그 스레드를 시작한다.
@@ -445,7 +453,15 @@ namespace MHLib::utils
 					break;
 
 				if (!isStopping)
+				{
+					{
+						// 이 락은 콜백 수명만 보호한다. 로그 생산자는 잡지 않는다.
+						CLockGuard<ELockType::Exclusive> periodicCallbackLock(m_periodicCallbackLock);
+						if (m_periodicCallback)
+							m_periodicCallback();
+					}
 					std::this_thread::sleep_for(pollInterval);
+				}
 			}
 
 			file.close();
@@ -524,6 +540,8 @@ namespace MHLib::utils
 	private:
 		SRWLOCK m_fileMapLock;
 		SRWLOCK m_consoleOutputLock = SRWLOCK_INIT;
+		SRWLOCK m_periodicCallbackLock = SRWLOCK_INIT;
+		std::function<void()> m_periodicCallback;
 		bool m_hasConsoleError = false;
 
 		// Producer

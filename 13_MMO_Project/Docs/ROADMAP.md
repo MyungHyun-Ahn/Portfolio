@@ -5,11 +5,12 @@
 상태: 서버 로그 개선, 공통 클라이언트 응답 핸들러, 다중 앱 워커 `CDummyRunner` 작업을 완료했다. DummyClient는 x64 Debug·Release 루프백 검증과 사용자 검수를 마쳤다.
 
 - [ ] 추가 전달 검증과 대규모 부하 — 고정 배치 수신 오라클과 무heartbeat 대조군은 별도로 검증한다. 포트 범위 규모의 접속 시험 전에는 [서버 설정](Plan/Server/004_DummyClient_검증.md#서버-설정-외부화)과 실제 사용 가능한 TCP 포트를 확인한다.
-- [ ] Prometheus·Grafana — [서버 프레임·섹터 전파 계측과 `Common/MetricsLib`](Plan/Server/006_프로메테우스_메트릭_설계.md)를 연결해 750명·875명 실행을 비교한다.
+- [ ] Prometheus 모니터링 후속 — [모니터 계측 코드 개선](Plan/Server/006_프로메테우스_메트릭_설계.md#모니터-계측-코드-개선)으로 채팅 카운터의 소유권을 분리한다. 그 뒤에 프레임·섹터 전파 계측과 Grafana 패널을 추가해 750명·875명 실행을 비교한다.
 - [ ] [원본 로그 수집](Plan/Server/005_서버_비동기_로그_설계.md#외부-로그-수집)은 후속 작업이다. 관측 연동은 로컬 DummyClient 실행의 선행 조건이 아니다.
 
 ## 완료된 작업
 ### 2차 완료 항목
+- [x] Prometheus 모니터링 #1 — `MetricsLib`와 공통 서버 지표 매핑을 추가했다. ChatServer `/metrics`, 동일 호스트 Prometheus 수집, 사용자 코드 검토를 마쳤다. [설계 및 검증 결과](Plan/Server/006_프로메테우스_메트릭_설계.md#구현-순서와-확인-기준)
 - [x] DummyClient `CDummyRunner` — 여러 앱 워커에서 반복 채팅·섹터 이동·heartbeat·재접속과 종료를 검증하고 사용자 검수를 마쳤다. [실행 및 검증 결과](Plan/Server/004_DummyClient_검증.md#단일-dummyrunner-실행과-검증)
 - [x] 공통 클라이언트 응답 핸들러 — `CChatNetClient`에 공통 `Handle*()`와 `Req*()`를 두고, 콘솔 양방향 왕복 검증과 사용자 코드 검토를 마쳤다. [구현 및 검증 범위](Plan/Server/004_DummyClient_검증.md#공통-클라이언트-응답-핸들러)
 - [x] 서버 이벤트의 `WriteLog()` 경로 통합과 로그 레벨 정리. [확인 결과](Plan/Server/005_서버_비동기_로그_설계.md#서버-이벤트-입력-통합-확인-결과)

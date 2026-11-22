@@ -3,6 +3,7 @@
   <ItemGroup>
     <Filter Include="Common" />
     <Filter Include="Server" />
+    <Filter Include="Server\ServerMetrics" />
     <Filter Include="Generated" />
     <Filter Include="Generated\PacketHandler" />
   </ItemGroup>
@@ -12,6 +13,12 @@
     </ClCompile>
     <ClCompile Include="Main.cpp">
       <Filter>Server</Filter>
+    </ClCompile>
+    <ClCompile Include="ChatMetrics.cpp">
+      <Filter>Server</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\Server\ServerMetrics\ServerMetrics.cpp">
+      <Filter>Server\ServerMetrics</Filter>
     </ClCompile>
     <ClCompile Include="CChatServer.cpp">
       <Filter>Server</Filter>
@@ -38,6 +45,12 @@
   <ItemGroup>
     <ClInclude Include="pch.h">
       <Filter>Server</Filter>
+    </ClInclude>
+    <ClInclude Include="ChatMetrics.h">
+      <Filter>Server</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\Server\ServerMetrics\ServerMetrics.h">
+      <Filter>Server\ServerMetrics</Filter>
     </ClInclude>
     <ClInclude Include="CChatServer.h">
       <Filter>Server</Filter>

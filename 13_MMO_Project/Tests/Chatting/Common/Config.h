@@ -9,6 +9,8 @@ namespace Chatting
 		MHLib::utils::ELogLevel m_fileLogLevel = MHLib::utils::ELogLevel::Debug;
 		std::chrono::milliseconds m_logPollInterval{MHLib::utils::CLogger::kDefaultPollInterval};
 		USHORT m_port = kDefaultPort;
+		std::string m_metricsBindAddress;
+		USHORT m_metricsPort = 0;
 		USHORT m_maxSessionCount = 256;
 		int m_acceptExCount = 4;
 		int m_iocpWorkerCount = 2;

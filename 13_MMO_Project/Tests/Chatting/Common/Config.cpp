@@ -108,6 +108,24 @@ namespace Chatting
 			return ConfigError(pFileName, L"log levels must be Debug, Info or Error");
 		if (isServer)
 		{
+			std::wstring metricsPort;
+			if (loader.Load(pSection, L"METRICS_PORT", &metricsPort))
+			{
+				if (!loader.Load(pSection, L"METRICS_PORT", &number) || number < 0 || number > 65535)
+					return ConfigError(pFileName, L"METRICS_PORT must be an integer (0..65535; 0 disables metrics)");
+				config.m_metricsPort = static_cast<USHORT>(number);
+			}
+			std::wstring metricsBindAddress;
+			IN_ADDR metricsAddress{};
+			if (loader.Load(pSection, L"METRICS_BIND_ADDRESS", &metricsBindAddress))
+			{
+				if (InetPtonW(AF_INET, metricsBindAddress.c_str(), &metricsAddress) != 1 || metricsAddress.S_un.S_addr == INADDR_ANY)
+					return ConfigError(pFileName, L"METRICS_BIND_ADDRESS must be a specific IPv4 address");
+				config.m_metricsBindAddress.assign(metricsBindAddress.begin(), metricsBindAddress.end());
+			}
+			if (config.m_metricsPort != 0 && config.m_metricsBindAddress.empty())
+				return ConfigError(pFileName, L"METRICS_BIND_ADDRESS is required when metrics are enabled");
+
 			constexpr int kMaxAcceptExCount = 65535;
 			constexpr int kMaxContentsWorkerCount = 64;
 			constexpr int kMaxLogQueueCapacity = 1024 * 1024;

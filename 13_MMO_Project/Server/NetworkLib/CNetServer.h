@@ -147,9 +147,9 @@ class CBaseContents;
 		bool HasStartedBackgroundWork() const noexcept { return m_hasStartedBackgroundWork; }
 		void Stop();
 
-		inline LONG GetSessionCount() const noexcept
+		inline LONG GetSessionCount() noexcept
 		{
-			return m_sessionCount;
+			return InterlockedCompareExchange(&m_sessionCount, 0, 0);
 		}
 
 		void SendPacket(const UINT64 sessionId, CSerializableBuffer<FALSE> *pSBuffer) noexcept;

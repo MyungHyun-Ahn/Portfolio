@@ -232,7 +232,7 @@ CNetServer *g_pNetServer = nullptr;
 		InterlockedAnd(&m_sendFlag, TRUE);
 
 		ZeroMemory((m_pMyOverlappedStartAddr + 2), sizeof(OVERLAPPED));
-		InterlockedIncrement(&g_monitor.m_sendCallCount);
+		InterlockedIncrement64(&g_monitor.m_sendCallCount);
 		{
 			PROFILE_BEGIN(0, "WSASend");
 			retVal = WSASend(m_sessionSocket, wsaBuf, m_sendCount, nullptr, 0, (LPOVERLAPPED)(m_pMyOverlappedStartAddr + 2), NULL);
@@ -255,7 +255,7 @@ CNetServer *g_pNetServer = nullptr;
 			}
 			else
 			{
-				InterlockedIncrement(&g_monitor.m_sendPendingCount);
+				InterlockedIncrement64(&g_monitor.m_sendPendingCount);
 				if (m_cancelIoCalled)
 				{
 					CancelIoEx((HANDLE)m_sessionSocket, nullptr);
@@ -511,7 +511,7 @@ CNetServer *g_pNetServer = nullptr;
 		while (true)
 		{
 			// 세션 전부 끊고
-			if (m_sessionCount == 0)
+			if (GetSessionCount() == 0)
 			{
 				m_isWorkerRun = FALSE;
 				PostQueuedCompletionStatus(m_iocpHandle, 0, 0, 0);

@@ -11,6 +11,8 @@
 #include "Config.h"
 #include "Console.h"
 #include "CChatServer.h"
+#include "CMetricsExporter.h"
+#include "ChatMetrics.h"
 
 int main(void)
 {
@@ -29,6 +31,29 @@ int main(void)
 		return 2;
 	}
 	g_pLogger->RegisterLogProducer();
+
+	MetricsLib::CMetricsExporter metricsExporter;
+	if (config.m_metricsPort != 0)
+	{
+		uint16_t boundPort = 0;
+		if (metricsExporter.Start(config.m_metricsBindAddress, config.m_metricsPort, boundPort))
+		{
+			g_pLogger->SetPeriodicCallback(metricsExporter.CreatePublishCallback(Chatting::MakeChatMetricsCollector()));
+			g_pLogger->WriteLog(ELogLevel::Info, L"ChatServer", 0, std::source_location::current(),
+				L"event=metrics_started port=%u | 메트릭 리스너를 시작했습니다.", static_cast<unsigned>(boundPort));
+		}
+		else
+		{
+			g_pLogger->WriteLog(ELogLevel::Error, L"ChatServer", 0, std::source_location::current(),
+				L"event=metrics_start_failed port=%u | 메트릭 리스너를 시작하지 못했습니다. 채팅 서버는 계속 시작합니다.",
+				static_cast<unsigned>(config.m_metricsPort));
+		}
+	}
+	const auto stopMetrics = [&metricsExporter]
+	{
+		g_pLogger->SetPeriodicCallback({});
+		metricsExporter.Stop();
+	};
 
 	NetworkLib::serverSetting::openIp = config.m_ip;
 	NetworkLib::serverSetting::openPort = config.m_port;
@@ -67,6 +92,7 @@ int main(void)
 		{
 			g_pLogger->WriteLog(ELogLevel::Info, L"ChatServer", 0, std::source_location::current(),
 				L"event=server_process_exit | 서버 프로세스를 종료합니다. NetworkLib 정상 종료 처리는 보류 중입니다.");
+			stopMetrics();
 			fflush(nullptr);
 			ExitProcess(0);
 		}
@@ -85,6 +111,7 @@ int main(void)
 			L"event=server_start_failed | 서버 시작에 실패했습니다.");
 	}
 	// 생산자가 남을 수 있는 부분 시작 실패와 /exit의 수명은 이 단계에서 바꾸지 않는다.
+	stopMetrics();
 	if (!pServer->HasStartedBackgroundWork())
 		g_pLogger->Stop();
 	fflush(nullptr);

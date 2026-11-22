@@ -1,6 +1,9 @@
-"""Run against the built x64 Chatting solution: python test_server_event_input.py bind|chat|log-interval|session-limit|server-options [Release|Debug]."""
+"""Run against the built x64 Chatting solution: python test_server_event_input.py bind|chat|log-interval|session-limit|server-options|metrics [Release|Debug]."""
 
 from contextlib import ExitStack, contextmanager
+import ctypes
+from ctypes import wintypes
+from math import isfinite
 from pathlib import Path
 import re
 import os
@@ -10,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from http.client import HTTPConnection
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -17,12 +21,12 @@ ROOT = Path(__file__).resolve().parents[2]
 
 @contextmanager
 def launch(base, configuration, side, label, port, levels=None, log_interval=None, nickname=None, *, session_limit=None,
-           server_options=None):
+           server_options=None, executable_name=None):
     folder = base / label
     folder.mkdir()
     source = ROOT / "Build" / configuration / f"Chat{side}"
-    exe = folder / f"Chat{side}.exe"
-    shutil.copyfile(source / exe.name, exe)
+    exe = folder / (executable_name or f"Chat{side}.exe")
+    shutil.copyfile(source / f"Chat{side}.exe", exe)
     config = f"{side}Config.conf"
     text = (source / config).read_text(encoding="utf-16")
     text, count = re.subn(r"(\bPORT\s*=\s*)\d+", rf"\g<1>{port}", text)
@@ -258,12 +262,213 @@ def chat(base, configuration):
         print("chat: 1/19-code-unit nicknames preserved, including Korean and emoji; 20-code-unit config rejected")
 
 
+def scrape(address, port):
+    connection = HTTPConnection(address, port, timeout=1)
+    try:
+        connection.request("GET", "/metrics")
+        response = connection.getresponse()
+        body = response.read().decode("utf-8")
+        assert response.status in (200, 503), response.status
+        if response.status == 503:
+            return {}
+        assert response.getheader("Content-Type").startswith("text/plain; version=0.0.4")
+        lines = [sample.rsplit(" ", 1) for sample in body.splitlines() if sample and not sample.startswith("#")]
+        samples = {name: float(value) for name, value in lines}
+        assert len(samples) == len(lines), "duplicate metric series"
+        return samples
+    finally:
+        connection.close()
+
+
+def wait_metrics(address, port, predicate):
+    deadline = time.monotonic() + 5
+    samples = {}
+    while time.monotonic() < deadline:
+        samples = scrape(address, port)
+        if predicate(samples):
+            return samples
+        time.sleep(0.04)
+    raise AssertionError(f"metrics condition not met: {samples}")
+
+
+NIC_PREFIX = "game_host_nic_total_bytes_per_second"
+LABEL_ESCAPES = str.maketrans({"\\": "\\\\", '"': '\\"', "\n": "\\n"})
+
+
+def windows_nic_series():
+    class CounterItem(ctypes.Structure):
+        _fields_ = [("name", wintypes.LPWSTR), ("status", wintypes.DWORD), ("value", ctypes.c_double)]
+
+    pdh = ctypes.WinDLL("pdh.dll")
+    pdh.PdhOpenQueryW.argtypes = (wintypes.LPCWSTR, ctypes.c_size_t, ctypes.POINTER(wintypes.HANDLE))
+    pdh.PdhAddEnglishCounterW.argtypes = (wintypes.HANDLE, wintypes.LPCWSTR, ctypes.c_size_t, ctypes.POINTER(wintypes.HANDLE))
+    pdh.PdhCollectQueryData.argtypes = (wintypes.HANDLE,)
+    pdh.PdhGetFormattedCounterArrayW.argtypes = (
+        wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD), ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p,
+    )
+    pdh.PdhCloseQuery.argtypes = (wintypes.HANDLE,)
+    query = wintypes.HANDLE()
+    counter = wintypes.HANDLE()
+    assert pdh.PdhOpenQueryW(None, 0, ctypes.byref(query)) == 0
+    try:
+        status = pdh.PdhAddEnglishCounterW(query, r"\Network Interface(*)\Bytes Total/sec", 0, ctypes.byref(counter))
+        assert status == 0, f"NIC counter registration: {status & 0xffffffff:#x}"
+        assert pdh.PdhCollectQueryData(query) == 0
+        time.sleep(1.1)
+        assert pdh.PdhCollectQueryData(query) == 0
+        size, count = wintypes.DWORD(), wintypes.DWORD()
+        flags = 0x200 | 0x1000 | 0x8000  # DOUBLE | NOSCALE | NOCAP100
+        status = pdh.PdhGetFormattedCounterArrayW(counter, flags, ctypes.byref(size), ctypes.byref(count), None)
+        assert status & 0xffffffff == 0x800007D2, f"NIC array sizing: {status & 0xffffffff:#x}"
+        buffer = ctypes.create_string_buffer(size.value)
+        status = pdh.PdhGetFormattedCounterArrayW(counter, flags, ctypes.byref(size), ctypes.byref(count), buffer)
+        assert status == 0, f"NIC array formatting: {status & 0xffffffff:#x}"
+        items = ctypes.cast(buffer, ctypes.POINTER(CounterItem))
+        return {items[i].name for i in range(count.value)
+                if items[i].name and items[i].status in (0, 1) and isfinite(items[i].value) and items[i].value >= 0}
+    finally:
+        pdh.PdhCloseQuery(query)
+
+
+def check_monitor_series(samples, process_series, *, has_rates=True):
+    intervals = (
+        "net_accept_completions", "net_received_packets", "net_sent_packets", "chat_content_updates",
+        "chat_login_requests", "chat_sector_move_requests", "chat_message_requests", "chat_message_send_requests",
+        "chat_work_delegations", "chat_work_steals", "net_send_batch_limit_hits",
+    )
+    rates = {f"game_{name}_per_second" for name in intervals}
+    required = {f"game_{name}_total" for name in intervals}
+    if has_rates:
+        required |= rates
+    else:
+        assert rates.isdisjoint(samples), "first monitor snapshot published interval rates"
+    required |= {f"game_net_{name}" for name in ("sessions", "sessions_accepted_total", "wsasend_calls_total", "wsasend_pending_total")}
+    required |= {f"game_process_{name}_bytes" for name in (
+        "working_set", "peak_working_set", "paged_pool", "peak_paged_pool", "nonpaged_pool", "peak_nonpaged_pool",
+        "commit", "peak_commit", "private",
+    )}
+    publish_time = "game_observability_snapshot_timestamp_seconds"
+    required.update(("game_process_page_faults_total", process_series, publish_time))
+    cpu = {f'game_{scope}_cpu_usage_ratio{{mode="{mode}"}}' for scope in ("host", "process")
+           for mode in ("total", "user", "kernel")}
+    pdh = {name for name in samples if re.fullmatch(rf'{NIC_PREFIX}\{{interface="(?:[^"\\]|\\["\\n])+"\}}', name)}
+    if not has_rates:
+        assert not pdh, "first monitor snapshot published NIC rates"
+    pdh |= {"game_host_nonpaged_pool_bytes", "game_host_available_memory_bytes", "game_host_tcpv4_retransmitted_segments_per_second"}
+    actual = set(samples)
+    assert required <= actual <= required | cpu | pdh, (required - actual, actual - required - cpu - pdh)
+    assert all(isfinite(value) and value >= 0 for value in samples.values()), samples
+    assert samples[process_series] == 1
+    assert abs(time.time() - samples[publish_time]) < 30, "expected a recent Unix publication time"
+    print(f"metrics: {len(actual)} series; valid Windows samples: {sorted(actual & (cpu | pdh))}")
+
+
+def metrics(base, configuration):
+    address = "127.0.0.2"
+    executable_name = "Monitor-검증-😀.exe"
+    process_series = f'game_process_info{{process="{executable_name}"}}'
+    with socket.socket() as chat_probe, socket.socket() as metrics_probe:
+        chat_probe.bind(("127.0.0.1", 0))
+        metrics_probe.bind(("0.0.0.0", 0))
+        chat_port = chat_probe.getsockname()[1]
+        metrics_port = metrics_probe.getsockname()[1]
+    options = {"METRICS_BIND_ADDRESS": address, "METRICS_PORT": metrics_port}
+    with launch(base, configuration, "Server", "metrics", chat_port, server_options=options,
+                executable_name=executable_name) as server:
+        wait_text(server, f"event=metrics_started port={metrics_port}")
+        initial = wait_metrics(address, metrics_port, bool)
+        expected_interfaces = windows_nic_series()
+        assert expected_interfaces, "Windows PDH provides no valid NIC instances; discovery not verified"
+        expected_nics = {f'{NIC_PREFIX}{{interface="{name.translate(LABEL_ESCAPES)}"}}'
+                         for name in expected_interfaces}
+        # The exporter only retains the latest sample, so the first HTTP read may miss warm-up.
+        check_monitor_series(initial, process_series, has_rates="game_net_accept_completions_per_second" in initial)
+        wait_metrics(address, metrics_port, lambda values: expected_nics <= values.keys())
+        print(f"metrics discovery: {process_series} = 1; Windows PDH `Bytes Total/sec`: {sorted(expected_interfaces)}")
+        assert initial["game_net_sessions"] == 0
+        assert initial["game_process_working_set_bytes"] > 0
+        assert initial["game_process_nonpaged_pool_bytes"] > 0
+        assert initial["game_net_sessions_accepted_total"] == 0
+        wait_text(server, f"event=server_ready port={chat_port}")
+        idle_rates = wait_metrics(address, metrics_port,
+                                  lambda values: "game_net_accept_completions_per_second" in values)
+        check_monitor_series(idle_rates, process_series)
+        assert idle_rates["game_net_received_packets_per_second"] == idle_rates["game_net_sent_packets_per_second"] == 0
+        with socket.socket() as wrong_address:
+            wrong_address.settimeout(3)
+            assert wrong_address.connect_ex(("127.0.0.1", metrics_port)) in (10060, 10061), "unexpected metrics listener"
+        with launch(base, configuration, "Client", "metrics-client", chat_port) as client:
+            wait_text(client, "READY account=")
+            pending_rates = {"game_net_received_packets_per_second", "game_net_sent_packets_per_second"}
+
+            def observed_directional_rates(values):
+                # 수신과 송신은 서로 다른 모니터 구간에 집계될 수 있다.
+                pending_rates.difference_update(name for name in tuple(pending_rates) if values.get(name, 0) > 0)
+                return not pending_rates
+
+            send(client, "metrics echo")
+            try:
+                wait_metrics(address, metrics_port, observed_directional_rates)
+            except AssertionError as exc:
+                raise AssertionError(f"positive packet rates not observed: {sorted(pending_rates)}") from exc
+            wait_text(client, ": metrics echo")
+            active = wait_metrics(address, metrics_port, lambda values: values.get("game_net_sessions") == 1
+                                  and values.get("game_chat_message_send_requests_total", 0) >= 1
+                                  and values.get("game_net_sent_packets_total", 0) >= 3)
+            assert active["game_net_sessions_accepted_total"] == 1
+            assert active["game_net_received_packets_total"] >= 3
+            assert active["game_net_sent_packets_total"] >= 3
+            assert active["game_net_wsasend_calls_total"] >= 1
+            assert active["game_chat_login_requests_total"] == 1
+            assert active["game_chat_sector_move_requests_total"] == 1
+            assert active["game_chat_message_send_requests_total"] >= 1
+            check_monitor_series(active, process_series)
+            send(client, "/exit")
+            assert client[0].wait(timeout=8) == 0
+        idle = wait_metrics(address, metrics_port, lambda values: values.get("game_net_sessions") == 0
+                            and values.get("game_net_received_packets_per_second") == 0)
+        assert idle["game_net_received_packets_total"] == active["game_net_received_packets_total"]
+        send(server, "/exit")
+        assert server[0].wait(timeout=8) == 0
+
+    with socket.socket() as blocker:
+        blocker.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        blocker.bind((address, metrics_port))
+        blocker.listen()
+        with launch(base, configuration, "Server", "metrics-conflict", chat_port, server_options=options) as server:
+            wait_text(server, f"event=metrics_start_failed port={metrics_port}")
+            wait_text(server, f"event=server_ready port={chat_port}")
+            with launch(base, configuration, "Client", "conflict-client", chat_port) as client:
+                wait_text(client, "READY account=")
+                send(client, "metrics conflict echo")
+                wait_text(client, ": metrics conflict echo")
+                send(client, "/exit")
+                assert client[0].wait(timeout=8) == 0
+            send(server, "/exit")
+            assert server[0].wait(timeout=8) == 0
+
+    with launch(base, configuration, "Server", "metrics-disabled", chat_port,
+                server_options={**options, "METRICS_PORT": 0}) as server:
+        wait_text(server, f"event=server_ready port={chat_port}")
+        assert "event=metrics_" not in server[1].read_text(encoding="utf-8")
+        send(server, "/exit")
+        assert server[0].wait(timeout=8) == 0
+
+    for index, invalid in enumerate(({"METRICS_PORT": "65536"}, {"METRICS_PORT": "3ms"},
+                                     {"METRICS_BIND_ADDRESS": "invalid"}, {"METRICS_BIND_ADDRESS": "0.0.0.0"})):
+        with launch(base, configuration, "Server", f"metrics-invalid-{index}", chat_port,
+                    server_options={**options, **invalid}) as server:
+            assert server[0].wait(timeout=5) == 2
+            wait_text(server, next(iter(invalid)))
+    print("metrics: configured alternate loopback, live CMonitor snapshot, shutdown/port reuse, bind collision and config checks")
+
+
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
     mode = sys.argv[1]
     configuration = sys.argv[2] if len(sys.argv) > 2 else "Release"
     case = {"bind": bind_failure, "chat": chat, "log-interval": log_interval_config,
-            "session-limit": session_limit_config, "server-options": server_options_config}[mode]
+            "session-limit": session_limit_config, "server-options": server_options_config, "metrics": metrics}[mode]
     evidence = os.environ.get("MMO_SERVER_EVENT_EVIDENCE")
     if evidence:
         output = Path(evidence) / f"{configuration}-{mode}"

@@ -26,7 +26,7 @@ void SMonitorTimerEvent::SetEvent() noexcept
 
 void SMonitorTimerEvent::Execute(int delayFrame) noexcept
 {
-	g_monitor.Update();
+	g_monitor.Update(g_pNetServer->GetSessionCount());
 }
 
 void SKeyboardTimerEvent::SetEvent() noexcept

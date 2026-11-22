@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="CMetricsExporter.h" />
+    <ClInclude Include="MetricsSnapshot.h" />
+    <ClCompile Include="CMetricsExporter.cpp" />
+    <ClCompile Include="MetricsSnapshot.cpp" />
+  </ItemGroup>
+</Project>

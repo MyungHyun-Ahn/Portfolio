@@ -36,7 +36,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderOutputFile>$(IntDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\Common;$(ProjectDir)Generated\PacketHandler;$(ProjectDir)..\..\..\Common\Packet\Struct;$(ProjectDir)..\..\..\Common\NetworkCommon;$(ProjectDir)..\..\..\Server\NetworkLib;$(ProjectDir)..\..\..\Server\MHLib\includes;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\Common;$(ProjectDir)Generated\PacketHandler;$(ProjectDir)..\..\..\Common\Packet\Struct;$(ProjectDir)..\..\..\Common\NetworkCommon;$(ProjectDir)..\..\..\Server\NetworkLib;$(ProjectDir)..\..\..\Server\MHLib\includes;$(ProjectDir)..\..\..\Server\MetricsLib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <RuntimeLibrary Condition="'$(Configuration)' == 'Debug'">MultiThreadedDebugDLL</RuntimeLibrary>
       <RuntimeLibrary Condition="'$(Configuration)' == 'Release'">MultiThreadedDLL</RuntimeLibrary>
@@ -54,6 +54,10 @@
   <ItemGroup>
     <ClCompile Include="pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="ChatMetrics.cpp" />
+    <ClCompile Include="..\..\..\Server\ServerMetrics\ServerMetrics.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="CChatServer.cpp" />
     <ClCompile Include="CChatContents.cpp" />
     <ClCompile Include="CProcessPacket.cpp" />
@@ -64,6 +68,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
+    <ClInclude Include="ChatMetrics.h" />
+    <ClInclude Include="..\..\..\Server\ServerMetrics\ServerMetrics.h" />
     <ClInclude Include="CChatServer.h" />
     <ClInclude Include="CChatContents.h" />
     <ClInclude Include="CPlayer.h" />
@@ -82,6 +88,9 @@
     </ProjectReference>
     <ProjectReference Include="..\..\..\Server\NetworkLib\ServerNetworkLib.vcxproj">
       <Project>{BABB7C61-118C-407C-A3D8-5C628A1C1B5D}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\..\Server\MetricsLib\MetricsLib.vcxproj">
+      <Project>{1D22E8AB-E273-4C7B-A869-AF8C711EB707}</Project>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
