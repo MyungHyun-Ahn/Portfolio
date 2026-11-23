@@ -31,6 +31,10 @@
   <ItemGroup>
     <ClInclude Include="CFixedStepScheduler.h" />
     <ClCompile Include="CFixedStepScheduler.cpp" />
+    <ClInclude Include="Input\CInputManager.h" />
+    <ClInclude Include="Input\Win32InputAdapter.h" />
+    <ClCompile Include="Input\CInputManager.cpp" />
+    <ClCompile Include="Input\Win32InputAdapter.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

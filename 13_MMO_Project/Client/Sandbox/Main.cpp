@@ -1,14 +1,29 @@
 #include <Windows.h>
+#include <array>
 #include <chrono>
+#include <cmath>
 #include <memory>
+#include <optional>
 #include <string>
+#include <unordered_map>
 #include "CDirect2DRenderer.h"
 #include "CFixedStepScheduler.h"
+#include "Input/CInputManager.h"
+#include "Input/Win32InputAdapter.h"
 
 namespace
 {
 	constexpr wchar_t kWindowClassName[] = L"PortfolioSandboxWindow";
 	constexpr wchar_t kWindowTitle[] = L"Sandbox";
+	using ClientFrameworkLib::Input::CInputManager;
+	using ClientFrameworkLib::CFixedStepScheduler;
+
+	enum class EGameAction : CInputManager::ActionId
+	{
+		MoveTo = 1,
+	};
+
+	constexpr float kMovePixelsPerTick = 300.0f / CFixedStepScheduler::kTicksPerSecond;
 
 	struct SWindowSizeState
 	{
@@ -18,10 +33,45 @@ namespace
 		bool m_hasPendingResize = false;
 	};
 
-	void FixedUpdate(ULONGLONG& updatesInSample) noexcept
+	struct SWindowState
 	{
-		// 예제 콘텐츠는 고정 틱이 실행된 횟수만 센다.
+		SWindowSizeState m_size;
+		CInputManager m_input;
+	};
+
+	struct SRectangleMovement
+	{
+		float m_centerXPixels = 160.0f;
+		float m_centerYPixels = 140.0f;
+		std::optional<CInputManager::SPosition> m_destination;
+	};
+
+	void FixedUpdate(const CInputManager& input, SRectangleMovement& rectangle, ULONGLONG& updatesInSample) noexcept
+	{
 		++updatesInSample;
+		const auto moveTo = input.GetActionState(static_cast<CInputManager::ActionId>(EGameAction::MoveTo));
+		if (moveTo.m_wasPressed && moveTo.m_pressPosition)
+			rectangle.m_destination = moveTo.m_pressPosition;
+		if (!rectangle.m_destination)
+			return;
+
+		const float targetXPixels = static_cast<float>(rectangle.m_destination->m_xPixels);
+		const float targetYPixels = static_cast<float>(rectangle.m_destination->m_yPixels);
+		const float deltaXPixels = targetXPixels - rectangle.m_centerXPixels;
+		const float deltaYPixels = targetYPixels - rectangle.m_centerYPixels;
+		const float distancePixels = std::hypot(deltaXPixels, deltaYPixels);
+		// 한 틱 이동 거리 안에 목적지가 있으면 지나치지 말고 그 자리에서 멈춘다.
+		if (distancePixels <= kMovePixelsPerTick)
+		{
+			rectangle.m_centerXPixels = targetXPixels;
+			rectangle.m_centerYPixels = targetYPixels;
+			rectangle.m_destination.reset();
+			return;
+		}
+
+		const float stepRatio = kMovePixelsPerTick / distancePixels;
+		rectangle.m_centerXPixels += deltaXPixels * stepRatio;
+		rectangle.m_centerYPixels += deltaYPixels * stepRatio;
 	}
 
 	// Windows에 등록한 콜백
@@ -34,17 +84,19 @@ namespace
 			SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreate->lpCreateParams));
 		}
 
-		// 새창 크기와 최소화 상태만 기록한다.
-		if (message == WM_SIZE)
+		auto* pState = reinterpret_cast<SWindowState*>(GetWindowLongPtrW(window, GWLP_USERDATA));
+		if (pState != nullptr)
 		{
-			auto* pSize = reinterpret_cast<SWindowSizeState*>(GetWindowLongPtrW(window, GWLP_USERDATA));
-			if (pSize != nullptr)
+			if (ClientFrameworkLib::Input::HandleInputMessage(pState->m_input, window, message, wParam, lParam))
+				return 0;
+
+			if (message == WM_SIZE)
 			{
 				// 콜백에서는 마지막 상태만 기록하고, 실제 리사이즈는 프레임 사이에 한다.
-				pSize->m_isMinimized = wParam == SIZE_MINIMIZED;
-				pSize->m_widthPixels = LOWORD(lParam);
-				pSize->m_heightPixels = HIWORD(lParam);
-				pSize->m_hasPendingResize = true;
+				pState->m_size.m_isMinimized = wParam == SIZE_MINIMIZED;
+				pState->m_size.m_widthPixels = LOWORD(lParam);
+				pState->m_size.m_heightPixels = HIWORD(lParam);
+				pState->m_size.m_hasPendingResize = true;
 				return 0;
 			}
 		}
@@ -83,9 +135,10 @@ int main(void)
 	if (RegisterClassW(&windowClass) == 0)
 		return 1;
 
-	SWindowSizeState windowSize;
+	SWindowState windowState;
+	windowState.m_input.Bind(static_cast<CInputManager::ActionId>(EGameAction::MoveTo), VK_LBUTTON);
 	const HWND window = CreateWindowExW(0, kWindowClassName, kWindowTitle, WS_OVERLAPPEDWINDOW,
-		CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, nullptr, nullptr, instance, &windowSize);
+		CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, nullptr, nullptr, instance, &windowState);
 	if (window == nullptr)
 		return 1;
 
@@ -102,7 +155,9 @@ int main(void)
 
 	MSG message{};
 	using Clock = std::chrono::steady_clock;
-	ClientFrameworkLib::CFixedStepScheduler fixedStepScheduler;
+	CFixedStepScheduler fixedStepScheduler;
+	SRectangleMovement rectangle;
+	auto& windowSize = windowState.m_size;
 	auto previousFrameTime = Clock::now();
 	auto sampleStartTime = previousFrameTime;
 	ULONGLONG framesInSample = 0;
@@ -128,7 +183,10 @@ int main(void)
 		previousFrameTime = now;
 		const int updates = fixedStepScheduler.Advance(elapsed);
 		for (int tick = 0; tick < updates; ++tick)
-			FixedUpdate(updatesInSample);
+		{
+			windowState.m_input.BeginTick();
+			FixedUpdate(windowState.m_input, rectangle, updatesInSample);
+		}
 
 		// 최소화 중에는 백 버퍼를 건드리지 않고 그리기만 쉰다. 고정 업데이트는 위에서 계속 실행된다.
 		if (!windowSize.m_isMinimized && (!windowSize.m_hasPendingResize ||
@@ -147,7 +205,14 @@ int main(void)
 			}
 
 			renderer.BeginFrame(0.1f, 0.2f, 0.4f);
-			renderer.FillRectangle(80.0f, 80.0f, 240.0f, 200.0f);
+			if (rectangle.m_destination)
+			{
+				const float xPixels = static_cast<float>(rectangle.m_destination->m_xPixels);
+				const float yPixels = static_cast<float>(rectangle.m_destination->m_yPixels);
+				renderer.FillRectangle(xPixels - 4.0f, yPixels - 4.0f, xPixels + 4.0f, yPixels + 4.0f);
+			}
+			renderer.FillRectangle(rectangle.m_centerXPixels - 80.0f, rectangle.m_centerYPixels - 60.0f,
+				rectangle.m_centerXPixels + 80.0f, rectangle.m_centerYPixels + 60.0f);
 			if (FAILED(renderer.EndFrame()))
 			{
 				DestroyWindow(window);

@@ -3,5 +3,10 @@
   <ItemGroup>
     <ClInclude Include="CFixedStepScheduler.h" />
     <ClCompile Include="CFixedStepScheduler.cpp" />
+    <Filter Include="Input" />
+    <ClInclude Include="Input\CInputManager.h"><Filter>Input</Filter></ClInclude>
+    <ClInclude Include="Input\Win32InputAdapter.h"><Filter>Input</Filter></ClInclude>
+    <ClCompile Include="Input\CInputManager.cpp"><Filter>Input</Filter></ClCompile>
+    <ClCompile Include="Input\Win32InputAdapter.cpp"><Filter>Input</Filter></ClCompile>
   </ItemGroup>
 </Project>

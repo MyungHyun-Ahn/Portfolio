@@ -46,10 +46,10 @@ def find_visible_window(process_id):
 
 
 class SandboxWindowTest(unittest.TestCase):
-    def assert_rectangle_and_background(self, window, process):
+    def assert_rectangle_and_background(self, window, process, samples=None):
         client = wintypes.RECT()
         self.assertTrue(USER32.GetClientRect(window, ctypes.byref(client)))
-        samples = (
+        samples = samples or (
             # 오른쪽 내부를 찍어 기존 프레임을 축소해 표시하는 경우를 구분한다.
             (wintypes.POINT(220, 160), (255, 255, 255)),
             (wintypes.POINT(client.right // 2, client.bottom // 2), (25, 51, 102)),
@@ -122,6 +122,47 @@ class SandboxWindowTest(unittest.TestCase):
                     process.kill()
                     process.wait(timeout=5)
 
+    def test_rectangle_moves_and_stops_at_latest_click(self):
+        with subprocess.Popen([str(EXECUTABLE)]) as process:
+            try:
+                deadline = time.monotonic() + 5
+                window = None
+                while time.monotonic() < deadline and process.poll() is None:
+                    window = find_visible_window(process.pid)
+                    if window:
+                        break
+                    time.sleep(0.02)
+                self.assertIsNotNone(window)
+                self.assertTrue(USER32.SetWindowPos(window, -1, 40, 40, 800, 600, 0x0010))
+                self.assert_rectangle_and_background(window, process)
+
+                def click(x, y):
+                    position = x | (y << 16)
+                    self.assertTrue(USER32.PostMessageW(window, 0x0201, 1, position))
+                    self.assertTrue(USER32.PostMessageW(window, 0x0202, 0, position))
+
+                white, blue = (255, 255, 255), (25, 51, 102)
+                click(610, 140)
+                # 첫 목적지에 도착하기 전에 지나가는 위치를 관찰한다.
+                self.assert_rectangle_and_background(window, process, (
+                    (wintypes.POINT(310, 140), white), (wintypes.POINT(610, 140), white), (wintypes.POINT(610, 160), blue),
+                ))
+                click(460, 350)
+                expected = ((381, 350, white), (538, 350, white), (460, 291, white), (460, 408, white),
+                            (378, 350, blue), (542, 350, blue), (460, 288, blue), (460, 412, blue), (610, 140, blue))
+                for _ in range(2):
+                    self.assert_rectangle_and_background(window, process, tuple(
+                        (wintypes.POINT(x, y), color) for x, y, color in expected
+                    ))
+                    time.sleep(0.2)
+
+                self.assertTrue(USER32.PostMessageW(window, 0x0112, 0xF060, 0))
+                self.assertEqual(process.wait(timeout=5), 0)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=5)
+
     def test_frame_and_fixed_update_rates_are_reported_without_input(self):
         with subprocess.Popen([str(EXECUTABLE)]) as process:
             try:
@@ -167,4 +208,4 @@ class SandboxWindowTest(unittest.TestCase):
 
 if __name__ == "__main__":
     EXECUTABLE = Path(sys.argv[1]).resolve()
-    unittest.main(argv=[sys.argv[0]], verbosity=2)
+    unittest.main(argv=[sys.argv[0], *sys.argv[2:]], verbosity=2)
