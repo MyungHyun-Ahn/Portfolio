@@ -19,6 +19,7 @@ namespace ClientRenderLib
 												// - 더블 버퍼링을 담당함(버퍼를 묶어서 번갈아 쓰는 구조)
 												// - BufferCount = 2 설정
 		ComPtr<ID2D1DeviceContext> spContext; 	// 그림을 그리는 객체
+		ComPtr<ID2D1SolidColorBrush> spRectangleBrush;
 	};
 
 	CDirect2DRenderer::CDirect2DRenderer() noexcept = default;
@@ -127,19 +128,29 @@ namespace ClientRenderLib
 			return result;
 
 		pResources->spContext->SetTarget(spTarget.Get());
+		result = pResources->spContext->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White),
+			pResources->spRectangleBrush.GetAddressOf());
+		if (FAILED(result))
+			return result;
 
 		// 준비가 끝난 리소스를 랜더러에 넘긴다.
 		m_pResources = std::move(pResources);
 		return S_OK;
 	}
 
-	HRESULT CDirect2DRenderer::DrawBackground(float red, float green, float blue) noexcept
+	void CDirect2DRenderer::BeginFrame(float red, float green, float blue) noexcept
 	{
-		if (!m_pResources)
-			return E_UNEXPECTED;
-
 		m_pResources->spContext->BeginDraw();
 		m_pResources->spContext->Clear(D2D1::ColorF(red, green, blue));
+	}
+
+	void CDirect2DRenderer::FillRectangle(float left, float top, float right, float bottom) noexcept
+	{
+		m_pResources->spContext->FillRectangle(D2D1::RectF(left, top, right, bottom), m_pResources->spRectangleBrush.Get());
+	}
+
+	HRESULT CDirect2DRenderer::EndFrame() noexcept
+	{
 		const HRESULT result = m_pResources->spContext->EndDraw();
 		if (FAILED(result))
 			return result;

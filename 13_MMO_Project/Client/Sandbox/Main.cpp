@@ -99,7 +99,9 @@ int main(void)
 		for (int tick = 0; tick < updates; ++tick)
 			FixedUpdate(updatesInSample);
 
-		if (FAILED(renderer.DrawBackground(0.1f, 0.2f, 0.4f)))
+		renderer.BeginFrame(0.1f, 0.2f, 0.4f);
+		renderer.FillRectangle(80.0f, 80.0f, 240.0f, 200.0f);
+		if (FAILED(renderer.EndFrame()))
 		{
 			DestroyWindow(window);
 			return 1;

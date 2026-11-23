@@ -12,8 +12,10 @@ namespace ClientRenderLib
 
 		[[nodiscard]] // Direct2DRenderer를 초기화 합니다.
 		HRESULT Initialize(HWND window) noexcept;
-		[[nodiscard]] 
-		HRESULT DrawBackground(float red, float green, float blue) noexcept;
+		// 초기화 성공 후 BeginFrame → 그리기 → EndFrame 순서로 호출한다.
+		void BeginFrame(float red, float green, float blue) noexcept;
+		void FillRectangle(float left, float top, float right, float bottom) noexcept;
+		[[nodiscard]] HRESULT EndFrame() noexcept;
 
 	private:
 		struct SResources;

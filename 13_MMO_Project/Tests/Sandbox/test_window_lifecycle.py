@@ -45,7 +45,7 @@ def find_visible_window(process_id):
 
 
 class SandboxWindowTest(unittest.TestCase):
-    def test_direct2d_background_is_presented(self):
+    def test_direct2d_rectangle_and_background_are_presented(self):
         with subprocess.Popen([str(EXECUTABLE)]) as process:
             try:
                 deadline = time.monotonic() + 5
@@ -61,23 +61,30 @@ class SandboxWindowTest(unittest.TestCase):
                 self.assertTrue(USER32.SetWindowPos(window, hwnd_topmost, 0, 0, 0, 0, swp_no_move_size_activate))
                 client = wintypes.RECT()
                 self.assertTrue(USER32.GetClientRect(window, ctypes.byref(client)))
-                point = wintypes.POINT(client.right // 2, client.bottom // 2)
-                self.assertTrue(USER32.ClientToScreen(window, ctypes.byref(point)))
+                samples = (
+                    (wintypes.POINT(180, 160), (255, 255, 255)),
+                    (wintypes.POINT(client.right // 2, client.bottom // 2), (25, 51, 102)),
+                )
+                for point, _ in samples:
+                    self.assertTrue(USER32.ClientToScreen(window, ctypes.byref(point)))
 
-                # COLORREF는 채널을 BGR 순으로 저장한다. Sandbox 배경은 RGB(25, 51, 102)다.
-                expected = (25, 51, 102)
-                color = 0xFFFFFFFF
+                colors = []
                 desktop = USER32.GetDC(None)
                 self.assertTrue(desktop)
                 try:
                     while time.monotonic() < deadline and process.poll() is None:
-                        color = GDI32.GetPixel(desktop, point.x, point.y)
-                        channels = tuple((color >> shift) & 255 for shift in (0, 8, 16))
-                        if all(abs(actual - target) <= 2 for actual, target in zip(channels, expected)):
+                        colors = [GDI32.GetPixel(desktop, point.x, point.y) for point, _ in samples]
+                        if all(
+                            color != 0xFFFFFFFF and all(
+                                abs(((color >> shift) & 255) - target) <= 2
+                                for shift, target in zip((0, 8, 16), expected)
+                            )
+                            for color, (_, expected) in zip(colors, samples)
+                        ):
                             break
                         time.sleep(0.02)
                     else:
-                        self.fail(f"Sandbox did not present the expected background: COLORREF={color:#010x}")
+                        self.fail(f"Sandbox did not present the expected rectangle and background: COLORREFs={colors!r}")
                 finally:
                     USER32.ReleaseDC(None, desktop)
 
