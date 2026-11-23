@@ -64,7 +64,6 @@ int main(void)
 	ServerNetworkLib::serverSetting::contentsThreadCount = config.m_contentsWorkerCount;
 	ServerNetworkLib::serverSetting::maxContentsFps = config.m_contentsFps;
 	ServerNetworkLib::serverSetting::packetCode = Chatting::kPacketCode;
-	ServerNetworkLib::serverSetting::packetKey = Chatting::kPacketKey;
 	MHLib::security::CEncryption::sm_packetKey = Chatting::kPacketKey;
 	MHLib::utils::g_pProfileManager = MHLib::utils::CProfileManager::GetInstance();
 	g_pLogger->WriteLog(ELogLevel::Info, L"ChatServer", 0, std::source_location::current(),

@@ -44,9 +44,6 @@
     <ClInclude Include="includes\MHLib\memory\CLfMemoryPool.h">
       <Filter>includes\MHLib\memory</Filter>
     </ClInclude>
-    <ClInclude Include="includes\MHLib\memory\CSingleMemoryPool.h">
-      <Filter>includes\MHLib\memory</Filter>
-    </ClInclude>
     <ClInclude Include="includes\MHLib\memory\CTlsMemoryPool.h">
       <Filter>includes\MHLib\memory</Filter>
     </ClInclude>

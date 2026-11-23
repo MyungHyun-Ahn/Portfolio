@@ -10,10 +10,8 @@ enum class EIoOperation
 	AcceptEx,
 	Recv,
 	Send,
-	// System Event - 3 ~
-	SendPost,
-	SendAll,
-	ReleaseSession,
+	// 세션 해제를 IOCP 워커에 넘기는 태그
+	ReleaseSession = 5,
 	None = 400
 };
 

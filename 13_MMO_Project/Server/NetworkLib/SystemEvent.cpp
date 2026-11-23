@@ -64,17 +64,6 @@ void SContentsFrameEvent::Execute(int delayFrame) noexcept
 	m_pBaseContent->ProcessRecvMsg(delayFrame);
 }
 
-void SSendAllTimerEvent::SetEvent() noexcept
-{
-	m_timeMilliseconds = 50; // 1초에 20번
-	m_nextExecuteTime = timeGetTime(); // 현재 시각
-}
-
-void SSendAllTimerEvent::Execute(int delayFrame) noexcept
-{
-	ServerNetworkLib::g_pServer->SendAll();
-}
-
 void SExampleTimerEvent::SetEvent(int param1, double param2, int frame) noexcept
 {
 	m_param1 = param1;

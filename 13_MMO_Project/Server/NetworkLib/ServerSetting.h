@@ -4,7 +4,6 @@ namespace ServerNetworkLib
 {
 namespace serverSetting
 {
-	extern BYTE packetKey;
 	extern BYTE packetCode;
 	extern std::string openIp;
 	extern USHORT openPort;

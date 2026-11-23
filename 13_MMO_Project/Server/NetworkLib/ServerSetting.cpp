@@ -4,7 +4,6 @@ namespace ServerNetworkLib
 {
 namespace serverSetting
 {
-	BYTE packetKey = 0xa9;
 	BYTE packetCode = 0x77;
 	std::string openIp;
 	USHORT openPort;

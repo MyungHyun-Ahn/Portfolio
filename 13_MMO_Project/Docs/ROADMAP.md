@@ -7,6 +7,9 @@
 
 추가 부하 시험과 성능 계측 보완은 이번 순서의 선행 조건이 아니다.
 
+### 보류 TODO
+- [ ] **서버 수신 View 전환 검토** — 현재 복사 경로와 `CRecvBuffer` / `CSerializableBufferView`를 유지한다. `ContentsRuntime`의 수신 데이터 소유권과 반환 스레드가 정해진 뒤, 복사량·TLS 공용 풀 왕복·수신 페이지 점유량을 비교해 서버에만 적용할지 결정한다.
+
 ## 완료된 작업
 ### 2차 완료 항목
 - [x] **Loki·Alloy 로그 수집** — 원격 Windows 노드의 ChatServer 원본 로그를 Alloy로 수집해 Loki로 보내고, Grafana의 `ChatServer 로그` 대시보드에서 조회를 확인했다. [로그 설계](Plan/Server/005_서버_비동기_로그_설계.md#외부-로그-수집) · [모니터링 연동 방법](Infra/002_채팅서버_모니터링.md)

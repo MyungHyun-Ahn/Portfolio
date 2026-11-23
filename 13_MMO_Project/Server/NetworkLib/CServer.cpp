@@ -322,8 +322,6 @@ CServer *g_pServer = nullptr;
 		int errVal;
 		WSAData wsaData;
 
-		m_maxSessionCount = serverSetting::maxSessionCount;
-
 		m_pSessions = new CSession * [serverSetting::maxSessionCount];
 
 		ZeroMemory((char *)m_pSessions, sizeof(CSession *) * serverSetting::maxSessionCount);
@@ -535,57 +533,6 @@ CServer *g_pServer = nullptr;
 		{
 			ReleaseSession(pSession);
 		}
-	}
-
-	// Sector 락이 잡힌 경우에만 PQCS
-	void CServer::EnqueuePacket(const UINT64 sessionId, CSerializableBuffer *pSBuffer) noexcept
-	{
-		CSession *pSession = m_pSessions[getIndex(sessionId)];
-
-		InterlockedIncrement(&pSession->m_ioCountAndRelease);
-		// ReleaseFlag가 이미 켜진 상황
-		if ((pSession->m_ioCountAndRelease & CSession::sm_releaseFlag) == CSession::sm_releaseFlag)
-		{
-			if (InterlockedDecrement(&pSession->m_ioCountAndRelease) == 0)
-			{
-				ReleaseSession(pSession, TRUE);
-			}
-			return;
-		}
-
-		if (sessionId != pSession->m_sessionId)
-		{
-			if (InterlockedDecrement(&pSession->m_ioCountAndRelease) == 0)
-			{
-				ReleaseSession(pSession, TRUE);
-			}
-			return;
-		}
-
-		if (!pSession->SendPacket(pSBuffer))
-			Disconnect(sessionId);
-
-		if (InterlockedDecrement(&pSession->m_ioCountAndRelease) == 0)
-		{
-			ReleaseSession(pSession, TRUE);
-		}
-	}
-
-	void CServer::SendAll()
-	{
-		for (int i = 0; i < serverSetting::maxSessionCount; i++)
-		{
-			if (m_pSessions[i] != nullptr)
-				m_pSessions[i]->PostSend();
-		}
-
-		InterlockedExchange(&m_sendAllFlag, FALSE);
-	}
-
-	void CServer::SendAllPqcs()
-	{
-		if (InterlockedExchange(&m_sendAllFlag, TRUE) == FALSE)
-			PostQueuedCompletionStatus(m_iocpHandle, 0, 0, (LPOVERLAPPED)EIoOperation::SendAll);
 	}
 
 	BOOL CServer::Disconnect(const UINT64 sessionId, BOOL isPqcs) noexcept
@@ -892,11 +839,6 @@ CServer *g_pServer = nullptr;
 					pSession->SendCompleted(dwTransferred);
 				}
 				break;
-				case EIoOperation::SendAll:
-				{
-					SendAll();
-					continue;
-				}
 				case EIoOperation::ReleaseSession:
 				{
 					ReleaseSessionPqcs(pSession);
@@ -926,9 +868,5 @@ CServer *g_pServer = nullptr;
 		pKeyBoardEvent->SetEvent();
 		CContentsThread::EnqueueEvent(pKeyBoardEvent);
 		// CContentThread::s_arrContentThreads[2]->EnqueueEventMy(pKeyBoardEvent);
-
-		// SendAllTimerEvent *pSendAllEvent = new SendAllTimerEvent;
-		// pSendAllEvent->SetEvent();
-		// CContentThread::s_arrContentThreads[3]->EnqueueEventMy(pSendAllEvent);
 	}
 }

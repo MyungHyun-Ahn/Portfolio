@@ -240,15 +240,6 @@ public:
 		return back;
 	}
 
-	inline void SetSessionId(UINT64 id) noexcept
-	{
-		m_sessionId = id;
-	}
-	inline UINT64 GetSessionId() noexcept
-	{
-		return m_sessionId;
-	}
-
 private:
 	using PageRelease = void (*)(char *) noexcept;
 	using BufferRelease = void (*)(CSerializableBuffer *) noexcept;
@@ -327,7 +318,6 @@ private:
 
 public:
 	BOOL			m_isEnqueueHeader = 0;
-	UINT64			m_sessionId = 0;
 
 	static MHLib::memory::CTlsMemoryPoolManager<CSerializableBuffer, 512, 2> sm_sbufferPool;
 	static MHLib::memory::CTlsPagePoolManager<(int)EBufferDefine::PacketMaxSize, 16, false> sm_pagePool;

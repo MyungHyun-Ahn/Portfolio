@@ -10,12 +10,6 @@ struct SMonitorTimerEvent : public STimerEvent
 	void Execute(int delayFrame) noexcept override;
 };
 
-struct SSendAllTimerEvent : public STimerEvent
-{
-	void SetEvent() noexcept;
-	void Execute(int delayFrame) noexcept override;
-};
-
 struct SKeyboardTimerEvent : public STimerEvent
 {
 	void SetEvent() noexcept;

@@ -154,10 +154,6 @@ class CBaseContents;
 		}
 
 		void SendPacket(const UINT64 sessionId, CSerializableBuffer *pSBuffer) noexcept;
-		// Send 시도는 하지 않음
-		void EnqueuePacket(const UINT64 sessionId, CSerializableBuffer *pSBuffer) noexcept;
-		void SendAll();
-		void SendAllPqcs();
 
 		BOOL Disconnect(const UINT64 sessionId, BOOL isPqcs = FALSE) noexcept;
 		BOOL ReleaseSession(CSession *pSession, BOOL isPqcs = FALSE) noexcept;
@@ -208,14 +204,12 @@ class CBaseContents;
 		LONG					m_sessionCount = 0;
 		LONG64					m_currentId = 0;
 
-		USHORT					m_maxSessionCount;
 		CSession				**m_pSessions;
 		CLfStack<USHORT>		m_stackDisconnectIndex;
 
 		// Worker
 		EPacketMode m_packetMode = EPacketMode::Net;
 		SOCKET					m_listenSocket = INVALID_SOCKET;
-		UINT32					m_maxWorkerThreadCount;
 		BOOL					m_isWorkerRun = TRUE;
 		bool m_hasStartedBackgroundWork = false;
 		std::vector<HANDLE>		m_arrWorkerThreads;
@@ -230,8 +224,6 @@ class CBaseContents;
 
 		// IOCP 핸들
 		HANDLE m_iocpHandle = INVALID_HANDLE_VALUE;
-
-		LONG m_sendAllFlag = FALSE;
 
 		LONG m_isStop = FALSE;
 	};

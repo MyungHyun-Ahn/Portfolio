@@ -38,10 +38,8 @@ namespace Chatting
 		}
 	}
 
-	void CProcessPacket::sendPacket(UINT64 sessionId, EPacketType type, NetworkCommonLib::CSerializableBuffer &packet) noexcept
+	void CProcessPacket::sendPacket(UINT64 sessionId, EPacketType, NetworkCommonLib::CSerializableBuffer &packet) noexcept
 	{
-		if (type == EPacketType::ResMessage)
-			packet.SetSessionId(sessionId);
 		NetworkCommonLib::PreparePacket(packet, kPacketCode, m_contents.m_server.GetPacketMode());
 		m_contents.m_server.SendPacket(sessionId, &packet);
 	}
