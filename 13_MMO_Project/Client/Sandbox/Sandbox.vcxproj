@@ -44,6 +44,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="CSandboxPlayer.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="CSandboxPlayer.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\ClientFrameworkLib\ClientFrameworkLib.vcxproj">
       <Project>{91EE45DE-B241-453E-95B9-DB2206E0A987}</Project>
     </ProjectReference>

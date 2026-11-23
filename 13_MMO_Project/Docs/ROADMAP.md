@@ -36,7 +36,7 @@
 ## 현재 클라 목표
 ### Win32 + Direct2D 2D 게임 개발 라이브러리 준비
 
-상태: Phase 2.4까지 완료. 다음은 [Phase 3.1 — 플레이어 상태 분리](Plan/Client/001_클라이언트_기반_구축.md#phase-31--플레이어-상태-분리)다. 서버 연동 없이 독립 실행형 `Sandbox`에서 단계별로 확인한다. [전체 개발 계획](Plan/Client/001_클라이언트_기반_구축.md)
+상태: Phase 3.1까지 완료. 다음은 [Phase 3.2 — 게임 루프 경계 분리](Plan/Client/001_클라이언트_기반_구축.md#phase-32--게임-루프-경계-분리)다. 서버 연동 없이 독립 실행형 `Sandbox`에서 단계별로 확인한다. [전체 개발 계획](Plan/Client/001_클라이언트_기반_구축.md)
 
 - [x] [Phase 1.1 — 빈 Win32 창 열고 닫기](Plan/Client/001_클라이언트_기반_구축.md#phase-11--빈-win32-창-열고-닫기) — 창 표시·종료 자동 검증 및 사용자 동작·코드 확인 완료.
 - [x] [Phase 1.2 — 프레임 루프](Plan/Client/001_클라이언트_기반_구축.md#phase-12--프레임-루프) — `PeekMessageW` 기반 루프, 입력 없는 상태의 FPS 표시 및 정상 종료 검증과 사용자 확인 완료.
@@ -52,9 +52,9 @@
 - [x] [Phase 2.3 — PNG 한 장](Plan/Client/001_클라이언트_기반_구축.md#phase-23--png-한-장) — 투명 PNG의 첫 프레임을 기존 사각형 위에 표시한다. x64 Debug·Release 자동 검증 및 사용자 완료 확인.
 - [x] [Phase 2.4 — 스프라이트 시트](Plan/Client/001_클라이언트_기반_구축.md#phase-24--스프라이트-시트) — 정지·이동 애니메이션과 전환을 x64 Debug·Release에서 자동 검증했으며, 사용자 확인으로 완료 처리했다. 구현 커밋 `ac70abe`의 `origin/DevClient` 반영을 확인했다.
 
-**[구조 개편 순서와 완료 기준](Plan/Client/001_클라이언트_기반_구축.md#새-구현-순서와-확인-기준)** — Win32 실행 구조와 `Game → Scene → Actor → Component`를 기준으로 삼고, 그리기는 기존 Direct2D 백엔드를 쓴다.
+**[구조 개편 순서와 완료 기준](Plan/Client/001_클라이언트_기반_구축.md#새-구현-순서와-확인-기준)** — Win32 실행 구조와 `Game → Scene → Actor → Component`를 기준으로 삼는다. `Sandbox`에 있는 코드라도 재사용할 수 있는 클라이언트 기능은 `ClientFrameworkLib`로 옮긴다. 예제 게임 로직은 `Sandbox`, Direct2D 구현은 `ClientRenderLib`에 둔다.
 
-- [ ] [Phase 3.1 — 플레이어 상태 분리](Plan/Client/001_클라이언트_기반_구축.md#phase-31--플레이어-상태-분리) — 다음 구현. 이동·방향·재생을 `CSandboxPlayer`로 옮긴다.
+- [x] [Phase 3.1 — 플레이어 상태 분리](Plan/Client/001_클라이언트_기반_구축.md#phase-31--플레이어-상태-분리) — 이동·방향·재생을 `CSandboxPlayer`로 옮겼다. x64 Debug·Release 자동 검증 및 사용자 코드 검토 완료.
 - [ ] [Phase 3.2 — 게임 루프 경계 분리](Plan/Client/001_클라이언트_기반_구축.md#phase-32--게임-루프-경계-분리) — 게임 호출과 창·고정 틱·프레임 제출의 책임을 분리한다.
 - [ ] [Phase 3.3 — 비트맵 슬롯을 이미지 ID로 교체](Plan/Client/001_클라이언트_기반_구축.md#phase-33--비트맵-슬롯을-이미지-id로-교체) — 렌더러의 고정 두 장 제한을 없앤다.
 - [ ] [Phase 3.4 — 두 번째 캐릭터로 공유와 독립 재생 검증](Plan/Client/001_클라이언트_기반_구축.md#phase-34--두-번째-캐릭터로-공유와-독립-재생-검증) — 프레임 루프를 고치지 않고 캐릭터를 추가한다.

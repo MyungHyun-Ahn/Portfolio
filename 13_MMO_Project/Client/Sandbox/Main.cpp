@@ -1,7 +1,6 @@
 #include <Windows.h>
 #include <array>
 #include <chrono>
-#include <cmath>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -14,6 +13,7 @@
 #include "Camera/CCameraManager.h"
 #include "Animation/CSpriteAnimator.h"
 #include "Transform/CoordinateTransform2D.h"
+#include "CSandboxPlayer.h"
 
 namespace
 {
@@ -22,36 +22,19 @@ namespace
 	using ClientFrameworkLib::Input::CInputManager;
 	using ClientFrameworkLib::CFixedStepScheduler;
 	using ClientFrameworkLib::Camera::CCameraManager;
-	using ClientFrameworkLib::Animation::CSpriteAnimator;
 	using ClientFrameworkLib::Transform::SCoord2D;
 	using ClientFrameworkLib::Transform::WorldToClient;
 	using ClientFrameworkLib::Transform::ClientToWorld;
+	using Sandbox::CSandboxPlayer;
+	using Sandbox::ESpriteClip;
 
 	enum class EGameAction : CInputManager::ActionId
 	{
 		MoveTo = 1,
 	};
 
-	constexpr float kMoveWorldUnitsPerTick = 300.0f / CFixedStepScheduler::kTicksPerSecond;
 	constexpr SCoord2D kWorldLandmark{460.0f, 240.0f};
 	constexpr float kSpriteFramePixels = 16.0f;
-	constexpr unsigned int kWalkFrameCount = 4;
-	constexpr unsigned int kSpriteTicksPerFrame = 6;
-	enum class ESpriteClip : unsigned int
-	{
-		Idle,
-		Walk,
-	};
-	// Idle 시트의 열 순서다.
-	enum class ESpriteFacing : unsigned int
-	{
-		Down,
-		Up,
-		Left,
-		Right,
-	};
-	// Walk 시트의 열은 상·하·좌·우 순서다.
-	constexpr std::array<unsigned int, 4> kWalkColumnsByFacing{1, 0, 2, 3};
 	constexpr float kSpriteHalfSizeWorld = 16.0f;
 	constexpr float kSpriteOffsetWorldY = -20.0f;
 
@@ -69,53 +52,16 @@ namespace
 		CInputManager m_input;
 	};
 
-	struct SRectangleMovement
+	void ApplyPlayerInput(const CInputManager& input, CSandboxPlayer& player, SCoord2D viewCenterWorld,
+		SCoord2D clientCenter, float zoom) noexcept
 	{
-		SCoord2D m_centerWorld{160.0f, 140.0f};
-		std::optional<SCoord2D> m_destinationWorld;
-		ESpriteFacing m_facing = ESpriteFacing::Down;
-	};
-
-	void FixedUpdate(const CInputManager& input, SRectangleMovement& rectangle, SCoord2D viewCenterWorld,
-		SCoord2D clientCenter, float zoom, ULONGLONG& updatesInSample) noexcept
-	{
-		++updatesInSample;
 		const auto moveTo = input.GetActionState(static_cast<CInputManager::ActionId>(EGameAction::MoveTo));
 		if (moveTo.m_wasPressed && moveTo.m_pressPosition)
 		{
 			const auto& press = *moveTo.m_pressPosition;
 			const SCoord2D click{static_cast<float>(press.m_xPixels), static_cast<float>(press.m_yPixels)};
-			const auto destination = ClientToWorld(click, viewCenterWorld, clientCenter, zoom);
-			rectangle.m_destinationWorld = destination;
-			const float deltaX = destination.m_x - rectangle.m_centerWorld.m_x;
-			const float deltaY = destination.m_y - rectangle.m_centerWorld.m_y;
-			if (deltaX != 0.0f || deltaY != 0.0f)
-			{
-				// 직선 이동을 시작할 때 방향을 정한다. 대각선이 정확히 같으면 세로 방향을 우선한다.
-				rectangle.m_facing = std::abs(deltaX) > std::abs(deltaY)
-					? (deltaX < 0.0f ? ESpriteFacing::Left : ESpriteFacing::Right)
-					: (deltaY < 0.0f ? ESpriteFacing::Up : ESpriteFacing::Down);
-			}
+			player.MoveTo(ClientToWorld(click, viewCenterWorld, clientCenter, zoom));
 		}
-		if (!rectangle.m_destinationWorld)
-			return;
-
-		const SCoord2D target = *rectangle.m_destinationWorld;
-		const float deltaX = target.m_x - rectangle.m_centerWorld.m_x;
-		const float deltaY = target.m_y - rectangle.m_centerWorld.m_y;
-		const float distanceWorld = std::hypot(deltaX, deltaY);
-
-		// 한 틱 이동 거리 안에 목적지가 있으면 지나치지 말고 그 자리에서 멈춘다.
-		if (distanceWorld <= kMoveWorldUnitsPerTick)
-		{
-			rectangle.m_centerWorld = target;
-			rectangle.m_destinationWorld.reset();
-			return;
-		}
-
-		const float stepRatio = kMoveWorldUnitsPerTick / distanceWorld;
-		rectangle.m_centerWorld.m_x += deltaX * stepRatio;
-		rectangle.m_centerWorld.m_y += deltaY * stepRatio;
 	}
 
 	// Windows에 등록한 콜백
@@ -217,11 +163,10 @@ int main(void)
 	MSG message{};
 	using Clock = std::chrono::steady_clock;
 	CFixedStepScheduler fixedStepScheduler;
-	SRectangleMovement rectangle;
-	ESpriteClip spriteClip = ESpriteClip::Idle;
-	CSpriteAnimator spriteAnimator;
+	CSandboxPlayer player;
 	CCameraManager cameraManager;
-	cameraManager.FollowTarget(rectangle.m_centerWorld.m_x, rectangle.m_centerWorld.m_y);
+	const auto initialCenterWorld = player.GetCenterWorld();
+	cameraManager.FollowTarget(initialCenterWorld.m_x, initialCenterWorld.m_y);
 	auto& windowSize = windowState.m_size;
 	RECT initialClient{};
 	if (!GetClientRect(window, &initialClient))
@@ -262,19 +207,11 @@ int main(void)
 			windowState.m_input.BeginTick();
 			const SCoord2D viewCenterWorld{cameraManager.GetCenterWorldX(), cameraManager.GetCenterWorldY()};
 			// 같은 틱의 클릭은 줌 변경 전 배율로 해석한다.
-			FixedUpdate(windowState.m_input, rectangle, viewCenterWorld, clientCenter, cameraManager.GetZoom(), updatesInSample);
-			const auto nextClip = rectangle.m_destinationWorld ? ESpriteClip::Walk : ESpriteClip::Idle;
-			if (nextClip != spriteClip)
-			{
-				spriteClip = nextClip;
-				if (spriteClip == ESpriteClip::Walk)
-					spriteAnimator.Restart(kWalkFrameCount, kSpriteTicksPerFrame);
-			}
-			else if (spriteClip == ESpriteClip::Walk)
-			{
-				spriteAnimator.AdvanceTick();
-			}
-			cameraManager.FollowTarget(rectangle.m_centerWorld.m_x, rectangle.m_centerWorld.m_y);
+			ApplyPlayerInput(windowState.m_input, player, viewCenterWorld, clientCenter, cameraManager.GetZoom());
+			player.FixedUpdate();
+			++updatesInSample;
+			const auto playerCenterWorld = player.GetCenterWorld();
+			cameraManager.FollowTarget(playerCenterWorld.m_x, playerCenterWorld.m_y);
 			const auto wheelSteps = windowState.m_input.GetWheelSteps();
 			for (auto steps = wheelSteps; steps > 0; --steps)
 				cameraManager.ZoomIn();
@@ -305,25 +242,24 @@ int main(void)
 			const float landmarkHalfSize = 5.0f * zoom;
 			renderer.FillRectangle(landmark.m_x - landmarkHalfSize, landmark.m_y - landmarkHalfSize,
 				landmark.m_x + landmarkHalfSize, landmark.m_y + landmarkHalfSize);
-			if (rectangle.m_destinationWorld)
+			if (const auto destinationWorld = player.GetDestinationWorld())
 			{
-				const auto target = WorldToClient(*rectangle.m_destinationWorld, viewCenterWorld, clientCenter, zoom);
+				const auto target = WorldToClient(*destinationWorld, viewCenterWorld, clientCenter, zoom);
 				renderer.FillRectangle(target.m_x - 4.0f, target.m_y - 4.0f, target.m_x + 4.0f, target.m_y + 4.0f);
 			}
-			const auto center = WorldToClient(rectangle.m_centerWorld, viewCenterWorld, clientCenter, zoom);
+			const auto playerCenterWorld = player.GetCenterWorld();
+			const auto center = WorldToClient(playerCenterWorld, viewCenterWorld, clientCenter, zoom);
 			const float halfWidth = 80.0f * zoom;
 			const float halfHeight = 60.0f * zoom;
 			renderer.FillRectangle(center.m_x - halfWidth, center.m_y - halfHeight, center.m_x + halfWidth, center.m_y + halfHeight);
-			const SCoord2D spriteWorld{rectangle.m_centerWorld.m_x, rectangle.m_centerWorld.m_y + kSpriteOffsetWorldY};
+			const SCoord2D spriteWorld{playerCenterWorld.m_x, playerCenterWorld.m_y + kSpriteOffsetWorldY};
 			const auto spriteCenter = WorldToClient(spriteWorld, viewCenterWorld, clientCenter, zoom);
 			const float spriteHalfSize = kSpriteHalfSizeWorld * zoom;
-			const auto facingIndex = static_cast<unsigned int>(rectangle.m_facing);
-			const bool isWalking = spriteClip == ESpriteClip::Walk;
-			const auto sourceColumn = isWalking ? kWalkColumnsByFacing[facingIndex] : facingIndex;
-			const auto sourceRow = isWalking ? spriteAnimator.GetFrameIndex() : 0u;
-			const float sourceLeftPixels = static_cast<float>(sourceColumn) * kSpriteFramePixels;
-			const float sourceTopPixels = static_cast<float>(sourceRow) * kSpriteFramePixels;
-			renderer.DrawSprite(static_cast<unsigned int>(spriteClip), spriteCenter.m_x - spriteHalfSize, spriteCenter.m_y - spriteHalfSize,
+			const auto spriteFrame = player.GetSpriteFrame();
+			const float sourceLeftPixels = static_cast<float>(spriteFrame.m_column) * kSpriteFramePixels;
+			const float sourceTopPixels = static_cast<float>(spriteFrame.m_row) * kSpriteFramePixels;
+			renderer.DrawSprite(static_cast<unsigned int>(spriteFrame.m_clip),
+				spriteCenter.m_x - spriteHalfSize, spriteCenter.m_y - spriteHalfSize,
 				spriteCenter.m_x + spriteHalfSize, spriteCenter.m_y + spriteHalfSize,
 				{sourceLeftPixels, sourceTopPixels, sourceLeftPixels + kSpriteFramePixels, sourceTopPixels + kSpriteFramePixels});
 			if (FAILED(renderer.EndFrame()))

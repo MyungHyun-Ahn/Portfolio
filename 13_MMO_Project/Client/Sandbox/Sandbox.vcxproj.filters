@@ -2,5 +2,9 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="CSandboxPlayer.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="CSandboxPlayer.h" />
   </ItemGroup>
 </Project>
