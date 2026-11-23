@@ -5,6 +5,8 @@ namespace Chatting
 {
 	struct SHeartbeatNoti final : public MHLib::serialization::ISerializable
 	{
+		static constexpr EPacketType kPacketType = EPacketType::HeartbeatNoti;
+
 		std::int64_t m_accountNo{};
 
 		[[nodiscard]] bool Serialize(NetworkCommonLib::CSerializableBuffer &buffer) const noexcept override

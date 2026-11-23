@@ -2,6 +2,8 @@
 
 namespace ServerNetworkLib
 {
+using SendPacketPtr = MHLib::utils::CSmartPtr<NetworkCommonLib::CSerializableBuffer>;
+
 struct SContentsFrameEvent;
 class CBaseContents;
 

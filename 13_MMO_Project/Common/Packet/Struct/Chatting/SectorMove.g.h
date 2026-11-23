@@ -5,6 +5,8 @@ namespace Chatting
 {
 	struct SReqSectorMove final : public MHLib::serialization::ISerializable
 	{
+		static constexpr EPacketType kPacketType = EPacketType::ReqSectorMove;
+
 		std::int64_t m_accountNo{};
 		std::uint16_t m_sectorX{};
 		std::uint16_t m_sectorY{};
@@ -30,6 +32,8 @@ namespace Chatting
 
 	struct SResSectorMove final : public MHLib::serialization::ISerializable
 	{
+		static constexpr EPacketType kPacketType = EPacketType::ResSectorMove;
+
 		std::int64_t m_accountNo{};
 		std::uint16_t m_sectorX{};
 		std::uint16_t m_sectorY{};

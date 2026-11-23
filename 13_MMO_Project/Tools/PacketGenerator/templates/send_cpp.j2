@@ -18,48 +18,40 @@
 
 namespace Chatting
 {
+{% if side == 'Client' %}
 {% for packet in packets %}
-{% set buffer = 'spBuffer' if side == 'Client' else 'pBuffer' %}
-	{{ 'std::shared_ptr<NetworkCommonLib::CSerializableBuffer> ' if side == 'Client' else 'NetworkCommonLib::CSerializableBuffer *' }}MakePacket{{ packet.name }}(const S{{ packet.name }} &packet) noexcept
+	std::shared_ptr<NetworkCommonLib::CSerializableBuffer> MakePacket{{ packet.name }}(const S{{ packet.name }} &packet) noexcept
 	{
-		auto {{ '' if side == 'Client' else '*' }}{{ buffer }} = NetworkCommonLib::CSerializableBuffer::{{ 'MakeShared' if side == 'Client' else 'Alloc' }}();
-		if ({{ buffer }} == nullptr)
+		auto spBuffer = NetworkCommonLib::CSerializableBuffer::MakeShared();
+		if (spBuffer == nullptr)
 		{
 			return nullptr;
 		}
 
-		*{{ buffer }} << static_cast<std::uint16_t>(EPacketType::{{ packet.name }}) << packet;
-		if (!{{ buffer }}->IsValid())
+		*spBuffer << static_cast<std::uint16_t>(EPacketType::{{ packet.name }}) << packet;
+		if (!spBuffer->IsValid())
 		{
-{% if side == 'Server' %}
-			NetworkCommonLib::CSerializableBuffer::Free(pBuffer);
-{% endif %}
 			return nullptr;
 		}
-		return {{ buffer }};
+		return spBuffer;
 	}
 {% if not loop.last %}
 
 {% endif %}
 {% endfor %}
-{% if side == 'Server' %}
-
-	NetworkCommonLib::CSerializableBuffer *CServerPacketSender::submitPreparedPacket(
-		UINT64 sessionId, EPacketType type, NetworkCommonLib::CSerializableBuffer *pPacket) noexcept
-	{
-		if (pPacket == nullptr)
-		{
-			return nullptr;
-		}
-		pPacket->IncreaseRef();
-		sendPacket(sessionId, type, *pPacket);
-		return pPacket;
-	}
-{% else %}
 
 	bool CChatNetClient::onRecv(NetworkCommonLib::CSerializableBuffer &message) noexcept
 	{
 		return DispatchClientPacket(message, *this);
+	}
+{% else %}
+	bool CServerPacketSender::SendPacket(UINT64 sessionId, const ServerNetworkLib::SendPacketPtr &spPacket) noexcept
+	{
+		auto *pPacket = spPacket.GetRealPtr();
+		if (pPacket == nullptr)
+			return false;
+		sendPacket(sessionId, *pPacket);
+		return true;
 	}
 {% endif %}
 {% for packet in packets %}
@@ -84,14 +76,13 @@ namespace Chatting
 		}
 		catch (const std::bad_alloc &)
 		{
-			return {{ 'false' if side == 'Client' else 'nullptr' }};
+			return false;
 		}
 {% endif %}
 {% if side == 'Client' %}
 		return this->sendPacket(MakePacket{{ packet.name }}(packet));
 {% else %}
-		return this->submitPreparedPacket(sessionId, EPacketType::{{ packet.name }},
-			MakePacket{{ packet.name }}(packet));
+		return SendPacket(sessionId, MakePacket(packet));
 {% endif %}
 	}
 {% endfor %}

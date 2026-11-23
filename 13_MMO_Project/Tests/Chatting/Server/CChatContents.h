@@ -16,7 +16,7 @@ namespace Chatting
 		ServerNetworkLib::ERecvResult OnRecv(UINT64 sessionId, NetworkCommonLib::CSerializableBufferView *pMessage,
 			int delayFrame) noexcept override;
 		void OnLoopEnd() noexcept override;
-		void SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX, NetworkCommonLib::CSerializableBuffer *pMessage) noexcept;
+		void SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX, const ServerNetworkLib::SendPacketPtr &spMessage) noexcept;
 
 	private:
 		void nonLoginHeartbeat() noexcept;

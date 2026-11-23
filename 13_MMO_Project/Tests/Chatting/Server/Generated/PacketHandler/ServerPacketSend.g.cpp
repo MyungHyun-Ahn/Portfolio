@@ -8,87 +8,16 @@
 
 namespace Chatting
 {
-	NetworkCommonLib::CSerializableBuffer *MakePacketResMessage(const SResMessage &packet) noexcept
+	bool CServerPacketSender::SendPacket(UINT64 sessionId, const ServerNetworkLib::SendPacketPtr &spPacket) noexcept
 	{
-		auto *pBuffer = NetworkCommonLib::CSerializableBuffer::Alloc();
-		if (pBuffer == nullptr)
-		{
-			return nullptr;
-		}
-
-		*pBuffer << static_cast<std::uint16_t>(EPacketType::ResMessage) << packet;
-		if (!pBuffer->IsValid())
-		{
-			NetworkCommonLib::CSerializableBuffer::Free(pBuffer);
-			return nullptr;
-		}
-		return pBuffer;
-	}
-
-	NetworkCommonLib::CSerializableBuffer *MakePacketMessageNoti(const SMessageNoti &packet) noexcept
-	{
-		auto *pBuffer = NetworkCommonLib::CSerializableBuffer::Alloc();
-		if (pBuffer == nullptr)
-		{
-			return nullptr;
-		}
-
-		*pBuffer << static_cast<std::uint16_t>(EPacketType::MessageNoti) << packet;
-		if (!pBuffer->IsValid())
-		{
-			NetworkCommonLib::CSerializableBuffer::Free(pBuffer);
-			return nullptr;
-		}
-		return pBuffer;
-	}
-
-	NetworkCommonLib::CSerializableBuffer *MakePacketResLogin(const SResLogin &packet) noexcept
-	{
-		auto *pBuffer = NetworkCommonLib::CSerializableBuffer::Alloc();
-		if (pBuffer == nullptr)
-		{
-			return nullptr;
-		}
-
-		*pBuffer << static_cast<std::uint16_t>(EPacketType::ResLogin) << packet;
-		if (!pBuffer->IsValid())
-		{
-			NetworkCommonLib::CSerializableBuffer::Free(pBuffer);
-			return nullptr;
-		}
-		return pBuffer;
-	}
-
-	NetworkCommonLib::CSerializableBuffer *MakePacketResSectorMove(const SResSectorMove &packet) noexcept
-	{
-		auto *pBuffer = NetworkCommonLib::CSerializableBuffer::Alloc();
-		if (pBuffer == nullptr)
-		{
-			return nullptr;
-		}
-
-		*pBuffer << static_cast<std::uint16_t>(EPacketType::ResSectorMove) << packet;
-		if (!pBuffer->IsValid())
-		{
-			NetworkCommonLib::CSerializableBuffer::Free(pBuffer);
-			return nullptr;
-		}
-		return pBuffer;
-	}
-
-	NetworkCommonLib::CSerializableBuffer *CServerPacketSender::submitPreparedPacket(
-		UINT64 sessionId, EPacketType type, NetworkCommonLib::CSerializableBuffer *pPacket) noexcept
-	{
+		auto *pPacket = spPacket.GetRealPtr();
 		if (pPacket == nullptr)
-		{
-			return nullptr;
-		}
-		pPacket->IncreaseRef();
-		sendPacket(sessionId, type, *pPacket);
-		return pPacket;
+			return false;
+		sendPacket(sessionId, *pPacket);
+		return true;
 	}
 
-	NetworkCommonLib::CSerializableBuffer *CServerPacketSender::SendResMessage(
+	bool CServerPacketSender::SendResMessage(
 
 		UINT64 sessionId,
 		std::int64_t accountNo,
@@ -106,13 +35,12 @@ namespace Chatting
 		}
 		catch (const std::bad_alloc &)
 		{
-			return nullptr;
+			return false;
 		}
-		return this->submitPreparedPacket(sessionId, EPacketType::ResMessage,
-			MakePacketResMessage(packet));
+		return SendPacket(sessionId, MakePacket(packet));
 	}
 
-	NetworkCommonLib::CSerializableBuffer *CServerPacketSender::SendNotiMessage(
+	bool CServerPacketSender::SendNotiMessage(
 
 		UINT64 sessionId,
 		std::int64_t accountNo,
@@ -130,13 +58,12 @@ namespace Chatting
 		}
 		catch (const std::bad_alloc &)
 		{
-			return nullptr;
+			return false;
 		}
-		return this->submitPreparedPacket(sessionId, EPacketType::MessageNoti,
-			MakePacketMessageNoti(packet));
+		return SendPacket(sessionId, MakePacket(packet));
 	}
 
-	NetworkCommonLib::CSerializableBuffer *CServerPacketSender::SendResLogin(
+	bool CServerPacketSender::SendResLogin(
 
 		UINT64 sessionId,
 		std::uint8_t status,
@@ -145,11 +72,10 @@ namespace Chatting
 		SResLogin packet;
 		packet.m_status = status;
 		packet.m_accountNo = accountNo;
-		return this->submitPreparedPacket(sessionId, EPacketType::ResLogin,
-			MakePacketResLogin(packet));
+		return SendPacket(sessionId, MakePacket(packet));
 	}
 
-	NetworkCommonLib::CSerializableBuffer *CServerPacketSender::SendResSectorMove(
+	bool CServerPacketSender::SendResSectorMove(
 
 		UINT64 sessionId,
 		std::int64_t accountNo,
@@ -160,7 +86,6 @@ namespace Chatting
 		packet.m_accountNo = accountNo;
 		packet.m_sectorX = sectorX;
 		packet.m_sectorY = sectorY;
-		return this->submitPreparedPacket(sessionId, EPacketType::ResSectorMove,
-			MakePacketResSectorMove(packet));
+		return SendPacket(sessionId, MakePacket(packet));
 	}
 }

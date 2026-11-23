@@ -2,19 +2,35 @@
 
 namespace Chatting
 {
-{% if side == 'Server' %}
-	enum class EPacketType : std::uint16_t;
-{% endif %}
 {% for packet in packets %}
 	struct S{{ packet.name }};
 {% endfor %}
 {% if packets %}
 
 {% endif %}
+{% if side == 'Client' %}
 {% for packet in packets %}
-	[[nodiscard]] {% if side == 'Client' %}std::shared_ptr<NetworkCommonLib::CSerializableBuffer> {% else %}NetworkCommonLib::CSerializableBuffer *{% endif %}MakePacket{{ packet.name }}(
+	[[nodiscard]] std::shared_ptr<NetworkCommonLib::CSerializableBuffer> MakePacket{{ packet.name }}(
 		const S{{ packet.name }} &packet) noexcept;
 {% endfor %}
+{% else %}
+{% if packets %}
+	template<typename TPacket>
+		requires (
+{% for packet in packets %}
+			std::same_as<TPacket, S{{ packet.name }}>{{ ' ||' if not loop.last else ')' }}
+{% endfor %}
+	[[nodiscard]]
+	ServerNetworkLib::SendPacketPtr MakePacket(const TPacket &packet) noexcept
+	{
+		auto spBuffer = ServerNetworkLib::SendPacketPtr::MakeShared();
+		*spBuffer << static_cast<std::uint16_t>(TPacket::kPacketType) << packet;
+		if (!spBuffer->IsValid())
+			return {};
+		return spBuffer;
+	}
+{% endif %}
+{% endif %}
 
 {% if side == 'Client' %}
 	class CChatNetClient : public ClientNetworkLib::CClient, private IClientPacketHandler
@@ -23,11 +39,13 @@ namespace Chatting
 {% endif %}
 	{
 	public:
-{% for packet in packets %}
 {% if side == 'Server' %}
-		// 준비 실패 시 nullptr. 반환한 참조 1개는 호출자가 반환한다. 첫 전송 성공을 뜻하지 않는다.
+		// 버퍼가 있으면 송신을 요청한다. 접수나 전송 완료는 보장하지 않는다.
+		bool SendPacket(UINT64 sessionId, const ServerNetworkLib::SendPacketPtr &spPacket) noexcept;
+
 {% endif %}
-		[[nodiscard]] {{ packet.send_result }}{{ packet.send_name }}({% if packet.send_parameters %}{{ '\n' }}
+{% for packet in packets %}
+		{{ '[[nodiscard]] ' if side == 'Client' else '' }}{{ packet.send_result }}{{ packet.send_name }}({% if packet.send_parameters %}{{ '\n' }}
 {% for parameter in packet.send_parameters %}
 			{{ parameter }}{{ ',' if not loop.last else ') noexcept;' }}
 {% endfor %}
@@ -50,12 +68,9 @@ namespace Chatting
 #include "CChatNetClientMembers.inc"
 {% else %}
 		virtual ~C{{ side }}PacketSender() = default;
-		// 직렬화된 버퍼를 받아 호출자 참조를 확보한 뒤 전송한다.
-		[[nodiscard]] NetworkCommonLib::CSerializableBuffer *submitPreparedPacket(
-			UINT64 sessionId, EPacketType type, NetworkCommonLib::CSerializableBuffer *pPacket) noexcept;
 
 	private:
-		virtual void sendPacket(UINT64 sessionId, EPacketType type, NetworkCommonLib::CSerializableBuffer &packet) noexcept = 0;
+		virtual void sendPacket(UINT64 sessionId, NetworkCommonLib::CSerializableBuffer &packet) noexcept = 0;
 {% endif %}
 	};
 }

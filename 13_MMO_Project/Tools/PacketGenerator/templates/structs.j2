@@ -5,6 +5,8 @@ namespace Chatting
 {% for packet in packets %}
 	struct S{{ packet.name }} final : public MHLib::serialization::ISerializable
 	{
+		static constexpr EPacketType kPacketType = EPacketType::{{ packet.name }};
+
 {% for field in packet.fields %}
 		{{ field.cpp_type }} {{ field.member }}{};
 {% endfor %}

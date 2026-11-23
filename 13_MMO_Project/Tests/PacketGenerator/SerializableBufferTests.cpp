@@ -1,12 +1,14 @@
-#include "NetworkCommonLibPch.h"
+#include "../../Server/NetworkLib/ServerNetworkLibPch.h"
 #include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <limits>
 #include "MHLib/serialization/ISerializable.h"
 #include "CSerializableBuffer.h"
+#include "../../Common/Packet/Struct/PacketTypes.g.h"
 #include "../../Common/Packet/Struct/Chatting/Login.g.h"
 #include "../../Common/Packet/Struct/Chatting/Chatting.g.h"
+#include "../Chatting/Server/Generated/PacketHandler/ServerPacketSend.g.h"
 #include "../Chatting/Common/CommonProtocol.h"
 
 #ifdef NDEBUG
@@ -256,6 +258,31 @@ void TestRawBufferBoundaries()
 	assert(buffer.MoveWritePos((std::numeric_limits<int>::max)()) == 1024 && !buffer.IsValid());
 }
 
+void TestServerPacketBuilder()
+{
+	using NetworkCommonLib::CSerializableBuffer;
+	const LONG usage = CSerializableBuffer::GetPoolUsage();
+	{
+		Chatting::SResLogin response;
+		response.m_status = 1;
+		response.m_accountNo = 42;
+		ServerNetworkLib::SendPacketPtr spPacket = Chatting::MakePacket(response);
+		assert(spPacket.GetRealPtr() != nullptr && CSerializableBuffer::GetPoolUsage() == usage + 1);
+		std::uint16_t type{};
+		Chatting::SResLogin decoded;
+		*spPacket >> type >> decoded;
+		assert(type == static_cast<std::uint16_t>(Chatting::EPacketType::ResLogin));
+		assert(decoded.m_status == 1 && decoded.m_accountNo == 42);
+		assert(spPacket->IsValid() && spPacket->GetDataSize() == 0);
+	}
+	assert(CSerializableBuffer::GetPoolUsage() == usage);
+
+	Chatting::SMessageNoti notification;
+	notification.m_message.assign(1024, L'x');
+	const auto spInvalid = Chatting::MakePacket(notification);
+	assert(spInvalid.GetRealPtr() == nullptr && CSerializableBuffer::GetPoolUsage() == usage);
+}
+
 int main(void)
 {
 	TestFixedCapacity();
@@ -268,4 +295,5 @@ int main(void)
 	TestChatNameWire();
 	TestPoolReset();
 	TestRawBufferBoundaries();
+	TestServerPacketBuilder();
 }

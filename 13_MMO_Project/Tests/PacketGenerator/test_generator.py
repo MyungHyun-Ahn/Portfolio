@@ -107,7 +107,7 @@ class GeneratorTests(unittest.TestCase):
             self.assertRegex(dto, r'buffer\s*>> m_accountNo\s*>> m_id\s*>> m_nickname\s*>> m_message;')
             self.assertIn(f'Handle{name}', (self.client / 'ClientPacketDispatch.g.cpp').read_text(encoding='utf-8'))
             self.assertNotIn(f'Handle{name}', (self.server / 'ServerPacketDispatch.g.cpp').read_text(encoding='utf-8'))
-        self.assertIn('MakePacketMessageNoti', (self.server / 'ServerPacketSend.g.h').read_text(encoding='utf-8'))
+        self.assertIn('std::same_as<TPacket, SMessageNoti>', (self.server / 'ServerPacketSend.g.h').read_text(encoding='utf-8'))
         self.assertIn('MHLib::serialization::ISerializable', login)
         self.assertRegex(login, r'buffer\s*<< m_accountNo\s*<< m_id\s*<< m_nickname\s*<< m_sessionKey')
         self.assertIn('Chatting/ChattingPacketAll.g.h', (self.common / 'IncludePacketAll.g.h').read_text())
@@ -175,10 +175,15 @@ class GeneratorTests(unittest.TestCase):
                     self.assertRegex(send, r'if \(!spBuffer->IsValid\(\)\)\s*\{\s*return nullptr;')
                     self.assertNotIn('::Free(', send)
                 else:
-                    self.assertIn('NetworkCommonLib::CSerializableBuffer *MakePacket', header)
-                    self.assertIn('CSerializableBuffer::Alloc()', send)
-                    self.assertIn(f'*pBuffer << static_cast<std::uint16_t>(EPacketType::{packet}) << packet;', send)
-                    self.assertRegex(send, r'if \(!pBuffer->IsValid\(\)\)\s*\{\s*.*::Free\(pBuffer\);')
+                    login = (self.common / 'Chatting/Login.g.h').read_text(encoding='utf-8')
+                    self.assertIn('static constexpr EPacketType kPacketType = EPacketType::ResLogin;', login)
+                    self.assertIn('ServerNetworkLib::SendPacketPtr MakePacket(const TPacket &packet) noexcept', header)
+                    self.assertIn('ServerNetworkLib::SendPacketPtr::MakeShared()', header)
+                    self.assertNotIn('using SendPacketPtr', header)
+                    self.assertIn('*spBuffer << static_cast<std::uint16_t>(TPacket::kPacketType) << packet;', header)
+                    self.assertRegex(header, r'if \(!spBuffer->IsValid\(\)\)\s*return \{\};')
+                    for manual in ('IncreaseRef(', 'DecreaseRef(', '::Free('):
+                        self.assertNotIn(manual, header + send)
                 self.assertEqual(dispatch.count('message >> type;'), int(side == 'Client'))
                 self.assertRegex(dispatch, r'message >> packet;\s*return message.IsValid\(\)'
                                  r' && message.GetDataSize\(\) == 0\s*&& handler.Handle')
@@ -206,20 +211,21 @@ class GeneratorTests(unittest.TestCase):
         self.assertRegex(server, r'SendResMessage\([\s\S]*?const std::wstring &id,\s*const std::wstring &nickname,\s*'
                                  r'const std::wstring &message')
         for name in ('Login', 'SectorMove', 'Message'):
-            self.assertRegex(server, rf'\*SendRes{name}\(\s*UINT64 sessionId,')
+            self.assertRegex(server, rf'bool SendRes{name}\(\s*UINT64 sessionId,')
             self.assertNotIn(f'SendRes{name}', client)
         self.assertNotRegex(server, r'SendReq|SendNotiHeartbeat')
-        self.assertRegex(server, r'\*SendNotiMessage\(\s*UINT64 sessionId,')
+        self.assertRegex(server, r'bool SendNotiMessage\(\s*UINT64 sessionId,')
         self.assertNotIn('SendNotiMessage', client)
         self.assertIn('packet.m_message = message;', client_cpp)
         self.assertRegex(client_cpp, r'catch \(const std::bad_alloc &\)\s*\{\s*return false;')
         for name in ('ReqLogin', 'ReqSectorMove', 'ReqMessage', 'HeartbeatNoti'):
             self.assertIn(f'return this->sendPacket(MakePacket{name}(packet));', client_cpp)
         self.assertNotIn('submitChatRequest', client_cpp)
-        self.assertRegex(server_cpp, r'catch \(const std::bad_alloc &\)\s*\{\s*return nullptr;')
-        self.assertRegex(server_cpp, r'submitPreparedPacket\(sessionId, EPacketType::ResMessage,\s*MakePacketResMessage\(packet\)\)')
-        self.assertRegex(server_cpp, r'if \(pPacket == nullptr\)\s*\{\s*return nullptr;\s*\}\s*'
-                                     r'pPacket->IncreaseRef\(\);\s*sendPacket\(sessionId, type, \*pPacket\);\s*return pPacket;')
+        self.assertRegex(server_cpp, r'catch \(const std::bad_alloc &\)\s*\{\s*return false;')
+        self.assertIn('bool SendPacket(UINT64 sessionId, const ServerNetworkLib::SendPacketPtr &spPacket) noexcept;', server)
+        self.assertIn('return SendPacket(sessionId, MakePacket(packet));', server_cpp)
+        self.assertNotIn('submitPreparedPacket', server + server_cpp)
+        self.assertNotIn('EPacketType type', server + server_cpp)
 
     def test_server_noti_and_field_parameter_name_conflicts(self):
         schema = NOTI.replace('client_to_server', 'server_to_client').replace('account_no', 'session_id')
@@ -232,9 +238,9 @@ class GeneratorTests(unittest.TestCase):
         self.assert_generated(self.generate())
         server = (self.server / 'ServerPacketSend.g.h').read_text(encoding='utf-8')
         server_cpp = (self.server / 'ServerPacketSend.g.cpp').read_text()
-        self.assertRegex(server, r'\*SendNotiPulse\(\s*UINT64 sessionId,\s*std::int64_t sessionIdValue,\s*'
+        self.assertRegex(server, r'bool SendNotiPulse\(\s*UINT64 sessionId,\s*std::int64_t sessionIdValue,\s*'
                                  r'std::uint8_t packetValue2,\s*std::uint8_t classValue,\s*std::uint8_t packetValue\) noexcept;')
-        self.assertRegex(server, r'\*SendNotiReady\(\s*UINT64 sessionId\) noexcept;')
+        self.assertRegex(server, r'bool SendNotiReady\(\s*UINT64 sessionId\) noexcept;')
         self.assertIn('packet.m_sessionId = sessionIdValue;', server_cpp)
         self.assertIn('packet.m_packet = packetValue2;', server_cpp)
         self.assertNotIn('SendNotiPulse', (self.client / 'CChatNetClient.g.h').read_text(encoding='utf-8'))

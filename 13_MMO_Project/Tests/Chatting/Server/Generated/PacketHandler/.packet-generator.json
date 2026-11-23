@@ -3,8 +3,8 @@
     "IServerPacketHandler.g.h": "8942ee77f76ba4a97ce3f64ae278836f88ec968023d5693ab612e3323817fbc6",
     "ServerPacketDispatch.g.cpp": "2f6f94dd6a075d596c390caaaef812bf5a04af8066157c1fe5deb9b7a8238416",
     "ServerPacketDispatch.g.h": "f5e8d607f2cf6603ab86fdf4f66f75245126ecf2b268dd5beabe6bb9eaef91d7",
-    "ServerPacketSend.g.cpp": "6a28caf80217a862cac6e28da18f296286b895ba50436568e4b68a9a20e76b4a",
-    "ServerPacketSend.g.h": "1c3a605f0f83922c38728188d8772eedbc12372c36c76f3e390abc08cc340162"
+    "ServerPacketSend.g.cpp": "11be6b9f11a04d0fd4f62066a49f1ff4ce46bd9a90a71f3c40d01894d4ae8c85",
+    "ServerPacketSend.g.h": "d0a0081b23e24d22a1455e9c6a89630e0bc33fb787ca0c69e5194f5a2a069f9f"
   },
   "role": "Server",
   "version": 1

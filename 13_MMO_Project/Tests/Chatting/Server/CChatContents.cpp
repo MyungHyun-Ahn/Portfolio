@@ -10,6 +10,7 @@
 #include "CBaseContents.h"
 #include "CMonitor.h"
 #include "CommonProtocol.h"
+#include "PacketFraming.h"
 #include "CPlayer.h"
 #include "CSector.h"
 #include "PacketTypes.g.h"
@@ -102,8 +103,11 @@ namespace Chatting
 	}
 
 	void CChatContents::SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX,
-		NetworkCommonLib::CSerializableBuffer *pMessage) noexcept
+		const ServerNetworkLib::SendPacketPtr &spMessage) noexcept
 	{
+		auto *pMessage = spMessage.GetRealPtr();
+		// 공유하는 송신 버퍼는 큐에 넣기 전에 한 번만 준비한다.
+		NetworkCommonLib::PreparePacket(*pMessage, kPacketCode, m_server.GetPacketMode());
 		int startY = sectorY - kSectorViewStart;
 		int startX = sectorX - kSectorViewStart;
 		for (int y = 0; y < kSectorViewCount; y++)

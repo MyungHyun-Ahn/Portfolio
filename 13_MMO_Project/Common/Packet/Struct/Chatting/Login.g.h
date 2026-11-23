@@ -5,6 +5,8 @@ namespace Chatting
 {
 	struct SReqLogin final : public MHLib::serialization::ISerializable
 	{
+		static constexpr EPacketType kPacketType = EPacketType::ReqLogin;
+
 		std::int64_t m_accountNo{};
 		std::wstring m_id{};
 		std::wstring m_nickname{};
@@ -33,6 +35,8 @@ namespace Chatting
 
 	struct SResLogin final : public MHLib::serialization::ISerializable
 	{
+		static constexpr EPacketType kPacketType = EPacketType::ResLogin;
+
 		std::uint8_t m_status{};
 		std::int64_t m_accountNo{};
 
