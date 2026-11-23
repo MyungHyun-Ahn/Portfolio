@@ -10,3 +10,10 @@ datasources:
     editable: false
     jsonData:
       timeInterval: 5s
+
+  - name: Loki
+    uid: portfolio-loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false

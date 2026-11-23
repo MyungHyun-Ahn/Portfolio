@@ -1,0 +1,19 @@
+loki.source.file "chatserver" {
+	targets = [{
+		__path__ = sys.env("CHATSERVER_LOG_GLOB"),
+		service  = "chatserver",
+	}]
+
+	file_match {
+		enabled = true
+	}
+
+	tail_from_end = true
+	forward_to    = [loki.write.portfolio.receiver]
+}
+
+loki.write "portfolio" {
+	endpoint {
+		url = sys.env("LOKI_PUSH_URL")
+	}
+}

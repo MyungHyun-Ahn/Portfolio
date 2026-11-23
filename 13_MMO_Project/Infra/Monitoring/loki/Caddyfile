@@ -1,0 +1,18 @@
+{
+	admin off
+}
+
+:8080 {
+	# 루프백의 Tailscale Serve가 설정한 원격 노드 주소만 사용한다.
+	@jenkins_push {
+		method POST
+		path /loki/api/v1/push
+		header_regexp X-Forwarded-For `^(100[.]95[.]10[.]123|fd7a:115c:a1e0::b937:a7d)$`
+	}
+	handle @jenkins_push {
+		reverse_proxy loki:3100
+	}
+	handle {
+		respond 403
+	}
+}

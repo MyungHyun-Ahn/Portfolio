@@ -21,6 +21,23 @@ services:
       - grafana-data:/var/lib/grafana
     restart: unless-stopped
 
+  loki:
+    image: grafana/loki:3.7.0
+    command: -config.file=/etc/loki/portfolio.yml
+    volumes:
+      - ./loki/loki.yml:/etc/loki/portfolio.yml:ro
+      - loki-data:/loki
+    restart: unless-stopped
+
+  loki-ingest:
+    image: caddy:2.11.8-alpine
+    ports:
+      - "127.0.0.1:3101:8080"
+    volumes:
+      - ./loki/Caddyfile:/etc/caddy/Caddyfile:ro
+    restart: unless-stopped
+
 volumes:
   prometheus-data:
   grafana-data:
+  loki-data:
