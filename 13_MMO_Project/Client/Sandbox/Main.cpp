@@ -10,6 +10,14 @@ namespace
 	constexpr wchar_t kWindowClassName[] = L"PortfolioSandboxWindow";
 	constexpr wchar_t kWindowTitle[] = L"Sandbox";
 
+	struct SWindowSizeState
+	{
+		UINT m_widthPixels = 0;
+		UINT m_heightPixels = 0;
+		bool m_isMinimized = false;
+		bool m_hasPendingResize = false;
+	};
+
 	void FixedUpdate(ULONGLONG& updatesInSample) noexcept
 	{
 		// 예제 콘텐츠는 고정 틱이 실행된 횟수만 센다.
@@ -19,6 +27,28 @@ namespace
 	// Windows에 등록한 콜백
 	LRESULT CALLBACK WndProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
 	{
+		if (message == WM_NCCREATE)
+		{
+			// main의 창 상태를 HWND에 연결한다. 상태는 창보다 오래 살아 있다.
+			const auto* pCreate = reinterpret_cast<const CREATESTRUCTW*>(lParam);
+			SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreate->lpCreateParams));
+		}
+
+		// 새창 크기와 최소화 상태만 기록한다.
+		if (message == WM_SIZE)
+		{
+			auto* pSize = reinterpret_cast<SWindowSizeState*>(GetWindowLongPtrW(window, GWLP_USERDATA));
+			if (pSize != nullptr)
+			{
+				// 콜백에서는 마지막 상태만 기록하고, 실제 리사이즈는 프레임 사이에 한다.
+				pSize->m_isMinimized = wParam == SIZE_MINIMIZED;
+				pSize->m_widthPixels = LOWORD(lParam);
+				pSize->m_heightPixels = HIWORD(lParam);
+				pSize->m_hasPendingResize = true;
+				return 0;
+			}
+		}
+
 		// X 버튼을 누르면 하는 동작을 정의한다.
 		if (message == WM_DESTROY)
 		{
@@ -53,8 +83,9 @@ int main(void)
 	if (RegisterClassW(&windowClass) == 0)
 		return 1;
 
+	SWindowSizeState windowSize;
 	const HWND window = CreateWindowExW(0, kWindowClassName, kWindowTitle, WS_OVERLAPPEDWINDOW,
-		CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, nullptr, nullptr, instance, nullptr);
+		CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, nullptr, nullptr, instance, &windowSize);
 	if (window == nullptr)
 		return 1;
 
@@ -99,16 +130,33 @@ int main(void)
 		for (int tick = 0; tick < updates; ++tick)
 			FixedUpdate(updatesInSample);
 
-		renderer.BeginFrame(0.1f, 0.2f, 0.4f);
-		renderer.FillRectangle(80.0f, 80.0f, 240.0f, 200.0f);
-		if (FAILED(renderer.EndFrame()))
+		// 최소화 중에는 백 버퍼를 건드리지 않고 그리기만 쉰다. 고정 업데이트는 위에서 계속 실행된다.
+		if (!windowSize.m_isMinimized && (!windowSize.m_hasPendingResize ||
+			(windowSize.m_widthPixels > 0 && windowSize.m_heightPixels > 0)))
 		{
-			DestroyWindow(window);
-			return 1;
+			if (windowSize.m_hasPendingResize)
+			{
+				// 다음 프레임을 그리기 전에 Resize()를 호출한다.
+				// - 최소화 중에는 렌더링만 건너뛰고 FixedUpdate는 계속 실행된다.
+				windowSize.m_hasPendingResize = false;
+				if (FAILED(renderer.Resize(windowSize.m_widthPixels, windowSize.m_heightPixels)))
+				{
+					DestroyWindow(window);
+					return 1;
+				}
+			}
+
+			renderer.BeginFrame(0.1f, 0.2f, 0.4f);
+			renderer.FillRectangle(80.0f, 80.0f, 240.0f, 200.0f);
+			if (FAILED(renderer.EndFrame()))
+			{
+				DestroyWindow(window);
+				return 1;
+			}
+			++framesInSample;
 		}
 
-		// 프레임 루프와 실제 고정 업데이트의 실행 횟수를 따로 표시한다.
-		++framesInSample;
+		// 렌더링 프레임과 고정 업데이트의 실행 횟수를 따로 표시한다.
 		const auto sampleElapsed = now - sampleStartTime;
 		if (sampleElapsed >= std::chrono::seconds(1))
 		{

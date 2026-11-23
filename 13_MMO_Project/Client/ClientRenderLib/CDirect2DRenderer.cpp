@@ -12,6 +12,7 @@ namespace ClientRenderLib
 {
 	// delete가 아닌 Release로 참조를 반납해야 하는 COM 객체에는 ComPtr을 사용한다.
 	using Microsoft::WRL::ComPtr;
+	constexpr DXGI_FORMAT kBackBufferFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
 
 	struct CDirect2DRenderer::SResources
 	{
@@ -72,7 +73,7 @@ namespace ClientRenderLib
 
 		// 창에 연결할 스왑 체인을 만든다.
 		DXGI_SWAP_CHAIN_DESC1 swapChainDescription{};
-		swapChainDescription.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+		swapChainDescription.Format = kBackBufferFormat;
 		swapChainDescription.SampleDesc.Count = 1;
 		swapChainDescription.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 		swapChainDescription.BufferCount = 2;
@@ -81,7 +82,7 @@ namespace ClientRenderLib
 		if (FAILED(result))
 			return result;
 
-		// 백 버퍼 크기를 다시 맞추는 처리가 없어서, Alt+Enter로 DXGI가 창 모드와 전체화면을 자동 전환하지 않게 막아둠
+		// 창 크기는 앱에서 처리하지만 전체화면 전환은 아직 지원하지 않으므로 DXGI의 Alt+Enter 자동 전환을 막는다.
 		// - 나중에 앱에서 전체화면 전환을 직접 구현할 것
 		result = spDxgiFactory->MakeWindowAssociation(window, DXGI_MWA_NO_ALT_ENTER);
 		if (FAILED(result))
@@ -102,14 +103,60 @@ namespace ClientRenderLib
 			return result;
 
 		// 실제로 그리기 명령을 받을 객체를 만든다.
-		// - DrawBackground()에서 BeginDraw(), Clear(), EndDraw()를 호출하는게 이 객체임.
+		// - BeginFrame()과 EndFrame()에서 BeginDraw(), Clear(), EndDraw()를 호출하는 객체.
 		result = spD2dDevice->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, pResources->spContext.GetAddressOf());
 		if (FAILED(result))
 			return result;
 
+		result = bindBackBufferTarget(*pResources);
+		if (FAILED(result))
+			return result;
+
+		result = pResources->spContext->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White),
+			pResources->spRectangleBrush.GetAddressOf());
+		if (FAILED(result))
+			return result;
+
+		// 준비가 끝난 리소스를 랜더러에 넘긴다.
+		m_pResources = std::move(pResources);
+		return S_OK;
+	}
+
+	HRESULT CDirect2DRenderer::Resize(UINT widthPixels, UINT heightPixels) noexcept
+	{
+		if (!m_pResources)
+			return E_UNEXPECTED;
+
+		if (widthPixels == 0 || heightPixels == 0)
+			return E_INVALIDARG;
+
+		auto& resources = *m_pResources;
+		DXGI_SWAP_CHAIN_DESC1 description{};
+		HRESULT result = resources.spSwapChain->GetDesc1(&description);
+		if (FAILED(result))
+			return result;
+
+		if (description.Width == widthPixels && description.Height == heightPixels)
+			return S_OK;
+
+		// 리사이즈 과정 #1 : 이전 그리기 대상을 떼어낸다.
+		// - 컨텍스트가 이전 타깃을 붙들고 있으면 DXGI가 백 버퍼를 교체할 수 없다.
+		resources.spContext->SetTarget(nullptr);
+
+		// 리사이즈 과정 #2 : 같은 스왑 체인 안에서 백 버퍼를 새 크기로 교체한다.
+		result = resources.spSwapChain->ResizeBuffers(0, widthPixels, heightPixels, DXGI_FORMAT_UNKNOWN, description.Flags);
+		if (FAILED(result))
+			return result;
+
+		return bindBackBufferTarget(resources);
+	}
+
+	HRESULT CDirect2DRenderer::bindBackBufferTarget(SResources& resources) noexcept
+	{
+		// 리사이즈 과정 #3 - 새 버퍼를 준비한다.
 		// Direct2D의 그리기 대상은 스왑 체인의 백 버퍼다.
 		ComPtr<IDXGISurface> spBackBuffer;
-		result = pResources->spSwapChain->GetBuffer(0, IID_PPV_ARGS(spBackBuffer.GetAddressOf()));
+		HRESULT result = resources.spSwapChain->GetBuffer(0, IID_PPV_ARGS(spBackBuffer.GetAddressOf()));
 		if (FAILED(result))
 			return result;
 
@@ -119,22 +166,15 @@ namespace ClientRenderLib
 		// 즉, 여기에 그릴수는 있지만, 이걸 다른 곳에 그리는 재료로 쓰진 않는다는 뜻
 		const auto targetProperties = D2D1::BitmapProperties1(
 			D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
-			D2D1::PixelFormat(swapChainDescription.Format, D2D1_ALPHA_MODE_IGNORE));
-		
-		 // 이 비트맵을 이후 Direct2D 그리기 대상으로 지정한다.
+			D2D1::PixelFormat(kBackBufferFormat, D2D1_ALPHA_MODE_IGNORE));
+
 		ComPtr<ID2D1Bitmap1> spTarget;
-		result = pResources->spContext->CreateBitmapFromDxgiSurface(spBackBuffer.Get(), &targetProperties, spTarget.GetAddressOf());
+		result = resources.spContext->CreateBitmapFromDxgiSurface(spBackBuffer.Get(), &targetProperties, spTarget.GetAddressOf());
 		if (FAILED(result))
 			return result;
 
-		pResources->spContext->SetTarget(spTarget.Get());
-		result = pResources->spContext->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White),
-			pResources->spRectangleBrush.GetAddressOf());
-		if (FAILED(result))
-			return result;
-
-		// 준비가 끝난 리소스를 랜더러에 넘긴다.
-		m_pResources = std::move(pResources);
+		// 리사이즈 과정 #4 : 새 버퍼를 Direct2D의 그리기 대상으로 연결한다.
+		resources.spContext->SetTarget(spTarget.Get());
 		return S_OK;
 	}
 

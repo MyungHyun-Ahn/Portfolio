@@ -12,13 +12,21 @@ namespace ClientRenderLib
 
 		[[nodiscard]] // Direct2DRenderer를 초기화 합니다.
 		HRESULT Initialize(HWND window) noexcept;
+		// 초기화 후 프레임 사이에 호출한다. 실패하면 더 이상 프레임을 그리지 않는다.
+		[[nodiscard]] 
+		HRESULT Resize(UINT widthPixels, UINT heightPixels) noexcept;
 		// 초기화 성공 후 BeginFrame → 그리기 → EndFrame 순서로 호출한다.
 		void BeginFrame(float red, float green, float blue) noexcept;
 		void FillRectangle(float left, float top, float right, float bottom) noexcept;
-		[[nodiscard]] HRESULT EndFrame() noexcept;
+		[[nodiscard]] 
+		HRESULT EndFrame() noexcept;
 
 	private:
 		struct SResources;
+		[[nodiscard]] 
+		static HRESULT bindBackBufferTarget(SResources& resources) noexcept;
+
+	private:
 		std::unique_ptr<SResources> m_pResources;
 	};
 }

@@ -14,6 +14,7 @@ ENUM_WINDOW = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
 USER32.EnumWindows.argtypes = (ENUM_WINDOW, wintypes.LPARAM)
 USER32.GetWindowThreadProcessId.argtypes = (wintypes.HWND, ctypes.POINTER(wintypes.DWORD))
 USER32.IsWindowVisible.argtypes = (wintypes.HWND,)
+USER32.IsIconic.argtypes = (wintypes.HWND,)
 USER32.GetWindowTextW.argtypes = (wintypes.HWND, wintypes.LPWSTR, ctypes.c_int)
 USER32.PostMessageW.argtypes = (wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
 USER32.GetClientRect.argtypes = (wintypes.HWND, ctypes.POINTER(wintypes.RECT))
@@ -45,7 +46,51 @@ def find_visible_window(process_id):
 
 
 class SandboxWindowTest(unittest.TestCase):
-    def test_direct2d_rectangle_and_background_are_presented(self):
+    def assert_rectangle_and_background(self, window, process):
+        client = wintypes.RECT()
+        self.assertTrue(USER32.GetClientRect(window, ctypes.byref(client)))
+        samples = (
+            # 오른쪽 내부를 찍어 기존 프레임을 축소해 표시하는 경우를 구분한다.
+            (wintypes.POINT(220, 160), (255, 255, 255)),
+            (wintypes.POINT(client.right // 2, client.bottom // 2), (25, 51, 102)),
+        )
+        for point, _ in samples:
+            self.assertTrue(USER32.ClientToScreen(window, ctypes.byref(point)))
+
+        colors = []
+        desktop = USER32.GetDC(None)
+        self.assertTrue(desktop)
+        try:
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline and process.poll() is None:
+                colors = [GDI32.GetPixel(desktop, point.x, point.y) for point, _ in samples]
+                if all(
+                    color != 0xFFFFFFFF and all(
+                        abs(((color >> shift) & 255) - target) <= 2
+                        for shift, target in zip((0, 8, 16), expected)
+                    )
+                    for color, (_, expected) in zip(colors, samples)
+                ):
+                    return
+                time.sleep(0.02)
+            self.fail(f"Sandbox did not present expected colors: COLORREFs={colors!r}, exit={process.poll()}")
+        finally:
+            USER32.ReleaseDC(None, desktop)
+
+    def assert_window_rates(self, window, process, *, minimized):
+        deadline = time.monotonic() + 5
+        title = ctypes.create_unicode_buffer(64)
+        while time.monotonic() < deadline and process.poll() is None:
+            USER32.GetWindowTextW(window, title, len(title))
+            sample = re.fullmatch(r"Sandbox - FPS: ([0-9]+) \| UPS: ([0-9]+)", title.value)
+            if bool(USER32.IsIconic(window)) == minimized and sample:
+                fps, ups = map(int, sample.groups())
+                if (fps == 0 if minimized else fps > 0) and ups > 0:
+                    return
+            time.sleep(0.02)
+        self.fail(f"Sandbox did not report expected rates (minimized={minimized}): {title.value!r}")
+
+    def test_direct2d_survives_resize_minimize_and_restore(self):
         with subprocess.Popen([str(EXECUTABLE)]) as process:
             try:
                 deadline = time.monotonic() + 5
@@ -57,38 +102,20 @@ class SandboxWindowTest(unittest.TestCase):
                     time.sleep(0.02)
                 self.assertIsNotNone(window, f"Sandbox showed no window (exit={process.poll()})")
 
-                hwnd_topmost, swp_no_move_size_activate = -1, 0x0013
-                self.assertTrue(USER32.SetWindowPos(window, hwnd_topmost, 0, 0, 0, 0, swp_no_move_size_activate))
-                client = wintypes.RECT()
-                self.assertTrue(USER32.GetClientRect(window, ctypes.byref(client)))
-                samples = (
-                    (wintypes.POINT(180, 160), (255, 255, 255)),
-                    (wintypes.POINT(client.right // 2, client.bottom // 2), (25, 51, 102)),
-                )
-                for point, _ in samples:
-                    self.assertTrue(USER32.ClientToScreen(window, ctypes.byref(point)))
+                hwnd_topmost, swp_no_activate = -1, 0x0010
+                wm_syscommand, sc_minimize, sc_restore, sc_close = 0x0112, 0xF020, 0xF120, 0xF060
+                for width, height in ((800, 600), (570, 460), (740, 540)):
+                    with self.subTest(width=width, height=height):
+                        self.assertTrue(USER32.SetWindowPos(window, hwnd_topmost, 40, 40, width, height, swp_no_activate))
+                        self.assert_rectangle_and_background(window, process)
 
-                colors = []
-                desktop = USER32.GetDC(None)
-                self.assertTrue(desktop)
-                try:
-                    while time.monotonic() < deadline and process.poll() is None:
-                        colors = [GDI32.GetPixel(desktop, point.x, point.y) for point, _ in samples]
-                        if all(
-                            color != 0xFFFFFFFF and all(
-                                abs(((color >> shift) & 255) - target) <= 2
-                                for shift, target in zip((0, 8, 16), expected)
-                            )
-                            for color, (_, expected) in zip(colors, samples)
-                        ):
-                            break
-                        time.sleep(0.02)
-                    else:
-                        self.fail(f"Sandbox did not present the expected rectangle and background: COLORREFs={colors!r}")
-                finally:
-                    USER32.ReleaseDC(None, desktop)
+                self.assertTrue(USER32.PostMessageW(window, wm_syscommand, sc_minimize, 0))
+                self.assert_window_rates(window, process, minimized=True)
+                self.assertTrue(USER32.PostMessageW(window, wm_syscommand, sc_restore, 0))
+                self.assert_window_rates(window, process, minimized=False)
+                self.assert_rectangle_and_background(window, process)
 
-                self.assertTrue(USER32.PostMessageW(window, 0x0112, 0xF060, 0))
+                self.assertTrue(USER32.PostMessageW(window, wm_syscommand, sc_close, 0))
                 self.assertEqual(process.wait(timeout=5), 0)
             finally:
                 if process.poll() is None:
