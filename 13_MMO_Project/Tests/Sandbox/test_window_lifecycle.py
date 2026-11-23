@@ -1,6 +1,7 @@
 import ctypes
 from ctypes import wintypes
 from pathlib import Path
+import re
 import subprocess
 import sys
 import time
@@ -33,23 +34,23 @@ def find_visible_window(process_id):
 
 
 class SandboxWindowTest(unittest.TestCase):
-    def test_fps_is_reported_without_input(self):
+    def test_frame_and_fixed_update_rates_are_reported_without_input(self):
         with subprocess.Popen([str(EXECUTABLE)]) as process:
             try:
                 deadline = time.monotonic() + 5
                 title = ctypes.create_unicode_buffer(64)
-                prefix = "Sandbox - FPS: "
+                rates = re.compile(r"Sandbox - FPS: ([0-9]+) \| UPS: ([0-9]+)")
                 while time.monotonic() < deadline and process.poll() is None:
                     window = find_visible_window(process.pid)
                     if window:
                         USER32.GetWindowTextW(window, title, len(title))
-                        fps = title.value.removeprefix(prefix)
-                        if title.value.startswith(prefix) and fps.isdecimal() and int(fps) > 0:
+                        sample = rates.fullmatch(title.value)
+                        if sample and int(sample[1]) > 0 and 0 < int(sample[2]) <= 60:
                             self.assertTrue(USER32.PostMessageW(window, 0x0112, 0xF060, 0))
                             self.assertEqual(process.wait(timeout=5), 0)
                             return
                     time.sleep(0.02)
-                self.fail("Sandbox did not report positive FPS without input")
+                self.fail(f"Sandbox did not report FPS and fixed UPS without input: {title.value!r}")
             finally:
                 if process.poll() is None:
                     process.kill()

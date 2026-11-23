@@ -2,6 +2,8 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "Sandbox", "Client\Sandbox\Sandbox.vcxproj", "{9510771E-C28A-4E6C-BC83-12A2C566BB57}"
 EndProject
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "ClientFrameworkLib", "Client\ClientFrameworkLib\ClientFrameworkLib.vcxproj", "{91EE45DE-B241-453E-95B9-DB2206E0A987}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -12,5 +14,9 @@ Global
 		{9510771E-C28A-4E6C-BC83-12A2C566BB57}.Debug|x64.Build.0 = Debug|x64
 		{9510771E-C28A-4E6C-BC83-12A2C566BB57}.Release|x64.ActiveCfg = Release|x64
 		{9510771E-C28A-4E6C-BC83-12A2C566BB57}.Release|x64.Build.0 = Release|x64
+		{91EE45DE-B241-453E-95B9-DB2206E0A987}.Debug|x64.ActiveCfg = Debug|x64
+		{91EE45DE-B241-453E-95B9-DB2206E0A987}.Debug|x64.Build.0 = Debug|x64
+		{91EE45DE-B241-453E-95B9-DB2206E0A987}.Release|x64.ActiveCfg = Release|x64
+		{91EE45DE-B241-453E-95B9-DB2206E0A987}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 EndGlobal

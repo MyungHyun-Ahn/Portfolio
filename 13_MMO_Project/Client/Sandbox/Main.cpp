@@ -1,10 +1,18 @@
 #include <Windows.h>
+#include <chrono>
 #include <string>
+#include "CFixedStepScheduler.h"
 
 namespace
 {
 	constexpr wchar_t kWindowClassName[] = L"PortfolioSandboxWindow";
 	constexpr wchar_t kWindowTitle[] = L"Sandbox";
+
+	void FixedUpdate(ULONGLONG& updatesInSample) noexcept
+	{
+		// 예제 콘텐츠는 고정 틱이 실행된 횟수만 센다.
+		++updatesInSample;
+	}
 
 	// Windows에 등록한 콜백
 	LRESULT CALLBACK WndProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
@@ -53,9 +61,12 @@ int main(void)
 	ShowWindow(window, SW_SHOWDEFAULT);
 
 	MSG message{};
+	using Clock = std::chrono::steady_clock;
+	ClientFrameworkLib::CFixedStepScheduler fixedStepScheduler;
+	auto previousFrameTime = Clock::now();
+	auto sampleStartTime = previousFrameTime;
 	ULONGLONG framesInSample = 0;
-	ULONGLONG sampleStartMilliseconds = GetTickCount64();
-	constexpr ULONGLONG kSampleIntervalMilliseconds = 1000;
+	ULONGLONG updatesInSample = 0;
 	while (true)
 	{
 		// 메시지 처리 #1 - 큐에 있는 메시지를 꺼내고, 비어 있으면 기다리지 않는다.
@@ -72,16 +83,26 @@ int main(void)
 			DispatchMessageW(&message);
 		}
 
-		// 이번 측정 구간의 초당 루프 횟수를 표시한다.
+		const auto now = Clock::now();
+		const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(now - previousFrameTime);
+		previousFrameTime = now;
+		const int updates = fixedStepScheduler.Advance(elapsed);
+		for (int tick = 0; tick < updates; ++tick)
+			FixedUpdate(updatesInSample);
+
+		// 프레임 루프와 실제 고정 업데이트의 실행 횟수를 따로 표시한다.
 		++framesInSample;
-		const ULONGLONG elapsedMilliseconds = GetTickCount64() - sampleStartMilliseconds;
-		if (elapsedMilliseconds >= kSampleIntervalMilliseconds)
+		const auto sampleElapsed = now - sampleStartTime;
+		if (sampleElapsed >= std::chrono::seconds(1))
 		{
-			const ULONGLONG fps = framesInSample * 1000 / elapsedMilliseconds;
-			const std::wstring title = L"Sandbox - FPS: " + std::to_wstring(fps);
+			const double sampleSeconds = std::chrono::duration<double>(sampleElapsed).count();
+			const auto fps = static_cast<ULONGLONG>(static_cast<double>(framesInSample) / sampleSeconds);
+			const auto ups = static_cast<ULONGLONG>(static_cast<double>(updatesInSample) / sampleSeconds);
+			const std::wstring title = L"Sandbox - FPS: " + std::to_wstring(fps) + L" | UPS: " + std::to_wstring(ups);
 			SetWindowTextW(window, title.c_str());
 			framesInSample = 0;
-			sampleStartMilliseconds += elapsedMilliseconds;
+			updatesInSample = 0;
+			sampleStartTime = now;
 		}
 
 		// 빈 루프의 바쁜 대기를 줄이기 위한 임시 대기. 고정 틱을 만드는 코드는 아니다.
