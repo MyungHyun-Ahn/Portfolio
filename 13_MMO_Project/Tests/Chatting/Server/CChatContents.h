@@ -6,17 +6,17 @@ namespace Chatting
 	class CPlayer;
 	class CProcessPacket;
 
-	class CChatContents : public NetworkLib::CBaseContents
+	class CChatContents : public ServerNetworkLib::CBaseContents
 	{
 	public:
 		friend class CProcessPacket;
 		explicit CChatContents(CChatServer &server) noexcept;
 		void OnEnter(UINT64 sessionId, void *pObject) noexcept override;
 		void OnLeave(UINT64 sessionId) noexcept override;
-		NetworkLib::ERecvResult OnRecv(UINT64 sessionId, NetworkLib::CSerializableBuffer<FALSE> *pMessage,
+		ServerNetworkLib::ERecvResult OnRecv(UINT64 sessionId, NetworkCommonLib::CSerializableBuffer<FALSE> *pMessage,
 			int delayFrame) noexcept override;
 		void OnLoopEnd() noexcept override;
-		void SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX, NetworkLib::CSerializableBuffer<FALSE> *pMessage) noexcept;
+		void SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX, NetworkCommonLib::CSerializableBuffer<FALSE> *pMessage) noexcept;
 
 	private:
 		void nonLoginHeartbeat() noexcept;

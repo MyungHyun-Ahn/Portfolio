@@ -1,6 +1,6 @@
 #pragma once
 
-#include "NetworkCommonPch.h"
+#include "NetworkCommonLibPch.h"
 #include <pdh.h>
 #include <psapi.h>
 #include <optional>
@@ -9,6 +9,11 @@
 #pragma comment(lib, "psapi")
 
 #include "COverlappedAllocator.h"
+
+namespace ServerNetworkLib
+{
+	using namespace NetworkCommonLib;
+}
 
 #include "SBaseEvent.h"
 #include "ServerSetting.h"

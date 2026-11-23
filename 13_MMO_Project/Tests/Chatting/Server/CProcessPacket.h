@@ -17,7 +17,7 @@ namespace Chatting
 		bool HandleHeartbeatNoti(UINT64 sessionId, const SHeartbeatNoti &packet) noexcept override;
 
 	private:
-		void sendPacket(UINT64 sessionId, EPacketType type, NetworkLib::CSerializableBuffer<FALSE> &packet) noexcept override;
+		void sendPacket(UINT64 sessionId, EPacketType type, NetworkCommonLib::CSerializableBuffer<FALSE> &packet) noexcept override;
 		CChatContents &m_contents;
 	};
 }

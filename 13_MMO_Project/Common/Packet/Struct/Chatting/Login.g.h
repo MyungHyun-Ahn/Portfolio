@@ -10,7 +10,7 @@ namespace Chatting
 		std::wstring m_nickname{};
 		std::array<char, 64> m_sessionKey{};
 
-		[[nodiscard]] bool Serialize(NetworkLib::CSerializableBuffer<false> &buffer) const noexcept override
+		[[nodiscard]] bool Serialize(NetworkCommonLib::CSerializableBuffer<false> &buffer) const noexcept override
 		{
 			buffer
 				<< m_accountNo
@@ -20,7 +20,7 @@ namespace Chatting
 			return buffer.IsValid();
 		}
 
-		[[nodiscard]] bool Deserialize(NetworkLib::CSerializableBuffer<false> &buffer) noexcept override
+		[[nodiscard]] bool Deserialize(NetworkCommonLib::CSerializableBuffer<false> &buffer) noexcept override
 		{
 			buffer
 				>> m_accountNo
@@ -36,7 +36,7 @@ namespace Chatting
 		std::uint8_t m_status{};
 		std::int64_t m_accountNo{};
 
-		[[nodiscard]] bool Serialize(NetworkLib::CSerializableBuffer<false> &buffer) const noexcept override
+		[[nodiscard]] bool Serialize(NetworkCommonLib::CSerializableBuffer<false> &buffer) const noexcept override
 		{
 			buffer
 				<< m_status
@@ -44,7 +44,7 @@ namespace Chatting
 			return buffer.IsValid();
 		}
 
-		[[nodiscard]] bool Deserialize(NetworkLib::CSerializableBuffer<false> &buffer) noexcept override
+		[[nodiscard]] bool Deserialize(NetworkCommonLib::CSerializableBuffer<false> &buffer) noexcept override
 		{
 			buffer
 				>> m_status

@@ -9,7 +9,7 @@ namespace Chatting
 		{{ field.cpp_type }} {{ field.member }}{};
 {% endfor %}
 
-		[[nodiscard]] bool Serialize(NetworkLib::CSerializableBuffer<false> &buffer) const noexcept override
+		[[nodiscard]] bool Serialize(NetworkCommonLib::CSerializableBuffer<false> &buffer) const noexcept override
 		{
 {% if packet.fields %}
 			buffer
@@ -20,7 +20,7 @@ namespace Chatting
 			return buffer.IsValid();
 		}
 
-		[[nodiscard]] bool Deserialize(NetworkLib::CSerializableBuffer<false> &buffer) noexcept override
+		[[nodiscard]] bool Deserialize(NetworkCommonLib::CSerializableBuffer<false> &buffer) noexcept override
 		{
 {% if packet.fields %}
 			buffer

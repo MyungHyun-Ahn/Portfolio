@@ -1,6 +1,6 @@
 #pragma once
 
-namespace NetworkLib
+namespace NetworkCommonLib
 {
 // 링버퍼 안씀
 // - Recv - recv 버퍼로 교체 -> SerializableBufferView로

@@ -1,6 +1,6 @@
 #pragma once
 
-namespace NetworkLib
+namespace ServerNetworkLib
 {
 // Event 수행이 필요하다면 BaseEvent를 상속받고 execute 를 등록
 struct SBaseEvent

@@ -8,7 +8,7 @@
 namespace Chatting
 {
 	bool Dispatch{{ side }}Packet({% if side == 'Server' %}std::uint16_t type, UINT64 sessionId,
-		{% endif %}NetworkLib::CSerializableBuffer<FALSE> &message, I{{ side }}PacketHandler &handler) noexcept
+		{% endif %}NetworkCommonLib::CSerializableBuffer<FALSE> &message, I{{ side }}PacketHandler &handler) noexcept
 	{
 {% if not packets %}
 {% if side == 'Server' %}

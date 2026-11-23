@@ -5,7 +5,7 @@
     <ClCompile Include="COverlappedAllocator.cpp" />
     <ClCompile Include="NetworkBufferPools.cpp" />
     <ClCompile Include="NetPacket.cpp" />
-    <ClCompile Include="pch.cpp" />
+    <ClCompile Include="NetworkCommonLibPch.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="NetworkLimits.h" />
@@ -16,8 +16,7 @@
     <ClInclude Include="NetPacket.h" />
     <ClInclude Include="CRingBuffer.h" />
     <ClInclude Include="CSerializableBuffer.h" />
-    <ClInclude Include="NetworkCommonPch.h" />
+    <ClInclude Include="NetworkCommonLibPch.h" />
     <ClInclude Include="NetHeaders.h" />
-    <ClInclude Include="pch.h" />
   </ItemGroup>
 </Project>

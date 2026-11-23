@@ -2,8 +2,10 @@
 #include "SNetworkCounters.h"
 #include "COverlappedAllocator.h"
 
-namespace NetworkLib
+namespace ClientNetworkLib
 {
+	using namespace NetworkCommonLib;
+
 CLanClientManager *g_pLanClientManager;
 
 	void CLanSession::Clear() noexcept

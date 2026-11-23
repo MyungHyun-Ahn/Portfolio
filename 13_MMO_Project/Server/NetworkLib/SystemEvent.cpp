@@ -1,6 +1,6 @@
 #include "ServerNetworkLibPch.h"
 
-namespace NetworkLib
+namespace ServerNetworkLib
 {
 void SMonitorTimerEvent::SetEvent() noexcept
 {
@@ -29,7 +29,7 @@ void SKeyboardTimerEvent::Execute(int delayFrame) noexcept
 {
 	// 서버 종료
 	if (GetAsyncKeyState(VK_F1))
-		NetworkLib::g_pNetServer->Stop();
+		ServerNetworkLib::g_pNetServer->Stop();
 
 	// 프로파일러 저장
 	if (GetAsyncKeyState(VK_F2))
@@ -72,7 +72,7 @@ void SSendAllTimerEvent::SetEvent() noexcept
 
 void SSendAllTimerEvent::Execute(int delayFrame) noexcept
 {
-	NetworkLib::g_pNetServer->SendAll();
+	ServerNetworkLib::g_pNetServer->SendAll();
 }
 
 void SExampleTimerEvent::SetEvent(int param1, double param2, int frame) noexcept

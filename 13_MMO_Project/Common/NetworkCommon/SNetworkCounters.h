@@ -1,6 +1,6 @@
 #pragma once
 
-namespace NetworkLib
+namespace NetworkCommonLib
 {
 	// LAN과 Net 전송에서 함께 집계하는 카운터.
 	struct SNetworkCounters

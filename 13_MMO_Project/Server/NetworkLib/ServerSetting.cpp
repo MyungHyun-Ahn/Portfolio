@@ -1,6 +1,6 @@
 #include "ServerNetworkLibPch.h"
 
-namespace NetworkLib
+namespace ServerNetworkLib
 {
 namespace serverSetting
 {

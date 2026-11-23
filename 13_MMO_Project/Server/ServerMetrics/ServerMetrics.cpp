@@ -4,20 +4,20 @@
 
 namespace ServerMetrics
 {
-	void AppendIntervalMetric(const NetworkLib::SMonitorSnapshot &sample, NetworkLib::EMonitorInterval interval,
+	void AppendIntervalMetric(const ServerNetworkLib::SMonitorSnapshot &sample, ServerNetworkLib::EMonitorInterval interval,
 		const std::string &name, MetricsLib::SMetricsSnapshot &outMetrics)
 	{
 		const auto index = static_cast<size_t>(interval);
-		if (index >= NetworkLib::SMonitorSnapshot::kIntervalCount)
+		if (index >= ServerNetworkLib::SMonitorSnapshot::kIntervalCount)
 			return;
 		outMetrics.m_counters.push_back({name + "_total", sample.m_totals[index], {}});
 		if (sample.m_hasIntervalRates)
 			outMetrics.m_gauges.push_back({name + "_per_second", sample.m_rates[index], {}});
 	}
 
-	void AppendCommonMetrics(const NetworkLib::SMonitorSnapshot &sample, MetricsLib::SMetricsSnapshot &outMetrics)
+	void AppendCommonMetrics(const ServerNetworkLib::SMonitorSnapshot &sample, MetricsLib::SMetricsSnapshot &outMetrics)
 	{
-		using NetworkLib::EMonitorInterval;
+		using ServerNetworkLib::EMonitorInterval;
 		AppendIntervalMetric(sample, EMonitorInterval::AcceptCompletions, "game_net_accept_completions", outMetrics);
 		AppendIntervalMetric(sample, EMonitorInterval::ReceivedPackets, "game_net_received_packets", outMetrics);
 		AppendIntervalMetric(sample, EMonitorInterval::SentPackets, "game_net_sent_packets", outMetrics);

@@ -1,7 +1,7 @@
-#include "pch.h"
+#include "NetworkCommonLibPch.h"
 #include "COverlappedAllocator.h"
 
-namespace NetworkLib
+namespace NetworkCommonLib
 {
 COverlappedAllocator<false> g_overlappedAllocator;
 }

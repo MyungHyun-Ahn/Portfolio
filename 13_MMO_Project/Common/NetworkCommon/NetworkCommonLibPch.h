@@ -26,7 +26,7 @@
 #pragma comment(lib, "synchronization")
 #pragma comment(lib, "user32")
 
-namespace NetworkLib
+namespace NetworkCommonLib
 {
 	using namespace MHLib::utils;
 	using namespace MHLib::containers;

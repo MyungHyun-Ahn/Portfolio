@@ -55,16 +55,16 @@ int main(void)
 		metricsExporter.Stop();
 	};
 
-	NetworkLib::serverSetting::openIp = config.m_ip;
-	NetworkLib::serverSetting::openPort = config.m_port;
-	NetworkLib::serverSetting::maxSessionCount = config.m_maxSessionCount;
-	NetworkLib::serverSetting::acceptexCount = config.m_acceptExCount;
-	NetworkLib::serverSetting::iocpWorkerThread = config.m_iocpWorkerCount;
-	NetworkLib::serverSetting::iocpActiveThread = config.m_iocpConcurrency;
-	NetworkLib::serverSetting::contentsThreadCount = config.m_contentsWorkerCount;
-	NetworkLib::serverSetting::maxContentsFps = config.m_contentsFps;
-	NetworkLib::serverSetting::packetCode = Chatting::kPacketCode;
-	NetworkLib::serverSetting::packetKey = Chatting::kPacketKey;
+	ServerNetworkLib::serverSetting::openIp = config.m_ip;
+	ServerNetworkLib::serverSetting::openPort = config.m_port;
+	ServerNetworkLib::serverSetting::maxSessionCount = config.m_maxSessionCount;
+	ServerNetworkLib::serverSetting::acceptexCount = config.m_acceptExCount;
+	ServerNetworkLib::serverSetting::iocpWorkerThread = config.m_iocpWorkerCount;
+	ServerNetworkLib::serverSetting::iocpActiveThread = config.m_iocpConcurrency;
+	ServerNetworkLib::serverSetting::contentsThreadCount = config.m_contentsWorkerCount;
+	ServerNetworkLib::serverSetting::maxContentsFps = config.m_contentsFps;
+	ServerNetworkLib::serverSetting::packetCode = Chatting::kPacketCode;
+	ServerNetworkLib::serverSetting::packetKey = Chatting::kPacketKey;
 	MHLib::security::CEncryption::sm_packetKey = Chatting::kPacketKey;
 	MHLib::utils::g_pProfileManager = MHLib::utils::CProfileManager::GetInstance();
 	g_pLogger->WriteLog(ELogLevel::Info, L"ChatServer", 0, std::source_location::current(),
@@ -73,7 +73,7 @@ int main(void)
 		config.m_contentsWorkerCount, config.m_logQueueCapacity);
 
 	auto *pServer = new Chatting::CChatServer;
-	NetworkLib::g_pNetServer = pServer;
+	ServerNetworkLib::g_pNetServer = pServer;
 	std::atomic<bool> isReturned = false;
 	std::atomic<bool> isStarted = false;
 	std::thread serverThread([&]()

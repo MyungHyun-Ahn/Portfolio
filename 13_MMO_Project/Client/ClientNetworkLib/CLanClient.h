@@ -1,6 +1,6 @@
 #pragma once
 
-namespace NetworkLib
+namespace ClientNetworkLib
 {
 	class CLanClientManager;
 
@@ -35,7 +35,7 @@ namespace NetworkLib
 		void RecvCompleted(int size) noexcept;
 
 		bool PostSend(bool isPqcs = FALSE) noexcept;
-		bool SendPacket(std::shared_ptr<CSerializableBuffer<TRUE>> spMessage) noexcept;
+		bool SendPacket(std::shared_ptr<NetworkCommonLib::CSerializableBuffer<TRUE>> spMessage) noexcept;
 		void SendCompleted(int size) noexcept;
 
 	private:
@@ -44,7 +44,7 @@ namespace NetworkLib
 	// Release + IoCount
 		LONG m_ioCountAndRelease = sm_releaseFlag;
 		LONG m_sendCount = 0;
-		std::shared_ptr<CRecvBuffer> m_spRecvBuffer;
+		std::shared_ptr<NetworkCommonLib::CRecvBuffer> m_spRecvBuffer;
 		SOCKET m_sessionSocket = INVALID_SOCKET;
 		UINT64 m_sessionId = 0;
 		WCHAR		m_clientAddrBuffer[16];
@@ -57,12 +57,12 @@ namespace NetworkLib
 		USHORT		m_clientPort;
 		char		m_dummy01[2]; // 패딩 계산용
 		// 최대 무조건 1개 -> 있거나 없거나
-		std::shared_ptr<CSerializableBufferView<TRUE>> m_spDelayedBuffer;
+		std::shared_ptr<NetworkCommonLib::CSerializableBufferView<TRUE>> m_spDelayedBuffer;
 		std::mutex m_sendStateLock;
-		std::deque<std::shared_ptr<CSerializableBuffer<TRUE>>> m_sendQueue;
+		std::deque<std::shared_ptr<NetworkCommonLib::CSerializableBuffer<TRUE>>> m_sendQueue;
 		// ConnectEx, Recv, Send 순서. 완료를 소비할 때까지 세션이 소유한다.
 		std::array<OVERLAPPED, 3> m_overlappeds{};
-		std::array<std::shared_ptr<CSerializableBuffer<TRUE>>, kWsasendMaxBufferCount> m_spSendBuffers;
+		std::array<std::shared_ptr<NetworkCommonLib::CSerializableBuffer<TRUE>>, NetworkCommonLib::kWsasendMaxBufferCount> m_spSendBuffers;
 
 		LONG m_cancelIoCalled = FALSE;
 		bool m_isConnected = false;
@@ -85,8 +85,8 @@ namespace NetworkLib
 		}
 
 		// MakeShared()으로 만든 새 패킷을 넘긴다. 접수 후에는 내용이나 커서를 변경하지 않는다.
-		void SendPacket(const UINT64 sessionId, std::shared_ptr<CSerializableBuffer<TRUE>> spBuffer) noexcept;
-		void EnqueuePacket(const UINT64 sessionId, std::shared_ptr<CSerializableBuffer<TRUE>> spBuffer) noexcept;
+		void SendPacket(const UINT64 sessionId, std::shared_ptr<NetworkCommonLib::CSerializableBuffer<TRUE>> spBuffer) noexcept;
+		void EnqueuePacket(const UINT64 sessionId, std::shared_ptr<NetworkCommonLib::CSerializableBuffer<TRUE>> spBuffer) noexcept;
 
 		BOOL Disconnect(const UINT64 sessionId, BOOL isPqcs = FALSE) noexcept;
 		BOOL ReleaseSession(CLanSession *pSession, BOOL isPqcs = FALSE) noexcept;
@@ -94,7 +94,7 @@ namespace NetworkLib
 
 		virtual void OnConnect(const UINT64 sessionId) noexcept = 0;
 		virtual void OnDisconnect(const UINT64 sessionId) noexcept = 0;
-		virtual void OnRecv(const UINT64 sessionId, std::shared_ptr<CSerializableBufferView<TRUE>> spMessage) noexcept = 0;
+		virtual void OnRecv(const UINT64 sessionId, std::shared_ptr<NetworkCommonLib::CSerializableBufferView<TRUE>> spMessage) noexcept = 0;
 
 		BOOL PostConnectEx(const CHAR *pIp, const USHORT port) noexcept;
 		BOOL ConnectExCompleted(CLanSession *pSession) noexcept;
@@ -102,14 +102,14 @@ namespace NetworkLib
 	private:
 		inline static USHORT getIndex(UINT64 sessionId) noexcept
 		{
-			UINT64 mask64 = sessionId & kSessionIndexMask;
+			UINT64 mask64 = sessionId & NetworkCommonLib::kSessionIndexMask;
 			mask64 = mask64 >> 48;
 			return (USHORT)mask64;
 		}
 
 		inline static UINT64 getId(UINT64 sessionId) noexcept
 		{
-			UINT64 mask64 = sessionId & kSessionIdMask;
+			UINT64 mask64 = sessionId & NetworkCommonLib::kSessionIdMask;
 			return mask64;
 		}
 

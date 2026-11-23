@@ -3,11 +3,6 @@
 namespace ClientNetworkLib
 {
 	class CNetSession;
-}
-
-namespace NetworkLib
-{
-	template<bool isLanServer> class CSerializableBuffer;
 	class CClientMailbox;
 	struct SClientEvent;
 	class CClientLifecycleProbe;
@@ -35,7 +30,7 @@ namespace NetworkLib
 
 		// MakeShared()으로 만든 새 패킷을 한 번만 넘긴다. 송신 접수 후에는 내용이나 커서를 변경하지 않는다.
 		[[nodiscard]]
-		bool SendPacket(SessionId sessionId, std::shared_ptr<CSerializableBuffer<FALSE>> spMessage) noexcept;
+		bool SendPacket(SessionId sessionId, std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>> spMessage) noexcept;
 		bool Disconnect(SessionId sessionId) noexcept;
 		void Stop() noexcept;
 
@@ -45,10 +40,10 @@ namespace NetworkLib
 		// - 13_MMO_Project\Tests\ClientLifecycle 프로젝트에 정의하고 사용함
 		friend class CClientLifecycleProbe;
 
-		using SSessionEntry = std::pair<SessionId, std::shared_ptr<ClientNetworkLib::CNetSession>>;
+		using SSessionEntry = std::pair<SessionId, std::shared_ptr<CNetSession>>;
 
 		[[nodiscard]]
-		std::shared_ptr<ClientNetworkLib::CNetSession> findSession(SessionId sessionId) noexcept;
+		std::shared_ptr<CNetSession> findSession(SessionId sessionId) noexcept;
 		// 전체 순회 시 테이블 락을 걸고 id와 session 스마트 포인터의 쌍을 얻는 함수
 		// - 스마트 포인터로 얻기 때문에 순회 중 객체가 삭제되지 않는 것을 보장한다. (연결은 끊길 수 있다.)
 		// - 테이블을 얻기만 하기 때문에 전체 테이블을 Lock 잡는 시간이 적다.
@@ -74,7 +69,7 @@ namespace NetworkLib
 
 		// Mailbox와 세션은 수명주기가 다르다.
 		// - Disconnected를 처리하기 위해 Mailbox가 길 수 있음
-		std::unordered_map<SessionId, std::shared_ptr<ClientNetworkLib::CNetSession>> 	m_sessions;
+		std::unordered_map<SessionId, std::shared_ptr<CNetSession>> 	m_sessions;
 		std::unordered_map<SessionId, std::shared_ptr<CClientMailbox>> 					m_mailboxes;
 
 		// 세션 ID 발급 용도 - 단순 증가

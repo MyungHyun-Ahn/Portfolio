@@ -1,6 +1,6 @@
 #pragma once
 
-namespace NetworkLib
+namespace ServerNetworkLib
 {
 class CNetServer;
 
@@ -8,7 +8,7 @@ class CNetServer;
 class CContentsThread
 {
 public:
-	friend class NetworkLib::CNetServer;
+	friend class ServerNetworkLib::CNetServer;
 	CContentsThread()
 	{
 		InitializeSRWLock(&m_timerEventQueueRWLock);

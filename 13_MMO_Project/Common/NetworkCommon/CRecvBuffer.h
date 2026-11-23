@@ -1,6 +1,6 @@
 #pragma once
 
-namespace NetworkLib
+namespace NetworkCommonLib
 {
 // 사실 링버퍼랑 같은 역할인데 링 기능은 빠짐
 // - 진짜 RecvBuffer로 쓸 용도

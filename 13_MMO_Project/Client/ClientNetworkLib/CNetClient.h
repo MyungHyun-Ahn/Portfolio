@@ -1,6 +1,6 @@
 #pragma once
 
-namespace NetworkLib
+namespace ClientNetworkLib
 {
 	class CNetClient
 	{
@@ -25,11 +25,11 @@ namespace NetworkLib
 		virtual ~CNetClient() = default;
 
 		[[nodiscard]]
-		bool sendNetworkPacket(std::shared_ptr<CSerializableBuffer<FALSE>> spPacket) noexcept;
+		bool sendNetworkPacket(std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>> spPacket) noexcept;
 
 	private:
 		virtual bool onConnect() noexcept = 0;
-		virtual bool onRecv(CSerializableBuffer<FALSE> &message) noexcept = 0;
+		virtual bool onRecv(NetworkCommonLib::CSerializableBuffer<FALSE> &message) noexcept = 0;
 		// onRecv()의 실패를 더미 클라이언트에서 기록하기 위한 용도
 		// - 일반 클라는 구현 안함
 		virtual void onRecvRejected() noexcept

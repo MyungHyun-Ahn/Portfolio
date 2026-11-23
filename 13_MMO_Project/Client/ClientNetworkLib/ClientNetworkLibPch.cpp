@@ -1,6 +1,6 @@
 #include "ClientNetworkLibPch.h"
 
-namespace NetworkLib
+namespace ClientNetworkLib
 {
 
 }

@@ -25,7 +25,7 @@ int main(void)
 
 	int exitCode = 0;
 	{
-		NetworkLib::CNetClientManager network;
+		ClientNetworkLib::CNetClientManager network;
 		Chatting::CConsoleChatClient client(network, config);
 		MHLib::security::CEncryption::sm_packetKey = Chatting::kPacketKey;
 		if (network.Init(1, config.m_recvBufferBytes)

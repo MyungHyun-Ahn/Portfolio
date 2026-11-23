@@ -5,12 +5,12 @@ namespace ClientNetworkLib
 	class CNetSession
 	{
 	public:
-		CNetSession(BYTE packetCode, std::shared_ptr<NetworkLib::CClientMailbox> spMailbox, int recvBufferBytes);
+		CNetSession(BYTE packetCode, std::shared_ptr<CClientMailbox> spMailbox, int recvBufferBytes);
 		~CNetSession();
 
 	private:
-		friend class NetworkLib::CNetClientManager;
-		friend class NetworkLib::CClientLifecycleProbe;
+		friend class CNetClientManager;
+		friend class CClientLifecycleProbe;
 
 		enum class EState
 		{
@@ -25,7 +25,7 @@ namespace ClientNetworkLib
 
 		// 아래 함수들은 호출자가 m_sessionStateLock을 잡은 상태에서만 호출한다.
 		[[nodiscard]]
-		bool queueSendLocked(std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> spMessage) noexcept;
+		bool queueSendLocked(std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>> spMessage) noexcept;
 		[[nodiscard]]
 		bool postSendLocked() noexcept;
 		[[nodiscard]]
@@ -58,18 +58,18 @@ namespace ClientNetworkLib
 		// 헤더 식별 값
 		BYTE m_packetCode;
 
-		std::shared_ptr<NetworkLib::CClientMailbox> m_spMailbox;
+		std::shared_ptr<CClientMailbox> m_spMailbox;
 
 		OVERLAPPED m_connectOverlapped{};
 		OVERLAPPED m_recvOverlapped{};
 		OVERLAPPED m_sendOverlapped{};
 
 		// Recv 관련
-		NetworkLib::CRingBuffer m_recvBuffer;
+		NetworkCommonLib::CRingBuffer m_recvBuffer;
 
 		// Send 관련
-		std::deque<std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>>> 									m_sendQueue;
-		std::array<std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>>, NetworkLib::kWsasendMaxBufferCount> m_sendBatch;
+		std::deque<std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>>> 									m_sendQueue;
+		std::array<std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>>, NetworkCommonLib::kWsasendMaxBufferCount> m_sendBatch;
 		DWORD m_sendCount = 0;
 	};
 }

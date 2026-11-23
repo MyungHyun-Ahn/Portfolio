@@ -1,19 +1,17 @@
 #include "ServerNetworkLibPch.h"
 
-namespace NetworkLib
+namespace ServerNetworkLib
 {
 void CBaseContents::MoveJobEnqueue(UINT64 sessionId, void *pObject) noexcept
 {
-	NetworkLib::CNetSession *pSession 
-		= NetworkLib::g_pNetServer->m_pSessions[NetworkLib::CNetServer::getIndex(sessionId)];
+	CNetSession *pSession = g_pNetServer->m_pSessions[CNetServer::getIndex(sessionId)];
 
 	InterlockedIncrement(&pSession->m_ioCountAndRelease);
-	if ((pSession->m_ioCountAndRelease & NetworkLib::CNetSession::sm_releaseFlag) 
-		== NetworkLib::CNetSession::sm_releaseFlag)
+	if ((pSession->m_ioCountAndRelease & CNetSession::sm_releaseFlag) == CNetSession::sm_releaseFlag)
 	{
 		if (InterlockedDecrement(&pSession->m_ioCountAndRelease) == 0)
 		{
-			NetworkLib::g_pNetServer->ReleaseSession(pSession);
+			ServerNetworkLib::g_pNetServer->ReleaseSession(pSession);
 		}
 		return;
 	}
@@ -22,7 +20,7 @@ void CBaseContents::MoveJobEnqueue(UINT64 sessionId, void *pObject) noexcept
 	{
 		if (InterlockedDecrement(&pSession->m_ioCountAndRelease) == 0)
 		{
-			NetworkLib::g_pNetServer->ReleaseSession(pSession);
+			ServerNetworkLib::g_pNetServer->ReleaseSession(pSession);
 		}
 		return;
 	}
@@ -51,7 +49,7 @@ void CBaseContents::ProcessMoveJob() noexcept
 			break;
 
 		// 세션 찾기
-		NetworkLib::CNetSession *pSession = NetworkLib::g_pNetServer->m_pSessions[NetworkLib::CNetServer::getIndex(pMoveJob->m_sessionId)];
+		ServerNetworkLib::CNetSession *pSession = ServerNetworkLib::g_pNetServer->m_pSessions[ServerNetworkLib::CNetServer::getIndex(pMoveJob->m_sessionId)];
 
 		// 여기까진 유효한 세션일 것
 		// objectPtr == nullptr이면 OnEnter 받은 쪽에서 생성
@@ -65,7 +63,7 @@ void CBaseContents::ProcessMoveJob() noexcept
 
 		if (InterlockedDecrement(&pSession->m_ioCountAndRelease) == 0)
 		{
-			NetworkLib::g_pNetServer->ReleaseSession(pSession);
+			ServerNetworkLib::g_pNetServer->ReleaseSession(pSession);
 		}
 	}
 }
@@ -87,16 +85,15 @@ void CBaseContents::ProcessRecvMsg(int delayFrame) noexcept
 	for (auto &it : m_umapSessions)
 	{
 		UINT64 sessionId = it.first;
-		int sessionIdx = NetworkLib::CNetServer::getIndex(sessionId);
-		NetworkLib::CNetSession *pSession = NetworkLib::g_pNetServer->m_pSessions[sessionIdx];
+		int sessionIdx = ServerNetworkLib::CNetServer::getIndex(sessionId);
+		ServerNetworkLib::CNetSession *pSession = ServerNetworkLib::g_pNetServer->m_pSessions[sessionIdx];
 		
 		InterlockedIncrement(&pSession->m_ioCountAndRelease);
-		if ((pSession->m_ioCountAndRelease & NetworkLib::CNetSession::sm_releaseFlag) 
-			== NetworkLib::CNetSession::sm_releaseFlag)
+		if ((pSession->m_ioCountAndRelease & CNetSession::sm_releaseFlag) == CNetSession::sm_releaseFlag)
 		{
 			if (InterlockedDecrement(&pSession->m_ioCountAndRelease) == 0)
 			{
-				NetworkLib::g_pNetServer->ReleaseSession(pSession);
+				ServerNetworkLib::g_pNetServer->ReleaseSession(pSession);
 			}
 			continue;
 		}
@@ -105,7 +102,7 @@ void CBaseContents::ProcessRecvMsg(int delayFrame) noexcept
 		{
 			if (InterlockedDecrement(&pSession->m_ioCountAndRelease) == 0)
 			{
-				NetworkLib::g_pNetServer->ReleaseSession(pSession);
+				ServerNetworkLib::g_pNetServer->ReleaseSession(pSession);
 			}
 			continue;
 		}
@@ -126,7 +123,7 @@ void CBaseContents::ProcessRecvMsg(int delayFrame) noexcept
 			}
 			if (ret == ERecvResult::Failed)
 			{
-				NetworkLib::g_pNetServer->Disconnect(sessionId);
+				ServerNetworkLib::g_pNetServer->Disconnect(sessionId);
 
 				if (pMsg->DecreaseRef() == 0)
 					CSerializableBuffer<FALSE>::Free(pMsg);
@@ -139,7 +136,7 @@ void CBaseContents::ProcessRecvMsg(int delayFrame) noexcept
 
 		if (InterlockedDecrement(&pSession->m_ioCountAndRelease) == 0)
 		{
-			NetworkLib::g_pNetServer->ReleaseSession(pSession);
+			ServerNetworkLib::g_pNetServer->ReleaseSession(pSession);
 		}
 	}
 }

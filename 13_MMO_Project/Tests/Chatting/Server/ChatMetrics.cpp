@@ -26,14 +26,14 @@ namespace Chatting
 				return false;
 			nextCheck = now + std::chrono::milliseconds(100);
 
-			const auto spSample = NetworkLib::g_monitor.GetSnapshot();
+			const auto spSample = ServerNetworkLib::g_monitor.GetSnapshot();
 			if (!spSample || lastSampleMilliseconds == spSample->m_sampledAtMilliseconds)
 				return false;
 			const auto &sample = *spSample;
 			lastSampleMilliseconds = sample.m_sampledAtMilliseconds;
 
 			// 여기에 chat server 독립적인 수집 지표를 작성한다.
-			using NetworkLib::EMonitorInterval;
+			using ServerNetworkLib::EMonitorInterval;
 			using ServerMetrics::AppendIntervalMetric;
 			ServerMetrics::AppendCommonMetrics(sample, outMetrics);
 			AppendIntervalMetric(sample, EMonitorInterval::ContentUpdates, "game_chat_content_updates", outMetrics);

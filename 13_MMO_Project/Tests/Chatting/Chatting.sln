@@ -12,7 +12,7 @@ Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "ChatServer", "Server\ChatSe
 EndProject
 Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "Generate", "..\..\Tools\PacketGenerator\Generate.vcxproj", "{B07A0594-6BB1-4C91-B4D9-EB0DE1FB6C69}"
 EndProject
-Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "NetworkCommon", "..\..\Common\NetworkCommon\NetworkCommon.vcxproj", "{71D436B7-5958-42E7-A5D6-117397ACE88B}"
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "NetworkCommonLib", "..\..\Common\NetworkCommon\NetworkCommonLib.vcxproj", "{71D436B7-5958-42E7-A5D6-117397ACE88B}"
 EndProject
 Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "ClientNetworkLib", "..\..\Client\ClientNetworkLib\ClientNetworkLib.vcxproj", "{78263CEC-71A0-4A0F-BA79-66BF5873E3E6}"
 EndProject

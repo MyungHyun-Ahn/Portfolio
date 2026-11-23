@@ -60,26 +60,26 @@ namespace Chatting
 			L"event=session_leave | 세션이 콘텐츠를 떠났습니다.");
 	}
 
-	NetworkLib::ERecvResult CChatContents::OnRecv(UINT64 sessionId,
-		NetworkLib::CSerializableBuffer<FALSE> *pMessage, int /*delayFrame*/) noexcept
+	ServerNetworkLib::ERecvResult CChatContents::OnRecv(UINT64 sessionId,
+		NetworkCommonLib::CSerializableBuffer<FALSE> *pMessage, int /*delayFrame*/) noexcept
 	{
-		InterlockedIncrement(&NetworkLib::g_monitor.m_updateTps);
+		InterlockedIncrement(&ServerNetworkLib::g_monitor.m_updateTps);
 		std::uint16_t type{};
 		*pMessage >> type;
 		if (!pMessage->IsValid())
 		{
-			return NetworkLib::ERecvResult::Failed;
+			return ServerNetworkLib::ERecvResult::Failed;
 		}
 		switch (static_cast<EPacketType>(type))
 		{
 		case EPacketType::ReqLogin:
-			InterlockedIncrement(&NetworkLib::g_monitor.m_loginReq);
+			InterlockedIncrement(&ServerNetworkLib::g_monitor.m_loginReq);
 			break;
 		case EPacketType::ReqSectorMove:
-			InterlockedIncrement(&NetworkLib::g_monitor.m_sectorMoveReq);
+			InterlockedIncrement(&ServerNetworkLib::g_monitor.m_sectorMoveReq);
 			break;
 		case EPacketType::ReqMessage:
-			InterlockedIncrement(&NetworkLib::g_monitor.m_chatMsgReq);
+			InterlockedIncrement(&ServerNetworkLib::g_monitor.m_chatMsgReq);
 			break;
 		default:
 			break;
@@ -89,13 +89,13 @@ namespace Chatting
 		{
 			g_pLogger->WriteLog(ELogLevel::Error, L"ChatServer", sessionId, std::source_location::current(),
 				L"event=packet_rejected packet_type=%u | 패킷을 처리하지 못했습니다.", type);
-			return NetworkLib::ERecvResult::Failed;
+			return ServerNetworkLib::ERecvResult::Failed;
 		}
-		return NetworkLib::ERecvResult::Received;
+		return ServerNetworkLib::ERecvResult::Received;
 	}
 
 	void CChatContents::SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX,
-		NetworkLib::CSerializableBuffer<FALSE> *pMessage) noexcept
+		NetworkCommonLib::CSerializableBuffer<FALSE> *pMessage) noexcept
 	{
 		int startY = sectorY - kSectorViewStart;
 		int startX = sectorX - kSectorViewStart;
@@ -109,7 +109,7 @@ namespace Chatting
 				{
 					if (entry.first == sessionId)
 						continue;
-					InterlockedIncrement(&NetworkLib::g_monitor.m_chatMsgRes);
+					InterlockedIncrement(&ServerNetworkLib::g_monitor.m_chatMsgRes);
 					m_server.SendPacket(entry.first, pMessage);
 				}
 			}

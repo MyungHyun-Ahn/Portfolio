@@ -1,6 +1,6 @@
 #pragma once
 
-namespace NetworkLib
+namespace ServerNetworkLib
 {
 struct SNicRate
 {

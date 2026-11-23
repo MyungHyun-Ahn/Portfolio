@@ -1,7 +1,9 @@
 #include "ClientNetworkLibPch.h"
 
-namespace NetworkLib
+namespace ClientNetworkLib
 {
+	using namespace NetworkCommonLib;
+
 	CNetClientManager::~CNetClientManager()
 	{
 		Stop();
@@ -92,7 +94,7 @@ namespace NetworkLib
 		try
 		{
 			auto spMailbox = std::make_shared<CClientMailbox>();
-			auto spSession = std::make_shared<ClientNetworkLib::CNetSession>(packetCode, spMailbox, m_recvBufferBytes);
+			auto spSession = std::make_shared<CNetSession>(packetCode, spMailbox, m_recvBufferBytes);
 			// ConnectEx를 조회했던 공급자로 세션 소켓을 생성한다.
 			spSession->m_socket = WSASocketW(FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO,
 				&m_connectProtocol, 0, WSA_FLAG_OVERLAPPED);
@@ -172,7 +174,7 @@ namespace NetworkLib
 		bool isFinished;
 		{
 			std::lock_guard sessionStateLock(spSession->m_sessionStateLock);
-			if (spSession->m_state == ClientNetworkLib::CNetSession::EState::Closing)
+			if (spSession->m_state == CNetSession::EState::Closing)
 				return false;
 
 			spSession->beginCloseLocked(ERROR_OPERATION_ABORTED);
@@ -185,7 +187,7 @@ namespace NetworkLib
 		return true;
 	}
 
-	std::shared_ptr<ClientNetworkLib::CNetSession> CNetClientManager::findSession(SessionId sessionId) noexcept
+	std::shared_ptr<CNetSession> CNetClientManager::findSession(SessionId sessionId) noexcept
 	{
 		std::lock_guard sessionTableLock(m_sessionTableLock);
 		auto found = m_sessions.find(sessionId);
@@ -217,7 +219,7 @@ namespace NetworkLib
 			const auto &spSession = entry.second;
 			std::lock_guard sessionStateLock(spSession->m_sessionStateLock);
 			// Connecting 상태에는 아직 소비하지 않은 ConnectEx가 한 건 있다.
-			if (spSession->m_state == ClientNetworkLib::CNetSession::EState::Connecting && now >= spSession->m_connectDeadline)
+			if (spSession->m_state == CNetSession::EState::Connecting && now >= spSession->m_connectDeadline)
 				spSession->beginCloseLocked(WSAETIMEDOUT);
 		};
 		std::vector<SSessionEntry> sessions;

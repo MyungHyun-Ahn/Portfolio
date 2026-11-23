@@ -4,7 +4,7 @@
 #include <string_view>
 #include "SNetworkCounters.h"
 
-namespace NetworkLib
+namespace ServerNetworkLib
 {
 namespace
 {

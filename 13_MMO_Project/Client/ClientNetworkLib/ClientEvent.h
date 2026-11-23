@@ -1,9 +1,7 @@
 #pragma once
 
-namespace NetworkLib
+namespace ClientNetworkLib
 {
-	template<bool isLanServer> class CSerializableBuffer;
-
 	enum class EClientEvent
 	{
 		Connected,
@@ -16,6 +14,6 @@ namespace NetworkLib
 	{
 		EClientEvent 									m_kind{};
 		DWORD 											m_error = 0;
-		std::shared_ptr<CSerializableBuffer<FALSE>> 	m_spPacket;
+		std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>> 	m_spPacket;
 	};
 }

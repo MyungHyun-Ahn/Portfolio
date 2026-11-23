@@ -14,8 +14,10 @@
 #include "CSerializableBufferView.h"
 #include "CLanClient.h"
 
-namespace NetworkLib
+namespace ClientNetworkLib
 {
+	using NetworkCommonLib::CSerializableBuffer;
+
 	class CClientLifecycleProbe
 	{
 		static_assert(std::is_same_v<decltype(CNetClientManager::m_sessions),
@@ -127,7 +129,8 @@ namespace NetworkLib
 
 namespace
 {
-	using namespace NetworkLib;
+	using namespace ClientNetworkLib;
+	using namespace NetworkCommonLib;
 	constexpr DWORD kConnectTimeoutMilliseconds = 5000;
 	constexpr int kDefaultFixtureRecvBufferBytes = 4096;
 	static_assert(std::is_same_v<decltype(&CNetClient::Disconnect), void (CNetClient::*)() noexcept>);

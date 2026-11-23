@@ -169,13 +169,13 @@ class GeneratorTests(unittest.TestCase):
                 dispatch = (root / f'{side}PacketDispatch.g.cpp').read_text()
                 header = (root / f'{send_stem}.g.h').read_text(encoding='utf-8')
                 if side == 'Client':
-                    self.assertIn('std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>>', header)
+                    self.assertIn('std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>>', header)
                     self.assertIn('CSerializableBuffer<FALSE>::MakeShared()', send)
                     self.assertIn(f'*spBuffer << static_cast<std::uint16_t>(EPacketType::{packet}) << packet;', send)
                     self.assertRegex(send, r'if \(!spBuffer->IsValid\(\)\)\s*\{\s*return nullptr;')
                     self.assertNotIn('::Free(', send)
                 else:
-                    self.assertIn('NetworkLib::CSerializableBuffer<FALSE> *MakePacket', header)
+                    self.assertIn('NetworkCommonLib::CSerializableBuffer<FALSE> *MakePacket', header)
                     self.assertIn('CSerializableBuffer<FALSE>::Alloc()', send)
                     self.assertIn(f'*pBuffer << static_cast<std::uint16_t>(EPacketType::{packet}) << packet;', send)
                     self.assertRegex(send, r'if \(!pBuffer->IsValid\(\)\)\s*\{\s*.*::Free\(pBuffer\);')
@@ -191,9 +191,9 @@ class GeneratorTests(unittest.TestCase):
         server = (self.server / 'ServerPacketSend.g.h').read_text(encoding='utf-8')
         client_cpp = (self.client / 'CChatNetClient.g.cpp').read_text(encoding='utf-8')
         server_cpp = (self.server / 'ServerPacketSend.g.cpp').read_text()
-        self.assertIn('class CChatNetClient : public NetworkLib::CNetClient, private IClientPacketHandler', client)
-        self.assertRegex(client, r'private:\s*bool onRecv\(NetworkLib::CSerializableBuffer<FALSE> &message\) noexcept override final;')
-        self.assertRegex(client_cpp, r'bool CChatNetClient::onRecv\(NetworkLib::CSerializableBuffer<FALSE> &message\) noexcept\s*'
+        self.assertIn('class CChatNetClient : public ClientNetworkLib::CNetClient, private IClientPacketHandler', client)
+        self.assertRegex(client, r'private:\s*bool onRecv\(NetworkCommonLib::CSerializableBuffer<FALSE> &message\) noexcept override final;')
+        self.assertRegex(client_cpp, r'bool CChatNetClient::onRecv\(NetworkCommonLib::CSerializableBuffer<FALSE> &message\) noexcept\s*'
                                      r'\{\s*return DispatchClientPacket\(message, \*this\);\s*\}')
         self.assertIn('bool CChatNetClient::SendReqMessage(', client_cpp)
         self.assertNotIn('CClientPacketSender', client + client_cpp)

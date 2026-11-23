@@ -1,6 +1,6 @@
 #pragma once
 
-namespace NetworkLib
+namespace NetworkCommonLib
 {
 constexpr UINT64 kSessionIndexMask = 0xffff000000000000;
 constexpr UINT64 kSessionIdMask = 0x0000ffffffffffff;

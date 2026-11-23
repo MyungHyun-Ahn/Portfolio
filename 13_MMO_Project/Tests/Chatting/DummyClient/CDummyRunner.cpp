@@ -88,10 +88,10 @@ namespace Chatting
 		if (!LoadNumber(loader, L"SECTOR_X", 0, kMaxSectorX - 1, config.m_sectorX)
 			|| !LoadNumber(loader, L"SECTOR_Y", 0, kMaxSectorY - 1, config.m_sectorY))
 			return "config_sector_invalid";
-		constexpr int kMinRecvBufferBytes = static_cast<int>(NetworkLib::CSerializableBuffer<FALSE>::EBufferDefine::PacketMaxSize);
+		constexpr int kMinRecvBufferBytes = static_cast<int>(NetworkCommonLib::CSerializableBuffer<FALSE>::EBufferDefine::PacketMaxSize);
 		if (!LoadNumber(loader, L"WORKER_COUNT", 1, 16, config.m_workerCount)
 			|| !LoadNumber(loader, L"APP_WORKER_COUNT", 1, 16, config.m_appWorkerCount)
-			|| !LoadNumber(loader, L"RECV_BUFFER_BYTES", kMinRecvBufferBytes, NetworkLib::kMaxNetRecvBufferBytes, config.m_recvBufferBytes))
+			|| !LoadNumber(loader, L"RECV_BUFFER_BYTES", kMinRecvBufferBytes, NetworkCommonLib::kMaxNetRecvBufferBytes, config.m_recvBufferBytes))
 			return "config_network_limits_invalid";
 		if (!LoadNumber(loader, L"CONNECT_INTERVAL_MS", 1, MAXDWORD, config.m_connectIntervalMilliseconds)
 			|| !LoadNumber(loader, L"CONNECT_ATTEMPTS_PER_INTERVAL", 1, MAXDWORD, config.m_connectAttemptsPerInterval))
@@ -124,7 +124,7 @@ namespace Chatting
 			SDummyRunStats m_stats;
 			std::vector<SDummySlot> m_slots;
 		};
-		NetworkLib::CNetClientManager network;
+		ClientNetworkLib::CNetClientManager network;
 		const size_t appWorkerCount = (std::min)(m_config.m_clientCount, static_cast<size_t>(m_config.m_appWorkerCount));
 		std::vector<SAppWork> work;
 		std::vector<std::thread> workers;

@@ -168,9 +168,9 @@ namespace Chatting
 			std::wstring recvBufferBytes;
 			if (loader.Load(pSection, L"RECV_BUFFER_BYTES", &recvBufferBytes))
 			{
-				constexpr int kMinRecvBufferBytes = static_cast<int>(NetworkLib::CSerializableBuffer<FALSE>::EBufferDefine::PacketMaxSize);
+				constexpr int kMinRecvBufferBytes = static_cast<int>(NetworkCommonLib::CSerializableBuffer<FALSE>::EBufferDefine::PacketMaxSize);
 				if (!loader.Load(pSection, L"RECV_BUFFER_BYTES", &number) || number < kMinRecvBufferBytes
-					|| number > NetworkLib::kMaxNetRecvBufferBytes)
+					|| number > NetworkCommonLib::kMaxNetRecvBufferBytes)
 					return ConfigError(pFileName, L"RECV_BUFFER_BYTES must fit a full Net packet and the ring's cursor range");
 				config.m_recvBufferBytes = static_cast<int>(number);
 			}

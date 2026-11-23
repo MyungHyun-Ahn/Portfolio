@@ -9,7 +9,8 @@ namespace Chatting
 	class CChatDummyClient final : public CChatNetClient
 	{
 	public:
-		CChatDummyClient(NetworkLib::CNetClientManager &network, const SDummyConfig &config, SDummyRunStats &stats, size_t index, const std::wstring &runMarker);
+		CChatDummyClient(ClientNetworkLib::CNetClientManager &network, const SDummyConfig &config,
+			SDummyRunStats &stats, size_t index, const std::wstring &runMarker);
 
 		[[nodiscard]] 
 		bool 		Start() noexcept;

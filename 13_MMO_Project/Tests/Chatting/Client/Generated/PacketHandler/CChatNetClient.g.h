@@ -8,16 +8,16 @@ namespace Chatting
 	struct SReqSectorMove;
 	struct SHeartbeatNoti;
 
-	[[nodiscard]] std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> MakePacketReqMessage(
+	[[nodiscard]] std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>> MakePacketReqMessage(
 		const SReqMessage &packet) noexcept;
-	[[nodiscard]] std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> MakePacketReqLogin(
+	[[nodiscard]] std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>> MakePacketReqLogin(
 		const SReqLogin &packet) noexcept;
-	[[nodiscard]] std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> MakePacketReqSectorMove(
+	[[nodiscard]] std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>> MakePacketReqSectorMove(
 		const SReqSectorMove &packet) noexcept;
-	[[nodiscard]] std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> MakePacketHeartbeatNoti(
+	[[nodiscard]] std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>> MakePacketHeartbeatNoti(
 		const SHeartbeatNoti &packet) noexcept;
 
-	class CChatNetClient : public NetworkLib::CNetClient, private IClientPacketHandler
+	class CChatNetClient : public ClientNetworkLib::CNetClient, private IClientPacketHandler
 	{
 	public:
 		[[nodiscard]] bool SendReqMessage(
@@ -40,10 +40,10 @@ namespace Chatting
 			std::int64_t accountNo) noexcept;
 
 	protected:
-		using NetworkLib::CNetClient::CNetClient;
+		using ClientNetworkLib::CNetClient::CNetClient;
 
 	private:
-		bool onRecv(NetworkLib::CSerializableBuffer<FALSE> &message) noexcept override final;
+		bool onRecv(NetworkCommonLib::CSerializableBuffer<FALSE> &message) noexcept override final;
 		bool HandleResMessage(const SResMessage &packet) noexcept override final;
 		bool HandleMessageNoti(const SMessageNoti &packet) noexcept override final;
 		bool HandleResLogin(const SResLogin &packet) noexcept override final;

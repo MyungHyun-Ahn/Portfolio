@@ -1,7 +1,9 @@
 #include "ClientNetworkLibPch.h"
 
-namespace NetworkLib
+namespace ClientNetworkLib
 {
+	using namespace NetworkCommonLib;
+
 	bool CClientMailbox::tryPop(SClientEvent &outEvent) noexcept
 	{
 		std::lock_guard mailboxLock(m_mailboxLock);

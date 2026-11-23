@@ -20,9 +20,9 @@ namespace Chatting
 {
 {% for packet in packets %}
 {% set buffer = 'spBuffer' if side == 'Client' else 'pBuffer' %}
-	{{ 'std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> ' if side == 'Client' else 'NetworkLib::CSerializableBuffer<FALSE> *' }}MakePacket{{ packet.name }}(const S{{ packet.name }} &packet) noexcept
+	{{ 'std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>> ' if side == 'Client' else 'NetworkCommonLib::CSerializableBuffer<FALSE> *' }}MakePacket{{ packet.name }}(const S{{ packet.name }} &packet) noexcept
 	{
-		auto {{ '' if side == 'Client' else '*' }}{{ buffer }} = NetworkLib::CSerializableBuffer<FALSE>::{{ 'MakeShared' if side == 'Client' else 'Alloc' }}();
+		auto {{ '' if side == 'Client' else '*' }}{{ buffer }} = NetworkCommonLib::CSerializableBuffer<FALSE>::{{ 'MakeShared' if side == 'Client' else 'Alloc' }}();
 		if ({{ buffer }} == nullptr)
 		{
 			return nullptr;
@@ -32,7 +32,7 @@ namespace Chatting
 		if (!{{ buffer }}->IsValid())
 		{
 {% if side == 'Server' %}
-			NetworkLib::CSerializableBuffer<FALSE>::Free(pBuffer);
+			NetworkCommonLib::CSerializableBuffer<FALSE>::Free(pBuffer);
 {% endif %}
 			return nullptr;
 		}
@@ -44,8 +44,8 @@ namespace Chatting
 {% endfor %}
 {% if side == 'Server' %}
 
-	NetworkLib::CSerializableBuffer<FALSE> *CServerPacketSender::submitPreparedPacket(
-		UINT64 sessionId, EPacketType type, NetworkLib::CSerializableBuffer<FALSE> *pPacket) noexcept
+	NetworkCommonLib::CSerializableBuffer<FALSE> *CServerPacketSender::submitPreparedPacket(
+		UINT64 sessionId, EPacketType type, NetworkCommonLib::CSerializableBuffer<FALSE> *pPacket) noexcept
 	{
 		if (pPacket == nullptr)
 		{
@@ -57,7 +57,7 @@ namespace Chatting
 	}
 {% else %}
 
-	bool CChatNetClient::onRecv(NetworkLib::CSerializableBuffer<FALSE> &message) noexcept
+	bool CChatNetClient::onRecv(NetworkCommonLib::CSerializableBuffer<FALSE> &message) noexcept
 	{
 		return DispatchClientPacket(message, *this);
 	}

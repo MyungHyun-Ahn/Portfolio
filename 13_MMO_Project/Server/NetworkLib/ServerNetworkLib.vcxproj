@@ -190,7 +190,7 @@
     <ClInclude Include="SystemEvent.h" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Common\NetworkCommon\NetworkCommon.vcxproj">
+    <ProjectReference Include="..\..\Common\NetworkCommon\NetworkCommonLib.vcxproj">
       <Project>{71D436B7-5958-42E7-A5D6-117397ACE88B}</Project>
       <LinkLibraryDependencies>false</LinkLibraryDependencies>
     </ProjectReference>

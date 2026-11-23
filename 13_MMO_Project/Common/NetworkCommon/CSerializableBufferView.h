@@ -1,12 +1,17 @@
 #pragma once
 
-namespace NetworkLib
+namespace ClientNetworkLib
 {
-class CNetSession;
-
-
-
 	class CLanSession;
+}
+
+namespace ServerNetworkLib
+{
+	class CNetSession;
+}
+
+namespace NetworkCommonLib
+{
 
 
 
@@ -20,8 +25,8 @@ public:
 
 
 private:
-	friend class NetworkLib::CNetSession;
-	friend class NetworkLib::CLanSession;
+	friend class ServerNetworkLib::CNetSession;
+	friend class ClientNetworkLib::CLanSession;
 
 	// 오프셋 시작과 끝을 받음
 	inline void init(MHLib::utils::CSmartPtr<CRecvBuffer> spRecvBuffer, int offsetStart, int offsetEnd) noexcept

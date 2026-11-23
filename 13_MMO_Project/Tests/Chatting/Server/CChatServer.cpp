@@ -26,11 +26,11 @@ namespace Chatting
 	using MHLib::utils::ELogLevel;
 	using MHLib::utils::g_pLogger;
 
-	struct SChatFrameEvent : public NetworkLib::SContentsFrameEvent
+	struct SChatFrameEvent : public ServerNetworkLib::SContentsFrameEvent
 	{
 		void Execute(int delayFrame) noexcept override
 		{
-			NetworkLib::SContentsFrameEvent::Execute(delayFrame);
+			ServerNetworkLib::SContentsFrameEvent::Execute(delayFrame);
 			m_pBaseContent->OnLoopEnd();
 			RecordCompletedChatFrame();
 		}
@@ -59,7 +59,7 @@ namespace Chatting
 		// NetworkLib의 LeaveJobEnqueue 이후 콘텐츠 프레임에서 정리한다.
 	}
 
-	void CChatServer::OnRecv(UINT64 /*sessionId*/, NetworkLib::CSerializableBufferView<FALSE> * /*pMessage*/) noexcept
+	void CChatServer::OnRecv(UINT64 /*sessionId*/, NetworkCommonLib::CSerializableBufferView<FALSE> * /*pMessage*/) noexcept
 	{
 		// 현재 NetworkLib는 CBaseContents의 수신 큐를 사용한다.
 	}
@@ -74,9 +74,9 @@ namespace Chatting
 	void CChatServer::RegisterContentTimerEvent() noexcept
 	{
 		auto *pEvent = new SChatFrameEvent;
-		pEvent->SetEvent(m_pContents, NetworkLib::serverSetting::maxContentsFps);
-		NetworkLib::CContentsThread::EnqueueEvent(pEvent);
+		pEvent->SetEvent(m_pContents, ServerNetworkLib::serverSetting::maxContentsFps);
+		ServerNetworkLib::CContentsThread::EnqueueEvent(pEvent);
 		g_pLogger->WriteLog(ELogLevel::Info, L"ChatServer", 0, std::source_location::current(),
-			L"event=server_ready port=%u | 테스트 채팅 서버가 준비되었습니다.", NetworkLib::serverSetting::openPort);
+			L"event=server_ready port=%u | 테스트 채팅 서버가 준비되었습니다.", ServerNetworkLib::serverSetting::openPort);
 	}
 }

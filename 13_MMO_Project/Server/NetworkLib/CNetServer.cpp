@@ -1,7 +1,7 @@
 #include "ServerNetworkLibPch.h"
 #include "SNetworkCounters.h"
 
-namespace NetworkLib
+namespace ServerNetworkLib
 {
 CNetServer *g_pNetServer = nullptr;
 

@@ -8,7 +8,7 @@
 
 namespace Chatting
 {
-	bool DispatchClientPacket(NetworkLib::CSerializableBuffer<FALSE> &message, IClientPacketHandler &handler) noexcept
+	bool DispatchClientPacket(NetworkCommonLib::CSerializableBuffer<FALSE> &message, IClientPacketHandler &handler) noexcept
 	{
 		std::uint16_t type{};
 		message >> type;

@@ -9,7 +9,7 @@ namespace Chatting
 		std::uint16_t m_sectorX{};
 		std::uint16_t m_sectorY{};
 
-		[[nodiscard]] bool Serialize(NetworkLib::CSerializableBuffer<false> &buffer) const noexcept override
+		[[nodiscard]] bool Serialize(NetworkCommonLib::CSerializableBuffer<false> &buffer) const noexcept override
 		{
 			buffer
 				<< m_accountNo
@@ -18,7 +18,7 @@ namespace Chatting
 			return buffer.IsValid();
 		}
 
-		[[nodiscard]] bool Deserialize(NetworkLib::CSerializableBuffer<false> &buffer) noexcept override
+		[[nodiscard]] bool Deserialize(NetworkCommonLib::CSerializableBuffer<false> &buffer) noexcept override
 		{
 			buffer
 				>> m_accountNo
@@ -34,7 +34,7 @@ namespace Chatting
 		std::uint16_t m_sectorX{};
 		std::uint16_t m_sectorY{};
 
-		[[nodiscard]] bool Serialize(NetworkLib::CSerializableBuffer<false> &buffer) const noexcept override
+		[[nodiscard]] bool Serialize(NetworkCommonLib::CSerializableBuffer<false> &buffer) const noexcept override
 		{
 			buffer
 				<< m_accountNo
@@ -43,7 +43,7 @@ namespace Chatting
 			return buffer.IsValid();
 		}
 
-		[[nodiscard]] bool Deserialize(NetworkLib::CSerializableBuffer<false> &buffer) noexcept override
+		[[nodiscard]] bool Deserialize(NetworkCommonLib::CSerializableBuffer<false> &buffer) noexcept override
 		{
 			buffer
 				>> m_accountNo

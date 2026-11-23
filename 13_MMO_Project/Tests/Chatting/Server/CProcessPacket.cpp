@@ -31,18 +31,18 @@ namespace Chatting
 
 	namespace
 	{
-		void ReleaseResponse(NetworkLib::CSerializableBuffer<FALSE> *pResponse) noexcept
+		void ReleaseResponse(NetworkCommonLib::CSerializableBuffer<FALSE> *pResponse) noexcept
 		{
 			if (pResponse != nullptr && pResponse->DecreaseRef() == 0)
-				NetworkLib::CSerializableBuffer<FALSE>::Free(pResponse);
+				NetworkCommonLib::CSerializableBuffer<FALSE>::Free(pResponse);
 		}
 	}
 
-	void CProcessPacket::sendPacket(UINT64 sessionId, EPacketType type, NetworkLib::CSerializableBuffer<FALSE> &packet) noexcept
+	void CProcessPacket::sendPacket(UINT64 sessionId, EPacketType type, NetworkCommonLib::CSerializableBuffer<FALSE> &packet) noexcept
 	{
 		if (type == EPacketType::ResMessage)
 			packet.SetSessionId(sessionId);
-		NetworkLib::PrepareNetPacket(packet, kPacketCode);
+		NetworkCommonLib::PrepareNetPacket(packet, kPacketCode);
 		m_contents.m_server.SendPacket(sessionId, &packet);
 	}
 
@@ -160,16 +160,16 @@ namespace Chatting
 		auto *pNotification = MakePacketMessageNoti(notification);
 		if (pNotification == nullptr)
 		{
-			NetworkLib::CSerializableBuffer<FALSE>::Free(pResponse);
+			NetworkCommonLib::CSerializableBuffer<FALSE>::Free(pResponse);
 			return false;
 		}
 
 		ReleaseResponse(submitPreparedPacket(sessionId, EPacketType::ResMessage, pResponse));
 		pPlayer->m_prevRecvTime = timeGetTime();
-		InterlockedIncrement(&NetworkLib::g_monitor.m_chatMsgRes);
+		InterlockedIncrement(&ServerNetworkLib::g_monitor.m_chatMsgRes);
 		// 전파가 끝날 때까지 호출자 참조를 유지한다.
 		pNotification->IncreaseRef();
-		NetworkLib::PrepareNetPacket(*pNotification, kPacketCode);
+		NetworkCommonLib::PrepareNetPacket(*pNotification, kPacketCode);
 		m_contents.SendSector(sessionId, pPlayer->m_sectorY, pPlayer->m_sectorX, pNotification);
 		ReleaseResponse(pNotification);
 		g_pLogger->WriteLog(ELogLevel::Debug, L"ChatServer", sessionId, std::source_location::current(),

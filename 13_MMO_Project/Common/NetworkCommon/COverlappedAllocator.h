@@ -1,6 +1,6 @@
 #pragma once
 
-namespace NetworkLib
+namespace NetworkCommonLib
 {
 // 오버랩 구조체를 최대한 페이지를 적게 사용하고 몰아넣기 위한 할당기
 // - 할당 해제는 전혀 고려하지 않음

@@ -15,7 +15,7 @@
 
 namespace Chatting
 {
-	CChatDummyClient::CChatDummyClient(NetworkLib::CNetClientManager &network, const SDummyConfig &config,
+	CChatDummyClient::CChatDummyClient(ClientNetworkLib::CNetClientManager &network, const SDummyConfig &config,
 		SDummyRunStats &stats, size_t index, const std::wstring &runMarker)
 		: CChatNetClient(network)
 		, m_config(config)

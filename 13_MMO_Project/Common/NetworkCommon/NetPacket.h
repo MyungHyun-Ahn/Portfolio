@@ -1,6 +1,6 @@
 #pragma once
 
-namespace NetworkLib
+namespace NetworkCommonLib
 {
 	template<bool isLanServer> class CSerializableBuffer;
 

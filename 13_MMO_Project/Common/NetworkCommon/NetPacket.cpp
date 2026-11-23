@@ -1,7 +1,7 @@
-#include "pch.h"
+#include "NetworkCommonLibPch.h"
 #include "NetPacket.h"
 
-namespace NetworkLib
+namespace NetworkCommonLib
 {
 	void PrepareNetPacket(CSerializableBuffer<FALSE> &message, BYTE packetCode) noexcept
 	{

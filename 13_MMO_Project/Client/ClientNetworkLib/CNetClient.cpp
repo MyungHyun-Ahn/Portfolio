@@ -1,7 +1,9 @@
 #include "ClientNetworkLibPch.h"
 
-namespace NetworkLib
+namespace ClientNetworkLib
 {
+	using namespace NetworkCommonLib;
+
 	CNetClient::CNetClient(CNetClientManager &network) noexcept
 		: m_network(network)
 	{

@@ -5,7 +5,7 @@ namespace MHLib::serialization
 	template<bool isLanServer> class ISerializable;
 }
 
-namespace NetworkLib
+namespace NetworkCommonLib
 {
 template<bool isLanServer>
 class CSerializableBuffer

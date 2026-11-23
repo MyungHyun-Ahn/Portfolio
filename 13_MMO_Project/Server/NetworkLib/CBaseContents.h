@@ -1,6 +1,6 @@
 #pragma once
 
-namespace NetworkLib
+namespace ServerNetworkLib
 {
 class CNetServer;
 
@@ -36,7 +36,7 @@ enum class ERecvResult
 class CBaseContents
 {
 public:
-	friend class NetworkLib::CNetServer;
+	friend class ServerNetworkLib::CNetServer;
 	friend struct SContentsFrameEvent;
 	friend class CMonitor;
 

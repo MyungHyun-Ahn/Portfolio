@@ -1,6 +1,6 @@
 #pragma once
 
-namespace NetworkLib
+namespace ServerNetworkLib
 {
 // 시스템적인 이벤트는 여기서 선언
 

@@ -9,7 +9,7 @@
 namespace Chatting
 {
 	bool DispatchServerPacket(std::uint16_t type, UINT64 sessionId,
-NetworkLib::CSerializableBuffer<FALSE> &message, IServerPacketHandler &handler) noexcept
+NetworkCommonLib::CSerializableBuffer<FALSE> &message, IServerPacketHandler &handler) noexcept
 	{
 		switch (static_cast<EPacketType>(type))
 		{

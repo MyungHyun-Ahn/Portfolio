@@ -1,4 +1,4 @@
-#include "NetworkCommonPch.h"
+#include "NetworkCommonLibPch.h"
 #include <cassert>
 #include <cstdint>
 #include <cstring>
@@ -13,7 +13,7 @@
 #error SerializableBufferTests requires active assertions.
 #endif
 
-using CBuffer = NetworkLib::CSerializableBuffer<false>;
+using CBuffer = NetworkCommonLib::CSerializableBuffer<false>;
 
 void TestFixedCapacity()
 {
@@ -237,7 +237,7 @@ void TestPoolReset()
 
 void TestRawBufferBoundaries()
 {
-	NetworkLib::CSerializableBuffer<true> buffer;
+	NetworkCommonLib::CSerializableBuffer<true> buffer;
 	char header[]{1, 2};
 	char replacement[]{3, 4};
 	assert(buffer.GetHeaderSize() == 2 && buffer.GetBufferSize() == 128);

@@ -3,7 +3,7 @@
 
 namespace ClientNetworkLib
 {
-	using namespace NetworkLib;
+	using namespace NetworkCommonLib;
 
 	CNetSession::CNetSession(BYTE packetCode, std::shared_ptr<CClientMailbox> spMailbox, int recvBufferBytes)
 		: m_packetCode(packetCode)

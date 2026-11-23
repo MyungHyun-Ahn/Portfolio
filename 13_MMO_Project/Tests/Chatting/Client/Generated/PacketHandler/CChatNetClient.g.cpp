@@ -13,9 +13,9 @@
 
 namespace Chatting
 {
-	std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> MakePacketReqMessage(const SReqMessage &packet) noexcept
+	std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>> MakePacketReqMessage(const SReqMessage &packet) noexcept
 	{
-		auto spBuffer = NetworkLib::CSerializableBuffer<FALSE>::MakeShared();
+		auto spBuffer = NetworkCommonLib::CSerializableBuffer<FALSE>::MakeShared();
 		if (spBuffer == nullptr)
 		{
 			return nullptr;
@@ -29,9 +29,9 @@ namespace Chatting
 		return spBuffer;
 	}
 
-	std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> MakePacketReqLogin(const SReqLogin &packet) noexcept
+	std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>> MakePacketReqLogin(const SReqLogin &packet) noexcept
 	{
-		auto spBuffer = NetworkLib::CSerializableBuffer<FALSE>::MakeShared();
+		auto spBuffer = NetworkCommonLib::CSerializableBuffer<FALSE>::MakeShared();
 		if (spBuffer == nullptr)
 		{
 			return nullptr;
@@ -45,9 +45,9 @@ namespace Chatting
 		return spBuffer;
 	}
 
-	std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> MakePacketReqSectorMove(const SReqSectorMove &packet) noexcept
+	std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>> MakePacketReqSectorMove(const SReqSectorMove &packet) noexcept
 	{
-		auto spBuffer = NetworkLib::CSerializableBuffer<FALSE>::MakeShared();
+		auto spBuffer = NetworkCommonLib::CSerializableBuffer<FALSE>::MakeShared();
 		if (spBuffer == nullptr)
 		{
 			return nullptr;
@@ -61,9 +61,9 @@ namespace Chatting
 		return spBuffer;
 	}
 
-	std::shared_ptr<NetworkLib::CSerializableBuffer<FALSE>> MakePacketHeartbeatNoti(const SHeartbeatNoti &packet) noexcept
+	std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>> MakePacketHeartbeatNoti(const SHeartbeatNoti &packet) noexcept
 	{
-		auto spBuffer = NetworkLib::CSerializableBuffer<FALSE>::MakeShared();
+		auto spBuffer = NetworkCommonLib::CSerializableBuffer<FALSE>::MakeShared();
 		if (spBuffer == nullptr)
 		{
 			return nullptr;
@@ -77,7 +77,7 @@ namespace Chatting
 		return spBuffer;
 	}
 
-	bool CChatNetClient::onRecv(NetworkLib::CSerializableBuffer<FALSE> &message) noexcept
+	bool CChatNetClient::onRecv(NetworkCommonLib::CSerializableBuffer<FALSE> &message) noexcept
 	{
 		return DispatchClientPacket(message, *this);
 	}

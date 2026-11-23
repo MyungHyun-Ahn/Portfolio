@@ -1,6 +1,6 @@
-#include "pch.h"
+#include "NetworkCommonLibPch.h"
 
-namespace NetworkLib
+namespace NetworkCommonLib
 {
 	// 풀을 사용하는 서버만 이 오브젝트를 링크한다.
 	template<>

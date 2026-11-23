@@ -173,7 +173,7 @@ def parse_packet(value):
     parameters.extend(field['parameter'] for field in fields)
     return dict(name=name, id=packet_id, kind=kind, direction=direction, fields=fields,
                 send_name=sender_name(name, kind), send_parameters=parameters,
-                send_result='bool ' if is_client else 'NetworkLib::CSerializableBuffer<FALSE> *',
+                send_result='bool ' if is_client else 'NetworkCommonLib::CSerializableBuffer<FALSE> *',
                 copies_string=any(field['cpp_type'] == 'std::wstring' for field in fields))
 
 
