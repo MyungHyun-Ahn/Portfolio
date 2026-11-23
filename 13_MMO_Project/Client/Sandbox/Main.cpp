@@ -1,4 +1,5 @@
 #include <Windows.h>
+#include <string>
 
 namespace
 {
@@ -52,21 +53,38 @@ int main(void)
 	ShowWindow(window, SW_SHOWDEFAULT);
 
 	MSG message{};
+	ULONGLONG framesInSample = 0;
+	ULONGLONG sampleStartMilliseconds = GetTickCount64();
+	constexpr ULONGLONG kSampleIntervalMilliseconds = 1000;
 	while (true)
 	{
-		// 메시지 처리 #1 - 현재 스레드의 큐에서 메시지를 꺼난다.
-		// - 메시지가 없으면 기다린다. (현재는 대기형 메시지 루프)
-		const BOOL result = GetMessageW(&message, nullptr, 0, 0);
-		if (result == -1)
-			return 1;
-		if (result == 0)
-			return static_cast<int>(message.wParam);
+		// 메시지 처리 #1 - 큐에 있는 메시지를 꺼내고, 비어 있으면 기다리지 않는다.
+		while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
+		{
+			if (message.message == WM_QUIT)
+				return static_cast<int>(message.wParam);
 
-		// 메시지 처리 #2 - 키 입력을 바탕으로 필요하면 WM_CHAR 같은 문자 메시지를 큐에 추가한다.
-		TranslateMessage(&message);
+			// 메시지 처리 #2 - 키 입력을 바탕으로 필요하면 WM_CHAR 같은 문자 메시지를 큐에 추가한다.
+			TranslateMessage(&message);
 
-		// 메시지 처리 #3 - 꺼낸 창 메시지를 대상 창의 콜백으로 전달한다.
-		// - 우리가 등록한 WndProc이 호출됨
-		DispatchMessageW(&message);
+			// 메시지 처리 #3 - 꺼낸 창 메시지를 대상 창의 콜백으로 전달한다.
+			// - 우리가 등록한 WndProc이 호출됨
+			DispatchMessageW(&message);
+		}
+
+		// 이번 측정 구간의 초당 루프 횟수를 표시한다.
+		++framesInSample;
+		const ULONGLONG elapsedMilliseconds = GetTickCount64() - sampleStartMilliseconds;
+		if (elapsedMilliseconds >= kSampleIntervalMilliseconds)
+		{
+			const ULONGLONG fps = framesInSample * 1000 / elapsedMilliseconds;
+			const std::wstring title = L"Sandbox - FPS: " + std::to_wstring(fps);
+			SetWindowTextW(window, title.c_str());
+			framesInSample = 0;
+			sampleStartMilliseconds += elapsedMilliseconds;
+		}
+
+		// 빈 루프의 바쁜 대기를 줄이기 위한 임시 대기. 고정 틱을 만드는 코드는 아니다.
+		Sleep(1);
 	}
 }

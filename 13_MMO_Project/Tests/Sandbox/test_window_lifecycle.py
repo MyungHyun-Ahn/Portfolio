@@ -12,6 +12,7 @@ ENUM_WINDOW = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
 USER32.EnumWindows.argtypes = (ENUM_WINDOW, wintypes.LPARAM)
 USER32.GetWindowThreadProcessId.argtypes = (wintypes.HWND, ctypes.POINTER(wintypes.DWORD))
 USER32.IsWindowVisible.argtypes = (wintypes.HWND,)
+USER32.GetWindowTextW.argtypes = (wintypes.HWND, wintypes.LPWSTR, ctypes.c_int)
 USER32.PostMessageW.argtypes = (wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
 
 
@@ -32,6 +33,28 @@ def find_visible_window(process_id):
 
 
 class SandboxWindowTest(unittest.TestCase):
+    def test_fps_is_reported_without_input(self):
+        with subprocess.Popen([str(EXECUTABLE)]) as process:
+            try:
+                deadline = time.monotonic() + 5
+                title = ctypes.create_unicode_buffer(64)
+                prefix = "Sandbox - FPS: "
+                while time.monotonic() < deadline and process.poll() is None:
+                    window = find_visible_window(process.pid)
+                    if window:
+                        USER32.GetWindowTextW(window, title, len(title))
+                        fps = title.value.removeprefix(prefix)
+                        if title.value.startswith(prefix) and fps.isdecimal() and int(fps) > 0:
+                            self.assertTrue(USER32.PostMessageW(window, 0x0112, 0xF060, 0))
+                            self.assertEqual(process.wait(timeout=5), 0)
+                            return
+                    time.sleep(0.02)
+                self.fail("Sandbox did not report positive FPS without input")
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=5)
+
     def test_visible_window_closes_with_zero_exit_code(self):
         with subprocess.Popen([str(EXECUTABLE)]) as process:
             try:
