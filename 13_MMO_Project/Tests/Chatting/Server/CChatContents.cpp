@@ -61,12 +61,19 @@ namespace Chatting
 	}
 
 	ServerNetworkLib::ERecvResult CChatContents::OnRecv(UINT64 sessionId,
-		NetworkCommonLib::CSerializableBuffer *pMessage, int /*delayFrame*/) noexcept
+		NetworkCommonLib::CSerializableBufferView *pMessage, int /*delayFrame*/) noexcept
 	{
 		InterlockedIncrement(&ServerNetworkLib::g_monitor.m_updateTps);
+		// 테스트 채팅의 기존 디스패처에만 풀 버퍼로 본문을 전달한다.
+		auto spMessage = MHLib::utils::CSmartPtr<NetworkCommonLib::CSerializableBuffer>::MakeShared();
+		auto &message = *spMessage;
+		const int bodyBytes = pMessage->GetDataSize();
+		if (!pMessage->Dequeue(message.GetContentBufferPtr(), bodyBytes))
+			return ServerNetworkLib::ERecvResult::Failed;
+		message.MoveWritePos(bodyBytes);
 		std::uint16_t type{};
-		*pMessage >> type;
-		if (!pMessage->IsValid())
+		message >> type;
+		if (!message.IsValid())
 		{
 			return ServerNetworkLib::ERecvResult::Failed;
 		}
@@ -84,8 +91,8 @@ namespace Chatting
 		default:
 			break;
 		}
-		// 수신 버퍼의 ref 반환은 CBaseContents에서 수행한다.
-		if (!DispatchServerPacket(type, sessionId, *pMessage, m_processPacket))
+		// View 반환은 CBaseContents에서 수행한다.
+		if (!DispatchServerPacket(type, sessionId, message, m_processPacket))
 		{
 			g_pLogger->WriteLog(ELogLevel::Error, L"ChatServer", sessionId, std::source_location::current(),
 				L"event=packet_rejected packet_type=%u | 패킷을 처리하지 못했습니다.", type);

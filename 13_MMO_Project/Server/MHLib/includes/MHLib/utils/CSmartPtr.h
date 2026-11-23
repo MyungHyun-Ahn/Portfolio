@@ -31,8 +31,13 @@ namespace MHLib::utils
 			m_pObject->IncreaseRef();
 		}
 
-		// 명시적 호출해도 됨
 		~CSmartPtr() noexcept
+		{
+			Reset();
+		}
+
+		// 참조만 내려놓고 빈 상태로 만든다.
+		void Reset() noexcept
 		{
 			// 0이 되면
 			if (m_pObject != nullptr && m_pObject->DecreaseRef() == 0)

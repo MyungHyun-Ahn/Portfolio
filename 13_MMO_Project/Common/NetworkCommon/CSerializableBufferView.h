@@ -73,8 +73,8 @@ private:
 		m_readHeaderSize = 0;
 		if (m_spRecvBuffer.GetRealPtr() != nullptr)
 		{
-			// Ref Count 줄이고 지울 수 있다면 삭제
-			m_spRecvBuffer.~CSmartPtr();
+			// 풀에서 재사용하므로 페이지 참조만 내려놓는다.
+			m_spRecvBuffer.Reset();
 		}
 		else
 		{

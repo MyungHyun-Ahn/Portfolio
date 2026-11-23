@@ -2,60 +2,201 @@
 #include "SNetworkCounters.h"
 #include "PacketFraming.h"
 
+
 namespace ServerNetworkLib
 {
 CServer *g_pServer = nullptr;
 
-	void CSession::RecvCompleted(int size) noexcept
+	// 분할 패킷을 이어 붙이고 완성된 패킷을 검증해서 큐에 넣는다.
+	bool CSession::RecvCompleted(int size) noexcept
 	{
-		m_recvBuffer.MoveRear(size);
-		int currentUseSize = m_recvBuffer.GetUseSize();
-		while (currentUseSize > 0)
+		constexpr int kRecvHeaderBytes = sizeof(SPacketHeader);
+		constexpr int kMaxFrameBytes = static_cast<int>(CSerializableBuffer::EBufferDefine::PacketMaxSize);
+		constexpr int kChecksumOffset = offsetof(SPacketHeader, checkSum);
+		const BYTE packetCode = serverSetting::packetCode;
+		const EPacketMode mode = g_pServer->GetPacketMode();
+		if (size <= 0 || size > m_pRecvBuffer->GetCapacity())
 		{
-			if (currentUseSize < sizeof(SPacketHeader))
-				break;
+			if (m_pRecvBuffer != nullptr && m_pRecvBuffer->DecreaseRef() == 0)
+				CRecvBuffer::Free(m_pRecvBuffer);
+			m_pRecvBuffer = nullptr;
 
-			SPacketHeader packetHeader;
-			m_recvBuffer.Peek((char *)&packetHeader, sizeof(SPacketHeader));
-
-			if (packetHeader.code != serverSetting::packetCode)
+			if (m_pDelayedBuffer != nullptr)
 			{
-				g_pServer->Disconnect(m_sessionId);
-				return;
+				CSerializableBufferView::Free(m_pDelayedBuffer);
+				m_pDelayedBuffer = nullptr;
 			}
-			if (packetHeader.len > (int)CSerializableBuffer::EBufferDefine::PacketMaxSize - sizeof(SPacketHeader)
-				|| packetHeader.len >= 65535 || packetHeader.len >= m_recvBuffer.GetCapacity())
+			return false;
+		}
+
+		m_pRecvBuffer->MoveRear(size);
+
+		// 이전 수신에서 잘린 패킷부터 처리한다.
+		if (m_pDelayedBuffer != nullptr)
+		{
+			auto *pView = m_pDelayedBuffer;
+			SPacketHeader header;
+			if (pView->isReadHeaderSize() < kRecvHeaderBytes)
 			{
-				g_pServer->Disconnect(m_sessionId);
-				return;
-			}
-			if (m_recvBuffer.GetUseSize() < sizeof(SPacketHeader) + packetHeader.len)
-				break;
-
-			CSerializableBuffer *pView = CSerializableBuffer::Alloc();
-			m_recvBuffer.MoveFront(sizeof(SPacketHeader));
-			pView->EnqueueHeader((char *)&packetHeader, sizeof(SPacketHeader));
-
-			m_recvBuffer.Dequeue(pView->GetContentBufferPtr(), packetHeader.len);
-			pView->MoveWritePos(packetHeader.len);
-
-			if (g_pServer->GetPacketMode() == EPacketMode::Net)
-			{
-				constexpr int kChecksumOffset = offsetof(SPacketHeader, checkSum);
-				if (!CEncryption::DecodeAndValidateChecksum(pView->GetBufferPtr() + kChecksumOffset,
-					pView->GetFullSize() - kChecksumOffset, packetHeader.randKey))
+				// 헤더가 또 나뉠 수 있으니 이번에 받은 만큼만 이어 붙인다.
+				const int headerBytes = (std::min)(kRecvHeaderBytes - pView->isReadHeaderSize(), m_pRecvBuffer->GetUseSize());
+				pView->writeDelayedHeader(m_pRecvBuffer->GetFrontPtr(), headerBytes);
+				m_pRecvBuffer->MoveFront(headerBytes);
+				if (pView->isReadHeaderSize() < kRecvHeaderBytes)
 				{
-					CSerializableBuffer::Free(pView);
-					g_pServer->Disconnect(m_sessionId);
-					return;
+					if (m_pRecvBuffer != nullptr && m_pRecvBuffer->DecreaseRef() == 0)
+						CRecvBuffer::Free(m_pRecvBuffer);
+					m_pRecvBuffer = nullptr;
+					return true;
 				}
+
+				pView->getDelayedHeader(reinterpret_cast<char *>(&header), kRecvHeaderBytes);
+				if (header.code != packetCode || header.len > kMaxFrameBytes - kRecvHeaderBytes)
+				{
+					if (m_pRecvBuffer != nullptr && m_pRecvBuffer->DecreaseRef() == 0)
+						CRecvBuffer::Free(m_pRecvBuffer);
+					m_pRecvBuffer = nullptr;
+
+					if (m_pDelayedBuffer != nullptr)
+					{
+						CSerializableBufferView::Free(m_pDelayedBuffer);
+						m_pDelayedBuffer = nullptr;
+					}
+					return false;
+				}
+
+				const int frameBytes = kRecvHeaderBytes + header.len;
+				char *pBuffer = new (std::nothrow) char[frameBytes];
+				if (pBuffer == nullptr)
+				{
+					if (m_pRecvBuffer != nullptr && m_pRecvBuffer->DecreaseRef() == 0)
+						CRecvBuffer::Free(m_pRecvBuffer);
+					m_pRecvBuffer = nullptr;
+
+					if (m_pDelayedBuffer != nullptr)
+					{
+						CSerializableBufferView::Free(m_pDelayedBuffer);
+						m_pDelayedBuffer = nullptr;
+					}
+					return false;
+				}
+				pView->initStorage(pBuffer, frameBytes);
+				pView->copy(reinterpret_cast<char *>(&header), kRecvHeaderBytes);
+			}
+			else
+			{
+				pView->getHeader(reinterpret_cast<char *>(&header), kRecvHeaderBytes);
 			}
 
-			pView->IncreaseRef();
+			const int bodyBytes = (std::min)(header.len - pView->GetDataSize(), m_pRecvBuffer->GetUseSize());
+			pView->copy(m_pRecvBuffer->GetFrontPtr(), bodyBytes);
+			m_pRecvBuffer->MoveFront(bodyBytes);
+			if (pView->GetDataSize() < header.len)
+			{
+				if (m_pRecvBuffer != nullptr && m_pRecvBuffer->DecreaseRef() == 0)
+					CRecvBuffer::Free(m_pRecvBuffer);
+				m_pRecvBuffer = nullptr;
+				return true;
+			}
+
+			if (mode == EPacketMode::Net && !MHLib::security::CEncryption::DecodeAndValidateChecksum(
+				pView->getBufferPtr() + kChecksumOffset, pView->getFullSize() - kChecksumOffset, header.randKey))
+			{
+				if (m_pRecvBuffer != nullptr && m_pRecvBuffer->DecreaseRef() == 0)
+					CRecvBuffer::Free(m_pRecvBuffer);
+				m_pRecvBuffer = nullptr;
+
+				if (m_pDelayedBuffer != nullptr)
+				{
+					CSerializableBufferView::Free(m_pDelayedBuffer);
+					m_pDelayedBuffer = nullptr;
+				}
+				return false;
+			}
+
+			m_pDelayedBuffer = nullptr;
 			InterlockedIncrement(&g_networkCounters.m_recvTps);
 			m_recvMsgQueue.Enqueue(pView);
-			currentUseSize = m_recvBuffer.GetUseSize();
 		}
+
+		for (int useSize = m_pRecvBuffer->GetUseSize(); useSize > 0; useSize = m_pRecvBuffer->GetUseSize())
+		{
+			if (useSize < kRecvHeaderBytes)
+			{
+				m_pDelayedBuffer = CSerializableBufferView::alloc();
+				m_pDelayedBuffer->writeDelayedHeader(m_pRecvBuffer->GetFrontPtr(), useSize);
+				m_pRecvBuffer->MoveFront(useSize);
+				break;
+			}
+
+			SPacketHeader header;
+			m_pRecvBuffer->Peek(reinterpret_cast<char *>(&header), kRecvHeaderBytes);
+			if (header.code != packetCode || header.len > kMaxFrameBytes - kRecvHeaderBytes)
+			{
+				if (m_pRecvBuffer != nullptr && m_pRecvBuffer->DecreaseRef() == 0)
+					CRecvBuffer::Free(m_pRecvBuffer);
+				m_pRecvBuffer = nullptr;
+
+				if (m_pDelayedBuffer != nullptr)
+				{
+					CSerializableBufferView::Free(m_pDelayedBuffer);
+					m_pDelayedBuffer = nullptr;
+				}
+				return false;
+			}
+
+			const int frameBytes = kRecvHeaderBytes + header.len;
+			auto *pView = CSerializableBufferView::alloc();
+			if (useSize < frameBytes)
+			{
+				m_pDelayedBuffer = pView;
+				char *pBuffer = new (std::nothrow) char[frameBytes];
+				if (pBuffer == nullptr)
+				{
+					if (m_pRecvBuffer != nullptr && m_pRecvBuffer->DecreaseRef() == 0)
+						CRecvBuffer::Free(m_pRecvBuffer);
+					m_pRecvBuffer = nullptr;
+
+					if (m_pDelayedBuffer != nullptr)
+					{
+						CSerializableBufferView::Free(m_pDelayedBuffer);
+						m_pDelayedBuffer = nullptr;
+					}
+					return false;
+				}
+				pView->initStorage(pBuffer, frameBytes);
+				pView->copy(m_pRecvBuffer->GetFrontPtr(), useSize);
+				m_pRecvBuffer->MoveFront(useSize);
+				break;
+			}
+
+			// 한 페이지에서 끝난 패킷은 오프셋으로만 참조한다.
+			const int offsetStart = m_pRecvBuffer->GetFrontOffset();
+			pView->init(MHLib::utils::CSmartPtr<CRecvBuffer>(m_pRecvBuffer), offsetStart, offsetStart + frameBytes);
+			m_pRecvBuffer->MoveFront(frameBytes);
+			if (mode == EPacketMode::Net && !MHLib::security::CEncryption::DecodeAndValidateChecksum(
+				pView->getBufferPtr() + kChecksumOffset, pView->getFullSize() - kChecksumOffset, header.randKey))
+			{
+				CSerializableBufferView::Free(pView);
+				if (m_pRecvBuffer != nullptr && m_pRecvBuffer->DecreaseRef() == 0)
+					CRecvBuffer::Free(m_pRecvBuffer);
+				m_pRecvBuffer = nullptr;
+
+				if (m_pDelayedBuffer != nullptr)
+				{
+					CSerializableBufferView::Free(m_pDelayedBuffer);
+					m_pDelayedBuffer = nullptr;
+				}
+				return false;
+			}
+
+			InterlockedIncrement(&g_networkCounters.m_recvTps);
+			m_recvMsgQueue.Enqueue(pView);
+		}
+		if (m_pRecvBuffer != nullptr && m_pRecvBuffer->DecreaseRef() == 0)
+			CRecvBuffer::Free(m_pRecvBuffer);
+		m_pRecvBuffer = nullptr;
+		return true;
 	}
 
 	// m_iSendCount를 믿고 할당 해제를 진행
@@ -96,18 +237,17 @@ CServer *g_pServer = nullptr;
 			return FALSE;
 		}
 
-		WSABUF wsaBuf[2];
-		wsaBuf[0].buf = m_recvBuffer.GetRearPtr();
-		wsaBuf[0].len = m_recvBuffer.DirectEnqueueSize();
-		wsaBuf[1].buf = m_recvBuffer.GetPQueuePtr();
-		wsaBuf[1].len = m_recvBuffer.GetFreeSize() - wsaBuf[0].len;
+		// 완료 통지가 올 때까지 수신 페이지 참조를 유지한다.
+		m_pRecvBuffer = CRecvBuffer::Alloc();
+		m_pRecvBuffer->IncreaseRef();
+		WSABUF wsaBuf{ static_cast<ULONG>(m_pRecvBuffer->GetCapacity()), m_pRecvBuffer->GetPQueuePtr() };
 
 		ZeroMemory((m_pMyOverlappedStartAddr + 1), sizeof(OVERLAPPED));
 
 		DWORD flag = 0;
 		{
 			// PROFILE_BEGIN(0, "WSARecv");
-			retVal = WSARecv(m_sessionSocket, wsaBuf, 2, nullptr, &flag, (LPWSAOVERLAPPED)(m_pMyOverlappedStartAddr + 1), NULL);
+			retVal = WSARecv(m_sessionSocket, &wsaBuf, 1, nullptr, &flag, (LPWSAOVERLAPPED)(m_pMyOverlappedStartAddr + 1), NULL);
 		}
 		if (retVal == SOCKET_ERROR)
 		{
@@ -117,6 +257,15 @@ CServer *g_pServer = nullptr;
 				if (errVal != WSAECONNABORTED && errVal != WSAECONNRESET && errVal != WSAEINTR)
 					g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", m_sessionId, std::source_location::current(),
 						L"event=recv_failed error_code=%d | 소켓 수신 요청에 실패했습니다.", errVal);
+				if (m_pRecvBuffer != nullptr && m_pRecvBuffer->DecreaseRef() == 0)
+					CRecvBuffer::Free(m_pRecvBuffer);
+				m_pRecvBuffer = nullptr;
+
+				if (m_pDelayedBuffer != nullptr)
+				{
+					CSerializableBufferView::Free(m_pDelayedBuffer);
+					m_pDelayedBuffer = nullptr;
+				}
 
 				// 사실 여기선 0이 될 일이 없음
 				// 반환값을 사용안해도 됨
@@ -287,21 +436,27 @@ CServer *g_pServer = nullptr;
 		useBufferSize = m_recvMsgQueue.GetUseSize();
 		for (int i = 0; i < useBufferSize; i++)
 		{
-			CSerializableBuffer *pBuffer;
+			CSerializableBufferView *pBuffer;
 			if (!m_recvMsgQueue.Dequeue(&pBuffer))
 			{
 				CCrashDump::Crash();
 			}
 
-			if (pBuffer->DecreaseRef() == 0)
-				CSerializableBuffer::Free(pBuffer);
+			CSerializableBufferView::Free(pBuffer);
 		}
 
 		m_sessionSocket = INVALID_SOCKET;
 		m_sessionId = 0;
-		// m_pRecvBuffer = nullptr;
 		m_pCurrentContent = nullptr;
-		m_recvBuffer.Clear();
+		if (m_pRecvBuffer != nullptr && m_pRecvBuffer->DecreaseRef() == 0)
+			CRecvBuffer::Free(m_pRecvBuffer);
+		m_pRecvBuffer = nullptr;
+
+		if (m_pDelayedBuffer != nullptr)
+		{
+			CSerializableBufferView::Free(m_pDelayedBuffer);
+			m_pDelayedBuffer = nullptr;
+		}
 		InterlockedExchange(&m_sendFlag, FALSE);
 	}
 
@@ -783,6 +938,19 @@ CServer *g_pServer = nullptr;
 					break;
 				}
 			}
+			// 수신 종료 통지 뒤에는 OS가 페이지를 더 이상 사용하지 않는다.
+			else if (oper == EIoOperation::Recv && (retVal == FALSE || dwTransferred == 0))
+			{
+				if (pSession->m_pRecvBuffer != nullptr && pSession->m_pRecvBuffer->DecreaseRef() == 0)
+					CRecvBuffer::Free(pSession->m_pRecvBuffer);
+				pSession->m_pRecvBuffer = nullptr;
+
+				if (pSession->m_pDelayedBuffer != nullptr)
+				{
+					CSerializableBufferView::Free(pSession->m_pDelayedBuffer);
+					pSession->m_pDelayedBuffer = nullptr;
+				}
+			}
 			// 소켓 정상 종료
 			else if (dwTransferred == 0 && oper != EIoOperation::AcceptEx && (UINT)oper < 3)
 			{
@@ -829,8 +997,10 @@ CServer *g_pServer = nullptr;
 				break;
 				case EIoOperation::Recv:
 				{
-					pSession->RecvCompleted(dwTransferred);
-					pSession->PostRecv();
+					if (pSession->RecvCompleted(dwTransferred))
+						pSession->PostRecv();
+					else
+						Disconnect(pSession->m_sessionId);
 				}
 				break;
 				case EIoOperation::Send:

@@ -25,6 +25,15 @@ class CBaseContents;
 
 		~CSession() noexcept
 		{
+			if (m_pRecvBuffer != nullptr && m_pRecvBuffer->DecreaseRef() == 0)
+				CRecvBuffer::Free(m_pRecvBuffer);
+			m_pRecvBuffer = nullptr;
+
+			if (m_pDelayedBuffer != nullptr)
+			{
+				CSerializableBufferView::Free(m_pDelayedBuffer);
+				m_pDelayedBuffer = nullptr;
+			}
 		}
 
 		void Init(UINT64 sessionId) noexcept
@@ -46,7 +55,8 @@ class CBaseContents;
 
 		void Clear() noexcept;
 
-		void RecvCompleted(int size) noexcept;
+		[[nodiscard]]
+		bool RecvCompleted(int size) noexcept;
 
 		// 인큐할 때 직렬화 버퍼의 포인터를 인큐
 
@@ -95,8 +105,8 @@ class CBaseContents;
 		// Release + IoCount
 		LONG m_ioCountAndRelease = sm_releaseFlag;
 		LONG m_sendCount = 0;
-		CRingBuffer m_recvBuffer;
-		// CRecvBuffer *m_pRecvBuffer = nullptr;
+		CRecvBuffer *m_pRecvBuffer = nullptr;
+		CSerializableBufferView *m_pDelayedBuffer = nullptr;
 		SOCKET m_sessionSocket;
 		UINT64 m_sessionId;
 		WCHAR		m_clientAddrBuffer[16];
@@ -108,8 +118,6 @@ class CBaseContents;
 		LONG		m_sendFlag = FALSE;
 		USHORT		m_clientPort;
 		char		m_dummy01[2]; // 패딩 계산용
-		// 최대 무조건 1개 -> 있거나 없거나
-		// CSerializableBufferView *m_pDelayedBuffer = nullptr;
 		CLfQueue<CSerializableBuffer *> m_lfSendBufferQueue;
 		// m_pMyOverlappedStartAddr
 		//  + 0 : ACCEPTEX
@@ -121,7 +129,7 @@ class CBaseContents;
 		LONG m_cancelIoCalled = FALSE;
 
 		// Recv 큐
-		MHLib::containers::CLfQueue<CSerializableBuffer *> m_recvMsgQueue;
+		MHLib::containers::CLfQueue<CSerializableBufferView *> m_recvMsgQueue;
 		// LONG m_ContentStatus = FALSE;
 
 		// 총 460바이트

@@ -110,28 +110,19 @@ void CBaseContents::ProcessRecvMsg(int delayFrame) noexcept
 		LONG recvMsgCount = pSession->m_recvMsgQueue.GetUseSize();
 		for (int i = 0; i < recvMsgCount; i++)
 		{
-			CSerializableBuffer *pMsg;
+			CSerializableBufferView *pMsg;
 			if (!pSession->m_recvMsgQueue.Dequeue(&pMsg))
 				break;
 
 			ERecvResult ret = OnRecv(sessionId, pMsg, delayFrame);
+			CSerializableBufferView::Free(pMsg);
 			if (ret == ERecvResult::Moved)
-			{
-				if (pMsg->DecreaseRef() == 0)
-					CSerializableBuffer::Free(pMsg);
 				break;
-			}
 			if (ret == ERecvResult::Failed)
 			{
 				ServerNetworkLib::g_pServer->Disconnect(sessionId);
-
-				if (pMsg->DecreaseRef() == 0)
-					CSerializableBuffer::Free(pMsg);
 				break;
 			}
-
-			if (pMsg->DecreaseRef() == 0)
-				CSerializableBuffer::Free(pMsg);
 		}
 
 		if (InterlockedDecrement(&pSession->m_ioCountAndRelease) == 0)

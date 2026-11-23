@@ -60,7 +60,7 @@ public:
 
 	virtual void OnEnter(const UINT64 sessionId, void *pObject) noexcept = 0;
 	virtual void OnLeave(const UINT64 sessionId) noexcept = 0;
-	virtual ERecvResult OnRecv(const UINT64 sessionId, CSerializableBuffer *pMessage, int delayFrame) noexcept = 0;
+	virtual ERecvResult OnRecv(const UINT64 sessionId, CSerializableBufferView *pMessage, int delayFrame) noexcept = 0;
 	virtual void OnLoopEnd() noexcept = 0;
 
 protected:
