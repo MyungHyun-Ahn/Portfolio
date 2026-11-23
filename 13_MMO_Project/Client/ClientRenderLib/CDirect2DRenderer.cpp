@@ -2,6 +2,7 @@
 #include <d3d11.h>
 #include <dxgi1_2.h>
 #include <d2d1_1.h>
+#include <wincodec.h>
 #include <wrl/client.h>
 #include <memory>
 #include <new>
@@ -16,11 +17,12 @@ namespace ClientRenderLib
 
 	struct CDirect2DRenderer::SResources
 	{
-		ComPtr<IDXGISwapChain1> spSwapChain;  	// 창에 표시할 이미지 버퍼들을 관리하는 객체 
-												// - 더블 버퍼링을 담당함(버퍼를 묶어서 번갈아 쓰는 구조)
-												// - BufferCount = 2 설정
-		ComPtr<ID2D1DeviceContext> spContext; 	// 그림을 그리는 객체
-		ComPtr<ID2D1SolidColorBrush> spRectangleBrush;
+		ComPtr<IDXGISwapChain1> 		spSwapChain;  	// 창에 표시할 이미지 버퍼들을 관리하는 객체 
+														// - 더블 버퍼링을 담당함(버퍼를 묶어서 번갈아 쓰는 구조)
+														// - BufferCount = 2 설정
+		ComPtr<ID2D1DeviceContext> 		spContext; 		// 그림을 그리는 객체
+		ComPtr<ID2D1SolidColorBrush> 	spRectangleBrush;
+		ComPtr<ID2D1Bitmap1> 			spSprite;
 	};
 
 	CDirect2DRenderer::CDirect2DRenderer() noexcept = default;
@@ -122,6 +124,77 @@ namespace ClientRenderLib
 		return S_OK;
 	}
 
+	HRESULT CDirect2DRenderer::LoadSpritePng(const wchar_t* pPath) noexcept
+	{
+		if (!m_pResources || m_pResources->spSprite)
+			return E_UNEXPECTED;
+		if (pPath == nullptr || *pPath == L'\0')
+			return E_INVALIDARG;
+
+		// WIC 객체를 해제한 뒤 이 호출에서 얻은 COM 초기화 참조만 반납한다.
+		HRESULT result = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+		if (FAILED(result) && result != RPC_E_CHANGED_MODE)
+			return result;
+		struct SComInitialization
+		{
+			bool m_shouldUninitialize;
+			~SComInitialization()
+			{
+				if (m_shouldUninitialize)
+					CoUninitialize();
+			}
+		};
+		const SComInitialization comInitialization{SUCCEEDED(result)};
+
+		ComPtr<IWICImagingFactory> spFactory;
+		result = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(spFactory.GetAddressOf()));
+		if (FAILED(result))
+			return result;
+
+		ComPtr<IWICBitmapDecoder> spDecoder;
+		result = spFactory->CreateDecoderFromFilename(pPath, nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad,
+			spDecoder.GetAddressOf());
+		if (FAILED(result))
+			return result;
+		GUID containerFormat{};
+		result = spDecoder->GetContainerFormat(&containerFormat);
+		if (FAILED(result))
+			return result;
+		if (containerFormat != GUID_ContainerFormatPng)
+			return WINCODEC_ERR_UNKNOWNIMAGEFORMAT;
+
+		ComPtr<IWICBitmapFrameDecode> spFrame;
+		result = spDecoder->GetFrame(0, spFrame.GetAddressOf());
+		if (FAILED(result))
+			return result;
+		ComPtr<IWICFormatConverter> spConverter;
+		result = spFactory->CreateFormatConverter(spConverter.GetAddressOf());
+		if (FAILED(result))
+			return result;
+
+		// WIC가 RGB에 알파를 한 번 곱한다. 동일 포맷으로 올리며 별도 알파 곱셈은 하지 않는다.
+		result = spConverter->Initialize(spFrame.Get(), GUID_WICPixelFormat32bppPBGRA,
+			WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom);
+		if (FAILED(result))
+			return result;
+
+		// 파일에 연결된 디코더 대신 메모리의 픽셀 복사본을 Direct2D에 전달한다.
+		ComPtr<IWICBitmap> spPixels;
+		result = spFactory->CreateBitmapFromSource(spConverter.Get(), WICBitmapCacheOnLoad, spPixels.GetAddressOf());
+		if (FAILED(result))
+			return result;
+
+		// PNG 메타데이터 DPI와 관계없이 소스 1픽셀을 비트맵 1 DIP로 읽는다.
+		const auto properties = D2D1::BitmapProperties1(D2D1_BITMAP_OPTIONS_NONE,
+			D2D1::PixelFormat(kBackBufferFormat, D2D1_ALPHA_MODE_PREMULTIPLIED), 96.0f, 96.0f);
+		ComPtr<ID2D1Bitmap1> spSprite;
+		result = m_pResources->spContext->CreateBitmapFromWicBitmap(spPixels.Get(), &properties, spSprite.GetAddressOf());
+		if (FAILED(result))
+			return result;
+		m_pResources->spSprite = std::move(spSprite);
+		return S_OK;
+	}
+
 	HRESULT CDirect2DRenderer::Resize(UINT widthPixels, UINT heightPixels) noexcept
 	{
 		if (!m_pResources)
@@ -187,6 +260,17 @@ namespace ClientRenderLib
 	void CDirect2DRenderer::FillRectangle(float left, float top, float right, float bottom) noexcept
 	{
 		m_pResources->spContext->FillRectangle(D2D1::RectF(left, top, right, bottom), m_pResources->spRectangleBrush.Get());
+	}
+
+	void CDirect2DRenderer::DrawSprite(float left, float top, float right, float bottom,
+		float sourceWidthPixels, float sourceHeightPixels) noexcept
+	{
+		if (!m_pResources->spSprite)
+			return;
+		const auto destination = D2D1::RectF(left, top, right, bottom);
+		const auto source = D2D1::RectF(0.0f, 0.0f, sourceWidthPixels, sourceHeightPixels);
+		m_pResources->spContext->DrawBitmap(m_pResources->spSprite.Get(), &destination, 1.0f,
+			D2D1_INTERPOLATION_MODE_NEAREST_NEIGHBOR, &source, nullptr);
 	}
 
 	HRESULT CDirect2DRenderer::EndFrame() noexcept

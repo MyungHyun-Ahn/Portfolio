@@ -2,6 +2,7 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <string>
@@ -31,6 +32,9 @@ namespace
 
 	constexpr float kMoveWorldUnitsPerTick = 300.0f / CFixedStepScheduler::kTicksPerSecond;
 	constexpr SCoord2D kWorldLandmark{460.0f, 240.0f};
+	constexpr float kSpriteFramePixels = 16.0f;
+	constexpr float kSpriteHalfSizeWorld = 16.0f;
+	constexpr float kSpriteOffsetWorldY = -20.0f;
 
 	struct SWindowSizeState
 	{
@@ -160,6 +164,21 @@ int main(void)
 		return 1;
 	}
 
+	// 작업 디렉터리와 관계없이 실행 파일 옆에 배치한 PNG를 한 번만 읽는다.
+	std::array<wchar_t, 32768> modulePath{};
+	const DWORD modulePathLength = GetModuleFileNameW(nullptr, modulePath.data(), static_cast<DWORD>(modulePath.size()));
+	if (modulePathLength == 0 || modulePathLength >= modulePath.size())
+	{
+		DestroyWindow(window);
+		return 2;
+	}
+	const auto spritePath = std::filesystem::path(modulePath.data()).parent_path() / L"BoyIdle.png";
+	if (FAILED(renderer.LoadSpritePng(spritePath.c_str())))
+	{
+		DestroyWindow(window);
+		return 2;
+	}
+
 	// 창 만들기 #6 - 만들어진 창을 화면에 표시한다.
 	ShowWindow(window, SW_SHOWDEFAULT);
 
@@ -250,6 +269,11 @@ int main(void)
 			const float halfWidth = 80.0f * zoom;
 			const float halfHeight = 60.0f * zoom;
 			renderer.FillRectangle(center.m_x - halfWidth, center.m_y - halfHeight, center.m_x + halfWidth, center.m_y + halfHeight);
+			const SCoord2D spriteWorld{rectangle.m_centerWorld.m_x, rectangle.m_centerWorld.m_y + kSpriteOffsetWorldY};
+			const auto spriteCenter = WorldToClient(spriteWorld, viewCenterWorld, clientCenter, zoom);
+			const float spriteHalfSize = kSpriteHalfSizeWorld * zoom;
+			renderer.DrawSprite(spriteCenter.m_x - spriteHalfSize, spriteCenter.m_y - spriteHalfSize,
+				spriteCenter.m_x + spriteHalfSize, spriteCenter.m_y + spriteHalfSize, kSpriteFramePixels, kSpriteFramePixels);
 			if (FAILED(renderer.EndFrame()))
 			{
 				DestroyWindow(window);

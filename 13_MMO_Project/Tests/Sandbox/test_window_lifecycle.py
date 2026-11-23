@@ -2,10 +2,14 @@ import ctypes
 from ctypes import wintypes
 from pathlib import Path
 import re
+import shutil
+import struct
 import subprocess
 import sys
+import tempfile
 import time
 import unittest
+import zlib
 
 
 USER32 = ctypes.WinDLL("user32", use_last_error=True)
@@ -203,7 +207,8 @@ class SandboxWindowTest(unittest.TestCase):
                     position = (point.x & 0xFFFF) | ((point.y & 0xFFFF) << 16)
                     self.assertTrue(USER32.PostMessageW(window, 0x020A, (delta & 0xFFFF) << 16, position))
 
-                check((0, 0, white), (75, 0, white), (300, 100, white))
+                # 배포된 Idle.png의 첫 프레임: 빨간색 픽셀과 흰 사각형이 비치는 투명 픽셀.
+                check((0, 0, white), (75, 0, white), (300, 100, white), (-7, -29, (209, 75, 52)), (-15, -35, white))
                 scroll(-120)
                 check((0, 0, white), (38, 0, white), (42, 0, blue), (150, 50, white), (300, 100, blue))
 
@@ -219,14 +224,83 @@ class SandboxWindowTest(unittest.TestCase):
                 check((75, 0, white), (100, 100, white), (50, 80, blue))
                 scroll(120)
                 check((155, 0, white), (165, 0, blue), (200, 200, white), (100, 155, blue))
+
+                # 확대 상태에서 창 크기를 바꿔도 기준점과 클릭은 새 창 중심을 공유한다.
+                self.assertTrue(USER32.SetWindowPos(window, -1, 40, 40, 691, 511, 0x0010))
+                self.assertTrue(USER32.GetClientRect(window, ctypes.byref(client)))
+                cx, cy = client.right // 2, client.bottom // 2
+                check((0, 0, white), (200, 200, white), (170, 150, blue))
+                position = (cx + 120) | (cy << 16)
+                self.assertTrue(USER32.PostMessageW(window, 0x0201, 1, position))
+                self.assertTrue(USER32.PostMessageW(window, 0x0202, 0, position))
+                check((0, 0, white), (115, 200, blue), (80, 200, white), (68, 200, blue))
+
                 scroll(-240)
-                check((38, 0, white), (42, 0, blue), (50, 50, white))
+                check((38, 0, white), (42, 0, blue), (20, 50, white))
                 self.assertTrue(USER32.PostMessageW(window, 0x0112, 0xF060, 0))
                 self.assertEqual(process.wait(timeout=5), 0)
             finally:
                 if process.poll() is None:
                     process.kill()
                     process.wait(timeout=5)
+
+    def test_png_alpha_and_reuse_through_camera_and_resize(self):
+        def chunk(tag, data):
+            return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data))
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            executable = shutil.copy2(EXECUTABLE, root)
+            sprite = root / "BoyIdle.png"
+
+            row = bytes((255, 0, 0, 255)) * 5 + bytes((0, 255, 0, 128)) * 6 + bytes((0, 0, 255, 0)) * 5
+            sprite.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 16, 16, 8, 6, 0, 0, 0))
+                               + chunk(b"IDAT", zlib.compress((b"\0" + row) * 16)) + chunk(b"IEND", b""))
+            with subprocess.Popen([executable], cwd=EXECUTABLE.parent) as process:
+                try:
+                    deadline = time.monotonic() + 5
+                    window = None
+                    while time.monotonic() < deadline and process.poll() is None:
+                        window = find_visible_window(process.pid)
+                        if window:
+                            break
+                        time.sleep(0.02)
+                    self.assertIsNotNone(window, f"Sandbox exited with {process.poll()}")
+
+                    def resize(width, height):
+                        self.assertTrue(USER32.SetWindowPos(window, -1, 40, 40, width, height, 0x0010))
+                        client = wintypes.RECT()
+                        self.assertTrue(USER32.GetClientRect(window, ctypes.byref(client)))
+                        return client.right // 2, client.bottom // 2
+
+                    def check(*expected):
+                        self.assert_rectangle_and_background(window, process, tuple(
+                            (wintypes.POINT(cx + x, cy + y), color) for x, y, color in expected
+                        ))
+
+                    red, green, white, blue = (255, 0, 0), (127, 255, 127), (255, 255, 255), (25, 51, 102)
+                    cx, cy = resize(800, 600)
+                    check((-12, -20, red), (0, -20, green), (12, -20, white), (300, 100, white))
+                    sprite.unlink()  # 이후 프레임과 리사이즈에 원본 파일이 필요 없어야 한다.
+                    position = (cx + 240) | (cy << 16)
+                    self.assertTrue(USER32.PostMessageW(window, 0x0201, 1, position))
+                    self.assertTrue(USER32.PostMessageW(window, 0x0202, 0, position))
+                    check((-12, -20, red), (60, 100, white), (70, 100, blue), (300, 100, blue))
+
+                    self.assertTrue(USER32.PostMessageW(window, 0x020A, 120 << 16, 0))
+                    check((-24, -40, red), (0, -40, green), (24, -40, white), (120, 200, white))
+                    cx, cy = resize(691, 511)
+                    check((-24, -40, red), (0, -40, green), (24, -40, white), (120, 200, white), (140, 200, blue))
+                    self.assertTrue(USER32.PostMessageW(window, 0x0112, 0xF060, 0))
+                    self.assertEqual(process.wait(timeout=5), 0)
+                finally:
+                    if process.poll() is None:
+                        process.kill()
+                        process.wait(timeout=5)
+
+            self.assertEqual(subprocess.run([executable], cwd=EXECUTABLE.parent, timeout=5).returncode, 2)
+            sprite.write_bytes(b"not a PNG")
+            self.assertEqual(subprocess.run([executable], cwd=EXECUTABLE.parent, timeout=5).returncode, 2)
 
     def test_frame_and_fixed_update_rates_are_reported_without_input(self):
         with subprocess.Popen([str(EXECUTABLE)]) as process:

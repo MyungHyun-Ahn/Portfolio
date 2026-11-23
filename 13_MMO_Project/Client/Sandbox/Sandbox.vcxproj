@@ -39,7 +39,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <EntryPointSymbol>mainCRTStartup</EntryPointSymbol>
-      <AdditionalDependencies>User32.lib;D3D11.lib;D2D1.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>User32.lib;D3D11.lib;D2D1.lib;Windowscodecs.lib;Ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -52,4 +52,8 @@
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="CopySandboxSprite" AfterTargets="Build">
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\..\..\Asset\Actor\Character\Boy\SeparateAnim\Idle.png"
+          DestinationFiles="$(OutDir)BoyIdle.png" SkipUnchangedFiles="true" />
+  </Target>
 </Project>
