@@ -31,6 +31,7 @@
   <ItemGroup>
     <ClInclude Include="CFixedStepScheduler.h" />
     <ClInclude Include="Camera\CCameraManager.h" />
+    <ClInclude Include="Animation\CSpriteAnimator.h" />
     <ClInclude Include="Transform\CoordinateTransform2D.h" />
     <ClCompile Include="CFixedStepScheduler.cpp" />
     <ClInclude Include="Input\CInputManager.h" />

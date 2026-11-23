@@ -4,6 +4,7 @@
 #include <d2d1_1.h>
 #include <wincodec.h>
 #include <wrl/client.h>
+#include <array>
 #include <memory>
 #include <new>
 #include <utility>
@@ -22,7 +23,7 @@ namespace ClientRenderLib
 														// - BufferCount = 2 설정
 		ComPtr<ID2D1DeviceContext> 		spContext; 		// 그림을 그리는 객체
 		ComPtr<ID2D1SolidColorBrush> 	spRectangleBrush;
-		ComPtr<ID2D1Bitmap1> 			spSprite;
+		std::array<ComPtr<ID2D1Bitmap1>, 2> m_sprites;
 	};
 
 	CDirect2DRenderer::CDirect2DRenderer() noexcept = default;
@@ -124,12 +125,15 @@ namespace ClientRenderLib
 		return S_OK;
 	}
 
-	HRESULT CDirect2DRenderer::LoadSpritePng(const wchar_t* pPath) noexcept
+	HRESULT CDirect2DRenderer::LoadSpritePng(unsigned int slot, const wchar_t* pPath) noexcept
 	{
-		if (!m_pResources || m_pResources->spSprite)
+		if (!m_pResources)
 			return E_UNEXPECTED;
-		if (pPath == nullptr || *pPath == L'\0')
+		if (slot >= m_pResources->m_sprites.size() || pPath == nullptr || *pPath == L'\0')
 			return E_INVALIDARG;
+		auto& sprite = m_pResources->m_sprites[slot];
+		if (sprite)
+			return E_UNEXPECTED;
 
 		// WIC 객체를 해제한 뒤 이 호출에서 얻은 COM 초기화 참조만 반납한다.
 		HRESULT result = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
@@ -191,7 +195,7 @@ namespace ClientRenderLib
 		result = m_pResources->spContext->CreateBitmapFromWicBitmap(spPixels.Get(), &properties, spSprite.GetAddressOf());
 		if (FAILED(result))
 			return result;
-		m_pResources->spSprite = std::move(spSprite);
+		sprite = std::move(spSprite);
 		return S_OK;
 	}
 
@@ -262,15 +266,15 @@ namespace ClientRenderLib
 		m_pResources->spContext->FillRectangle(D2D1::RectF(left, top, right, bottom), m_pResources->spRectangleBrush.Get());
 	}
 
-	void CDirect2DRenderer::DrawSprite(float left, float top, float right, float bottom,
-		float sourceWidthPixels, float sourceHeightPixels) noexcept
+	void CDirect2DRenderer::DrawSprite(unsigned int slot, float left, float top, float right, float bottom,
+		SSpriteSourceRect source) noexcept
 	{
-		if (!m_pResources->spSprite)
+		if (!m_pResources || slot >= m_pResources->m_sprites.size() || !m_pResources->m_sprites[slot])
 			return;
 		const auto destination = D2D1::RectF(left, top, right, bottom);
-		const auto source = D2D1::RectF(0.0f, 0.0f, sourceWidthPixels, sourceHeightPixels);
-		m_pResources->spContext->DrawBitmap(m_pResources->spSprite.Get(), &destination, 1.0f,
-			D2D1_INTERPOLATION_MODE_NEAREST_NEIGHBOR, &source, nullptr);
+		const auto sourceRect = D2D1::RectF(source.m_leftPixels, source.m_topPixels, source.m_rightPixels, source.m_bottomPixels);
+		m_pResources->spContext->DrawBitmap(m_pResources->m_sprites[slot].Get(), &destination, 1.0f,
+			D2D1_INTERPOLATION_MODE_NEAREST_NEIGHBOR, &sourceRect, nullptr);
 	}
 
 	HRESULT CDirect2DRenderer::EndFrame() noexcept

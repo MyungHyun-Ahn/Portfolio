@@ -207,8 +207,7 @@ class SandboxWindowTest(unittest.TestCase):
                     position = (point.x & 0xFFFF) | ((point.y & 0xFFFF) << 16)
                     self.assertTrue(USER32.PostMessageW(window, 0x020A, (delta & 0xFFFF) << 16, position))
 
-                # 배포된 Idle.png의 첫 프레임: 빨간색 픽셀과 흰 사각형이 비치는 투명 픽셀.
-                check((0, 0, white), (75, 0, white), (300, 100, white), (-7, -29, (209, 75, 52)), (-15, -35, white))
+                check((0, 0, white), (75, 0, white), (300, 100, white))
                 scroll(-120)
                 check((0, 0, white), (38, 0, white), (42, 0, blue), (150, 50, white), (300, 100, blue))
 
@@ -253,9 +252,19 @@ class SandboxWindowTest(unittest.TestCase):
             executable = shutil.copy2(EXECUTABLE, root)
             sprite = root / "BoyIdle.png"
 
-            row = bytes((255, 0, 0, 255)) * 5 + bytes((0, 255, 0, 128)) * 6 + bytes((0, 0, 255, 0)) * 5
-            sprite.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 16, 16, 8, 6, 0, 0, 0))
-                               + chunk(b"IDAT", zlib.compress((b"\0" + row) * 16)) + chunk(b"IEND", b""))
+            def write_sheet(path, rows):
+                pixels = b"".join((b"\0" + row) * 16 for row in rows)
+                path.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 64, 16 * len(rows), 8, 6, 0, 0, 0))
+                                 + chunk(b"IDAT", zlib.compress(pixels)) + chunk(b"IEND", b""))
+
+            idle_colors = ((255, 0, 0), (180, 0, 0), (120, 0, 0), (60, 0, 0))
+            alpha_samples = bytes((0, 255, 0, 128)) * 6 + bytes((0, 0, 255, 0)) * 5
+            write_sheet(sprite, [b"".join(bytes((*color, 255)) * 5 + alpha_samples for color in idle_colors)])
+            walk_sprite = root / "BoyWalk.png"
+            walk_colors = ((0, 0, 255), (0, 255, 255), (255, 0, 255), (255, 255, 0))
+            # Walk는 왼쪽부터 상·하·좌·우, 위에서 아래로 프레임이 진행된다.
+            write_sheet(walk_sprite, [b"".join(bytes((*color, 255)) * 16 for color in
+                        ((80, 0, 0), (40, 0, 0), (120, 0, 0), right_frame)) for right_frame in walk_colors])
             with subprocess.Popen([executable], cwd=EXECUTABLE.parent) as process:
                 try:
                     deadline = time.monotonic() + 5
@@ -278,19 +287,54 @@ class SandboxWindowTest(unittest.TestCase):
                             (wintypes.POINT(cx + x, cy + y), color) for x, y, color in expected
                         ))
 
-                    red, green, white, blue = (255, 0, 0), (127, 255, 127), (255, 255, 255), (25, 51, 102)
+                    down, right = idle_colors[0], idle_colors[3]
+                    green, white, blue = (127, 255, 127), (255, 255, 255), (25, 51, 102)
                     cx, cy = resize(800, 600)
-                    check((-12, -20, red), (0, -20, green), (12, -20, white), (300, 100, white))
+                    check((-12, -20, down), (0, -20, green), (12, -20, white), (300, 100, white))
+                    idle_point = wintypes.POINT(cx - 12, cy - 20)
+                    self.assertTrue(USER32.ClientToScreen(window, ctypes.byref(idle_point)))
+                    desktop = USER32.GetDC(None)
+                    self.assertTrue(desktop)
+                    try:
+                        deadline = time.monotonic() + 0.5
+                        while time.monotonic() < deadline:
+                            self.assertEqual(GDI32.GetPixel(desktop, idle_point.x, idle_point.y), down[0])
+                            time.sleep(0.01)
+                    finally:
+                        USER32.ReleaseDC(None, desktop)
                     sprite.unlink()  # 이후 프레임과 리사이즈에 원본 파일이 필요 없어야 한다.
+                    walk_sprite.unlink()
                     position = (cx + 240) | (cy << 16)
                     self.assertTrue(USER32.PostMessageW(window, 0x0201, 1, position))
                     self.assertTrue(USER32.PostMessageW(window, 0x0202, 0, position))
-                    check((-12, -20, red), (60, 100, white), (70, 100, blue), (300, 100, blue))
+                    point = wintypes.POINT(cx, cy - 20)
+                    self.assertTrue(USER32.ClientToScreen(window, ctypes.byref(point)))
+                    walk_colorrefs = {r | (g << 8) | (b << 16) for r, g, b in walk_colors}
+                    observed = set()
+                    deadline = time.monotonic() + 1.5
+                    desktop = USER32.GetDC(None)
+                    self.assertTrue(desktop)
+                    try:
+                        while time.monotonic() < deadline and len(observed) < 2:
+                            color = GDI32.GetPixel(desktop, point.x, point.y)
+                            if color in walk_colorrefs:
+                                observed.add(color)
+                            time.sleep(0.01)
+                    finally:
+                        USER32.ReleaseDC(None, desktop)
+                    self.assertGreaterEqual(len(observed), 2, "Walk should display more than one frame")
+                    check((-12, -20, right), (60, 100, white), (70, 100, blue), (300, 100, blue))
 
                     self.assertTrue(USER32.PostMessageW(window, 0x020A, 120 << 16, 0))
-                    check((-24, -40, red), (0, -40, green), (24, -40, white), (120, 200, white))
+                    check((-24, -40, right), (0, -40, green), (24, -40, white), (120, 200, white))
                     cx, cy = resize(691, 511)
-                    check((-24, -40, red), (0, -40, green), (24, -40, white), (120, 200, white), (140, 200, blue))
+                    check((-24, -40, right), (0, -40, green), (24, -40, white), (120, 200, white), (140, 200, blue))
+                    for direction, offset in ((0, (0, 180)), (1, (0, -180)), (2, (-180, 0))):
+                        position = (cx + offset[0]) | ((cy + offset[1]) << 16)
+                        self.assertTrue(USER32.PostMessageW(window, 0x0201, 1, position))
+                        self.assertTrue(USER32.PostMessageW(window, 0x0202, 0, position))
+                        check((0, -40, (40 + direction * 40, 0, 0)))
+                        check((-24, -40, idle_colors[direction]), (0, -40, green))
                     self.assertTrue(USER32.PostMessageW(window, 0x0112, 0xF060, 0))
                     self.assertEqual(process.wait(timeout=5), 0)
                 finally:

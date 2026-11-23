@@ -6,6 +6,7 @@
 #include "Input/CInputManager.h"
 #include "Transform/CoordinateTransform2D.h"
 #include "Camera/CCameraManager.h"
+#include "Animation/CSpriteAnimator.h"
 
 namespace
 {
@@ -171,6 +172,31 @@ static int TestMouseWheel()
 		return 22;
 	return 0;
 }
+
+constexpr bool SpriteAnimatorLoopsAndRestarts()
+{
+	ClientFrameworkLib::Animation::CSpriteAnimator animator;
+	animator.Restart(4, 6);
+	for (unsigned int tick = 0; tick < 30; ++tick)
+	{
+		if (animator.GetFrameIndex() != (tick / 6) % 4)
+			return false;
+		animator.AdvanceTick();
+	}
+	animator.AdvanceTick();
+	animator.Restart(2, 2);
+	animator.AdvanceTick();
+	if (animator.GetFrameIndex() != 0)
+		return false;
+	animator.AdvanceTick();
+	if (animator.GetFrameIndex() != 1)
+		return false;
+	animator.Restart(0, 0);
+	animator.AdvanceTick();
+	return animator.GetFrameIndex() == 0;
+}
+
+static_assert(SpriteAnimatorLoopsAndRestarts());
 
 int main(void)
 {

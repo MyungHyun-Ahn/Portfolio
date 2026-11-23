@@ -55,5 +55,7 @@
   <Target Name="CopySandboxSprite" AfterTargets="Build">
     <Copy SourceFiles="$(MSBuildProjectDirectory)\..\..\Asset\Actor\Character\Boy\SeparateAnim\Idle.png"
           DestinationFiles="$(OutDir)BoyIdle.png" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\..\..\Asset\Actor\Character\Boy\SeparateAnim\Walk.png"
+          DestinationFiles="$(OutDir)BoyWalk.png" SkipUnchangedFiles="true" />
   </Target>
 </Project>

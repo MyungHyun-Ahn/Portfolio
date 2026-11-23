@@ -12,6 +12,7 @@
 #include "Input/CInputManager.h"
 #include "Input/Win32InputAdapter.h"
 #include "Camera/CCameraManager.h"
+#include "Animation/CSpriteAnimator.h"
 #include "Transform/CoordinateTransform2D.h"
 
 namespace
@@ -21,6 +22,7 @@ namespace
 	using ClientFrameworkLib::Input::CInputManager;
 	using ClientFrameworkLib::CFixedStepScheduler;
 	using ClientFrameworkLib::Camera::CCameraManager;
+	using ClientFrameworkLib::Animation::CSpriteAnimator;
 	using ClientFrameworkLib::Transform::SCoord2D;
 	using ClientFrameworkLib::Transform::WorldToClient;
 	using ClientFrameworkLib::Transform::ClientToWorld;
@@ -33,6 +35,23 @@ namespace
 	constexpr float kMoveWorldUnitsPerTick = 300.0f / CFixedStepScheduler::kTicksPerSecond;
 	constexpr SCoord2D kWorldLandmark{460.0f, 240.0f};
 	constexpr float kSpriteFramePixels = 16.0f;
+	constexpr unsigned int kWalkFrameCount = 4;
+	constexpr unsigned int kSpriteTicksPerFrame = 6;
+	enum class ESpriteClip : unsigned int
+	{
+		Idle,
+		Walk,
+	};
+	// Idle 시트의 열 순서다.
+	enum class ESpriteFacing : unsigned int
+	{
+		Down,
+		Up,
+		Left,
+		Right,
+	};
+	// Walk 시트의 열은 상·하·좌·우 순서다.
+	constexpr std::array<unsigned int, 4> kWalkColumnsByFacing{1, 0, 2, 3};
 	constexpr float kSpriteHalfSizeWorld = 16.0f;
 	constexpr float kSpriteOffsetWorldY = -20.0f;
 
@@ -54,6 +73,7 @@ namespace
 	{
 		SCoord2D m_centerWorld{160.0f, 140.0f};
 		std::optional<SCoord2D> m_destinationWorld;
+		ESpriteFacing m_facing = ESpriteFacing::Down;
 	};
 
 	void FixedUpdate(const CInputManager& input, SRectangleMovement& rectangle, SCoord2D viewCenterWorld,
@@ -65,7 +85,17 @@ namespace
 		{
 			const auto& press = *moveTo.m_pressPosition;
 			const SCoord2D click{static_cast<float>(press.m_xPixels), static_cast<float>(press.m_yPixels)};
-			rectangle.m_destinationWorld = ClientToWorld(click, viewCenterWorld, clientCenter, zoom);
+			const auto destination = ClientToWorld(click, viewCenterWorld, clientCenter, zoom);
+			rectangle.m_destinationWorld = destination;
+			const float deltaX = destination.m_x - rectangle.m_centerWorld.m_x;
+			const float deltaY = destination.m_y - rectangle.m_centerWorld.m_y;
+			if (deltaX != 0.0f || deltaY != 0.0f)
+			{
+				// 직선 이동을 시작할 때 방향을 정한다. 대각선이 정확히 같으면 세로 방향을 우선한다.
+				rectangle.m_facing = std::abs(deltaX) > std::abs(deltaY)
+					? (deltaX < 0.0f ? ESpriteFacing::Left : ESpriteFacing::Right)
+					: (deltaY < 0.0f ? ESpriteFacing::Up : ESpriteFacing::Down);
+			}
 		}
 		if (!rectangle.m_destinationWorld)
 			return;
@@ -74,6 +104,7 @@ namespace
 		const float deltaX = target.m_x - rectangle.m_centerWorld.m_x;
 		const float deltaY = target.m_y - rectangle.m_centerWorld.m_y;
 		const float distanceWorld = std::hypot(deltaX, deltaY);
+
 		// 한 틱 이동 거리 안에 목적지가 있으면 지나치지 말고 그 자리에서 멈춘다.
 		if (distanceWorld <= kMoveWorldUnitsPerTick)
 		{
@@ -172,8 +203,9 @@ int main(void)
 		DestroyWindow(window);
 		return 2;
 	}
-	const auto spritePath = std::filesystem::path(modulePath.data()).parent_path() / L"BoyIdle.png";
-	if (FAILED(renderer.LoadSpritePng(spritePath.c_str())))
+	const auto spriteDirectory = std::filesystem::path(modulePath.data()).parent_path();
+	if (FAILED(renderer.LoadSpritePng(static_cast<unsigned int>(ESpriteClip::Idle), (spriteDirectory / L"BoyIdle.png").c_str())) ||
+		FAILED(renderer.LoadSpritePng(static_cast<unsigned int>(ESpriteClip::Walk), (spriteDirectory / L"BoyWalk.png").c_str())))
 	{
 		DestroyWindow(window);
 		return 2;
@@ -186,6 +218,8 @@ int main(void)
 	using Clock = std::chrono::steady_clock;
 	CFixedStepScheduler fixedStepScheduler;
 	SRectangleMovement rectangle;
+	ESpriteClip spriteClip = ESpriteClip::Idle;
+	CSpriteAnimator spriteAnimator;
 	CCameraManager cameraManager;
 	cameraManager.FollowTarget(rectangle.m_centerWorld.m_x, rectangle.m_centerWorld.m_y);
 	auto& windowSize = windowState.m_size;
@@ -229,6 +263,17 @@ int main(void)
 			const SCoord2D viewCenterWorld{cameraManager.GetCenterWorldX(), cameraManager.GetCenterWorldY()};
 			// 같은 틱의 클릭은 줌 변경 전 배율로 해석한다.
 			FixedUpdate(windowState.m_input, rectangle, viewCenterWorld, clientCenter, cameraManager.GetZoom(), updatesInSample);
+			const auto nextClip = rectangle.m_destinationWorld ? ESpriteClip::Walk : ESpriteClip::Idle;
+			if (nextClip != spriteClip)
+			{
+				spriteClip = nextClip;
+				if (spriteClip == ESpriteClip::Walk)
+					spriteAnimator.Restart(kWalkFrameCount, kSpriteTicksPerFrame);
+			}
+			else if (spriteClip == ESpriteClip::Walk)
+			{
+				spriteAnimator.AdvanceTick();
+			}
 			cameraManager.FollowTarget(rectangle.m_centerWorld.m_x, rectangle.m_centerWorld.m_y);
 			const auto wheelSteps = windowState.m_input.GetWheelSteps();
 			for (auto steps = wheelSteps; steps > 0; --steps)
@@ -272,8 +317,15 @@ int main(void)
 			const SCoord2D spriteWorld{rectangle.m_centerWorld.m_x, rectangle.m_centerWorld.m_y + kSpriteOffsetWorldY};
 			const auto spriteCenter = WorldToClient(spriteWorld, viewCenterWorld, clientCenter, zoom);
 			const float spriteHalfSize = kSpriteHalfSizeWorld * zoom;
-			renderer.DrawSprite(spriteCenter.m_x - spriteHalfSize, spriteCenter.m_y - spriteHalfSize,
-				spriteCenter.m_x + spriteHalfSize, spriteCenter.m_y + spriteHalfSize, kSpriteFramePixels, kSpriteFramePixels);
+			const auto facingIndex = static_cast<unsigned int>(rectangle.m_facing);
+			const bool isWalking = spriteClip == ESpriteClip::Walk;
+			const auto sourceColumn = isWalking ? kWalkColumnsByFacing[facingIndex] : facingIndex;
+			const auto sourceRow = isWalking ? spriteAnimator.GetFrameIndex() : 0u;
+			const float sourceLeftPixels = static_cast<float>(sourceColumn) * kSpriteFramePixels;
+			const float sourceTopPixels = static_cast<float>(sourceRow) * kSpriteFramePixels;
+			renderer.DrawSprite(static_cast<unsigned int>(spriteClip), spriteCenter.m_x - spriteHalfSize, spriteCenter.m_y - spriteHalfSize,
+				spriteCenter.m_x + spriteHalfSize, spriteCenter.m_y + spriteHalfSize,
+				{sourceLeftPixels, sourceTopPixels, sourceLeftPixels + kSpriteFramePixels, sourceTopPixels + kSpriteFramePixels});
 			if (FAILED(renderer.EndFrame()))
 			{
 				DestroyWindow(window);

@@ -5,6 +5,8 @@
     <ClCompile Include="CFixedStepScheduler.cpp" />
     <Filter Include="Input" />
     <Filter Include="Camera" />
+    <Filter Include="Animation" />
+    <ClInclude Include="Animation\CSpriteAnimator.h"><Filter>Animation</Filter></ClInclude>
     <Filter Include="Transform" />
     <ClInclude Include="Camera\CCameraManager.h"><Filter>Camera</Filter></ClInclude>
     <ClInclude Include="Transform\CoordinateTransform2D.h"><Filter>Transform</Filter></ClInclude>
