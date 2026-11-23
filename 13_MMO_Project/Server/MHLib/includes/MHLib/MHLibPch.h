@@ -54,6 +54,5 @@
 #include "MHLib/memory/CSingleMemoryPool.h"
 #include "MHLib/memory/CTlsMemoryPool.h"
 #include "MHLib/memory/CTlsPagePool.h"
-#include "MHLib/containers/CDeque.h"
 #include "MHLib/containers/CLfStack.h"
 #include "MHLib/containers/CLfQueue.h"

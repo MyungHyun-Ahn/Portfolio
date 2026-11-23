@@ -26,9 +26,6 @@
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>
-    <ClInclude Include="includes\MHLib\containers\CDeque.h">
-      <Filter>includes\MHLib\containers</Filter>
-    </ClInclude>
     <ClInclude Include="includes\MHLib\containers\CLfQueue.h">
       <Filter>includes\MHLib\containers</Filter>
     </ClInclude>

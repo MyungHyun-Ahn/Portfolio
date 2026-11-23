@@ -35,7 +35,6 @@
     <IntDir>$(OutDir)obj\</IntDir>
   </PropertyGroup>
   <ItemGroup>
-    <ClInclude Include="includes\MHLib\containers\CDeque.h" />
     <ClInclude Include="includes\MHLib\containers\CLfQueue.h" />
     <ClInclude Include="includes\MHLib\containers\CLfStack.h" />
     <ClInclude Include="includes\MHLib\containers\CLFSpscQueue.h" />
