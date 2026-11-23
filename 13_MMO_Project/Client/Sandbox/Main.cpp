@@ -1,6 +1,8 @@
 #include <Windows.h>
 #include <chrono>
+#include <memory>
 #include <string>
+#include "CDirect2DRenderer.h"
 #include "CFixedStepScheduler.h"
 
 namespace
@@ -44,8 +46,7 @@ int main(void)
 	// 창 만들기 #2 - Windows 기본 화살표 커서를 가져와 이 창 클래스의 기본 커서로 지정함
 	windowClass.hCursor = LoadCursorW(nullptr, IDC_ARROW);
 
-	// 창 만들기 #3 - 시스템의 기본 창 배경색으로 칠하는 브러시를 가져온다.
-	windowClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+	// 창 만들기 #3 - 창 배경은 Direct2D가 그리므로 클래스 배경 브러시는 지정하지 않는다.
 	windowClass.lpszClassName = kWindowClassName;
 
 	// 창 만들기 #4 - WNDCLASSW에 담은 설정을 Windows에 등록한다.
@@ -57,7 +58,15 @@ int main(void)
 	if (window == nullptr)
 		return 1;
 
-	// 창 만들기 #5 - 만들어진 창을 화면에 표시한다.
+	// 창 만들기 #5 - Direct2D 랜더러를 초기화한다.
+	ClientRenderLib::CDirect2DRenderer renderer;
+	if (FAILED(renderer.Initialize(window)))
+	{
+		DestroyWindow(window);
+		return 1;
+	}
+
+	// 창 만들기 #6 - 만들어진 창을 화면에 표시한다.
 	ShowWindow(window, SW_SHOWDEFAULT);
 
 	MSG message{};
@@ -89,6 +98,12 @@ int main(void)
 		const int updates = fixedStepScheduler.Advance(elapsed);
 		for (int tick = 0; tick < updates; ++tick)
 			FixedUpdate(updatesInSample);
+
+		if (FAILED(renderer.DrawBackground(0.1f, 0.2f, 0.4f)))
+		{
+			DestroyWindow(window);
+			return 1;
+		}
 
 		// 프레임 루프와 실제 고정 업데이트의 실행 횟수를 따로 표시한다.
 		++framesInSample;

@@ -30,7 +30,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(MSBuildProjectDirectory)\..\ClientFrameworkLib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(MSBuildProjectDirectory)\..\ClientFrameworkLib;$(MSBuildProjectDirectory)\..\ClientRenderLib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level4</WarningLevel>
       <TreatWarningAsError>true</TreatWarningAsError>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -39,13 +39,16 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <EntryPointSymbol>mainCRTStartup</EntryPointSymbol>
-      <AdditionalDependencies>User32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>User32.lib;D3D11.lib;D2D1.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
     <ProjectReference Include="..\ClientFrameworkLib\ClientFrameworkLib.vcxproj">
       <Project>{91EE45DE-B241-453E-95B9-DB2206E0A987}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\ClientRenderLib\ClientRenderLib.vcxproj">
+      <Project>{FEF09EE0-761B-43A1-80FF-6501CA060BE8}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

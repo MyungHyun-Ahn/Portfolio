@@ -9,12 +9,23 @@ import unittest
 
 
 USER32 = ctypes.WinDLL("user32", use_last_error=True)
+GDI32 = ctypes.WinDLL("gdi32", use_last_error=True)
 ENUM_WINDOW = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
 USER32.EnumWindows.argtypes = (ENUM_WINDOW, wintypes.LPARAM)
 USER32.GetWindowThreadProcessId.argtypes = (wintypes.HWND, ctypes.POINTER(wintypes.DWORD))
 USER32.IsWindowVisible.argtypes = (wintypes.HWND,)
 USER32.GetWindowTextW.argtypes = (wintypes.HWND, wintypes.LPWSTR, ctypes.c_int)
 USER32.PostMessageW.argtypes = (wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
+USER32.GetClientRect.argtypes = (wintypes.HWND, ctypes.POINTER(wintypes.RECT))
+USER32.ClientToScreen.argtypes = (wintypes.HWND, ctypes.POINTER(wintypes.POINT))
+USER32.SetWindowPos.argtypes = (
+    wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, wintypes.UINT
+)
+USER32.GetDC.argtypes = (wintypes.HWND,)
+USER32.GetDC.restype = wintypes.HDC
+USER32.ReleaseDC.argtypes = (wintypes.HWND, wintypes.HDC)
+GDI32.GetPixel.argtypes = (wintypes.HDC, ctypes.c_int, ctypes.c_int)
+GDI32.GetPixel.restype = wintypes.DWORD
 
 
 def find_visible_window(process_id):
@@ -34,6 +45,49 @@ def find_visible_window(process_id):
 
 
 class SandboxWindowTest(unittest.TestCase):
+    def test_direct2d_background_is_presented(self):
+        with subprocess.Popen([str(EXECUTABLE)]) as process:
+            try:
+                deadline = time.monotonic() + 5
+                window = None
+                while time.monotonic() < deadline and process.poll() is None:
+                    window = find_visible_window(process.pid)
+                    if window:
+                        break
+                    time.sleep(0.02)
+                self.assertIsNotNone(window, f"Sandbox showed no window (exit={process.poll()})")
+
+                hwnd_topmost, swp_no_move_size_activate = -1, 0x0013
+                self.assertTrue(USER32.SetWindowPos(window, hwnd_topmost, 0, 0, 0, 0, swp_no_move_size_activate))
+                client = wintypes.RECT()
+                self.assertTrue(USER32.GetClientRect(window, ctypes.byref(client)))
+                point = wintypes.POINT(client.right // 2, client.bottom // 2)
+                self.assertTrue(USER32.ClientToScreen(window, ctypes.byref(point)))
+
+                # COLORREF는 채널을 BGR 순으로 저장한다. Sandbox 배경은 RGB(25, 51, 102)다.
+                expected = (25, 51, 102)
+                color = 0xFFFFFFFF
+                desktop = USER32.GetDC(None)
+                self.assertTrue(desktop)
+                try:
+                    while time.monotonic() < deadline and process.poll() is None:
+                        color = GDI32.GetPixel(desktop, point.x, point.y)
+                        channels = tuple((color >> shift) & 255 for shift in (0, 8, 16))
+                        if all(abs(actual - target) <= 2 for actual, target in zip(channels, expected)):
+                            break
+                        time.sleep(0.02)
+                    else:
+                        self.fail(f"Sandbox did not present the expected background: COLORREF={color:#010x}")
+                finally:
+                    USER32.ReleaseDC(None, desktop)
+
+                self.assertTrue(USER32.PostMessageW(window, 0x0112, 0xF060, 0))
+                self.assertEqual(process.wait(timeout=5), 0)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=5)
+
     def test_frame_and_fixed_update_rates_are_reported_without_input(self):
         with subprocess.Popen([str(EXECUTABLE)]) as process:
             try:

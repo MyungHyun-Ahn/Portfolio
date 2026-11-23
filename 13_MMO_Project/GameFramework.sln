@@ -4,6 +4,8 @@ Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "Sandbox", "Client\Sandbox\S
 EndProject
 Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "ClientFrameworkLib", "Client\ClientFrameworkLib\ClientFrameworkLib.vcxproj", "{91EE45DE-B241-453E-95B9-DB2206E0A987}"
 EndProject
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "ClientRenderLib", "Client\ClientRenderLib\ClientRenderLib.vcxproj", "{FEF09EE0-761B-43A1-80FF-6501CA060BE8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -18,5 +20,9 @@ Global
 		{91EE45DE-B241-453E-95B9-DB2206E0A987}.Debug|x64.Build.0 = Debug|x64
 		{91EE45DE-B241-453E-95B9-DB2206E0A987}.Release|x64.ActiveCfg = Release|x64
 		{91EE45DE-B241-453E-95B9-DB2206E0A987}.Release|x64.Build.0 = Release|x64
+		{FEF09EE0-761B-43A1-80FF-6501CA060BE8}.Debug|x64.ActiveCfg = Debug|x64
+		{FEF09EE0-761B-43A1-80FF-6501CA060BE8}.Debug|x64.Build.0 = Debug|x64
+		{FEF09EE0-761B-43A1-80FF-6501CA060BE8}.Release|x64.ActiveCfg = Release|x64
+		{FEF09EE0-761B-43A1-80FF-6501CA060BE8}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 EndGlobal
