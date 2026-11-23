@@ -175,6 +175,59 @@ class SandboxWindowTest(unittest.TestCase):
                     process.kill()
                     process.wait(timeout=5)
 
+    def test_camera_zoom_scales_drawing_and_clicks(self):
+        with subprocess.Popen([str(EXECUTABLE)]) as process:
+            try:
+                deadline = time.monotonic() + 5
+                window = None
+                while time.monotonic() < deadline and process.poll() is None:
+                    window = find_visible_window(process.pid)
+                    if window:
+                        break
+                    time.sleep(0.02)
+                self.assertIsNotNone(window)
+                self.assertTrue(USER32.SetWindowPos(window, -1, 40, 40, 800, 600, 0x0010))
+                client = wintypes.RECT()
+                self.assertTrue(USER32.GetClientRect(window, ctypes.byref(client)))
+                cx, cy = client.right // 2, client.bottom // 2
+                white, blue = (255, 255, 255), (25, 51, 102)
+
+                def check(*expected):
+                    self.assert_rectangle_and_background(window, process, tuple(
+                        (wintypes.POINT(cx + x, cy + y), color) for x, y, color in expected
+                    ))
+
+                def scroll(delta):
+                    point = wintypes.POINT(cx + 25, cy + 25)
+                    self.assertTrue(USER32.ClientToScreen(window, ctypes.byref(point)))
+                    position = (point.x & 0xFFFF) | ((point.y & 0xFFFF) << 16)
+                    self.assertTrue(USER32.PostMessageW(window, 0x020A, (delta & 0xFFFF) << 16, position))
+
+                check((0, 0, white), (75, 0, white), (300, 100, white))
+                scroll(-120)
+                check((0, 0, white), (38, 0, white), (42, 0, blue), (150, 50, white), (300, 100, blue))
+
+                # 반 배율에서 화면 +100px 클릭은 월드 +200만큼의 이동이다.
+                position = (cx + 100) | (cy << 16)
+                self.assertTrue(USER32.PostMessageW(window, 0x0201, 1, position))
+                self.assertTrue(USER32.PostMessageW(window, 0x0202, 0, position))
+                check((0, 0, white), (50, 50, white), (55, 50, blue), (150, 50, blue))
+                time.sleep(0.2)
+                check((0, 0, white), (50, 50, white), (55, 50, blue))
+
+                scroll(120)
+                check((75, 0, white), (100, 100, white), (50, 80, blue))
+                scroll(120)
+                check((155, 0, white), (165, 0, blue), (200, 200, white), (100, 155, blue))
+                scroll(-240)
+                check((38, 0, white), (42, 0, blue), (50, 50, white))
+                self.assertTrue(USER32.PostMessageW(window, 0x0112, 0xF060, 0))
+                self.assertEqual(process.wait(timeout=5), 0)
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=5)
+
     def test_frame_and_fixed_update_rates_are_reported_without_input(self):
         with subprocess.Popen([str(EXECUTABLE)]) as process:
             try:

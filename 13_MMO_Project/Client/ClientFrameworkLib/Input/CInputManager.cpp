@@ -38,9 +38,16 @@ namespace ClientFrameworkLib::Input
 		state.m_pending.m_wasReleased = true;
 	}
 
-	void CInputManager::ClearButtons() noexcept
+	void CInputManager::OnMouseWheel(int delta) noexcept
+	{
+		m_pendingWheelDelta += delta;
+	}
+
+	void CInputManager::ClearInput() noexcept
 	{
 		m_buttons.fill(SButtonState{});
+		m_pendingWheelDelta = 0;
+		m_wheelStepsThisTick = 0;
 	}
 
 	void CInputManager::BeginTick() noexcept
@@ -50,6 +57,9 @@ namespace ClientFrameworkLib::Input
 			state.m_thisTick = state.m_pending;
 			state.m_pending = {};
 		}
+		m_wheelStepsThisTick = m_pendingWheelDelta / kWheelUnitsPerStep;
+		// 한 스텝 미만의 델타는 다음 휠 입력까지 보존한다.
+		m_pendingWheelDelta %= kWheelUnitsPerStep;
 	}
 
 	CInputManager::SActionState CInputManager::GetActionState(ActionId action) const noexcept

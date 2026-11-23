@@ -8,14 +8,18 @@ namespace ClientFrameworkLib::Transform
 		float m_y = 0.0f;
 	};
 
-	// 2.1에서는 월드 1단위를 창 내부 좌표 1픽셀로 다룬다.
-	[[nodiscard]] constexpr SCoord2D WorldToClient(SCoord2D world, SCoord2D viewCenterWorld, SCoord2D clientCenter) noexcept
+	// 두 변환에 동일한 양수 줌 배율을 사용한다. 1배율에서는 월드 1단위가 1픽셀이다.
+	[[nodiscard]]
+	constexpr SCoord2D WorldToClient(SCoord2D world, SCoord2D viewCenterWorld, SCoord2D clientCenter, float zoom) noexcept
 	{
-		return {world.m_x - viewCenterWorld.m_x + clientCenter.m_x, world.m_y - viewCenterWorld.m_y + clientCenter.m_y};
+		return {(world.m_x - viewCenterWorld.m_x) * zoom + clientCenter.m_x,
+			(world.m_y - viewCenterWorld.m_y) * zoom + clientCenter.m_y};
 	}
 
-	[[nodiscard]] constexpr SCoord2D ClientToWorld(SCoord2D client, SCoord2D viewCenterWorld, SCoord2D clientCenter) noexcept
+	[[nodiscard]]
+	constexpr SCoord2D ClientToWorld(SCoord2D client, SCoord2D viewCenterWorld, SCoord2D clientCenter, float zoom) noexcept
 	{
-		return {client.m_x - clientCenter.m_x + viewCenterWorld.m_x, client.m_y - clientCenter.m_y + viewCenterWorld.m_y};
+		return {(client.m_x - clientCenter.m_x) / zoom + viewCenterWorld.m_x,
+			(client.m_y - clientCenter.m_y) / zoom + viewCenterWorld.m_y};
 	}
 }

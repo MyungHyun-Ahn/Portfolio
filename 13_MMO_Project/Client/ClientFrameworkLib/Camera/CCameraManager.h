@@ -17,8 +17,24 @@ namespace ClientFrameworkLib::Camera
 		[[nodiscard]]
 		constexpr float GetCenterWorldY() const noexcept { return m_centerWorldY; }
 
+		constexpr void ZoomIn() noexcept
+		{
+			if (m_zoom < 2.0f)
+				m_zoom *= 2.0f;
+		}
+
+		constexpr void ZoomOut() noexcept
+		{
+			if (m_zoom > 0.5f)
+				m_zoom *= 0.5f;
+		}
+
+		[[nodiscard]]
+		constexpr float GetZoom() const noexcept { return m_zoom; }
+
 	private:
 		float m_centerWorldX = 0.0f;
 		float m_centerWorldY = 0.0f;
+		float m_zoom = 1.0f;
 	};
 }

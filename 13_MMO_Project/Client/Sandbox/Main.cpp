@@ -53,7 +53,7 @@ namespace
 	};
 
 	void FixedUpdate(const CInputManager& input, SRectangleMovement& rectangle, SCoord2D viewCenterWorld,
-		SCoord2D clientCenter, ULONGLONG& updatesInSample) noexcept
+		SCoord2D clientCenter, float zoom, ULONGLONG& updatesInSample) noexcept
 	{
 		++updatesInSample;
 		const auto moveTo = input.GetActionState(static_cast<CInputManager::ActionId>(EGameAction::MoveTo));
@@ -61,7 +61,7 @@ namespace
 		{
 			const auto& press = *moveTo.m_pressPosition;
 			const SCoord2D click{static_cast<float>(press.m_xPixels), static_cast<float>(press.m_yPixels)};
-			rectangle.m_destinationWorld = ClientToWorld(click, viewCenterWorld, clientCenter);
+			rectangle.m_destinationWorld = ClientToWorld(click, viewCenterWorld, clientCenter, zoom);
 		}
 		if (!rectangle.m_destinationWorld)
 			return;
@@ -146,6 +146,7 @@ int main(void)
 
 	SWindowState windowState;
 	windowState.m_input.Bind(static_cast<CInputManager::ActionId>(EGameAction::MoveTo), VK_LBUTTON);
+
 	const HWND window = CreateWindowExW(0, kWindowClassName, kWindowTitle, WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT, CW_USEDEFAULT, 800, 600, nullptr, nullptr, instance, &windowState);
 	if (window == nullptr)
@@ -207,8 +208,14 @@ int main(void)
 		{
 			windowState.m_input.BeginTick();
 			const SCoord2D viewCenterWorld{cameraManager.GetCenterWorldX(), cameraManager.GetCenterWorldY()};
-			FixedUpdate(windowState.m_input, rectangle, viewCenterWorld, clientCenter, updatesInSample);
+			// 같은 틱의 클릭은 줌 변경 전 배율로 해석한다.
+			FixedUpdate(windowState.m_input, rectangle, viewCenterWorld, clientCenter, cameraManager.GetZoom(), updatesInSample);
 			cameraManager.FollowTarget(rectangle.m_centerWorld.m_x, rectangle.m_centerWorld.m_y);
+			const auto wheelSteps = windowState.m_input.GetWheelSteps();
+			for (auto steps = wheelSteps; steps > 0; --steps)
+				cameraManager.ZoomIn();
+			for (auto steps = wheelSteps; steps < 0; ++steps)
+				cameraManager.ZoomOut();
 		}
 
 		// 최소화 중에는 백 버퍼를 건드리지 않고 그리기만 쉰다. 고정 업데이트는 위에서 계속 실행된다.
@@ -229,15 +236,20 @@ int main(void)
 
 			renderer.BeginFrame(0.1f, 0.2f, 0.4f);
 			const SCoord2D viewCenterWorld{cameraManager.GetCenterWorldX(), cameraManager.GetCenterWorldY()};
-			const auto landmark = WorldToClient(kWorldLandmark, viewCenterWorld, clientCenter);
-			renderer.FillRectangle(landmark.m_x - 5.0f, landmark.m_y - 5.0f, landmark.m_x + 5.0f, landmark.m_y + 5.0f);
+			const float zoom = cameraManager.GetZoom();
+			const auto landmark = WorldToClient(kWorldLandmark, viewCenterWorld, clientCenter, zoom);
+			const float landmarkHalfSize = 5.0f * zoom;
+			renderer.FillRectangle(landmark.m_x - landmarkHalfSize, landmark.m_y - landmarkHalfSize,
+				landmark.m_x + landmarkHalfSize, landmark.m_y + landmarkHalfSize);
 			if (rectangle.m_destinationWorld)
 			{
-				const auto target = WorldToClient(*rectangle.m_destinationWorld, viewCenterWorld, clientCenter);
+				const auto target = WorldToClient(*rectangle.m_destinationWorld, viewCenterWorld, clientCenter, zoom);
 				renderer.FillRectangle(target.m_x - 4.0f, target.m_y - 4.0f, target.m_x + 4.0f, target.m_y + 4.0f);
 			}
-			const auto center = WorldToClient(rectangle.m_centerWorld, viewCenterWorld, clientCenter);
-			renderer.FillRectangle(center.m_x - 80.0f, center.m_y - 60.0f, center.m_x + 80.0f, center.m_y + 60.0f);
+			const auto center = WorldToClient(rectangle.m_centerWorld, viewCenterWorld, clientCenter, zoom);
+			const float halfWidth = 80.0f * zoom;
+			const float halfHeight = 60.0f * zoom;
+			renderer.FillRectangle(center.m_x - halfWidth, center.m_y - halfHeight, center.m_x + halfWidth, center.m_y + halfHeight);
 			if (FAILED(renderer.EndFrame()))
 			{
 				DestroyWindow(window);

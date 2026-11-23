@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 namespace ClientFrameworkLib::Input
 {
 	// 메시지 수집과 고정 틱이 같은 스레드에서 실행되는 것을 전제로 한다.
@@ -8,6 +10,7 @@ namespace ClientFrameworkLib::Input
 	public:
 		using ActionId = unsigned int;
 		using ButtonId = unsigned int;
+		static constexpr int kWheelUnitsPerStep = 120;
 
 		struct SPosition
 		{
@@ -17,19 +20,22 @@ namespace ClientFrameworkLib::Input
 
 		struct SActionState
 		{
-			bool m_isDown = false;
-			bool m_wasPressed = false;
-			bool m_wasReleased = false;
-			std::optional<SPosition> m_pressPosition;
+			bool 						m_isDown = false;
+			bool 						m_wasPressed = false;
+			bool 						m_wasReleased = false;
+			std::optional<SPosition> 	m_pressPosition;
 		};
 
 		// 한 액션에 버튼 하나를 연결한다. 다시 호출하면 해당 액션의 매핑을 교체한다.
 		void Bind(ActionId action, ButtonId button);
 		void OnButtonDown(ButtonId button, std::optional<SPosition> position = std::nullopt) noexcept;
 		void OnButtonUp(ButtonId button) noexcept;
-		void ClearButtons() noexcept;
-		// 고정 틱마다 한 번 호출해 대기 중인 눌림·떼어짐을 해당 틱에만 노출한다.
+		void OnMouseWheel(int delta) noexcept;
+		void ClearInput() noexcept;
+		// 대기 중인 버튼 변화와 휠의 정수 스텝은 이번 틱에만 노출한다.
 		void BeginTick() noexcept;
+		[[nodiscard]]
+		std::int64_t GetWheelSteps() const noexcept { return m_wheelStepsThisTick; }
 
 		// 현재 눌림 상태와 이번 틱의 변화를 값으로 반환한다. 미매핑 액션은 비활성 상태다.
 		[[nodiscard]]
@@ -38,22 +44,24 @@ namespace ClientFrameworkLib::Input
 	private:
 		struct STransitions
 		{
-			bool m_wasPressed = false;
-			bool m_wasReleased = false;
-			std::optional<SPosition> m_pressPosition;
+			bool 						m_wasPressed = false;
+			bool 						m_wasReleased = false;
+			std::optional<SPosition> 	m_pressPosition;
 		};
 
 		struct SButtonState
 		{
-			bool m_isDown = false;
-			STransitions m_pending;
-			STransitions m_thisTick;
+			bool 			m_isDown = false;
+			STransitions 	m_pending;
+			STransitions 	m_thisTick;
 		};
 
 	private:
 		// Sandbox는 Win32 가상 키 값을 키보드와 마우스 버튼의 공통 ID로 사용한다.
-		static constexpr unsigned int kButtonCount = 256;
-		std::array<SButtonState, kButtonCount> m_buttons{};
-		std::unordered_map<ActionId, ButtonId> m_bindings;
+		static constexpr unsigned int 				kButtonCount = 256;
+		std::array<SButtonState, kButtonCount> 		m_buttons{};
+		std::unordered_map<ActionId, ButtonId> 		m_bindings;
+		std::int64_t 								m_pendingWheelDelta = 0;
+		std::int64_t 								m_wheelStepsThisTick = 0;
 	};
 }

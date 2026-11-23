@@ -41,13 +41,17 @@ namespace ClientFrameworkLib::Input
 				ReleaseCapture();
 			return true;
 		}
+		case WM_MOUSEWHEEL:
+			static_assert(WHEEL_DELTA == CInputManager::kWheelUnitsPerStep);
+			input.OnMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam));
+			return true;
 		case WM_CAPTURECHANGED:
 			input.OnButtonUp(VK_LBUTTON);
 			input.OnButtonUp(VK_RBUTTON);
 			input.OnButtonUp(VK_MBUTTON);
 			return true;
 		case WM_KILLFOCUS:
-			input.ClearButtons();
+			input.ClearInput();
 			if (GetCapture() == window)
 				ReleaseCapture();
 			break;

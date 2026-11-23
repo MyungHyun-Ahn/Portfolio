@@ -26,12 +26,44 @@ namespace
 
 	static_assert(CameraFollowsTarget());
 
-	constexpr auto kClientPoint = WorldToClient({-30.0f, 90.0f}, {100.0f, 40.0f}, {400.0f, 300.0f});
+	constexpr auto kClientPoint = WorldToClient({-30.0f, 90.0f}, {100.0f, 40.0f}, {400.0f, 300.0f}, 1.0f);
 	static_assert(kClientPoint.m_x == 270.0f && kClientPoint.m_y == 350.0f);
-	constexpr auto kWorldPoint = ClientToWorld(kClientPoint, {100.0f, 40.0f}, {400.0f, 300.0f});
+	constexpr auto kWorldPoint = ClientToWorld(kClientPoint, {100.0f, 40.0f}, {400.0f, 300.0f}, 1.0f);
 	static_assert(kWorldPoint.m_x == -30.0f && kWorldPoint.m_y == 90.0f);
-	constexpr auto kResizedCenter = WorldToClient({100.0f, 40.0f}, {100.0f, 40.0f}, {250.5f, 150.5f});
+	constexpr auto kResizedCenter = WorldToClient({100.0f, 40.0f}, {100.0f, 40.0f}, {250.5f, 150.5f}, 2.0f);
 	static_assert(kResizedCenter.m_x == 250.5f && kResizedCenter.m_y == 150.5f);
+
+	constexpr bool ZoomPreservesWorldCoordinates()
+	{
+		CCameraManager camera;
+		camera.FollowTarget(100.0f, 40.0f);
+		if (camera.GetZoom() != 1.0f)
+			return false;
+
+		camera.ZoomIn();
+		camera.ZoomIn();
+		if (camera.GetZoom() != 2.0f || camera.GetCenterWorldX() != 100.0f || camera.GetCenterWorldY() != 40.0f)
+			return false;
+
+		camera.ZoomOut();
+		if (camera.GetZoom() != 1.0f)
+			return false;
+		camera.ZoomOut();
+		camera.ZoomOut();
+		if (camera.GetZoom() != 0.5f)
+			return false;
+
+		for (const float zoom : {0.5f, 1.0f, 2.0f})
+		{
+			const auto client = WorldToClient({-30.0f, 90.0f}, {100.0f, 40.0f}, {400.0f, 300.0f}, zoom);
+			const auto world = ClientToWorld(client, {100.0f, 40.0f}, {400.0f, 300.0f}, zoom);
+			if (world.m_x != -30.0f || world.m_y != 90.0f)
+				return false;
+		}
+		return true;
+	}
+
+	static_assert(ZoomPreservesWorldCoordinates());
 
 	int TestInputManager()
 	{
@@ -89,7 +121,7 @@ namespace
 		if (state.m_isDown || !state.m_wasReleased)
 			return 13;
 		input.OnButtonDown(kKeyE);
-		input.ClearButtons();
+		input.ClearInput();
 		input.BeginTick();
 		state = input.GetActionState(kMoveTo);
 		if (state.m_isDown || state.m_wasPressed)
@@ -106,6 +138,38 @@ namespace
 			return 15;
 		return 0;
 	}
+}
+
+static int TestMouseWheel()
+{
+	ClientFrameworkLib::Input::CInputManager input;
+	constexpr int kHalfStep = input.kWheelUnitsPerStep / 2;
+	input.OnMouseWheel(kHalfStep);
+	input.BeginTick();
+	if (input.GetWheelSteps() != 0)
+		return 16;
+	input.OnMouseWheel(kHalfStep);
+	if (input.GetWheelSteps() != 0)
+		return 17;
+	input.BeginTick();
+	if (input.GetWheelSteps() != 1)
+		return 18;
+	input.BeginTick();
+	if (input.GetWheelSteps() != 0)
+		return 19;
+	input.OnMouseWheel(-5 * kHalfStep);
+	input.BeginTick();
+	if (input.GetWheelSteps() != -2)
+		return 20;
+	input.OnMouseWheel(-3 * kHalfStep);
+	input.ClearInput();
+	if (input.GetWheelSteps() != 0)
+		return 21;
+	input.OnMouseWheel(-kHalfStep);
+	input.BeginTick();
+	if (input.GetWheelSteps() != 0)
+		return 22;
+	return 0;
 }
 
 int main(void)
@@ -143,5 +207,7 @@ int main(void)
 	CFixedStepScheduler invalid;
 	if (invalid.Advance(10ms) != 0 || invalid.Advance(-10ms) != 0 || invalid.Advance(7ms) != 1)
 		return 5;
-	return TestInputManager();
+	if (const int inputResult = TestInputManager(); inputResult != 0)
+		return inputResult;
+	return TestMouseWheel();
 }
