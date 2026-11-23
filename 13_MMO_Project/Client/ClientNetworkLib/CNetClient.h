@@ -8,17 +8,24 @@ namespace NetworkLib
 		CNetClient(const CNetClient &) = delete;
 		CNetClient &operator=(const CNetClient &) = delete;
 
-		[[nodiscard]] bool Connect(const char *pIp, USHORT port, BYTE packetCode, DWORD timeoutMilliseconds) noexcept;
+		[[nodiscard]]
+		bool Connect(const char *pIp, USHORT port, BYTE packetCode, DWORD timeoutMilliseconds) noexcept;
 		void Disconnect() noexcept;
+
 		// 연결 상태와 콜백은 Tick()을 호출하는 앱 스레드에서 처리한다.
 		void Tick() noexcept;
-		[[nodiscard]] bool IsActive() const noexcept;
-		[[nodiscard]] bool IsConnected() const noexcept;
+
+		[[nodiscard]]
+		bool IsActive() const noexcept;
+		[[nodiscard]]
+		bool IsConnected() const noexcept;
 
 	protected:
 		explicit CNetClient(CNetClientManager &network) noexcept;
 		virtual ~CNetClient() = default;
-		[[nodiscard]] bool sendNetworkPacket(std::shared_ptr<CSerializableBuffer<FALSE>> spPacket) noexcept;
+
+		[[nodiscard]]
+		bool sendNetworkPacket(std::shared_ptr<CSerializableBuffer<FALSE>> spPacket) noexcept;
 
 	private:
 		virtual bool onConnect() noexcept = 0;
@@ -30,8 +37,9 @@ namespace NetworkLib
 		}
 		virtual void onDisconnect(bool wasConnected, DWORD error) noexcept = 0;
 
-		CNetClientManager &m_network;
-		SessionId m_sessionId = 0;
-		bool m_isConnected = false;
+	private:
+		CNetClientManager 	&m_network;
+		SessionId 			m_sessionId = 0;
+		bool 				m_isConnected = false;
 	};
 }

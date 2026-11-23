@@ -1,13 +1,5 @@
-#include "pch.h"
-#include "NetHeaders.h"
-#include "CSerializableBuffer.h"
+#include "ClientNetworkLibPch.h"
 #include "NetPacket.h"
-#include "ClientEvent.h"
-#include "CClientMailbox.h"
-#include "CNetClientManager.h"
-#include "NetworkLimits.h"
-#include "CRingBuffer.h"
-#include "CNetSession.h"
 
 namespace ClientNetworkLib
 {
@@ -35,6 +27,7 @@ namespace ClientNetworkLib
 			nullptr, 0, &bytesSent, &m_connectOverlapped)
 			|| WSAGetLastError() == WSA_IO_PENDING)
 			return true;
+
 		--m_ioCount;
 		return false;
 	}
@@ -77,9 +70,11 @@ namespace ClientNetworkLib
 		++m_ioCount;
 		if (WSASend(m_socket, buffers, m_sendCount, nullptr, 0, &m_sendOverlapped, nullptr) == 0)
 			return true;
+
 		const int error = WSAGetLastError();
 		if (error == WSA_IO_PENDING)
 			return true;
+
 		--m_ioCount;
 		beginCloseLocked(error);
 		return false;
@@ -102,6 +97,7 @@ namespace ClientNetworkLib
 		++m_ioCount;
 		if (WSARecv(m_socket, buffers, secondBytes == 0 ? 1 : 2, nullptr, &flags, &m_recvOverlapped, nullptr) == 0)
 			return true;
+
 		const int error = WSAGetLastError();
 		if (error == WSA_IO_PENDING)
 			return true;
@@ -115,6 +111,7 @@ namespace ClientNetworkLib
 		--m_ioCount;
 		if (m_state == EState::Closing)
 			return;
+			
 		if (pOverlapped == &m_connectOverlapped && GetTickCount64() >= m_connectDeadline)
 			beginCloseLocked(WSAETIMEDOUT);
 		else if (error != 0)
@@ -142,10 +139,12 @@ namespace ClientNetworkLib
 			beginCloseLocked(WSAGetLastError());
 			return;
 		}
+
 		BOOL isNoDelay = TRUE;
 		setsockopt(m_socket, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char *>(&isNoDelay), sizeof(isNoDelay));
 		if (!postRecvLocked())
 			return;
+
 		m_state = EState::Connected;
 		m_wasConnected = true;
 		m_spMailbox->publishConnected();
@@ -171,6 +170,7 @@ namespace ClientNetworkLib
 
 		if (bytes > static_cast<DWORD>(m_recvBuffer.GetFreeSize()))
 			return ERROR_INVALID_DATA;
+
 		m_recvBuffer.MoveRear(static_cast<int>(bytes));
 		while (m_recvBuffer.GetUseSize() >= kHeaderBytes)
 		{
@@ -178,6 +178,7 @@ namespace ClientNetworkLib
 			m_recvBuffer.Peek(reinterpret_cast<char *>(&header), kHeaderBytes);
 			if (header.code != m_packetCode || header.len > kMaxPacketBytes - kHeaderBytes)
 				return ERROR_INVALID_DATA;
+
 			const int packetBytes = kHeaderBytes + header.len;
 			if (m_recvBuffer.GetUseSize() < packetBytes)
 				break;
@@ -185,12 +186,14 @@ namespace ClientNetworkLib
 			auto spMessage = CSerializableBuffer<FALSE>::MakeShared();
 			if (spMessage == nullptr)
 				return ERROR_NOT_ENOUGH_MEMORY;
+
 			m_recvBuffer.Dequeue(spMessage->GetBufferPtr(), packetBytes);
 			spMessage->MoveWritePos(header.len);
 			CEncryption::Decoding(spMessage->GetBufferPtr() + 4, header.len + 1, header.randKey);
 			BYTE checksum = CEncryption::CalCheckSum(spMessage->GetContentBufferPtr(), header.len);
 			if (checksum != static_cast<BYTE>(spMessage->GetBufferPtr()[4]))
 				return ERROR_INVALID_DATA;
+
 			if (!m_spMailbox->pushPacket(std::move(spMessage)))
 				return ERROR_NOT_ENOUGH_MEMORY;
 		}
@@ -201,6 +204,7 @@ namespace ClientNetworkLib
 	{
 		if (m_state == EState::Closing)
 			return;
+
 		m_state = EState::Closing;
 		m_closeError = error;
 
@@ -213,6 +217,7 @@ namespace ClientNetworkLib
 	{
 		if (m_state != EState::Closing || m_ioCount != 0 || m_isFinalized)
 			return false;
+
 		m_isFinalized = true;
 		releaseSendBatchLocked();
 		m_sendQueue.clear();

@@ -1,7 +1,4 @@
-#include "pch.h"
-#include "ClientEvent.h"
-#include "CNetClientManager.h"
-#include "CNetClient.h"
+#include "ClientNetworkLibPch.h"
 
 namespace NetworkLib
 {
@@ -14,6 +11,7 @@ namespace NetworkLib
 	{
 		if (IsActive())
 			return false;
+
 		m_sessionId = m_network.Connect(pIp, port, packetCode, timeoutMilliseconds);
 		return IsActive();
 	}
@@ -30,6 +28,8 @@ namespace NetworkLib
 	{
 		if (!IsActive())
 			return;
+
+		// 매 Tick() 호출마다 kMaxEventsPerTick의 개수만큼 메일박스 이벤트를 꺼내서 처리한다.
 		constexpr int kMaxEventsPerTick = 64;
 		SClientEvent event;
 		for (int count = 0; count < kMaxEventsPerTick && m_network.TryPopEvent(m_sessionId, event); ++count)
@@ -37,23 +37,32 @@ namespace NetworkLib
 			switch (event.m_kind)
 			{
 			case EClientEvent::Connected:
+			{
 				m_isConnected = true;
 				if (!onConnect())
 					Disconnect();
+
 				break;
+			}
 			case EClientEvent::Packet:
+			{
 				if (m_isConnected && !onRecv(*event.m_spPacket))
 				{
 					onRecvRejected();
 					Disconnect();
 				}
+
 				break;
+			}
 			case EClientEvent::ConnectFailed:
 			case EClientEvent::Disconnected:
+			{
 				m_sessionId = 0;
 				m_isConnected = false;
 				onDisconnect(event.m_kind == EClientEvent::Disconnected, event.m_error);
-				return;
+
+				break;
+			}
 			}
 		}
 	}

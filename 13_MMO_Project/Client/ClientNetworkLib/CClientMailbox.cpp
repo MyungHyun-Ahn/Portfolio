@@ -1,6 +1,4 @@
-#include "pch.h"
-#include "ClientEvent.h"
-#include "CClientMailbox.h"
+#include "ClientNetworkLibPch.h"
 
 namespace NetworkLib
 {

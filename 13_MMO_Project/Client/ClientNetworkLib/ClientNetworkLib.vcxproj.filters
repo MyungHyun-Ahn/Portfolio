@@ -17,6 +17,6 @@
     <ClInclude Include="CNetClient.h" />
     <ClInclude Include="CNetClientManager.h" />
     <ClInclude Include="CNetSession.h" />
-    <ClInclude Include="pch.h" />
+    <ClInclude Include="ClientNetworkLibPch.h" />
   </ItemGroup>
 </Project>

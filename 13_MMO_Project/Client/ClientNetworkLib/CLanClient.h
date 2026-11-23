@@ -31,13 +31,12 @@ namespace NetworkLib
 
 		void Clear() noexcept;
 
+		bool PostRecv() noexcept;
 		void RecvCompleted(int size) noexcept;
 
+		bool PostSend(bool isPqcs = FALSE) noexcept;
 		bool SendPacket(std::shared_ptr<CSerializableBuffer<TRUE>> spMessage) noexcept;
 		void SendCompleted(int size) noexcept;
-
-		bool PostRecv() noexcept;
-		bool PostSend(bool isPqcs = FALSE) noexcept;
 
 	private:
 		// 패딩 계산해서 세션 크기 최적화
@@ -121,6 +120,9 @@ namespace NetworkLib
 			return index64 | id;
 		}
 
+		std::shared_ptr<CLanSession> acquireSession(UINT64 sessionId) noexcept;
+		void retireSession(CLanSession &session, bool isNotify) noexcept;
+
 	private:
 		INT m_clientMgrIndex;
 
@@ -131,10 +133,6 @@ namespace NetworkLib
 		std::mutex m_sessionTableLock;
 		std::vector<USHORT> m_freeIndices;
 		std::vector<std::shared_ptr<CLanSession>> m_sessions;
-
-		std::shared_ptr<CLanSession> acquireSession(UINT64 sessionId) noexcept;
-		void retireSession(CLanSession &session, bool isNotify) noexcept;
-
 	};
 
 	class CLanClientManager
@@ -157,7 +155,8 @@ namespace NetworkLib
 			m_arrNetClients.push_back(pClient);
 		}
 
-		[[nodiscard]] bool RegisterIoCompletionPort(SOCKET sock, ULONG_PTR sessionId) noexcept;
+		[[nodiscard]]
+		bool RegisterIoCompletionPort(SOCKET sock, ULONG_PTR sessionId) noexcept;
 
 		inline BOOL ConnectEx(SOCKET sock, sockaddr *pName, int nameLen, LPOVERLAPPED pOverlapped)
 		{
@@ -184,5 +183,4 @@ namespace NetworkLib
 	};
 
 	extern CLanClientManager *g_pLanClientManager;
-;
 }
