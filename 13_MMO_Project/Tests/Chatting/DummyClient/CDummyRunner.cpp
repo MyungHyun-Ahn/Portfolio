@@ -414,7 +414,22 @@ namespace Chatting
 		file << "},\n  \"actions\": {\"move_submitted\": " << m_stats.m_moveSubmitted << ", \"move_completed\": " << m_stats.m_moveCompleted
 			<< ", \"message_submitted\": " << m_stats.m_messageSubmitted << ", \"message_completed\": " << m_stats.m_messageCompleted
 			<< ", \"peer_received\": " << m_stats.m_peerReceived << ", \"heartbeat_submitted\": " << m_stats.m_heartbeatSubmitted
-			<< "},\n  \"reconnects\": {\"requested\": " << m_stats.m_reconnectRequested << ", \"started\": " << m_stats.m_reconnectStarted
+			<< "},\n  \"message_rtt_ms\": {\"count\": " << m_stats.m_messageCompleted;
+		if (m_stats.m_messageCompleted == 0)
+		{
+			file << ", \"min\": null, \"mean\": null, \"p50\": null, \"p95\": null, \"p99\": null, \"max\": null";
+		}
+		else
+		{
+			constexpr double kMicrosecondsPerMillisecond = 1000.0;
+			file << ", \"min\": " << m_stats.m_messageRttMinMicroseconds / kMicrosecondsPerMillisecond
+				<< ", \"mean\": " << m_stats.m_messageRttSumMicroseconds / kMicrosecondsPerMillisecond / m_stats.m_messageCompleted
+				<< ", \"p50\": " << m_stats.GetMessageRttPercentileMicroseconds(50) / kMicrosecondsPerMillisecond
+				<< ", \"p95\": " << m_stats.GetMessageRttPercentileMicroseconds(95) / kMicrosecondsPerMillisecond
+				<< ", \"p99\": " << m_stats.GetMessageRttPercentileMicroseconds(99) / kMicrosecondsPerMillisecond
+				<< ", \"max\": " << m_stats.m_messageRttMaxMicroseconds / kMicrosecondsPerMillisecond;
+		}
+		file << "},\n  \"reconnects\": {\"requested\": " << m_stats.m_reconnectRequested << ", \"started\": " << m_stats.m_reconnectStarted
 			<< ", \"ready\": " << m_stats.m_reconnectReady << "},\n  \"failure_count\": " << m_stats.m_failureCount
 			<< ",\n  \"failures\": [";
 		for (size_t index = 0; index < m_stats.m_failureCount && index < m_stats.m_failures.size(); ++index)

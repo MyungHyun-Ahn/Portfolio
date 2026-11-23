@@ -176,6 +176,10 @@ def loopback(base, configuration, long_heartbeat):
         assert all(worker["clients"] == worker["first_ready"] == worker["terminals"] == 1
                    and worker["actions_completed"] > 0 for worker in workers), result
         assert actions["message_submitted"] == actions["message_completed"] > 2 and actions["peer_received"] > 0, result
+        rtt = result["message_rtt_ms"]
+        assert rtt["count"] == actions["message_completed"], result
+        assert 0 <= rtt["min"] <= rtt["mean"] <= rtt["max"] > 0, result
+        assert rtt["min"] <= rtt["p50"] <= rtt["p95"] <= rtt["p99"] <= rtt["max"], result
         assert actions["move_submitted"] == actions["move_completed"] == result["reconnects"]["requested"] == 0, result
         assert result["failure_count"] == 0, result
         print(f"{configuration}/message-only: {actions['message_completed']} self echoes, {actions['peer_received']} peer receives")
@@ -188,6 +192,7 @@ def loopback(base, configuration, long_heartbeat):
         assert stages["ready"] == 4 + reconnects["ready"] and stages["connect_requested"] == stages["terminal"], result
         assert reconnects["ready"] <= reconnects["started"] <= reconnects["requested"] <= actions["move_completed"], result
         assert actions["move_submitted"] == actions["move_completed"] and actions["message_submitted"] == 0, result
+        assert result["message_rtt_ms"] == dict(count=0, min=None, mean=None, p50=None, p95=None, p99=None, max=None), result
         assert result["failure_count"] == 0, result
         print(f"{configuration}/move-reconnect: {actions['move_completed']} moves, {reconnects['ready']} reconnects Ready")
 

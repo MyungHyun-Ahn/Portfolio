@@ -61,6 +61,7 @@ namespace Chatting
 		EChatPhase 			m_phase;
 		EChatPhase 			m_phaseBeforeClose;
 		TClock::time_point 	m_deadline{};
+		TClock::time_point 	m_messageStartedAt{};
 		EAction 			m_action = EAction::None;
 		bool 				m_hasActionCompletion = false;
 		bool 				m_hasReportedRecvRejection = false;

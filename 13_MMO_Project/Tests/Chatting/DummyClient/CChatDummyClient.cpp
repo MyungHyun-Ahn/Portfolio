@@ -101,11 +101,13 @@ namespace Chatting
 			recordFailure("message_allocation_failed");
 			return;
 		}
+		const auto startedAt = TClock::now();
 		if (!SendReqMessage(m_dummyAccount, m_expectedMessage))
 		{
 			recordFailure("message_submit_failed");
 			return;
 		}
+		m_messageStartedAt = startedAt;
 		m_action = EAction::Message;
 		m_deadline = TClock::now() + std::chrono::milliseconds(m_config.m_deliveryTimeoutMilliseconds);
 		++m_stats.m_messageSubmitted;
@@ -183,7 +185,8 @@ namespace Chatting
 			recordFailure("message_echo_mismatch");
 			return;
 		}
-		++m_stats.m_messageCompleted;
+		const auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(TClock::now() - m_messageStartedAt);
+		m_stats.RecordMessageRtt(static_cast<UINT64>(elapsed.count()));
 		completeAction();
 	}
 
