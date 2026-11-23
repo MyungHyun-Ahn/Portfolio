@@ -5,7 +5,7 @@
     <ClCompile Include="CBaseContents.cpp" />
     <ClCompile Include="CMonitor.cpp" />
     <ClCompile Include="CNetServer.cpp" />
-    <ClCompile Include="pch.cpp" />
+    <ClCompile Include="ServerNetworkLibPch.cpp" />
     <ClCompile Include="ServerSetting.cpp" />
     <ClCompile Include="SystemEvent.cpp" />
   </ItemGroup>
@@ -14,8 +14,7 @@
     <ClInclude Include="CContentsThread.h" />
     <ClInclude Include="CMonitor.h" />
     <ClInclude Include="CNetServer.h" />
-    <ClInclude Include="NetPch.h" />
-    <ClInclude Include="pch.h" />
+    <ClInclude Include="ServerNetworkLibPch.h" />
     <ClInclude Include="SBaseEvent.h" />
     <ClInclude Include="ServerSetting.h" />
     <ClInclude Include="SystemEvent.h" />

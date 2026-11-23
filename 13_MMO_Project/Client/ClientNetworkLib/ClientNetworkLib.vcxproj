@@ -178,7 +178,7 @@
     <ClCompile Include="CNetClient.cpp" />
     <ClCompile Include="CNetClientManager.cpp" />
     <ClCompile Include="CNetSession.cpp" />
-    <ClCompile Include="pch.cpp">
+    <ClCompile Include="ClientNetworkLibPch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
     <ClInclude Include="ClientSetting.h" />

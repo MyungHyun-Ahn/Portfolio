@@ -1,5 +1,4 @@
-#include "pch.h"
-#include "ServerSetting.h"
+#include "ServerNetworkLibPch.h"
 
 namespace NetworkLib
 {

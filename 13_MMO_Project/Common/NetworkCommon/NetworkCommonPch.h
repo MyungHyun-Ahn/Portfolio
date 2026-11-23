@@ -13,6 +13,13 @@
 #include <cstdint>
 #include <cstring>
 
+#include "NetHeaders.h"
+#include "NetworkLimits.h"
+#include "CRingBuffer.h"
+#include "CSerializableBuffer.h"
+#include "CRecvBuffer.h"
+#include "CSerializableBufferView.h"
+
 #pragma comment(lib, "ws2_32")
 #pragma comment(lib, "winmm")
 #pragma comment(lib, "dbghelp")
