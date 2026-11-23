@@ -30,6 +30,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="CFixedStepScheduler.h" />
+    <ClInclude Include="Camera\CCameraManager.h" />
+    <ClInclude Include="Transform\CoordinateTransform2D.h" />
     <ClCompile Include="CFixedStepScheduler.cpp" />
     <ClInclude Include="Input\CInputManager.h" />
     <ClInclude Include="Input\Win32InputAdapter.h" />

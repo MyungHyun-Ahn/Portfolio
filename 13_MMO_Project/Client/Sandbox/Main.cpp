@@ -10,6 +10,8 @@
 #include "CFixedStepScheduler.h"
 #include "Input/CInputManager.h"
 #include "Input/Win32InputAdapter.h"
+#include "Camera/CCameraManager.h"
+#include "Transform/CoordinateTransform2D.h"
 
 namespace
 {
@@ -17,13 +19,18 @@ namespace
 	constexpr wchar_t kWindowTitle[] = L"Sandbox";
 	using ClientFrameworkLib::Input::CInputManager;
 	using ClientFrameworkLib::CFixedStepScheduler;
+	using ClientFrameworkLib::Camera::CCameraManager;
+	using ClientFrameworkLib::Transform::SCoord2D;
+	using ClientFrameworkLib::Transform::WorldToClient;
+	using ClientFrameworkLib::Transform::ClientToWorld;
 
 	enum class EGameAction : CInputManager::ActionId
 	{
 		MoveTo = 1,
 	};
 
-	constexpr float kMovePixelsPerTick = 300.0f / CFixedStepScheduler::kTicksPerSecond;
+	constexpr float kMoveWorldUnitsPerTick = 300.0f / CFixedStepScheduler::kTicksPerSecond;
+	constexpr SCoord2D kWorldLandmark{460.0f, 240.0f};
 
 	struct SWindowSizeState
 	{
@@ -41,37 +48,39 @@ namespace
 
 	struct SRectangleMovement
 	{
-		float m_centerXPixels = 160.0f;
-		float m_centerYPixels = 140.0f;
-		std::optional<CInputManager::SPosition> m_destination;
+		SCoord2D m_centerWorld{160.0f, 140.0f};
+		std::optional<SCoord2D> m_destinationWorld;
 	};
 
-	void FixedUpdate(const CInputManager& input, SRectangleMovement& rectangle, ULONGLONG& updatesInSample) noexcept
+	void FixedUpdate(const CInputManager& input, SRectangleMovement& rectangle, SCoord2D viewCenterWorld,
+		SCoord2D clientCenter, ULONGLONG& updatesInSample) noexcept
 	{
 		++updatesInSample;
 		const auto moveTo = input.GetActionState(static_cast<CInputManager::ActionId>(EGameAction::MoveTo));
 		if (moveTo.m_wasPressed && moveTo.m_pressPosition)
-			rectangle.m_destination = moveTo.m_pressPosition;
-		if (!rectangle.m_destination)
+		{
+			const auto& press = *moveTo.m_pressPosition;
+			const SCoord2D click{static_cast<float>(press.m_xPixels), static_cast<float>(press.m_yPixels)};
+			rectangle.m_destinationWorld = ClientToWorld(click, viewCenterWorld, clientCenter);
+		}
+		if (!rectangle.m_destinationWorld)
 			return;
 
-		const float targetXPixels = static_cast<float>(rectangle.m_destination->m_xPixels);
-		const float targetYPixels = static_cast<float>(rectangle.m_destination->m_yPixels);
-		const float deltaXPixels = targetXPixels - rectangle.m_centerXPixels;
-		const float deltaYPixels = targetYPixels - rectangle.m_centerYPixels;
-		const float distancePixels = std::hypot(deltaXPixels, deltaYPixels);
+		const SCoord2D target = *rectangle.m_destinationWorld;
+		const float deltaX = target.m_x - rectangle.m_centerWorld.m_x;
+		const float deltaY = target.m_y - rectangle.m_centerWorld.m_y;
+		const float distanceWorld = std::hypot(deltaX, deltaY);
 		// 한 틱 이동 거리 안에 목적지가 있으면 지나치지 말고 그 자리에서 멈춘다.
-		if (distancePixels <= kMovePixelsPerTick)
+		if (distanceWorld <= kMoveWorldUnitsPerTick)
 		{
-			rectangle.m_centerXPixels = targetXPixels;
-			rectangle.m_centerYPixels = targetYPixels;
-			rectangle.m_destination.reset();
+			rectangle.m_centerWorld = target;
+			rectangle.m_destinationWorld.reset();
 			return;
 		}
 
-		const float stepRatio = kMovePixelsPerTick / distancePixels;
-		rectangle.m_centerXPixels += deltaXPixels * stepRatio;
-		rectangle.m_centerYPixels += deltaYPixels * stepRatio;
+		const float stepRatio = kMoveWorldUnitsPerTick / distanceWorld;
+		rectangle.m_centerWorld.m_x += deltaX * stepRatio;
+		rectangle.m_centerWorld.m_y += deltaY * stepRatio;
 	}
 
 	// Windows에 등록한 콜백
@@ -157,7 +166,16 @@ int main(void)
 	using Clock = std::chrono::steady_clock;
 	CFixedStepScheduler fixedStepScheduler;
 	SRectangleMovement rectangle;
+	CCameraManager cameraManager;
+	cameraManager.FollowTarget(rectangle.m_centerWorld.m_x, rectangle.m_centerWorld.m_y);
 	auto& windowSize = windowState.m_size;
+	RECT initialClient{};
+	if (!GetClientRect(window, &initialClient))
+	{
+		DestroyWindow(window);
+		return 1;
+	}
+	SCoord2D clientCenter{static_cast<float>(initialClient.right) * 0.5f, static_cast<float>(initialClient.bottom) * 0.5f};
 	auto previousFrameTime = Clock::now();
 	auto sampleStartTime = previousFrameTime;
 	ULONGLONG framesInSample = 0;
@@ -179,13 +197,18 @@ int main(void)
 		}
 
 		const auto now = Clock::now();
+		if (windowSize.m_hasPendingResize && !windowSize.m_isMinimized && windowSize.m_widthPixels > 0 && windowSize.m_heightPixels > 0)
+			clientCenter = {static_cast<float>(windowSize.m_widthPixels) * 0.5f, static_cast<float>(windowSize.m_heightPixels) * 0.5f};
+
 		const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(now - previousFrameTime);
 		previousFrameTime = now;
 		const int updates = fixedStepScheduler.Advance(elapsed);
 		for (int tick = 0; tick < updates; ++tick)
 		{
 			windowState.m_input.BeginTick();
-			FixedUpdate(windowState.m_input, rectangle, updatesInSample);
+			const SCoord2D viewCenterWorld{cameraManager.GetCenterWorldX(), cameraManager.GetCenterWorldY()};
+			FixedUpdate(windowState.m_input, rectangle, viewCenterWorld, clientCenter, updatesInSample);
+			cameraManager.FollowTarget(rectangle.m_centerWorld.m_x, rectangle.m_centerWorld.m_y);
 		}
 
 		// 최소화 중에는 백 버퍼를 건드리지 않고 그리기만 쉰다. 고정 업데이트는 위에서 계속 실행된다.
@@ -205,14 +228,16 @@ int main(void)
 			}
 
 			renderer.BeginFrame(0.1f, 0.2f, 0.4f);
-			if (rectangle.m_destination)
+			const SCoord2D viewCenterWorld{cameraManager.GetCenterWorldX(), cameraManager.GetCenterWorldY()};
+			const auto landmark = WorldToClient(kWorldLandmark, viewCenterWorld, clientCenter);
+			renderer.FillRectangle(landmark.m_x - 5.0f, landmark.m_y - 5.0f, landmark.m_x + 5.0f, landmark.m_y + 5.0f);
+			if (rectangle.m_destinationWorld)
 			{
-				const float xPixels = static_cast<float>(rectangle.m_destination->m_xPixels);
-				const float yPixels = static_cast<float>(rectangle.m_destination->m_yPixels);
-				renderer.FillRectangle(xPixels - 4.0f, yPixels - 4.0f, xPixels + 4.0f, yPixels + 4.0f);
+				const auto target = WorldToClient(*rectangle.m_destinationWorld, viewCenterWorld, clientCenter);
+				renderer.FillRectangle(target.m_x - 4.0f, target.m_y - 4.0f, target.m_x + 4.0f, target.m_y + 4.0f);
 			}
-			renderer.FillRectangle(rectangle.m_centerXPixels - 80.0f, rectangle.m_centerYPixels - 60.0f,
-				rectangle.m_centerXPixels + 80.0f, rectangle.m_centerYPixels + 60.0f);
+			const auto center = WorldToClient(rectangle.m_centerWorld, viewCenterWorld, clientCenter);
+			renderer.FillRectangle(center.m_x - 80.0f, center.m_y - 60.0f, center.m_x + 80.0f, center.m_y + 60.0f);
 			if (FAILED(renderer.EndFrame()))
 			{
 				DestroyWindow(window);

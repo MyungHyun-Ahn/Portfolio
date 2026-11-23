@@ -46,15 +46,18 @@ def find_visible_window(process_id):
 
 
 class SandboxWindowTest(unittest.TestCase):
-    def assert_rectangle_and_background(self, window, process, samples=None):
+    def assert_rectangle_and_background(self, window, process, samples=None, moving_landmark=()):
         client = wintypes.RECT()
         self.assertTrue(USER32.GetClientRect(window, ctypes.byref(client)))
         samples = samples or (
             # 오른쪽 내부를 찍어 기존 프레임을 축소해 표시하는 경우를 구분한다.
-            (wintypes.POINT(220, 160), (255, 255, 255)),
-            (wintypes.POINT(client.right // 2, client.bottom // 2), (25, 51, 102)),
+            (wintypes.POINT(client.right // 2 + 73, client.bottom // 2), (255, 255, 255)),
+            (wintypes.POINT(client.right // 2 + 83, client.bottom // 2), (25, 51, 102)),
+            (wintypes.POINT(client.right // 2, client.bottom // 2), (255, 255, 255)),
         )
         for point, _ in samples:
+            self.assertTrue(USER32.ClientToScreen(window, ctypes.byref(point)))
+        for point in moving_landmark:
             self.assertTrue(USER32.ClientToScreen(window, ctypes.byref(point)))
 
         colors = []
@@ -70,7 +73,9 @@ class SandboxWindowTest(unittest.TestCase):
                         for shift, target in zip((0, 8, 16), expected)
                     )
                     for color, (_, expected) in zip(colors, samples)
-                ):
+                ) and (not moving_landmark or any(
+                    GDI32.GetPixel(desktop, point.x, point.y) == 0xFFFFFF for point in moving_landmark
+                )):
                     return
                 time.sleep(0.02)
             self.fail(f"Sandbox did not present expected colors: COLORREFs={colors!r}, exit={process.poll()}")
@@ -122,7 +127,7 @@ class SandboxWindowTest(unittest.TestCase):
                     process.kill()
                     process.wait(timeout=5)
 
-    def test_rectangle_moves_and_stops_at_latest_click(self):
+    def test_camera_follows_and_clicks_resolve_in_world(self):
         with subprocess.Popen([str(EXECUTABLE)]) as process:
             try:
                 deadline = time.monotonic() + 5
@@ -135,6 +140,9 @@ class SandboxWindowTest(unittest.TestCase):
                 self.assertIsNotNone(window)
                 self.assertTrue(USER32.SetWindowPos(window, -1, 40, 40, 800, 600, 0x0010))
                 self.assert_rectangle_and_background(window, process)
+                client = wintypes.RECT()
+                self.assertTrue(USER32.GetClientRect(window, ctypes.byref(client)))
+                cx, cy = client.right // 2, client.bottom // 2
 
                 def click(x, y):
                     position = x | (y << 16)
@@ -142,19 +150,23 @@ class SandboxWindowTest(unittest.TestCase):
                     self.assertTrue(USER32.PostMessageW(window, 0x0202, 0, position))
 
                 white, blue = (255, 255, 255), (25, 51, 102)
-                click(610, 140)
-                # 첫 목적지에 도착하기 전에 지나가는 위치를 관찰한다.
-                self.assert_rectangle_and_background(window, process, (
-                    (wintypes.POINT(310, 140), white), (wintypes.POINT(610, 140), white), (wintypes.POINT(610, 160), blue),
-                ))
-                click(460, 350)
-                expected = ((381, 350, white), (538, 350, white), (460, 291, white), (460, 408, white),
-                            (378, 350, blue), (542, 350, blue), (460, 288, blue), (460, 412, blue), (610, 140, blue))
-                for _ in range(2):
+                def check(*expected, moving_landmark=()):
                     self.assert_rectangle_and_background(window, process, tuple(
-                        (wintypes.POINT(x, y), color) for x, y, color in expected
-                    ))
-                    time.sleep(0.2)
+                        (wintypes.POINT(cx + x, cy + y), color) for x, y, color in expected
+                    ), moving_landmark=tuple(wintypes.POINT(cx + x, cy + 100) for x in moving_landmark))
+
+                # 월드 기준점 (460, 240)은 초기 카메라 위치 (160, 140)에서 (+300, +100)에 보인다.
+                check((300, 100, white), (0, 100, blue))
+                click(cx + 300, cy)
+                # 사각형은 가운데에 있고 기준점은 이동 거리만큼 왼쪽으로 움직인다.
+                check((0, 0, white), (300, 100, blue), moving_landmark=range(100, 201, 5))
+                check((0, 0, white), (0, 100, white), (10, 100, blue))
+                time.sleep(0.15)
+                # 이동한 카메라 기준으로 두 번째 클릭을 해 월드 목적지 (300, 260)에 도착한다.
+                click(cx - 160, cy + 120)
+                check((0, 0, white), (160, -20, white), (170, -20, blue), (0, 100, blue))
+                time.sleep(0.2)
+                check((0, 0, white), (160, -20, white), (170, -20, blue))
 
                 self.assertTrue(USER32.PostMessageW(window, 0x0112, 0xF060, 0))
                 self.assertEqual(process.wait(timeout=5), 0)

@@ -4,6 +4,10 @@
     <ClInclude Include="CFixedStepScheduler.h" />
     <ClCompile Include="CFixedStepScheduler.cpp" />
     <Filter Include="Input" />
+    <Filter Include="Camera" />
+    <Filter Include="Transform" />
+    <ClInclude Include="Camera\CCameraManager.h"><Filter>Camera</Filter></ClInclude>
+    <ClInclude Include="Transform\CoordinateTransform2D.h"><Filter>Transform</Filter></ClInclude>
     <ClInclude Include="Input\CInputManager.h"><Filter>Input</Filter></ClInclude>
     <ClInclude Include="Input\Win32InputAdapter.h"><Filter>Input</Filter></ClInclude>
     <ClCompile Include="Input\CInputManager.cpp"><Filter>Input</Filter></ClCompile>

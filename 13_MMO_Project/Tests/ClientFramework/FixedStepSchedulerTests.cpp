@@ -4,9 +4,35 @@
 #include <unordered_map>
 #include "CFixedStepScheduler.h"
 #include "Input/CInputManager.h"
+#include "Transform/CoordinateTransform2D.h"
+#include "Camera/CCameraManager.h"
 
 namespace
 {
+	using ClientFrameworkLib::Transform::ClientToWorld;
+	using ClientFrameworkLib::Transform::WorldToClient;
+	using ClientFrameworkLib::Camera::CCameraManager;
+
+	constexpr bool CameraFollowsTarget()
+	{
+		CCameraManager camera;
+		camera.FollowTarget(160.0f, 140.0f);
+		if (camera.GetCenterWorldX() != 160.0f || camera.GetCenterWorldY() != 140.0f)
+			return false;
+
+		camera.FollowTarget(-25.5f, 200.0f);
+		return camera.GetCenterWorldX() == -25.5f && camera.GetCenterWorldY() == 200.0f;
+	}
+
+	static_assert(CameraFollowsTarget());
+
+	constexpr auto kClientPoint = WorldToClient({-30.0f, 90.0f}, {100.0f, 40.0f}, {400.0f, 300.0f});
+	static_assert(kClientPoint.m_x == 270.0f && kClientPoint.m_y == 350.0f);
+	constexpr auto kWorldPoint = ClientToWorld(kClientPoint, {100.0f, 40.0f}, {400.0f, 300.0f});
+	static_assert(kWorldPoint.m_x == -30.0f && kWorldPoint.m_y == 90.0f);
+	constexpr auto kResizedCenter = WorldToClient({100.0f, 40.0f}, {100.0f, 40.0f}, {250.5f, 150.5f});
+	static_assert(kResizedCenter.m_x == 250.5f && kResizedCenter.m_y == 150.5f);
+
 	int TestInputManager()
 	{
 		using ClientFrameworkLib::Input::CInputManager;
