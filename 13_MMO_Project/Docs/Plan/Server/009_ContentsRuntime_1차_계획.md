@@ -1,6 +1,6 @@
 # ContentsRuntime 1차 계획: 실행단위 확정
 
-상태: **1차 설계안, Phase 1~6 구현 미착수.** [분산 서버 구성 계획](008_MMO_분산_서버_구성_계획.md)의 첫 단계로, 실행단위 설계와 후속 구현 순서를 함께 정리한다. 실제 DB/RPC 연동은 이 계획의 완료 기준이 아니다.
+상태: **Phase 1 구현·자동 검증·사용자 코드 확인 완료. Phase 2~6 미착수.** 다음 작업은 [Phase 2 — 고정 배정 맵과 실제 수신 연결](#phase-2--고정-배정-맵과-실제-수신-연결)이다. 이 계획은 [분산 서버 구성 계획](008_MMO_분산_서버_구성_계획.md)의 첫 단계이며, 실제 DB/RPC 연동은 완료 기준이 아니다.
 
 ## 실행단위
 
@@ -12,7 +12,7 @@
 
 ## IContents 정의 초안
 
-`IContents`는 가상 함수만 선언하는 인터페이스가 아니라, **인스턴스 ID와 자기 완료 큐를 가진 공통 베이스 클래스**다. 아래는 `ContentsRuntimeLib`에 둘 선언 초안이며, 큐 구현과 워커 루프는 후속 작업이다.
+`IContents`는 가상 함수만 선언하는 인터페이스가 아니라, **인스턴스 ID와 자기 완료 큐를 가진 공통 베이스 클래스**다. 아래는 [Phase 1 구현](../../../Server/ContentsRuntimeLib/IContents.h)의 핵심 선언을 요약한 것이다.
 
 ```cpp
 namespace ContentsRuntimeLib
@@ -33,22 +33,22 @@ namespace ContentsRuntimeLib
 		explicit IContents(ContentsInstanceId instanceId) noexcept;
 
 		// 프레임을 등록한 인스턴스에서만 호출한다.
-		virtual void OnFrame() {}
+		virtual void OnFrame();
 
 	private:
 		friend class CContentsRuntime;
 
 	private:
 		const ContentsInstanceId m_instanceId;
-		std::mutex m_completionQueueLock;
 		std::deque<std::function<void()>> m_completionQueue;
 	};
 }
 ```
 
 - **완료 등록:** DB·RPC는 `IContents*`를 보관하거나 큐를 직접 건드리지 않는다. `CContentsRuntime`에 대상 인스턴스 ID와 람다를 넘기면, 런타임이 등록 상태를 확인해 대상 큐에 넣는다. 늦게 도착한 완료가 다른 인스턴스에 들어가지 않도록 인스턴스 ID는 런타임 수명 동안 재사용하지 않는다.
-- **완료 실행:** 대상 인스턴스를 맡은 워커가 큐에서 콜백을 꺼낸 뒤, 큐 락을 놓고 실행한다. 같은 인스턴스에서는 패킷 처리와 `OnFrame()`이 완료 콜백과 겹치지 않는다. 큐 락은 외부 스레드와의 전달만 보호하며, 맵 상태를 보호하는 락이 아니다.
+- **완료 실행:** Phase 1의 고정 배정에서는 담당 워커의 작업 락이 완료 큐 게시·꺼내기와 대기 조건을 함께 보호한다. 워커는 락을 놓고 콜백을 실행한다. 같은 인스턴스에서는 `OnFrame()`과 완료 콜백이 겹치지 않으며, 이 락으로 맵 상태를 보호하지 않는다. 재배치 중 완료 게시와 깨우기는 Phase 4에서 다룬다.
 - **맵 구현:** `CMapInstance`는 `IMap`을 통해 `IContents`를 상속하고, 캐릭터와 맵 상태를 소유한다. 런타임 등록 시 프레임 사용 여부만 지정한다. 프레임을 쓰는 인스턴스는 런타임의 공통 `FrameInterval`을 사용하며, `OnFrame()`을 재정의했다는 이유만으로 주기 실행하지 않는다.
+- **밀린 프레임:** 실행 중에는 틱을 버리지 않는다. `OnFrame()` 한 번에 이전 예정 시각을 `FrameInterval`만큼 전진시키며, 아직 밀려 있어도 같은 인스턴스는 워커 순회당 한 번만 실행한다. 완료 콜백은 프레임과 별도로 순회당 최대 한 건을 처리한다. 여유가 생기면 남은 틱을 따라잡지만, 지속 과부하에서는 지연이 누적될 수 있다.
 
 ## IMap 정의 초안
 
@@ -116,7 +116,7 @@ ERecvPopResult TryPopRecvPacket(ConnectionId connectionId, CRecvPacket &outPacke
 
 ## ContentsRuntimeLib 분리안
 
-**권장 위치는 `Server/ContentsRuntimeLib`이며 현재 새 프로젝트는 만들지 않는다.** 지금 채팅 서버에 쓰이는 `CBaseContents`와 `CContentsThread`는 `Server/NetworkLib`에 있다. 이 둘을 그대로 옮기는 것부터 시작하지 않고, 먼저 아래 경계를 확정한다.
+**Phase 1 런타임은 `Server/ContentsRuntimeLib`에 분리했다.** 지금 채팅 서버에 쓰이는 `CBaseContents`와 `CContentsThread`는 `Server/NetworkLib`에 그대로 유지한다. 새 런타임은 아래 경계를 따른다.
 
 새 라이브러리에는 이전 `ContentsRuntime` 구현을 별도로 보존하지 않는다. 남아 있는 원본은 수정하지 않고, `FContentThread`의 워커 등록·시작·종료(`join`)와 작업 도착 또는 다음 프레임 시각에 워커를 깨우는 방식만 참고한다. 기존 라우팅과 Delegate·Work Stealing 정책은 첫 구현에 이식하지 않는다.
 
@@ -160,12 +160,16 @@ ERecvPopResult TryPopRecvPacket(ConnectionId connectionId, CRecvPacket &outPacke
 
 ## Phase별 구현 및 검증 순서
 
-**첫 구현 범위는 Phase 1만이다.** 각 Phase에서 확인 기준을 검증하고 사용자 검토를 마친 뒤 다음 Phase로 넘어간다. 먼저 고정 배정에서 콘텐츠와 캐릭터의 소유권을 검증하고, 그 위에 워커 재배치와 자동 정책을 순서대로 붙인다.
+각 Phase에서 확인 기준을 검증하고 사용자 검토를 마친 뒤 다음 Phase로 넘어간다. 먼저 고정 배정에서 콘텐츠와 캐릭터의 소유권을 검증하고, 그 위에 워커 재배치와 자동 정책을 순서대로 붙인다.
 
 ### Phase 1 — ContentsRuntimeLib와 고정 워커 배정
 
 - **작업:** `Server/ContentsRuntimeLib`에 `IContents`와 `CContentsRuntime`을 만든다. 워커 시작·깨우기·종료, 인스턴스 등록과 고정 배정, 공통 프레임 주기와 인스턴스별 완료 큐까지만 구현한다. 게임 서버와 네트워크 연결은 이 단계에서 바꾸지 않는다.
 - **완료 기준:** 워커 두 개에 배정한 테스트 콘텐츠에서 같은 인스턴스의 `OnFrame()`과 완료 콜백이 겹치지 않고, 서로 다른 인스턴스 상태가 섞이지 않는다. 프레임을 쓰지 않는 콘텐츠도 ID로 전달한 완료를 처리하며, 종료 시 워커가 모두 `join`된다.
+- **구현 경계:** 인스턴스 등록은 `Start()` 전까지만 받는다. 시작·등록·종료는 제어 스레드가 맡는다. 외부 스레드의 `PostCompletion()`은 실행 중에만 받으며, `Stop()`이 접수를 닫으면 이미 접수된 콜백을 비우고 워커를 `join`한다. 런타임 재시작은 지원하지 않는다.
+- **검증:** [Tests/WorldServer](../../../Tests/WorldServer/WorldServer.vcxproj)의 `RunTests`에서 x64 Debug·Release 통과. 네트워크 없이 두 워커의 고정 배정, 한 프레임이 대기하는 동안 다른 워커의 진행, 프레임 없는 인스턴스의 완료 처리, 완료 FIFO와 종료 중 접수 차단·큐 비우기를 확인했다. Release 실행 파일 30회 반복도 통과했다.
+- **프레임 따라잡기 검증:** 첫 프레임을 여러 주기 동안 보류한 뒤, 같은 워커의 다른 인스턴스 완료 사이에서 밀린 프레임이 한 번씩 실행되는지 확인했다. 기존 스킵 구현에서는 실패했고, 변경 후 x64 Debug·Release와 Release 20회 반복에서 통과했다.
+- **최종 확인:** 라이브러리 전용 `ContentsRuntimeLibPch`를 사용한다. 프레임 예정 시각은 `+= frameInterval`로 전진시키고, 완료 콜백은 담당 워커의 락 아래에서 큐로부터 `std::move`로 꺼낸 뒤 락을 풀고 실행한다. 변경 후 WorldServer `RunTests`가 x64 Debug·Release에서 통과했고, 사용자 코드 확인을 마쳤다.
 
 ### Phase 2 — 고정 배정 맵과 실제 수신 연결
 

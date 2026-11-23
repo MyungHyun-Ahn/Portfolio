@@ -2,9 +2,8 @@
 ## 현재 목표
 ### 서버 작업 순서
 
-`ContentsRuntime`의 [1차 구현 계획](Plan/Server/009_ContentsRuntime_1차_계획.md#phase별-구현-및-검증-순서). 현재 첫 구현 대상은 **Phase 1**이며, 각 Phase의 검증과 사용자 검토 뒤 다음으로 진행한다.
+`ContentsRuntime`의 [1차 구현 계획](Plan/Server/009_ContentsRuntime_1차_계획.md#phase별-구현-및-검증-순서). **Phase 1은 사용자 코드 확인까지 완료**했으며, 다음 작업은 **Phase 2 — 고정 배정 맵과 실제 수신 연결**이다. Phase 2는 아직 시작하지 않았다.
 
-- [ ] **Phase 1 — ContentsRuntimeLib와 고정 워커 배정:** 프레임과 완료 콜백의 인스턴스별 직렬 실행.
 - [ ] **Phase 2 — 고정 배정 맵과 실제 수신 연결:** 같은 종류의 맵 두 개에서 소속별 패킷 처리.
 - [ ] **Phase 3 — 캐릭터 맵 이동:** 완료 콜백 처리 후 예약·인계하고, 목적지에서 수신 재개.
 - [ ] **Phase 4 — 수동 Delegate:** 같은 맵의 실행권만 다른 워커에 인계.
@@ -16,6 +15,9 @@
 장시간 원격 부하 시험은 이번 순서의 선행 조건이 아니다.
 
 ## 완료된 작업
+### ContentsRuntime
+- [x] **Phase 1 — ContentsRuntimeLib와 고정 워커 배정:** 테스트용 WorldServer에서 프레임·완료 콜백의 직렬 실행, 밀린 프레임 처리와 워커 종료를 검증했고 사용자 코드 확인을 마쳤다. [구현 및 검증 범위](Plan/Server/009_ContentsRuntime_1차_계획.md#phase-1--contentsruntimelib와-고정-워커-배정)
+
 ### 2차 완료 항목
 - [x] **서버 패킷 경로 개선: 송신 RefCount 정리** — 공용 `SendPacketPtr`로 콘텐츠의 수동 송신 참조 관리를 제거했고 사용자 확인을 마쳤다. `Net` 수신 복호화·체크섬 통합도 완료했다. [개선 계획](Plan/Server/007_서버_패킷_경로_개선_계획.md)
 - [x] **서버 수신 View 개선** — `CRecvBuffer`·View 경로 전환 및 사용자 확인 완료. [개선 계획](Plan/Server/007_서버_패킷_경로_개선_계획.md)
