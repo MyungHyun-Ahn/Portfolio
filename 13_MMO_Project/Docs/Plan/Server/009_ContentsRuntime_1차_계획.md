@@ -1,6 +1,6 @@
 # ContentsRuntime 1차 계획: 실행단위 확정
 
-상태: **Phase 1 구현·자동 검증·사용자 코드 확인 완료. Phase 2~6 미착수.** 다음 작업은 [Phase 2 — 고정 배정 맵과 실제 수신 연결](#phase-2--고정-배정-맵과-실제-수신-연결)이다. 이 계획은 [분산 서버 구성 계획](008_MMO_분산_서버_구성_계획.md)의 첫 단계이며, 실제 DB/RPC 연동은 완료 기준이 아니다.
+상태: **Phase 1 사용자 코드 확인 완료. Phase 2 구현·루프백 검증 완료 및 사용자 코드 확인 대기. Phase 3~6 미착수.** 현재 작업은 [Phase 2 — 고정 배정 맵과 실제 수신 연결](#phase-2--고정-배정-맵과-실제-수신-연결)이다. 이 계획은 [분산 서버 구성 계획](008_MMO_분산_서버_구성_계획.md)의 첫 단계이며, 실제 DB/RPC 연동은 완료 기준이 아니다.
 
 ## 실행단위
 
@@ -102,16 +102,17 @@ namespace GameServer
 - 담당 워커가 소속 유저가 없음을 확인한 뒤, `MoveQueue` 락 안에서 큐가 비었고 **아직 게시되지 않은 예약과 이미 꺼내서 처리 중인 이동도 없음**을 확인한다. 이 조건 확인과 새 접수를 닫는 상태 전환은 같은 임계 구간에서 수행한다.
 - 종료 전환이 먼저면 새 이동 접수는 실패한다. 접수가 먼저면 그 예약과 이동의 처리가 끝날 때까지 맵을 없애지 않는다. 실제 객체 해제는 등록 해제 후 목적지 조회나 워커 실행 등 맵을 사용하는 곳이 모두 끝난 뒤에 한다. 이미 소멸한 큐의 락으로 접수 실패를 판별하지 않는다.
 
-### 수신 인터페이스 초안
+### 수신 인터페이스
 
 ```cpp
-// ServerNetworkLib의 공개 수신 API 초안
+// ServerNetworkLib::CServer의 수신 API
 [[nodiscard]]
-ERecvPopResult TryPopRecvPacket(ConnectionId connectionId, CRecvPacket &outPacket);
+bool TryPopRecvPacket(UINT64 sessionId, RecvPacketPtr &outPacket) noexcept;
 ```
 
-- `CSession`과 `RecvQueue`는 네트워크 내부 구현으로 둔다. 네트워크가 불투명한 `ConnectionId`로 대상 세션의 세대와 수명을 확인한 후 패킷 한 개를 꺼낸다. 결과는 `Packet`, `Empty`, `Disconnected`로 구분하며, `CRecvPacket`은 꺼낸 패킷을 소유하고 자동 반환한다.
-- 게임 서버의 맵 실행 코드는 소속 캐릭터의 연결 식별자로 호출하고, 실제 핸들러에는 캐릭터와 패킷만 넘긴다. `IContents`에는 세션·수신 API를 넣지 않는다. 수신 API는 세션의 안전을 맡고, 어느 맵이 소비할 수 있는지는 게임 서버 소속 규칙이 보장한다.
+- `CServer`가 기존 슬롯에서 세션을 조회하고 I/O 참조를 올린 뒤, 해제 플래그와 세션 ID를 확인해 `CSession::m_recvMsgQueue`에서 패킷 한 건을 꺼낸다. 세션 사용이 끝나면 참조를 내린다. 한 건을 꺼냈을 때만 `true`를 반환하며, 꺼낸 View는 `RecvPacketPtr`가 풀에 반환한다. 별도 락·슬롯 테이블·수신 큐를 추가하지 않는다.
+- 맵의 `OnFrame()`은 소속 연결의 세션 ID로 이 함수를 부른다. `IContents`와 `ContentsRuntimeLib`에는 세션·수신 API를 넣지 않는다. 어느 맵이 읽을지는 게임 서버 소속 규칙이 보장한다.
+- 연결 종료는 수신 결과와 분리한다. 테스트 월드의 `OnClientLeave()`는 담당 맵에 연결 제거 작업을 등록하고, 담당 워커가 맵 소속을 정리한다.
 - 패킷은 한 개씩 꺼낸다. 이동을 시작한 핸들러가 끝난 뒤에는 다음 패킷을 미리 꺼내지 않는다. 이동 중 연결이 종료되면 목적지가 끊어진 연결을 활성 소속으로 등록하지 않으며, 남은 패킷은 네트워크의 세션 정리 경로가 반환한다.
 
 ## ContentsRuntimeLib 분리안
@@ -173,8 +174,10 @@ ERecvPopResult TryPopRecvPacket(ConnectionId connectionId, CRecvPacket &outPacke
 
 ### Phase 2 — 고정 배정 맵과 실제 수신 연결
 
-- **작업:** 최소 게임 서버에 `IMap`을 구현한 같은 종류의 맵 두 개를 고정 배치한다. 네트워크의 `TryPopRecvPacket()`을 통해 맵이 자기 소속 연결의 패킷을 한 개씩 꺼내 공통 디스패처에 넘긴다. 기존 채팅 경로는 새 런타임으로 옮기지 않는다.
+- **작업:** 테스트 월드에 `IContents`를 구현한 `CMapInstance` 두 개를 고정 배치한다. 맵의 `OnFrame()`은 `CServer::TryPopRecvPacket()`으로 자기 소속 연결만 읽고, `CBaseContents`는 호출하지 않는다. 기존 채팅의 수신·세션 조회 경로는 변경하지 않는다.
 - **완료 기준:** 루프백에서 두 맵의 패킷이 각자 소속 맵의 상태만 바꾼다. 잘못된 맵 ID가 담긴 요청은 해당 건만 거절하고, 콘텐츠가 `CSession`이나 `RecvQueue`를 직접 접근하지 않는다.
+- **검증:** [FixedMaps](../../../Tests/WorldServer/FixedMaps.vcxproj)와 Phase 1 `WorldServer`의 `RunTests`가 x64 Debug·Release에서 통과했다. 실제 IOCP 루프백(Lan)에서 서로 다른 담당 워커, 맵별 누계, 잘못된 맵 ID 거절 후 정상 처리, 미지원 opcode 거절, 연결 제거 및 재접속을 확인했다. 기존 채팅은 두 구성에서 Net·Lan 모두 통과했다. MSBuild에서 `python`을 찾지 못하면 `/p:PythonExecutable=<python.exe 경로>`로 지정한다.
+- **검증 범위:** 테스트 실행기가 자신이 시작한 서버 프로세스만 회수한다. 테스트 월드의 정상 종료와 같은 슬롯을 강제로 재사용한 뒤 이전 세션 ID로 조회하는 시험은 실행하지 않았다.
 
 ### Phase 3 — 캐릭터 맵 이동
 

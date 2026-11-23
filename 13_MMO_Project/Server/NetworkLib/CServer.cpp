@@ -655,6 +655,29 @@ CServer *g_pServer = nullptr;
 		}
 	}
 
+	bool CServer::TryPopRecvPacket(UINT64 sessionId, RecvPacketPtr &outPacket) noexcept
+	{
+		outPacket.reset();
+		const USHORT index = getIndex(sessionId);
+		if (m_pSessions == nullptr || index >= serverSetting::maxSessionCount)
+			return false;
+		CSession *pSession = m_pSessions[index];
+		if (pSession == nullptr)
+			return false;
+
+		const LONG ioCount = InterlockedIncrement(&pSession->m_ioCountAndRelease);
+		if ((ioCount & CSession::sm_releaseFlag) == 0 && pSession->m_sessionId == sessionId)
+		{
+			CSerializableBufferView *pView = nullptr;
+			if (pSession->m_recvMsgQueue.Dequeue(&pView))
+				outPacket = RecvPacketPtr(pView, CSerializableBufferView::Free);
+		}
+
+		if (InterlockedDecrement(&pSession->m_ioCountAndRelease) == 0)
+			ReleaseSession(pSession);
+		return outPacket != nullptr;
+	}
+
 	void CServer::SendPacket(const UINT64 sessionId, CSerializableBuffer *pSBuffer) noexcept
 	{
 		CSession *pSession = m_pSessions[getIndex(sessionId)];

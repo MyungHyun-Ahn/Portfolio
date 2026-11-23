@@ -3,6 +3,8 @@
 namespace ServerNetworkLib
 {
 using SendPacketPtr = MHLib::utils::CSmartPtr<NetworkCommonLib::CSerializableBuffer>;
+// View의 소유권을 콘텐츠 단으로 넘기기 위한 목적
+using RecvPacketPtr = std::unique_ptr<CSerializableBufferView, decltype(&CSerializableBufferView::Free)>;
 
 struct SContentsFrameEvent;
 class CBaseContents;
@@ -164,6 +166,9 @@ class CBaseContents;
 		}
 
 		void SendPacket(const UINT64 sessionId, CSerializableBuffer *pSBuffer) noexcept;
+		// 담당 맵의 수신 큐에서 한 건을 꺼내 소유권을 넘긴다.
+		[[nodiscard]]
+		bool TryPopRecvPacket(UINT64 sessionId, RecvPacketPtr &outPacket) noexcept;
 
 		BOOL Disconnect(const UINT64 sessionId, BOOL isPqcs = FALSE) noexcept;
 		BOOL ReleaseSession(CSession *pSession, BOOL isPqcs = FALSE) noexcept;
