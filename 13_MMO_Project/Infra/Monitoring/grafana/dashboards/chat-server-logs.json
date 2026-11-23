@@ -1,0 +1,39 @@
+{
+  "uid": "chat-server-logs",
+  "title": "ChatServer 로그",
+  "tags": ["chatserver", "logs"],
+  "schemaVersion": 41,
+  "refresh": "10s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "logs",
+      "title": "ChatServer 원본 로그",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 24 },
+      "datasource": { "type": "loki", "uid": "portfolio-loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "portfolio-loki" },
+          "editorMode": "code",
+          "expr": "{service=\"chatserver\"}",
+          "queryType": "range",
+          "direction": "backward",
+          "maxLines": 500
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      }
+    }
+  ]
+}
