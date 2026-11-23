@@ -187,6 +187,36 @@ namespace
 		Check(!client.TryPopEvent(sessionId, event), L"terminal event was delivered only once");
 	}
 
+	void VerifyDecodeAndValidateChecksum()
+	{
+		using MHLib::security::CEncryption;
+		constexpr int kMaxPayloadBytes = static_cast<int>(CSerializableBuffer::EBufferDefine::PacketMaxSize) - sizeof(SPacketHeader);
+		for (const int randKey : { 0, 127, 255 })
+		{
+			for (int payloadBytes = 0; payloadBytes <= kMaxPayloadBytes; ++payloadBytes)
+			{
+				std::vector<char> plain(payloadBytes + 1);
+				for (int i = 1; i <= payloadBytes; ++i)
+					plain[i] = static_cast<char>(i * 173 + payloadBytes);
+				const BYTE checksum = CEncryption::CalCheckSum(plain.data() + 1, payloadBytes);
+				for (const bool isValid : { true, false })
+				{
+					plain[0] = static_cast<char>(isValid ? checksum : checksum ^ 1);
+					auto fused = plain;
+					CEncryption::Encoding(fused.data(), payloadBytes + 1, randKey);
+					auto legacy = fused;
+					CEncryption::Decoding(legacy.data(), payloadBytes + 1, randKey);
+					const bool legacyValid = CEncryption::CalCheckSum(legacy.data() + 1, payloadBytes) == static_cast<BYTE>(legacy[0]);
+					Check(legacyValid == isValid, L"checksum fixture exercises both decisions");
+					Check(CEncryption::DecodeAndValidateChecksum(fused.data(), payloadBytes + 1, randKey) == legacyValid,
+						L"fused decoding preserves the legacy checksum decision");
+					Check(fused == legacy && fused == plain, L"fused decoding preserves every decoded byte");
+				}
+			}
+		}
+		g_pLogger->WriteLogConsole(ELogLevel::Info, L"PASS: fused Net decoding and checksum match the legacy path");
+	}
+
 	void VerifyRecvRing(EPacketMode mode)
 	{
 		constexpr BYTE kPacketCode = 0x77;
@@ -266,8 +296,24 @@ namespace
 		sendBytes(tail.data(), static_cast<int>(tail.size()));
 		expectFrame(kSmallFrameBytes, 21);
 		expectFrame(kSmallFrameBytes, 22);
-		Check(shutdown(peer, SD_SEND) == 0, L"ring fixture sends EOF");
-		ExpectOnlyTerminal(client, sessionId, EClientEvent::Disconnected, 0);
+		if (mode == EPacketMode::Net)
+		{
+			constexpr BYTE kPayload = 42;
+			constexpr int kChecksumOffset = offsetof(SPacketHeader, checkSum);
+			const SPacketHeader header{ kPacketCode, 1, 0, static_cast<BYTE>(kPayload + 1) };
+			std::array<char, kHeaderBytes + 1> frame{};
+			memcpy(frame.data(), &header, kHeaderBytes);
+			frame[kHeaderBytes] = kPayload;
+			MHLib::security::CEncryption::Encoding(frame.data() + kChecksumOffset, 2, header.randKey);
+			sendBytes(frame.data(), static_cast<int>(frame.size()));
+			ExpectOnlyTerminal(client, sessionId, EClientEvent::Disconnected, ERROR_INVALID_DATA);
+			g_pLogger->WriteLogConsole(ELogLevel::Info, L"PASS: Net checksum rejection does not publish a packet");
+		}
+		else
+		{
+			Check(shutdown(peer, SD_SEND) == 0, L"ring fixture sends EOF");
+			ExpectOnlyTerminal(client, sessionId, EClientEvent::Disconnected, 0);
+		}
 		closesocket(peer);
 		closesocket(listener);
 		client.Stop();
@@ -657,6 +703,7 @@ namespace
 int main(void)
 {
 	g_pLogger = CLogger::GetInstance();
+	VerifyDecodeAndValidateChecksum();
 	WSADATA wsaData{};
 	Check(WSAStartup(MAKEWORD(2, 2), &wsaData) == 0, L"fixture Winsock startup");
 	VerifyLifecycle(1);

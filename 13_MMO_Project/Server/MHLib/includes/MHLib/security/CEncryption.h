@@ -101,6 +101,44 @@ public:
 		}
 	}
 
+	// 첫 바이트는 체크섬이고, 나머지는 합산할 본문이다.
+	[[nodiscard]]
+	inline static bool DecodeAndValidateChecksum(char *pMsg, int len, int randKey) noexcept
+	{
+		if (len <= 0)
+			return false;
+
+		char prevP = 0;
+		char prevE = 0;
+		const int randKeyPlusOne = randKey + 1;
+		const int packetKeyPlusOne = sm_packetKey + 1;
+		const auto decodeByte = [&](int index) noexcept -> BYTE
+		{
+			const char encodedByte = pMsg[index];
+			const char plainByte = encodedByte ^ (prevE + packetKeyPlusOne + index);
+			const char decodedByte = plainByte ^ (prevP + randKeyPlusOne + index);
+			prevE = encodedByte;
+			prevP = plainByte;
+			pMsg[index] = decodedByte;
+			return static_cast<BYTE>(decodedByte);
+		};
+
+		const BYTE expectedChecksum = decodeByte(0);
+		unsigned int sum = 0;
+		int i = 1;
+		for (; i <= len - 4; i += 4)
+		{
+			sum += decodeByte(i);
+			sum += decodeByte(i + 1);
+			sum += decodeByte(i + 2);
+			sum += decodeByte(i + 3);
+		}
+		for (; i < len; ++i)
+			sum += decodeByte(i);
+
+		return static_cast<BYTE>(sum) == expectedChecksum;
+	}
+
 	// inline static void Decoding(char *msg, int len, int randKey) noexcept
 	// {
 	// 	char prevP = 0;

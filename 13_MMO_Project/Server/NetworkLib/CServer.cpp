@@ -41,10 +41,9 @@ CServer *g_pServer = nullptr;
 
 			if (g_pServer->GetPacketMode() == EPacketMode::Net)
 			{
-				CEncryption::Decoding(pView->GetBufferPtr() + 4, pView->GetFullSize() - 4, packetHeader.randKey);
-				BYTE dataCheckSum = CEncryption::CalCheckSum(pView->GetContentBufferPtr(), pView->GetDataSize());
-				BYTE headerCheckSum = *(pView->GetBufferPtr() + offsetof(SPacketHeader, checkSum));
-				if (dataCheckSum != headerCheckSum)
+				constexpr int kChecksumOffset = offsetof(SPacketHeader, checkSum);
+				if (!CEncryption::DecodeAndValidateChecksum(pView->GetBufferPtr() + kChecksumOffset,
+					pView->GetFullSize() - kChecksumOffset, packetHeader.randKey))
 				{
 					CSerializableBuffer::Free(pView);
 					g_pServer->Disconnect(m_sessionId);

@@ -192,9 +192,9 @@ namespace ClientNetworkLib
 			spMessage->MoveWritePos(header.len);
 			if (m_packetMode == EPacketMode::Net)
 			{
-				CEncryption::Decoding(spMessage->GetBufferPtr() + 4, header.len + 1, header.randKey);
-				BYTE checksum = CEncryption::CalCheckSum(spMessage->GetContentBufferPtr(), header.len);
-				if (checksum != static_cast<BYTE>(spMessage->GetBufferPtr()[4]))
+				constexpr int kChecksumOffset = offsetof(SPacketHeader, checkSum);
+				if (!CEncryption::DecodeAndValidateChecksum(spMessage->GetBufferPtr() + kChecksumOffset,
+					packetBytes - kChecksumOffset, header.randKey))
 					return ERROR_INVALID_DATA;
 			}
 
