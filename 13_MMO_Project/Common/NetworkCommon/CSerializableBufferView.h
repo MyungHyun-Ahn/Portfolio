@@ -1,13 +1,8 @@
 #pragma once
 
-namespace ClientNetworkLib
-{
-	class CLanSession;
-}
-
 namespace ServerNetworkLib
 {
-	class CNetSession;
+	class CSession;
 }
 
 namespace NetworkCommonLib
@@ -16,7 +11,6 @@ namespace NetworkCommonLib
 
 
 // CRecvBuffer로 받은 데이터를 직렬화 버퍼처럼 볼 수 있게 함
-template<bool isLanServer>
 class CSerializableBufferView
 {
 public:
@@ -25,8 +19,7 @@ public:
 
 
 private:
-	friend class ServerNetworkLib::CNetSession;
-	friend class ClientNetworkLib::CLanSession;
+	friend class ServerNetworkLib::CSession;
 
 	// 오프셋 시작과 끝을 받음
 	inline void init(MHLib::utils::CSmartPtr<CRecvBuffer> spRecvBuffer, int offsetStart, int offsetEnd) noexcept
@@ -34,7 +27,7 @@ private:
 		m_spRecvBuffer = spRecvBuffer;
 		m_pBuffer = m_spRecvBuffer->GetOffsetPtr(offsetStart);
 		m_headerFront = 0;
-		m_front = (int)CSerializableBuffer<isLanServer>::EBufferDefine::HeaderSize;
+		m_front = (int)CSerializableBuffer::EBufferDefine::HeaderSize;
 		// Rear는 end - start
 		m_rear = offsetEnd - offsetStart;
 		m_readHeaderSize = 0;
@@ -45,7 +38,7 @@ private:
 		m_spSharedRecvBuffer = spRecvBuffer;
 		m_pBuffer = spRecvBuffer->GetOffsetPtr(offsetStart);
 		m_headerFront = 0;
-		m_front = (int)CSerializableBuffer<isLanServer>::EBufferDefine::HeaderSize;
+		m_front = (int)CSerializableBuffer::EBufferDefine::HeaderSize;
 		m_rear = offsetEnd - offsetStart;
 		m_readHeaderSize = 0;
 	}
@@ -70,7 +63,7 @@ private:
 		m_pBuffer = pBuffer;
 		m_bufferSize = size;
 		m_headerFront = 0;
-		m_front = (int)CSerializableBuffer<isLanServer>::EBufferDefine::HeaderSize;
+		m_front = (int)CSerializableBuffer::EBufferDefine::HeaderSize;
 		m_rear = 0;
 		m_readHeaderSize = 0;
 	}
@@ -108,7 +101,7 @@ private:
 
 	inline int getHeaderSize() const noexcept
 	{
-		return  (int)CSerializableBuffer<isLanServer>::EBufferDefine::HeaderSize;
+		return  (int)CSerializableBuffer::EBufferDefine::HeaderSize;
 	}
 	inline int getFullSize() const noexcept
 	{
@@ -137,11 +130,7 @@ private:
 	bool writeDelayedHeader(char *pBuffer, int size) noexcept;
 	bool getDelayedHeader(char *outBuffer, int size) noexcept;
 
-	inline static CSerializableBufferView *alloc() noexcept
-	{
-		CSerializableBufferView *pSBuffer = sm_sbufferPool.Alloc();
-		return pSBuffer;
-	}
+	static CSerializableBufferView *alloc() noexcept;
 
 public:
 	inline int GetDataSize() const noexcept
@@ -149,11 +138,7 @@ public:
 		return m_rear - m_front;
 	}
 
-	inline static void Free(CSerializableBufferView *pDelSBuffer) noexcept
-	{
-		pDelSBuffer->clear();
-		sm_sbufferPool.Free(pDelSBuffer);
-	}
+	static void Free(CSerializableBufferView *pDelSBuffer) noexcept;
 
 	// operator
 public:
@@ -304,14 +289,8 @@ public:
 		return *this;
 	}
 
-	inline static LONG GetPoolCapacity() noexcept
-	{
-		return sm_sbufferPool.GetCapacity();
-	}
-	inline static LONG GetPoolUsage() noexcept
-	{
-		return sm_sbufferPool.GetUseCount();
-	}
+	static LONG GetPoolCapacity() noexcept;
+	static LONG GetPoolUsage() noexcept;
 
 	inline LONG IncreaseRef() noexcept
 	{
@@ -334,7 +313,7 @@ private:
 	std::shared_ptr<CRecvBuffer> m_spSharedRecvBuffer;
 	std::unique_ptr<char[]> m_upFragmentStorage;
 	// 사이즈 헤더 조차도 밀림을 방지하기 위한 버퍼
-	char m_delayedHeader[(int)CSerializableBuffer<isLanServer>::EBufferDefine::HeaderSize];
+	char m_delayedHeader[(int)CSerializableBuffer::EBufferDefine::HeaderSize];
 	USHORT m_readHeaderSize = 0;
 
 	LONG			m_refCount = 0;
@@ -344,8 +323,7 @@ private:
 };
 
 // offset은 거의 0만 쓸 듯?
-template<bool isLanServer>
-bool CSerializableBufferView<isLanServer>::copy(char *pBuffer, int offset, int size) noexcept
+inline bool CSerializableBufferView::copy(char *pBuffer, int offset, int size) noexcept
 {
 	if (m_bufferSize - m_rear < size)
 	{
@@ -357,14 +335,13 @@ bool CSerializableBufferView<isLanServer>::copy(char *pBuffer, int offset, int s
 	memcpy_s(m_pBuffer + offset, m_bufferSize - m_rear, pBuffer, size);
 
 	// Copy 함수가 호출될 때는 무조건 HEADER는 읽은 상태임
-	m_readHeaderSize = (int)CSerializableBuffer<isLanServer>::EBufferDefine::HeaderSize;
+	m_readHeaderSize = (int)CSerializableBuffer::EBufferDefine::HeaderSize;
 	m_rear = offset + size;
 
 	return true;
 }
 
-template<bool isLanServer>
-bool CSerializableBufferView<isLanServer>::copy(char *pBuffer, int size) noexcept
+inline bool CSerializableBufferView::copy(char *pBuffer, int size) noexcept
 {
 	if (m_bufferSize - m_rear < size)
 	{
@@ -376,14 +353,13 @@ bool CSerializableBufferView<isLanServer>::copy(char *pBuffer, int size) noexcep
 	memcpy_s(m_pBuffer + m_rear, m_bufferSize - m_rear, pBuffer, size);
 
 	// Copy 함수가 호출될 때는 무조건 HEADER는 읽은 상태임
-	m_readHeaderSize = (int)CSerializableBuffer<isLanServer>::EBufferDefine::HeaderSize;
+	m_readHeaderSize = (int)CSerializableBuffer::EBufferDefine::HeaderSize;
 	m_rear += size;
 
 	return true;
 }
 
-template<bool isLanServer>
-bool CSerializableBufferView<isLanServer>::Dequeue(char *outBuffer, int size) noexcept
+inline bool CSerializableBufferView::Dequeue(char *outBuffer, int size) noexcept
 {
 	if (GetDataSize() < size)
 	{
@@ -396,10 +372,9 @@ bool CSerializableBufferView<isLanServer>::Dequeue(char *outBuffer, int size) no
 	return true;
 }
 
-template<bool isLanServer>
-bool CSerializableBufferView<isLanServer>::getHeader(char *outBuffer, int size) noexcept
+inline bool CSerializableBufferView::getHeader(char *outBuffer, int size) noexcept
 {
-	if (size < (int)CSerializableBuffer<isLanServer>::EBufferDefine::HeaderSize)
+	if (size < (int)CSerializableBuffer::EBufferDefine::HeaderSize)
 	{
 		return false;
 	}
@@ -409,21 +384,19 @@ bool CSerializableBufferView<isLanServer>::getHeader(char *outBuffer, int size) 
 	return true;
 }
 
-template<bool isLanServer>
-bool CSerializableBufferView<isLanServer>::writeDelayedHeader(char *pBuffer, int size) noexcept
+inline bool CSerializableBufferView::writeDelayedHeader(char *pBuffer, int size) noexcept
 {
-	if (m_readHeaderSize + size > (int)CSerializableBuffer<isLanServer>::EBufferDefine::HeaderSize)
+	if (m_readHeaderSize + size > (int)CSerializableBuffer::EBufferDefine::HeaderSize)
 	{
 		return false;
 	}
 
-	memcpy_s(m_delayedHeader + m_readHeaderSize, (int)CSerializableBuffer<isLanServer>::EBufferDefine::HeaderSize, pBuffer, size);
+	memcpy_s(m_delayedHeader + m_readHeaderSize, (int)CSerializableBuffer::EBufferDefine::HeaderSize, pBuffer, size);
 	m_readHeaderSize += size;
 	return true;
 }
 
-template<bool isLanServer>
-bool CSerializableBufferView<isLanServer>::getDelayedHeader(char *outBuffer, int size) noexcept
+inline bool CSerializableBufferView::getDelayedHeader(char *outBuffer, int size) noexcept
 {
 	if (size < m_readHeaderSize)
 	{

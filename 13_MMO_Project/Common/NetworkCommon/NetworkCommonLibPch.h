@@ -13,7 +13,7 @@
 #include <cstdint>
 #include <cstring>
 
-#include "NetHeaders.h"
+#include "PacketHeaders.h"
 #include "NetworkLimits.h"
 #include "CRingBuffer.h"
 #include "CSerializableBuffer.h"

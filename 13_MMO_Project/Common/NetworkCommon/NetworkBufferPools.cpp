@@ -3,17 +3,65 @@
 namespace NetworkCommonLib
 {
 	// 풀을 사용하는 서버만 이 오브젝트를 링크한다.
-	template<>
-	MHLib::memory::CTlsMemoryPoolManager<CSerializableBuffer<false>, 512, 2> CSerializableBuffer<false>::sm_sbufferPool{};
-	template<>
-	MHLib::memory::CTlsMemoryPoolManager<CSerializableBuffer<true>, 512, 2> CSerializableBuffer<true>::sm_sbufferPool{};
+	MHLib::memory::CTlsMemoryPoolManager<CSerializableBuffer, 512, 2> CSerializableBuffer::sm_sbufferPool{};
 
-	template<>
-	MHLib::memory::CTlsPagePoolManager<static_cast<int>(CSerializableBuffer<false>::EBufferDefine::PacketMaxSize), 16, false>
-		CSerializableBuffer<false>::sm_pagePool{};
-	template<>
-	MHLib::memory::CTlsPagePoolManager<static_cast<int>(CSerializableBuffer<true>::EBufferDefine::PacketMaxSize), 16, false>
-		CSerializableBuffer<true>::sm_pagePool{};
+	MHLib::memory::CTlsPagePoolManager<static_cast<int>(CSerializableBuffer::EBufferDefine::PacketMaxSize), 16, false>
+		CSerializableBuffer::sm_pagePool{};
+
+	CSerializableBuffer::CSerializableBuffer() noexcept
+		: CSerializableBuffer(static_cast<char *>(sm_pagePool.Alloc()), freePooledPage, freePooledBuffer)
+	{
+	}
+
+	CSerializableBuffer *CSerializableBuffer::Alloc() noexcept
+	{
+		// 할당하고 초기화해서 반환
+		CSerializableBuffer *pSBuffer = sm_sbufferPool.Alloc();
+		pSBuffer->Clear();
+		return pSBuffer;
+	}
+
+	LONG CSerializableBuffer::GetPoolCapacity() noexcept
+	{
+		return sm_sbufferPool.GetCapacity();
+	}
+
+	LONG CSerializableBuffer::GetPoolUsage() noexcept
+	{
+		return sm_sbufferPool.GetUseCount();
+	}
+
+	void CSerializableBuffer::freePooledPage(char *pPage) noexcept
+	{
+		sm_pagePool.Free(pPage);
+	}
+
+	void CSerializableBuffer::freePooledBuffer(CSerializableBuffer *pBuffer) noexcept
+	{
+		sm_sbufferPool.Free(pBuffer);
+	}
+
+	CSerializableBufferView *CSerializableBufferView::alloc() noexcept
+	{
+		CSerializableBufferView *pSBuffer = sm_sbufferPool.Alloc();
+		return pSBuffer;
+	}
+
+	void CSerializableBufferView::Free(CSerializableBufferView *pDelSBuffer) noexcept
+	{
+		pDelSBuffer->clear();
+		sm_sbufferPool.Free(pDelSBuffer);
+	}
+
+	LONG CSerializableBufferView::GetPoolCapacity() noexcept
+	{
+		return sm_sbufferPool.GetCapacity();
+	}
+
+	LONG CSerializableBufferView::GetPoolUsage() noexcept
+	{
+		return sm_sbufferPool.GetUseCount();
+	}
 
 	namespace
 	{
@@ -53,8 +101,5 @@ namespace NetworkCommonLib
 		return g_recvBufferPool.GetUseCount();
 	}
 
-	template<>
-	MHLib::memory::CTlsMemoryPoolManager<CSerializableBufferView<false>, 128, 4, false> CSerializableBufferView<false>::sm_sbufferPool{};
-	template<>
-	MHLib::memory::CTlsMemoryPoolManager<CSerializableBufferView<true>, 128, 4, false> CSerializableBufferView<true>::sm_sbufferPool{};
+	MHLib::memory::CTlsMemoryPoolManager<CSerializableBufferView, 128, 4, false> CSerializableBufferView::sm_sbufferPool{};
 }

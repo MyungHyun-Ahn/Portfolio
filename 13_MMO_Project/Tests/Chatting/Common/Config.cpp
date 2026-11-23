@@ -103,6 +103,14 @@ namespace Chatting
 		if (!loader.Load(pSection, L"PORT", &number) || number < 1 || number > 65535)
 			return ConfigError(pFileName, L"PORT is missing or invalid (1..65535)");
 		config.m_port = static_cast<USHORT>(number);
+		std::wstring packetMode;
+		if (loader.Load(pSection, L"PACKET_MODE", &packetMode))
+		{
+			if (packetMode == L"Lan")
+				config.m_packetMode = NetworkCommonLib::EPacketMode::Lan;
+			else if (packetMode != L"Net")
+				return ConfigError(pFileName, L"PACKET_MODE must be Net or Lan");
+		}
 		if (isServer && (!LoadLogLevel(loader, L"CONSOLE_LOG_LEVEL", config.m_consoleLogLevel)
 			|| !LoadLogLevel(loader, L"FILE_LOG_LEVEL", config.m_fileLogLevel)))
 			return ConfigError(pFileName, L"log levels must be Debug, Info or Error");
@@ -168,9 +176,9 @@ namespace Chatting
 			std::wstring recvBufferBytes;
 			if (loader.Load(pSection, L"RECV_BUFFER_BYTES", &recvBufferBytes))
 			{
-				constexpr int kMinRecvBufferBytes = static_cast<int>(NetworkCommonLib::CSerializableBuffer<FALSE>::EBufferDefine::PacketMaxSize);
+				constexpr int kMinRecvBufferBytes = static_cast<int>(NetworkCommonLib::CSerializableBuffer::EBufferDefine::PacketMaxSize);
 				if (!loader.Load(pSection, L"RECV_BUFFER_BYTES", &number) || number < kMinRecvBufferBytes
-					|| number > NetworkCommonLib::kMaxNetRecvBufferBytes)
+					|| number > NetworkCommonLib::kMaxRecvBufferBytes)
 					return ConfigError(pFileName, L"RECV_BUFFER_BYTES must fit a full Net packet and the ring's cursor range");
 				config.m_recvBufferBytes = static_cast<int>(number);
 			}

@@ -1,12 +1,12 @@
 {
   "files": {
-    "Chatting/Chatting.g.h": "6d9600cb65a4b0736e867f936440ab7b0b9adebb7462cb9f55462ff7512aa1f5",
+    "Chatting/Chatting.g.h": "6409a136dcf63efa687245d88c6e38147878688024898f45c228cf2215a9e82f",
     "Chatting/ChattingPacketAll.g.h": "312b751a10ea5a56a896b85f76c0de53eab0f8aeb17fc074f2cc4ab6d391c7af",
-    "Chatting/Login.g.h": "b6c8867ba5a25259c195edd5b2f8b33570ce8b941383ca3de5db3730c19f206e",
-    "Chatting/SectorMove.g.h": "b78ebbff2ceadbb08db28630873afaba5a895db902305a5ae0dc902e9ae5ab30",
+    "Chatting/Login.g.h": "bb6d44f7fc1f9f189b4c344de41ef03fbb019ee493c8f79a9738d0519afc73ef",
+    "Chatting/SectorMove.g.h": "90a669287dfd10e219e00295f3fa870e4c586421ffc7082aec45171dcb61d9c0",
     "IncludePacketAll.g.h": "8beb5d5488e838e392ab220a6a7db387a013476008d2b7b842ed7b4bae2b5946",
     "PacketTypes.g.h": "3978fb49dfb30949d955010946c504274fee1e41375409209e88df9e61732de8",
-    "System/Heartbeat.g.h": "534890737c69e9a7f4b2f945acb736e91cb9eb82b741b8895da08f99af05980f",
+    "System/Heartbeat.g.h": "c92741c3d6efa8c6228b93b53697f34e9ff3ef07af60cb0cb5034340783005cc",
     "System/SystemPacketAll.g.h": "1e11ffe9ea00deb712d584b621acd536e26412e2b28d5e89d697f5742de16df5"
   },
   "role": "Common",

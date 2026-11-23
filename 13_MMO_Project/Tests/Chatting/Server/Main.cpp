@@ -6,7 +6,7 @@
 #include "CRecvBuffer.h"
 #include "CSerializableBufferView.h"
 #include "ServerSetting.h"
-#include "CNetServer.h"
+#include "CServer.h"
 #include "CommonProtocol.h"
 #include "Config.h"
 #include "Console.h"
@@ -73,13 +73,13 @@ int main(void)
 		config.m_contentsWorkerCount, config.m_logQueueCapacity);
 
 	auto *pServer = new Chatting::CChatServer;
-	ServerNetworkLib::g_pNetServer = pServer;
+	ServerNetworkLib::g_pServer = pServer;
 	std::atomic<bool> isReturned = false;
 	std::atomic<bool> isStarted = false;
 	std::thread serverThread([&]()
 	{
 		g_pLogger->RegisterLogProducer();
-		isStarted = pServer->Start(config.m_ip.c_str(), config.m_port) != FALSE;
+		isStarted = pServer->Start(config.m_ip.c_str(), config.m_port, config.m_packetMode) != FALSE;
 		isReturned = true;
 	});
 

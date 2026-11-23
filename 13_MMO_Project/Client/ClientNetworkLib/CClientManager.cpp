@@ -4,18 +4,18 @@ namespace ClientNetworkLib
 {
 	using namespace NetworkCommonLib;
 
-	CNetClientManager::~CNetClientManager()
+	CClientManager::~CClientManager()
 	{
 		Stop();
 	}
 
 	// ClientManager 초기화
-	bool CNetClientManager::Init(DWORD workerCount, int recvBufferBytes) noexcept
+	bool CClientManager::Init(DWORD workerCount, int recvBufferBytes, EPacketMode packetMode) noexcept
 	{
 		std::lock_guard lifecycleLock(m_lifecycleLock);
-		constexpr int kMinRecvBufferBytes = static_cast<int>(CSerializableBuffer<FALSE>::EBufferDefine::PacketMaxSize);
+		constexpr int kMinRecvBufferBytes = static_cast<int>(CSerializableBuffer::EBufferDefine::PacketMaxSize);
 		if (workerCount == 0 || m_iocpHandle != nullptr || recvBufferBytes < kMinRecvBufferBytes
-			|| recvBufferBytes > kMaxNetRecvBufferBytes)
+			|| recvBufferBytes > kMaxRecvBufferBytes || (packetMode != EPacketMode::Lan && packetMode != EPacketMode::Net))
 			return false;
 
 		WSADATA wsaData{};
@@ -61,7 +61,7 @@ namespace ClientNetworkLib
 		{
 			m_workers.reserve(workerCount);
 			for (DWORD workerIndex = 0; workerIndex < workerCount; ++workerIndex)
-				m_workers.emplace_back(&CNetClientManager::workerThread, this, workerIndex == 0);
+				m_workers.emplace_back(&CClientManager::workerThread, this, workerIndex == 0);
 		}
 		catch (...)
 		{
@@ -73,11 +73,12 @@ namespace ClientNetworkLib
 		m_pConnectEx = pConnectEx;
 		m_connectProtocol = connectProtocol;
 		m_recvBufferBytes = recvBufferBytes;
+		m_packetMode = packetMode;
 		m_isAccepting = true;
 		return true;
 	}
 
-	SessionId CNetClientManager::Connect(const char *pIp, USHORT port, BYTE packetCode, DWORD timeoutMilliseconds) noexcept
+	SessionId CClientManager::Connect(const char *pIp, USHORT port, BYTE packetCode, DWORD timeoutMilliseconds) noexcept
 	{
 		SOCKADDR_IN address{};
 		address.sin_family = AF_INET;
@@ -94,7 +95,7 @@ namespace ClientNetworkLib
 		try
 		{
 			auto spMailbox = std::make_shared<CClientMailbox>();
-			auto spSession = std::make_shared<CNetSession>(packetCode, spMailbox, m_recvBufferBytes);
+			auto spSession = std::make_shared<CSession>(packetCode, spMailbox, m_recvBufferBytes, m_packetMode);
 			// ConnectEx를 조회했던 공급자로 세션 소켓을 생성한다.
 			spSession->m_socket = WSASocketW(FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO,
 				&m_connectProtocol, 0, WSA_FLAG_OVERLAPPED);
@@ -124,7 +125,7 @@ namespace ClientNetworkLib
 		return 0;
 	}
 
-	bool CNetClientManager::TryPopEvent(SessionId sessionId, SClientEvent &outEvent) noexcept
+	bool CClientManager::TryPopEvent(SessionId sessionId, SClientEvent &outEvent) noexcept
 	{
 		std::lock_guard sessionTableLock(m_sessionTableLock);
 		const auto found = m_mailboxes.find(sessionId);
@@ -136,7 +137,7 @@ namespace ClientNetworkLib
 		return true;
 	}
 
-	bool CNetClientManager::SendPacket(SessionId sessionId, std::shared_ptr<CSerializableBuffer<FALSE>> spMessage) noexcept
+	bool CClientManager::SendPacket(SessionId sessionId, std::shared_ptr<CSerializableBuffer> spMessage) noexcept
 	{
 		if (spMessage == nullptr || !spMessage->IsHeapAllocated())
 			return false;
@@ -165,7 +166,7 @@ namespace ClientNetworkLib
 		return isSent;
 	}
 
-	bool CNetClientManager::Disconnect(SessionId sessionId) noexcept
+	bool CClientManager::Disconnect(SessionId sessionId) noexcept
 	{
 		auto spSession = findSession(sessionId);
 		if (spSession == nullptr)
@@ -174,7 +175,7 @@ namespace ClientNetworkLib
 		bool isFinished;
 		{
 			std::lock_guard sessionStateLock(spSession->m_sessionStateLock);
-			if (spSession->m_state == CNetSession::EState::Closing)
+			if (spSession->m_state == CSession::EState::Closing)
 				return false;
 
 			spSession->beginCloseLocked(ERROR_OPERATION_ABORTED);
@@ -187,14 +188,14 @@ namespace ClientNetworkLib
 		return true;
 	}
 
-	std::shared_ptr<CNetSession> CNetClientManager::findSession(SessionId sessionId) noexcept
+	std::shared_ptr<CSession> CClientManager::findSession(SessionId sessionId) noexcept
 	{
 		std::lock_guard sessionTableLock(m_sessionTableLock);
 		auto found = m_sessions.find(sessionId);
 		return found != m_sessions.end() ? found->second : nullptr;
 	}
 
-	void CNetClientManager::copySessionSnapshot(std::vector<SSessionEntry> &outSessions) noexcept
+	void CClientManager::copySessionSnapshot(std::vector<SSessionEntry> &outSessions) noexcept
 	{
 		std::lock_guard sessionTableLock(m_sessionTableLock);
 		// 스냅샷 할당에 실패하면 순회를 건너뛰지 않고 프로세스를 종료한다.
@@ -203,7 +204,7 @@ namespace ClientNetworkLib
 			outSessions.emplace_back(entry.first, entry.second);
 	}
 
-	void CNetClientManager::retireSession(SessionId sessionId) noexcept
+	void CClientManager::retireSession(SessionId sessionId) noexcept
 	{
 		std::lock_guard sessionTableLock(m_sessionTableLock);
 		m_sessions.erase(sessionId);
@@ -211,7 +212,7 @@ namespace ClientNetworkLib
 			m_sessionTableEmptyCv.notify_all();
 	}
 
-	void CNetClientManager::expireConnects() noexcept
+	void CClientManager::expireConnects() noexcept
 	{
 		const auto now = GetTickCount64();
 		const auto expireSession = [now](const SSessionEntry &entry)
@@ -219,7 +220,7 @@ namespace ClientNetworkLib
 			const auto &spSession = entry.second;
 			std::lock_guard sessionStateLock(spSession->m_sessionStateLock);
 			// Connecting 상태에는 아직 소비하지 않은 ConnectEx가 한 건 있다.
-			if (spSession->m_state == CNetSession::EState::Connecting && now >= spSession->m_connectDeadline)
+			if (spSession->m_state == CSession::EState::Connecting && now >= spSession->m_connectDeadline)
 				spSession->beginCloseLocked(WSAETIMEDOUT);
 		};
 		std::vector<SSessionEntry> sessions;
@@ -229,7 +230,7 @@ namespace ClientNetworkLib
 			expireSession(entry);
 	}
 
-	void CNetClientManager::workerThread(bool isTimeoutWorker) noexcept
+	void CClientManager::workerThread(bool isTimeoutWorker) noexcept
 	{
 		constexpr DWORD kTimeoutPollMilliseconds = 50;
 		auto nextPoll = GetTickCount64() + kTimeoutPollMilliseconds;
@@ -266,7 +267,7 @@ namespace ClientNetworkLib
 		}
 	}
 
-	void CNetClientManager::Stop() noexcept
+	void CClientManager::Stop() noexcept
 	{
 		std::lock_guard lifecycleLock(m_lifecycleLock);
 		if (m_iocpHandle == nullptr)
@@ -290,7 +291,7 @@ namespace ClientNetworkLib
 		stopWorkersLocked();
 	}
 
-	void CNetClientManager::closeSessionForStop(const SSessionEntry &entry) noexcept
+	void CClientManager::closeSessionForStop(const SSessionEntry &entry) noexcept
 	{
 		const auto &spSession = entry.second;
 		bool isFinished;
@@ -304,7 +305,7 @@ namespace ClientNetworkLib
 			retireSession(entry.first);
 	}
 
-	void CNetClientManager::stopWorkersLocked() noexcept
+	void CClientManager::stopWorkersLocked() noexcept
 	{
 		m_areWorkersStopping = true;
 		for (size_t index = 0; index < m_workers.size(); ++index)

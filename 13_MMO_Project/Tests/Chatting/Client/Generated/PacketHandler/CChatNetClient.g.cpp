@@ -5,17 +5,17 @@
 #include "CSerializableBuffer.h"
 #include "MHLib/serialization/ISerializable.h"
 #include "IncludePacketAll.g.h"
-#include "CNetClientManager.h"
-#include "CNetClient.h"
+#include "CClientManager.h"
+#include "CClient.h"
 #include "IClientPacketHandler.g.h"
 #include "ClientPacketDispatch.g.h"
 #include "CChatNetClient.g.h"
 
 namespace Chatting
 {
-	std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>> MakePacketReqMessage(const SReqMessage &packet) noexcept
+	std::shared_ptr<NetworkCommonLib::CSerializableBuffer> MakePacketReqMessage(const SReqMessage &packet) noexcept
 	{
-		auto spBuffer = NetworkCommonLib::CSerializableBuffer<FALSE>::MakeShared();
+		auto spBuffer = NetworkCommonLib::CSerializableBuffer::MakeShared();
 		if (spBuffer == nullptr)
 		{
 			return nullptr;
@@ -29,9 +29,9 @@ namespace Chatting
 		return spBuffer;
 	}
 
-	std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>> MakePacketReqLogin(const SReqLogin &packet) noexcept
+	std::shared_ptr<NetworkCommonLib::CSerializableBuffer> MakePacketReqLogin(const SReqLogin &packet) noexcept
 	{
-		auto spBuffer = NetworkCommonLib::CSerializableBuffer<FALSE>::MakeShared();
+		auto spBuffer = NetworkCommonLib::CSerializableBuffer::MakeShared();
 		if (spBuffer == nullptr)
 		{
 			return nullptr;
@@ -45,9 +45,9 @@ namespace Chatting
 		return spBuffer;
 	}
 
-	std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>> MakePacketReqSectorMove(const SReqSectorMove &packet) noexcept
+	std::shared_ptr<NetworkCommonLib::CSerializableBuffer> MakePacketReqSectorMove(const SReqSectorMove &packet) noexcept
 	{
-		auto spBuffer = NetworkCommonLib::CSerializableBuffer<FALSE>::MakeShared();
+		auto spBuffer = NetworkCommonLib::CSerializableBuffer::MakeShared();
 		if (spBuffer == nullptr)
 		{
 			return nullptr;
@@ -61,9 +61,9 @@ namespace Chatting
 		return spBuffer;
 	}
 
-	std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>> MakePacketHeartbeatNoti(const SHeartbeatNoti &packet) noexcept
+	std::shared_ptr<NetworkCommonLib::CSerializableBuffer> MakePacketHeartbeatNoti(const SHeartbeatNoti &packet) noexcept
 	{
-		auto spBuffer = NetworkCommonLib::CSerializableBuffer<FALSE>::MakeShared();
+		auto spBuffer = NetworkCommonLib::CSerializableBuffer::MakeShared();
 		if (spBuffer == nullptr)
 		{
 			return nullptr;
@@ -77,7 +77,7 @@ namespace Chatting
 		return spBuffer;
 	}
 
-	bool CChatNetClient::onRecv(NetworkCommonLib::CSerializableBuffer<FALSE> &message) noexcept
+	bool CChatNetClient::onRecv(NetworkCommonLib::CSerializableBuffer &message) noexcept
 	{
 		return DispatchClientPacket(message, *this);
 	}
@@ -97,7 +97,7 @@ namespace Chatting
 		{
 			return false;
 		}
-		return this->sendNetworkPacket(MakePacketReqMessage(packet));
+		return this->sendPacket(MakePacketReqMessage(packet));
 	}
 
 	bool CChatNetClient::SendReqLogin(
@@ -119,7 +119,7 @@ namespace Chatting
 		{
 			return false;
 		}
-		return this->sendNetworkPacket(MakePacketReqLogin(packet));
+		return this->sendPacket(MakePacketReqLogin(packet));
 	}
 
 	bool CChatNetClient::SendReqSectorMove(
@@ -132,7 +132,7 @@ namespace Chatting
 		packet.m_accountNo = accountNo;
 		packet.m_sectorX = sectorX;
 		packet.m_sectorY = sectorY;
-		return this->sendNetworkPacket(MakePacketReqSectorMove(packet));
+		return this->sendPacket(MakePacketReqSectorMove(packet));
 	}
 
 	bool CChatNetClient::SendNotiHeartbeat(
@@ -141,6 +141,6 @@ namespace Chatting
 	{
 		SHeartbeatNoti packet;
 		packet.m_accountNo = accountNo;
-		return this->sendNetworkPacket(MakePacketHeartbeatNoti(packet));
+		return this->sendPacket(MakePacketHeartbeatNoti(packet));
 	}
 }

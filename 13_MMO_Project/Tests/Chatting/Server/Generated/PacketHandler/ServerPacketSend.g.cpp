@@ -8,9 +8,9 @@
 
 namespace Chatting
 {
-	NetworkCommonLib::CSerializableBuffer<FALSE> *MakePacketResMessage(const SResMessage &packet) noexcept
+	NetworkCommonLib::CSerializableBuffer *MakePacketResMessage(const SResMessage &packet) noexcept
 	{
-		auto *pBuffer = NetworkCommonLib::CSerializableBuffer<FALSE>::Alloc();
+		auto *pBuffer = NetworkCommonLib::CSerializableBuffer::Alloc();
 		if (pBuffer == nullptr)
 		{
 			return nullptr;
@@ -19,15 +19,15 @@ namespace Chatting
 		*pBuffer << static_cast<std::uint16_t>(EPacketType::ResMessage) << packet;
 		if (!pBuffer->IsValid())
 		{
-			NetworkCommonLib::CSerializableBuffer<FALSE>::Free(pBuffer);
+			NetworkCommonLib::CSerializableBuffer::Free(pBuffer);
 			return nullptr;
 		}
 		return pBuffer;
 	}
 
-	NetworkCommonLib::CSerializableBuffer<FALSE> *MakePacketMessageNoti(const SMessageNoti &packet) noexcept
+	NetworkCommonLib::CSerializableBuffer *MakePacketMessageNoti(const SMessageNoti &packet) noexcept
 	{
-		auto *pBuffer = NetworkCommonLib::CSerializableBuffer<FALSE>::Alloc();
+		auto *pBuffer = NetworkCommonLib::CSerializableBuffer::Alloc();
 		if (pBuffer == nullptr)
 		{
 			return nullptr;
@@ -36,15 +36,15 @@ namespace Chatting
 		*pBuffer << static_cast<std::uint16_t>(EPacketType::MessageNoti) << packet;
 		if (!pBuffer->IsValid())
 		{
-			NetworkCommonLib::CSerializableBuffer<FALSE>::Free(pBuffer);
+			NetworkCommonLib::CSerializableBuffer::Free(pBuffer);
 			return nullptr;
 		}
 		return pBuffer;
 	}
 
-	NetworkCommonLib::CSerializableBuffer<FALSE> *MakePacketResLogin(const SResLogin &packet) noexcept
+	NetworkCommonLib::CSerializableBuffer *MakePacketResLogin(const SResLogin &packet) noexcept
 	{
-		auto *pBuffer = NetworkCommonLib::CSerializableBuffer<FALSE>::Alloc();
+		auto *pBuffer = NetworkCommonLib::CSerializableBuffer::Alloc();
 		if (pBuffer == nullptr)
 		{
 			return nullptr;
@@ -53,15 +53,15 @@ namespace Chatting
 		*pBuffer << static_cast<std::uint16_t>(EPacketType::ResLogin) << packet;
 		if (!pBuffer->IsValid())
 		{
-			NetworkCommonLib::CSerializableBuffer<FALSE>::Free(pBuffer);
+			NetworkCommonLib::CSerializableBuffer::Free(pBuffer);
 			return nullptr;
 		}
 		return pBuffer;
 	}
 
-	NetworkCommonLib::CSerializableBuffer<FALSE> *MakePacketResSectorMove(const SResSectorMove &packet) noexcept
+	NetworkCommonLib::CSerializableBuffer *MakePacketResSectorMove(const SResSectorMove &packet) noexcept
 	{
-		auto *pBuffer = NetworkCommonLib::CSerializableBuffer<FALSE>::Alloc();
+		auto *pBuffer = NetworkCommonLib::CSerializableBuffer::Alloc();
 		if (pBuffer == nullptr)
 		{
 			return nullptr;
@@ -70,14 +70,14 @@ namespace Chatting
 		*pBuffer << static_cast<std::uint16_t>(EPacketType::ResSectorMove) << packet;
 		if (!pBuffer->IsValid())
 		{
-			NetworkCommonLib::CSerializableBuffer<FALSE>::Free(pBuffer);
+			NetworkCommonLib::CSerializableBuffer::Free(pBuffer);
 			return nullptr;
 		}
 		return pBuffer;
 	}
 
-	NetworkCommonLib::CSerializableBuffer<FALSE> *CServerPacketSender::submitPreparedPacket(
-		UINT64 sessionId, EPacketType type, NetworkCommonLib::CSerializableBuffer<FALSE> *pPacket) noexcept
+	NetworkCommonLib::CSerializableBuffer *CServerPacketSender::submitPreparedPacket(
+		UINT64 sessionId, EPacketType type, NetworkCommonLib::CSerializableBuffer *pPacket) noexcept
 	{
 		if (pPacket == nullptr)
 		{
@@ -88,7 +88,7 @@ namespace Chatting
 		return pPacket;
 	}
 
-	NetworkCommonLib::CSerializableBuffer<FALSE> *CServerPacketSender::SendResMessage(
+	NetworkCommonLib::CSerializableBuffer *CServerPacketSender::SendResMessage(
 
 		UINT64 sessionId,
 		std::int64_t accountNo,
@@ -112,7 +112,7 @@ namespace Chatting
 			MakePacketResMessage(packet));
 	}
 
-	NetworkCommonLib::CSerializableBuffer<FALSE> *CServerPacketSender::SendNotiMessage(
+	NetworkCommonLib::CSerializableBuffer *CServerPacketSender::SendNotiMessage(
 
 		UINT64 sessionId,
 		std::int64_t accountNo,
@@ -136,7 +136,7 @@ namespace Chatting
 			MakePacketMessageNoti(packet));
 	}
 
-	NetworkCommonLib::CSerializableBuffer<FALSE> *CServerPacketSender::SendResLogin(
+	NetworkCommonLib::CSerializableBuffer *CServerPacketSender::SendResLogin(
 
 		UINT64 sessionId,
 		std::uint8_t status,
@@ -149,7 +149,7 @@ namespace Chatting
 			MakePacketResLogin(packet));
 	}
 
-	NetworkCommonLib::CSerializableBuffer<FALSE> *CServerPacketSender::SendResSectorMove(
+	NetworkCommonLib::CSerializableBuffer *CServerPacketSender::SendResSectorMove(
 
 		UINT64 sessionId,
 		std::int64_t accountNo,

@@ -13,7 +13,7 @@
 #error SerializableBufferTests requires active assertions.
 #endif
 
-using CBuffer = NetworkCommonLib::CSerializableBuffer<false>;
+using CBuffer = NetworkCommonLib::CSerializableBuffer;
 
 void TestFixedCapacity()
 {
@@ -37,7 +37,7 @@ void TestFixedCapacity()
 	assert(!buffer.IsValid() && word == 0xabcd && buffer.GetDataSize() == 1);
 }
 
-class CLeaf final : public MHLib::serialization::ISerializable<>
+class CLeaf final : public MHLib::serialization::ISerializable
 {
 public:
 	bool Serialize(CBuffer &buffer) const noexcept override { return (buffer << m_value).IsValid(); }
@@ -45,7 +45,7 @@ public:
 	std::uint16_t m_value = 0;
 };
 
-class CEnvelope final : public MHLib::serialization::ISerializable<>
+class CEnvelope final : public MHLib::serialization::ISerializable
 {
 public:
 	bool Serialize(CBuffer &buffer) const noexcept override { return (buffer << m_leaf << m_tag).IsValid(); }
@@ -54,7 +54,7 @@ public:
 	char m_tag = 0;
 };
 
-class CReject final : public MHLib::serialization::ISerializable<>
+class CReject final : public MHLib::serialization::ISerializable
 {
 public:
 	bool Serialize(CBuffer &) const noexcept override { return false; }
@@ -237,10 +237,10 @@ void TestPoolReset()
 
 void TestRawBufferBoundaries()
 {
-	NetworkCommonLib::CSerializableBuffer<true> buffer;
-	char header[]{1, 2};
-	char replacement[]{3, 4};
-	assert(buffer.GetHeaderSize() == 2 && buffer.GetBufferSize() == 128);
+	NetworkCommonLib::CSerializableBuffer buffer;
+	char header[]{1, 2, 3, 4, 5};
+	char replacement[sizeof(header)]{3, 4};
+	assert(buffer.GetHeaderSize() == 5 && buffer.GetBufferSize() == 1024);
 	assert(buffer.EnqueueHeader(header, sizeof(header)));
 	assert(buffer.EnqueueHeader(replacement, sizeof(replacement)));
 	assert(std::memcmp(buffer.GetBufferPtr(), header, sizeof(header)) == 0);
@@ -248,12 +248,12 @@ void TestRawBufferBoundaries()
 	assert(!buffer.Enqueue(nullptr, 1) && !buffer.IsValid() && buffer.GetDataSize() == 0);
 	buffer.Clear();
 	assert(buffer.Enqueue(header, sizeof(header)));
-	assert(!buffer.Dequeue(replacement, -1) && !buffer.IsValid() && buffer.GetDataSize() == 2);
+	assert(!buffer.Dequeue(replacement, -1) && !buffer.IsValid() && buffer.GetDataSize() == sizeof(header));
 	assert(replacement[0] == 3 && replacement[1] == 4);
 	buffer.Clear();
-	assert(buffer.MoveWritePos(126) == 128 && buffer.MoveReadPos(126) == 128);
+	assert(buffer.MoveWritePos(1019) == 1024 && buffer.MoveReadPos(1019) == 1024);
 	assert(buffer.IsValid() && buffer.GetDataSize() == 0);
-	assert(buffer.MoveWritePos((std::numeric_limits<int>::max)()) == 128 && !buffer.IsValid());
+	assert(buffer.MoveWritePos((std::numeric_limits<int>::max)()) == 1024 && !buffer.IsValid());
 }
 
 int main(void)

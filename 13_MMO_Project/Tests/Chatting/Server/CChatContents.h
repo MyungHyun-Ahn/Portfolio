@@ -13,10 +13,10 @@ namespace Chatting
 		explicit CChatContents(CChatServer &server) noexcept;
 		void OnEnter(UINT64 sessionId, void *pObject) noexcept override;
 		void OnLeave(UINT64 sessionId) noexcept override;
-		ServerNetworkLib::ERecvResult OnRecv(UINT64 sessionId, NetworkCommonLib::CSerializableBuffer<FALSE> *pMessage,
+		ServerNetworkLib::ERecvResult OnRecv(UINT64 sessionId, NetworkCommonLib::CSerializableBuffer *pMessage,
 			int delayFrame) noexcept override;
 		void OnLoopEnd() noexcept override;
-		void SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX, NetworkCommonLib::CSerializableBuffer<FALSE> *pMessage) noexcept;
+		void SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX, NetworkCommonLib::CSerializableBuffer *pMessage) noexcept;
 
 	private:
 		void nonLoginHeartbeat() noexcept;

@@ -6,5 +6,5 @@ namespace Chatting
 	class IServerPacketHandler;
 
 	[[nodiscard]] bool DispatchServerPacket(std::uint16_t type, UINT64 sessionId,
-NetworkCommonLib::CSerializableBuffer<FALSE> &message, IServerPacketHandler &handler) noexcept;
+NetworkCommonLib::CSerializableBuffer &message, IServerPacketHandler &handler) noexcept;
 }

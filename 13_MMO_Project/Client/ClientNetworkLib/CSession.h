@@ -2,14 +2,15 @@
 
 namespace ClientNetworkLib
 {
-	class CNetSession
+	class CSession
 	{
 	public:
-		CNetSession(BYTE packetCode, std::shared_ptr<CClientMailbox> spMailbox, int recvBufferBytes);
-		~CNetSession();
+		CSession(BYTE packetCode, std::shared_ptr<CClientMailbox> spMailbox, int recvBufferBytes,
+			NetworkCommonLib::EPacketMode packetMode = NetworkCommonLib::EPacketMode::Net);
+		~CSession();
 
 	private:
-		friend class CNetClientManager;
+		friend class CClientManager;
 		friend class CClientLifecycleProbe;
 
 		enum class EState
@@ -25,7 +26,7 @@ namespace ClientNetworkLib
 
 		// 아래 함수들은 호출자가 m_sessionStateLock을 잡은 상태에서만 호출한다.
 		[[nodiscard]]
-		bool queueSendLocked(std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>> spMessage) noexcept;
+		bool queueSendLocked(std::shared_ptr<NetworkCommonLib::CSerializableBuffer> spMessage) noexcept;
 		[[nodiscard]]
 		bool postSendLocked() noexcept;
 		[[nodiscard]]
@@ -57,6 +58,7 @@ namespace ClientNetworkLib
 
 		// 헤더 식별 값
 		BYTE m_packetCode;
+		const NetworkCommonLib::EPacketMode m_packetMode;
 
 		std::shared_ptr<CClientMailbox> m_spMailbox;
 
@@ -68,8 +70,8 @@ namespace ClientNetworkLib
 		NetworkCommonLib::CRingBuffer m_recvBuffer;
 
 		// Send 관련
-		std::deque<std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>>> 									m_sendQueue;
-		std::array<std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>>, NetworkCommonLib::kWsasendMaxBufferCount> m_sendBatch;
+		std::deque<std::shared_ptr<NetworkCommonLib::CSerializableBuffer>> 									m_sendQueue;
+		std::array<std::shared_ptr<NetworkCommonLib::CSerializableBuffer>, NetworkCommonLib::kWsasendMaxBufferCount> m_sendBatch;
 		DWORD m_sendCount = 0;
 	};
 }

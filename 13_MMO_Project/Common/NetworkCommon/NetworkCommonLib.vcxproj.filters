@@ -4,7 +4,7 @@
   <ItemGroup>
     <ClCompile Include="COverlappedAllocator.cpp" />
     <ClCompile Include="NetworkBufferPools.cpp" />
-    <ClCompile Include="NetPacket.cpp" />
+    <ClCompile Include="PacketFraming.cpp" />
     <ClCompile Include="NetworkCommonLibPch.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -13,10 +13,10 @@
     <ClInclude Include="CSerializableBufferView.h" />
     <ClInclude Include="CRecvBuffer.h" />
     <ClInclude Include="COverlappedAllocator.h" />
-    <ClInclude Include="NetPacket.h" />
+    <ClInclude Include="PacketFraming.h" />
     <ClInclude Include="CRingBuffer.h" />
     <ClInclude Include="CSerializableBuffer.h" />
     <ClInclude Include="NetworkCommonLibPch.h" />
-    <ClInclude Include="NetHeaders.h" />
+    <ClInclude Include="PacketHeaders.h" />
   </ItemGroup>
 </Project>

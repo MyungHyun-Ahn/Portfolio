@@ -20,6 +20,7 @@ namespace Chatting
 		int m_logQueueCapacity = 1024;
 		DWORD m_connectTimeoutMilliseconds = 5000;
 		int m_recvBufferBytes = 4096;
+		NetworkCommonLib::EPacketMode m_packetMode = NetworkCommonLib::EPacketMode::Net;
 		INT64 m_accountNo = 0;
 		std::wstring m_name = L"player";
 		WORD m_sectorX = 10;

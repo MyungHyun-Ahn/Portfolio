@@ -6,7 +6,7 @@
 #include "CRecvBuffer.h"
 #include "CSerializableBufferView.h"
 #include "SBaseEvent.h"
-#include "CNetServer.h"
+#include "CServer.h"
 #include "CBaseContents.h"
 #include "CMonitor.h"
 #include "CommonProtocol.h"
@@ -61,7 +61,7 @@ namespace Chatting
 	}
 
 	ServerNetworkLib::ERecvResult CChatContents::OnRecv(UINT64 sessionId,
-		NetworkCommonLib::CSerializableBuffer<FALSE> *pMessage, int /*delayFrame*/) noexcept
+		NetworkCommonLib::CSerializableBuffer *pMessage, int /*delayFrame*/) noexcept
 	{
 		InterlockedIncrement(&ServerNetworkLib::g_monitor.m_updateTps);
 		std::uint16_t type{};
@@ -95,7 +95,7 @@ namespace Chatting
 	}
 
 	void CChatContents::SendSector(UINT64 sessionId, WORD sectorY, WORD sectorX,
-		NetworkCommonLib::CSerializableBuffer<FALSE> *pMessage) noexcept
+		NetworkCommonLib::CSerializableBuffer *pMessage) noexcept
 	{
 		int startY = sectorY - kSectorViewStart;
 		int startX = sectorX - kSectorViewStart;

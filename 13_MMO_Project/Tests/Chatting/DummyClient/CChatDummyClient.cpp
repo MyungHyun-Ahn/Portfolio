@@ -3,8 +3,8 @@
 #include <utility>
 #include "CSerializableBuffer.h"
 #include "CommonProtocol.h"
-#include "CNetClientManager.h"
-#include "CNetClient.h"
+#include "CClientManager.h"
+#include "CClient.h"
 #include "MHLib/serialization/ISerializable.h"
 #include "IncludePacketAll.g.h"
 #include "IClientPacketHandler.g.h"
@@ -15,7 +15,7 @@
 
 namespace Chatting
 {
-	CChatDummyClient::CChatDummyClient(ClientNetworkLib::CNetClientManager &network, const SDummyConfig &config,
+	CChatDummyClient::CChatDummyClient(ClientNetworkLib::CClientManager &network, const SDummyConfig &config,
 		SDummyRunStats &stats, size_t index, const std::wstring &runMarker)
 		: CChatNetClient(network)
 		, m_config(config)

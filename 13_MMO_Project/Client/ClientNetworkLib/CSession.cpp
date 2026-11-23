@@ -1,24 +1,25 @@
 #include "ClientNetworkLibPch.h"
-#include "NetPacket.h"
+#include "PacketFraming.h"
 
 namespace ClientNetworkLib
 {
 	using namespace NetworkCommonLib;
 
-	CNetSession::CNetSession(BYTE packetCode, std::shared_ptr<CClientMailbox> spMailbox, int recvBufferBytes)
+	CSession::CSession(BYTE packetCode, std::shared_ptr<CClientMailbox> spMailbox, int recvBufferBytes, EPacketMode packetMode)
 		: m_packetCode(packetCode)
+		, m_packetMode(packetMode)
 		, m_spMailbox(std::move(spMailbox))
 		, m_recvBuffer(recvBufferBytes)
 	{
 	}
 
-	CNetSession::~CNetSession()
+	CSession::~CSession()
 	{
 		if (m_socket != INVALID_SOCKET)
 			closesocket(m_socket);
 	}
 
-	bool CNetSession::postConnectLocked(LPFN_CONNECTEX pConnectEx, const SOCKADDR_IN &address, DWORD timeoutMilliseconds) noexcept
+	bool CSession::postConnectLocked(LPFN_CONNECTEX pConnectEx, const SOCKADDR_IN &address, DWORD timeoutMilliseconds) noexcept
 	{
 		m_connectDeadline = GetTickCount64() + timeoutMilliseconds;
 		++m_ioCount;
@@ -32,7 +33,7 @@ namespace ClientNetworkLib
 		return false;
 	}
 
-	bool CNetSession::queueSendLocked(std::shared_ptr<CSerializableBuffer<FALSE>> spMessage) noexcept
+	bool CSession::queueSendLocked(std::shared_ptr<CSerializableBuffer> spMessage) noexcept
 	{
 		if (m_state != EState::Connected || m_sendQueue.size() >= 512)
 			return false;
@@ -44,11 +45,11 @@ namespace ClientNetworkLib
 		{
 			return false;
 		}
-		PrepareNetPacket(*m_sendQueue.back(), m_packetCode);
+		PreparePacket(*m_sendQueue.back(), m_packetCode, m_packetMode);
 		return postSendLocked();
 	}
 
-	bool CNetSession::postSendLocked() noexcept
+	bool CSession::postSendLocked() noexcept
 	{
 		if (m_sendCount != 0)
 			return true;
@@ -80,7 +81,7 @@ namespace ClientNetworkLib
 		return false;
 	}
 
-	bool CNetSession::postRecvLocked() noexcept
+	bool CSession::postRecvLocked() noexcept
 	{
 		const int freeBytes = m_recvBuffer.GetFreeSize();
 		if (freeBytes == 0)
@@ -106,7 +107,7 @@ namespace ClientNetworkLib
 		return false;
 	}
 
-	void CNetSession::completeLocked(OVERLAPPED *pOverlapped, DWORD bytes, DWORD error) noexcept
+	void CSession::completeLocked(OVERLAPPED *pOverlapped, DWORD bytes, DWORD error) noexcept
 	{
 		--m_ioCount;
 		if (m_state == EState::Closing)
@@ -132,7 +133,7 @@ namespace ClientNetworkLib
 		}
 	}
 
-	void CNetSession::connectCompletedLocked() noexcept
+	void CSession::connectCompletedLocked() noexcept
 	{
 		if (setsockopt(m_socket, SOL_SOCKET, SO_UPDATE_CONNECT_CONTEXT, nullptr, 0) == SOCKET_ERROR)
 		{
@@ -150,23 +151,23 @@ namespace ClientNetworkLib
 		m_spMailbox->publishConnected();
 	}
 
-	void CNetSession::sendCompletedLocked() noexcept
+	void CSession::sendCompletedLocked() noexcept
 	{
 		releaseSendBatchLocked();
 		(void)postSendLocked();
 	}
 
-	void CNetSession::releaseSendBatchLocked() noexcept
+	void CSession::releaseSendBatchLocked() noexcept
 	{
 		for (DWORD index = 0; index < m_sendCount; ++index)
 			m_sendBatch[index].reset();
 		m_sendCount = 0;
 	}
 
-	DWORD CNetSession::recvCompletedLocked(DWORD bytes) noexcept
+	DWORD CSession::recvCompletedLocked(DWORD bytes) noexcept
 	{
-		constexpr int kHeaderBytes = sizeof(SNetHeader);
-		constexpr int kMaxPacketBytes = static_cast<int>(CSerializableBuffer<FALSE>::EBufferDefine::PacketMaxSize);
+		constexpr int kHeaderBytes = sizeof(SPacketHeader);
+		constexpr int kMaxPacketBytes = static_cast<int>(CSerializableBuffer::EBufferDefine::PacketMaxSize);
 
 		if (bytes > static_cast<DWORD>(m_recvBuffer.GetFreeSize()))
 			return ERROR_INVALID_DATA;
@@ -174,7 +175,7 @@ namespace ClientNetworkLib
 		m_recvBuffer.MoveRear(static_cast<int>(bytes));
 		while (m_recvBuffer.GetUseSize() >= kHeaderBytes)
 		{
-			SNetHeader header;
+			SPacketHeader header;
 			m_recvBuffer.Peek(reinterpret_cast<char *>(&header), kHeaderBytes);
 			if (header.code != m_packetCode || header.len > kMaxPacketBytes - kHeaderBytes)
 				return ERROR_INVALID_DATA;
@@ -183,16 +184,19 @@ namespace ClientNetworkLib
 			if (m_recvBuffer.GetUseSize() < packetBytes)
 				break;
 
-			auto spMessage = CSerializableBuffer<FALSE>::MakeShared();
+			auto spMessage = CSerializableBuffer::MakeShared();
 			if (spMessage == nullptr)
 				return ERROR_NOT_ENOUGH_MEMORY;
 
 			m_recvBuffer.Dequeue(spMessage->GetBufferPtr(), packetBytes);
 			spMessage->MoveWritePos(header.len);
-			CEncryption::Decoding(spMessage->GetBufferPtr() + 4, header.len + 1, header.randKey);
-			BYTE checksum = CEncryption::CalCheckSum(spMessage->GetContentBufferPtr(), header.len);
-			if (checksum != static_cast<BYTE>(spMessage->GetBufferPtr()[4]))
-				return ERROR_INVALID_DATA;
+			if (m_packetMode == EPacketMode::Net)
+			{
+				CEncryption::Decoding(spMessage->GetBufferPtr() + 4, header.len + 1, header.randKey);
+				BYTE checksum = CEncryption::CalCheckSum(spMessage->GetContentBufferPtr(), header.len);
+				if (checksum != static_cast<BYTE>(spMessage->GetBufferPtr()[4]))
+					return ERROR_INVALID_DATA;
+			}
 
 			if (!m_spMailbox->pushPacket(std::move(spMessage)))
 				return ERROR_NOT_ENOUGH_MEMORY;
@@ -200,7 +204,7 @@ namespace ClientNetworkLib
 		return 0;
 	}
 
-	void CNetSession::beginCloseLocked(DWORD error) noexcept
+	void CSession::beginCloseLocked(DWORD error) noexcept
 	{
 		if (m_state == EState::Closing)
 			return;
@@ -213,7 +217,7 @@ namespace ClientNetworkLib
 		m_socket = INVALID_SOCKET;
 	}
 
-	bool CNetSession::finishCloseLocked() noexcept
+	bool CSession::finishCloseLocked() noexcept
 	{
 		if (m_state != EState::Closing || m_ioCount != 0 || m_isFinalized)
 			return false;

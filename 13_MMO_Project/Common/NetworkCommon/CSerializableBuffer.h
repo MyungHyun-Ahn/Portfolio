@@ -2,26 +2,22 @@
 
 namespace MHLib::serialization
 {
-	template<bool isLanServer> class ISerializable;
+	class ISerializable;
 }
 
 namespace NetworkCommonLib
 {
-template<bool isLanServer>
 class CSerializableBuffer
 {
 public:
 	enum class EBufferDefine : int
 	{
-		HeaderSize = isLanServer ? 2 : 5,
-		PacketMaxSize = isLanServer ? 128 : 1024 // 채팅 로그인과 최대 메시지 응답
+		HeaderSize = sizeof(SPacketHeader),
+		PacketMaxSize = 1024 // 채팅 로그인과 최대 메시지 응답
 	};
 
 
-	CSerializableBuffer() noexcept
-		: CSerializableBuffer(static_cast<char *>(sm_pagePool.Alloc()), freePooledPage, freePooledBuffer)
-	{
-	}
+	CSerializableBuffer() noexcept;
 
 	virtual ~CSerializableBuffer() noexcept
 	{
@@ -140,19 +136,19 @@ public:
 		return *this;
 	}
 
-	template<typename TValue> requires std::derived_from<TValue, MHLib::serialization::ISerializable<isLanServer>>
+	template<typename TValue> requires std::derived_from<TValue, MHLib::serialization::ISerializable>
 	CSerializableBuffer &operator<<(const TValue &value) noexcept
 	{
-		const MHLib::serialization::ISerializable<isLanServer> &serializable = value;
+		const MHLib::serialization::ISerializable &serializable = value;
 		if (m_isValid && !serializable.Serialize(*this))
 			fail();
 		return *this;
 	}
 
-	template<typename TValue> requires std::derived_from<TValue, MHLib::serialization::ISerializable<isLanServer>>
+	template<typename TValue> requires std::derived_from<TValue, MHLib::serialization::ISerializable>
 	CSerializableBuffer &operator>>(TValue &outValue) noexcept
 	{
-		MHLib::serialization::ISerializable<isLanServer> &serializable = outValue;
+		MHLib::serialization::ISerializable &serializable = outValue;
 		if (m_isValid && !serializable.Deserialize(*this))
 			fail();
 		return *this;
@@ -221,27 +217,15 @@ public:
 		return *this;
 	}
 
-	inline static CSerializableBuffer *Alloc() noexcept
-	{
-		// 할당하고 초기화해서 반환
-		CSerializableBuffer *pSBuffer = sm_sbufferPool.Alloc();
-		pSBuffer->Clear();
-		return pSBuffer;
-	}
+	static CSerializableBuffer *Alloc() noexcept;
 
 	inline static void Free(CSerializableBuffer *pDelSBuffer) noexcept
 	{
 		pDelSBuffer->m_releaseBuffer(pDelSBuffer);
 	}
 
-	inline static LONG GetPoolCapacity() noexcept
-	{
-		return sm_sbufferPool.GetCapacity();
-	}
-	inline static LONG GetPoolUsage() noexcept
-	{
-		return sm_sbufferPool.GetUseCount();
-	}
+	static LONG GetPoolCapacity() noexcept;
+	static LONG GetPoolUsage() noexcept;
 
 	inline LONG IncreaseRef() noexcept 
 	{
@@ -278,15 +262,9 @@ private:
 	{
 	}
 
-	static void freePooledPage(char *pPage) noexcept
-	{
-		sm_pagePool.Free(pPage);
-	}
+	static void freePooledPage(char *pPage) noexcept;
 
-	static void freePooledBuffer(CSerializableBuffer *pBuffer) noexcept
-	{
-		sm_sbufferPool.Free(pBuffer);
-	}
+	static void freePooledBuffer(CSerializableBuffer *pBuffer) noexcept;
 
 	static void freeHeapPage(char *pPage) noexcept
 	{
@@ -355,8 +333,7 @@ public:
 	static MHLib::memory::CTlsPagePoolManager<(int)EBufferDefine::PacketMaxSize, 16, false> sm_pagePool;
 };
 
-template<bool isLanServer>
-bool CSerializableBuffer<isLanServer>::EnqueueHeader(char *pBuffer, int size) noexcept
+inline bool CSerializableBuffer::EnqueueHeader(char *pBuffer, int size) noexcept
 {
 	if (!m_isValid)
 		return false;
@@ -373,14 +350,12 @@ bool CSerializableBuffer<isLanServer>::EnqueueHeader(char *pBuffer, int size) no
 	return true;
 }
 
-template<bool isLanServer>
-bool CSerializableBuffer<isLanServer>::Enqueue(char *pBuffer, int size) noexcept
+inline bool CSerializableBuffer::Enqueue(char *pBuffer, int size) noexcept
 {
 	return size >= 0 ? writeBytes(pBuffer, size) : fail();
 }
 
-template<bool isLanServer>
-bool CSerializableBuffer<isLanServer>::Dequeue(char *outBuffer, int size) noexcept
+inline bool CSerializableBuffer::Dequeue(char *outBuffer, int size) noexcept
 {
 	return size >= 0 ? readBytes(outBuffer, size) : fail();
 }

@@ -2,7 +2,7 @@
 
 namespace ServerNetworkLib
 {
-class CNetServer;
+class CServer;
 
 
 struct SMoveJob
@@ -36,7 +36,7 @@ enum class ERecvResult
 class CBaseContents
 {
 public:
-	friend class ServerNetworkLib::CNetServer;
+	friend class ServerNetworkLib::CServer;
 	friend struct SContentsFrameEvent;
 	friend class CMonitor;
 
@@ -60,7 +60,7 @@ public:
 
 	virtual void OnEnter(const UINT64 sessionId, void *pObject) noexcept = 0;
 	virtual void OnLeave(const UINT64 sessionId) noexcept = 0;
-	virtual ERecvResult OnRecv(const UINT64 sessionId, CSerializableBuffer<FALSE> *pMessage, int delayFrame) noexcept = 0;
+	virtual ERecvResult OnRecv(const UINT64 sessionId, CSerializableBuffer *pMessage, int delayFrame) noexcept = 0;
 	virtual void OnLoopEnd() noexcept = 0;
 
 protected:

@@ -8,7 +8,7 @@
 #include "SBaseEvent.h"
 #include "ServerSetting.h"
 #include "CMonitor.h"
-#include "CNetServer.h"
+#include "CServer.h"
 #include "CBaseContents.h"
 #include "SystemEvent.h"
 #include "CContentsThread.h"
@@ -59,7 +59,7 @@ namespace Chatting
 		// NetworkLib의 LeaveJobEnqueue 이후 콘텐츠 프레임에서 정리한다.
 	}
 
-	void CChatServer::OnRecv(UINT64 /*sessionId*/, NetworkCommonLib::CSerializableBufferView<FALSE> * /*pMessage*/) noexcept
+	void CChatServer::OnRecv(UINT64 /*sessionId*/, NetworkCommonLib::CSerializableBufferView * /*pMessage*/) noexcept
 	{
 		// 현재 NetworkLib는 CBaseContents의 수신 큐를 사용한다.
 	}

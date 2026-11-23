@@ -5,5 +5,5 @@ namespace Chatting
 {
 	class IClientPacketHandler;
 
-	[[nodiscard]] bool DispatchClientPacket(NetworkCommonLib::CSerializableBuffer<FALSE> &message, IClientPacketHandler &handler) noexcept;
+	[[nodiscard]] bool DispatchClientPacket(NetworkCommonLib::CSerializableBuffer &message, IClientPacketHandler &handler) noexcept;
 }

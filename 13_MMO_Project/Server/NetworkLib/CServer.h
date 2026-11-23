@@ -6,14 +6,14 @@ struct SContentsFrameEvent;
 class CBaseContents;
 
 
-	class CNetSession
+	class CSession
 	{
 	public:
-		friend class CNetServer;
+		friend class CServer;
 		friend class CBaseContents;
 		friend struct SContentsFrameEvent;
 
-		CNetSession() noexcept
+		CSession() noexcept
 			: m_sessionSocket(INVALID_SOCKET)
 			, m_sessionId(0)
 		{
@@ -23,7 +23,7 @@ class CBaseContents;
 			m_pMyOverlappedStartAddr = g_overlappedAllocator.Alloc();
 		}
 
-		~CNetSession() noexcept
+		~CSession() noexcept
 		{
 		}
 
@@ -51,7 +51,7 @@ class CBaseContents;
 		// 인큐할 때 직렬화 버퍼의 포인터를 인큐
 
 
-		inline bool SendPacket(CSerializableBuffer<FALSE> *pMessage) noexcept
+		inline bool SendPacket(CSerializableBuffer *pMessage) noexcept
 		{
 			pMessage->IncreaseRef();
 			m_lfSendBufferQueue.Enqueue(pMessage);
@@ -68,13 +68,13 @@ class CBaseContents;
 		bool PostSend(bool isSendFlag = FALSE) noexcept;
 
 	public:
-		inline static CNetSession *Alloc() noexcept
+		inline static CSession *Alloc() noexcept
 		{
-			CNetSession *pSession = sm_sessionPool.Alloc();
+			CSession *pSession = sm_sessionPool.Alloc();
 			return pSession;
 		}
 
-		inline static void Free(CNetSession *pDelSession) noexcept
+		inline static void Free(CSession *pDelSession) noexcept
 		{
 			pDelSession->Clear();
 			sm_sessionPool.Free(pDelSession);
@@ -109,19 +109,19 @@ class CBaseContents;
 		USHORT		m_clientPort;
 		char		m_dummy01[2]; // 패딩 계산용
 		// 최대 무조건 1개 -> 있거나 없거나
-		// CSerializableBufferView<FALSE> *m_pDelayedBuffer = nullptr;
-		CLfQueue<CSerializableBuffer<FALSE> *> m_lfSendBufferQueue;
+		// CSerializableBufferView *m_pDelayedBuffer = nullptr;
+		CLfQueue<CSerializableBuffer *> m_lfSendBufferQueue;
 		// m_pMyOverlappedStartAddr
 		//  + 0 : ACCEPTEX
 		//  + 1 : RECV
 		//  + 2 : SEND
 		OVERLAPPED *m_pMyOverlappedStartAddr = nullptr;
-		CSerializableBuffer<FALSE> *m_pSendBuffers[kWsasendMaxBufferCount]; // 8 * 32 = 256
+		CSerializableBuffer *m_pSendBuffers[kWsasendMaxBufferCount]; // 8 * 32 = 256
 
 		LONG m_cancelIoCalled = FALSE;
 
 		// Recv 큐
-		MHLib::containers::CLfQueue<CSerializableBuffer<FALSE> *> m_recvMsgQueue;
+		MHLib::containers::CLfQueue<CSerializableBuffer *> m_recvMsgQueue;
 		// LONG m_ContentStatus = FALSE;
 
 		// 총 460바이트
@@ -129,20 +129,21 @@ class CBaseContents;
 		// ContentPtr
 		CBaseContents *m_pCurrentContent = nullptr;
 
-		inline static MHLib::memory::CTlsMemoryPoolManager<CNetSession, 16, 4> sm_sessionPool =
-			MHLib::memory::CTlsMemoryPoolManager<CNetSession, 16, 4>();
+		inline static MHLib::memory::CTlsMemoryPoolManager<CSession, 16, 4> sm_sessionPool =
+			MHLib::memory::CTlsMemoryPoolManager<CSession, 16, 4>();
 		inline static LONG sm_releaseFlag = 0x80000000;
 		inline static LONG sm_enqueueFlag = 0x80000000;
 	};
 
 
-	class CNetServer
+	class CServer
 	{
 	public:
 		friend class CBaseContents;
 		friend struct SContentsFrameEvent;
 
-		BOOL Start(const CHAR *pOpenIp, const USHORT port) noexcept;
+		BOOL Start(const CHAR *pOpenIp, const USHORT port, EPacketMode packetMode = EPacketMode::Net) noexcept;
+		EPacketMode GetPacketMode() const noexcept { return m_packetMode; }
 		// Start 호출 스레드가 반환하고 합류한 뒤에만 조회한다.
 		bool HasStartedBackgroundWork() const noexcept { return m_hasStartedBackgroundWork; }
 		void Stop();
@@ -152,22 +153,22 @@ class CBaseContents;
 			return InterlockedCompareExchange(&m_sessionCount, 0, 0);
 		}
 
-		void SendPacket(const UINT64 sessionId, CSerializableBuffer<FALSE> *pSBuffer) noexcept;
+		void SendPacket(const UINT64 sessionId, CSerializableBuffer *pSBuffer) noexcept;
 		// Send 시도는 하지 않음
-		void EnqueuePacket(const UINT64 sessionId, CSerializableBuffer<FALSE> *pSBuffer) noexcept;
+		void EnqueuePacket(const UINT64 sessionId, CSerializableBuffer *pSBuffer) noexcept;
 		void SendAll();
 		void SendAllPqcs();
 
 		BOOL Disconnect(const UINT64 sessionId, BOOL isPqcs = FALSE) noexcept;
-		BOOL ReleaseSession(CNetSession *pSession, BOOL isPqcs = FALSE) noexcept;
-		BOOL ReleaseSessionPqcs(CNetSession *pSession) noexcept;
+		BOOL ReleaseSession(CSession *pSession, BOOL isPqcs = FALSE) noexcept;
+		BOOL ReleaseSessionPqcs(CSession *pSession) noexcept;
 
 		virtual bool OnConnectionRequest(const WCHAR *pIp, USHORT port) noexcept = 0;
 
 
 		virtual void OnAccept(const UINT64 sessionId) noexcept = 0;
 		virtual void OnClientLeave(const UINT64 sessionId) noexcept = 0;
-		virtual void OnRecv(const UINT64 sessionId, CSerializableBufferView<FALSE> *pMessage) noexcept = 0;
+		virtual void OnRecv(const UINT64 sessionId, CSerializableBufferView *pMessage) noexcept = 0;
 
 
 		virtual void OnError(int errorcode, WCHAR *pErrMsg) noexcept = 0;
@@ -175,7 +176,7 @@ class CBaseContents;
 		// AcceptEx
 		void FristPostAcceptEx() noexcept;
 		BOOL PostAcceptEx(INT index) noexcept;
-		BOOL AcceptExCompleted(CNetSession *pSession) noexcept;
+		BOOL AcceptExCompleted(CSession *pSession) noexcept;
 
 	private:
 		inline static USHORT getIndex(UINT64 sessionId) noexcept
@@ -208,10 +209,11 @@ class CBaseContents;
 		LONG64					m_currentId = 0;
 
 		USHORT					m_maxSessionCount;
-		CNetSession				**m_pSessions;
+		CSession				**m_pSessions;
 		CLfStack<USHORT>		m_stackDisconnectIndex;
 
 		// Worker
+		EPacketMode m_packetMode = EPacketMode::Net;
 		SOCKET					m_listenSocket = INVALID_SOCKET;
 		UINT32					m_maxWorkerThreadCount;
 		BOOL					m_isWorkerRun = TRUE;
@@ -221,7 +223,7 @@ class CBaseContents;
 		// Accepter
 		LPFN_ACCEPTEX					m_pAcceptEx = NULL;
 		GUID							m_guidAcceptEx = WSAID_ACCEPTEX;
-		CNetSession						**m_pAcceptExSessions;
+		CSession						**m_pAcceptExSessions;
 
 		LPFN_GETACCEPTEXSOCKADDRS		m_pGetAcceptExSockaddrs = NULL;
 		GUID							m_guidGetAcceptExSockaddrs = WSAID_GETACCEPTEXSOCKADDRS;
@@ -234,5 +236,5 @@ class CBaseContents;
 		LONG m_isStop = FALSE;
 	};
 
-	extern CNetServer *g_pNetServer;
+	extern CServer *g_pServer;
 }

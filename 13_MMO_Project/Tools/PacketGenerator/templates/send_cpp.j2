@@ -9,8 +9,8 @@
 #include "MHLib/serialization/ISerializable.h"
 #include "IncludePacketAll.g.h"
 {% if side == 'Client' %}
-#include "CNetClientManager.h"
-#include "CNetClient.h"
+#include "CClientManager.h"
+#include "CClient.h"
 #include "IClientPacketHandler.g.h"
 #include "ClientPacketDispatch.g.h"
 {% endif %}
@@ -20,9 +20,9 @@ namespace Chatting
 {
 {% for packet in packets %}
 {% set buffer = 'spBuffer' if side == 'Client' else 'pBuffer' %}
-	{{ 'std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>> ' if side == 'Client' else 'NetworkCommonLib::CSerializableBuffer<FALSE> *' }}MakePacket{{ packet.name }}(const S{{ packet.name }} &packet) noexcept
+	{{ 'std::shared_ptr<NetworkCommonLib::CSerializableBuffer> ' if side == 'Client' else 'NetworkCommonLib::CSerializableBuffer *' }}MakePacket{{ packet.name }}(const S{{ packet.name }} &packet) noexcept
 	{
-		auto {{ '' if side == 'Client' else '*' }}{{ buffer }} = NetworkCommonLib::CSerializableBuffer<FALSE>::{{ 'MakeShared' if side == 'Client' else 'Alloc' }}();
+		auto {{ '' if side == 'Client' else '*' }}{{ buffer }} = NetworkCommonLib::CSerializableBuffer::{{ 'MakeShared' if side == 'Client' else 'Alloc' }}();
 		if ({{ buffer }} == nullptr)
 		{
 			return nullptr;
@@ -32,7 +32,7 @@ namespace Chatting
 		if (!{{ buffer }}->IsValid())
 		{
 {% if side == 'Server' %}
-			NetworkCommonLib::CSerializableBuffer<FALSE>::Free(pBuffer);
+			NetworkCommonLib::CSerializableBuffer::Free(pBuffer);
 {% endif %}
 			return nullptr;
 		}
@@ -44,8 +44,8 @@ namespace Chatting
 {% endfor %}
 {% if side == 'Server' %}
 
-	NetworkCommonLib::CSerializableBuffer<FALSE> *CServerPacketSender::submitPreparedPacket(
-		UINT64 sessionId, EPacketType type, NetworkCommonLib::CSerializableBuffer<FALSE> *pPacket) noexcept
+	NetworkCommonLib::CSerializableBuffer *CServerPacketSender::submitPreparedPacket(
+		UINT64 sessionId, EPacketType type, NetworkCommonLib::CSerializableBuffer *pPacket) noexcept
 	{
 		if (pPacket == nullptr)
 		{
@@ -57,7 +57,7 @@ namespace Chatting
 	}
 {% else %}
 
-	bool CChatNetClient::onRecv(NetworkCommonLib::CSerializableBuffer<FALSE> &message) noexcept
+	bool CChatNetClient::onRecv(NetworkCommonLib::CSerializableBuffer &message) noexcept
 	{
 		return DispatchClientPacket(message, *this);
 	}
@@ -88,7 +88,7 @@ namespace Chatting
 		}
 {% endif %}
 {% if side == 'Client' %}
-		return this->sendNetworkPacket(MakePacket{{ packet.name }}(packet));
+		return this->sendPacket(MakePacket{{ packet.name }}(packet));
 {% else %}
 		return this->submitPreparedPacket(sessionId, EPacketType::{{ packet.name }},
 			MakePacket{{ packet.name }}(packet));

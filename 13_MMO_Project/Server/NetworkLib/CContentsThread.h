@@ -2,13 +2,13 @@
 
 namespace ServerNetworkLib
 {
-class CNetServer;
+class CServer;
 
 
 class CContentsThread
 {
 public:
-	friend class ServerNetworkLib::CNetServer;
+	friend class ServerNetworkLib::CServer;
 	CContentsThread()
 	{
 		InitializeSRWLock(&m_timerEventQueueRWLock);

@@ -1,51 +1,55 @@
 #include "ServerNetworkLibPch.h"
 #include "SNetworkCounters.h"
+#include "PacketFraming.h"
 
 namespace ServerNetworkLib
 {
-CNetServer *g_pNetServer = nullptr;
+CServer *g_pServer = nullptr;
 
-	void CNetSession::RecvCompleted(int size) noexcept
+	void CSession::RecvCompleted(int size) noexcept
 	{
 		m_recvBuffer.MoveRear(size);
 		int currentUseSize = m_recvBuffer.GetUseSize();
 		while (currentUseSize > 0)
 		{
-			if (currentUseSize < sizeof(SNetHeader))
+			if (currentUseSize < sizeof(SPacketHeader))
 				break;
 
-			SNetHeader packetHeader;
-			m_recvBuffer.Peek((char *)&packetHeader, sizeof(SNetHeader));
+			SPacketHeader packetHeader;
+			m_recvBuffer.Peek((char *)&packetHeader, sizeof(SPacketHeader));
 
 			if (packetHeader.code != serverSetting::packetCode)
 			{
-				g_pNetServer->Disconnect(m_sessionId);
+				g_pServer->Disconnect(m_sessionId);
 				return;
 			}
-			if (packetHeader.len > (int)CSerializableBuffer<FALSE>::EBufferDefine::PacketMaxSize - sizeof(SNetHeader)
+			if (packetHeader.len > (int)CSerializableBuffer::EBufferDefine::PacketMaxSize - sizeof(SPacketHeader)
 				|| packetHeader.len >= 65535 || packetHeader.len >= m_recvBuffer.GetCapacity())
 			{
-				g_pNetServer->Disconnect(m_sessionId);
+				g_pServer->Disconnect(m_sessionId);
 				return;
 			}
-			if (m_recvBuffer.GetUseSize() < sizeof(SNetHeader) + packetHeader.len)
+			if (m_recvBuffer.GetUseSize() < sizeof(SPacketHeader) + packetHeader.len)
 				break;
 
-			CSerializableBuffer<FALSE> *pView = CSerializableBuffer<FALSE>::Alloc();
-			m_recvBuffer.MoveFront(sizeof(SNetHeader));
-			pView->EnqueueHeader((char *)&packetHeader, sizeof(SNetHeader));
+			CSerializableBuffer *pView = CSerializableBuffer::Alloc();
+			m_recvBuffer.MoveFront(sizeof(SPacketHeader));
+			pView->EnqueueHeader((char *)&packetHeader, sizeof(SPacketHeader));
 
 			m_recvBuffer.Dequeue(pView->GetContentBufferPtr(), packetHeader.len);
 			pView->MoveWritePos(packetHeader.len);
 
-			CEncryption::Decoding(pView->GetBufferPtr() + 4, pView->GetFullSize() - 4, packetHeader.randKey);
-			BYTE dataCheckSum = CEncryption::CalCheckSum(pView->GetContentBufferPtr(), pView->GetDataSize());
-			BYTE headerCheckSum = *(pView->GetBufferPtr() + offsetof(SNetHeader, checkSum));
-			if (dataCheckSum != headerCheckSum)
+			if (g_pServer->GetPacketMode() == EPacketMode::Net)
 			{
-				CSerializableBuffer<FALSE>::Free(pView);
-				g_pNetServer->Disconnect(m_sessionId);
-				return;
+				CEncryption::Decoding(pView->GetBufferPtr() + 4, pView->GetFullSize() - 4, packetHeader.randKey);
+				BYTE dataCheckSum = CEncryption::CalCheckSum(pView->GetContentBufferPtr(), pView->GetDataSize());
+				BYTE headerCheckSum = *(pView->GetBufferPtr() + offsetof(SPacketHeader, checkSum));
+				if (dataCheckSum != headerCheckSum)
+				{
+					CSerializableBuffer::Free(pView);
+					g_pServer->Disconnect(m_sessionId);
+					return;
+				}
 			}
 
 			pView->IncreaseRef();
@@ -59,7 +63,7 @@ CNetServer *g_pNetServer = nullptr;
 	// * 논블락킹 I/O일 때만 Send를 요청한 데이터보다 덜 보내는 상황이 발생 가능
 	// * 비동기 I/O는 무조건 전부 보내고 완료 통지가 도착함
 
-	void CNetSession::SendCompleted(int size) noexcept
+	void CSession::SendCompleted(int size) noexcept
 	{
 		InterlockedAdd(&g_networkCounters.m_sendTps, m_sendCount);
 
@@ -67,7 +71,7 @@ CNetServer *g_pNetServer = nullptr;
 		{
 			if (m_pSendBuffers[count]->DecreaseRef() == 0)
 			{
-				CSerializableBuffer<FALSE>::Free(m_pSendBuffers[count]);
+				CSerializableBuffer::Free(m_pSendBuffers[count]);
 			}
 		}
 
@@ -78,7 +82,7 @@ CNetServer *g_pNetServer = nullptr;
 		PostSend();
 	}
 
-	bool CNetSession::PostRecv() noexcept
+	bool CSession::PostRecv() noexcept
 	{
 		int errVal;
 		int retVal;
@@ -87,7 +91,7 @@ CNetServer *g_pNetServer = nullptr;
 		// * WSARecv에서 Ref 관리가 불가능
 
 		InterlockedIncrement(&m_ioCountAndRelease);
-		if ((m_ioCountAndRelease & CNetSession::sm_releaseFlag) == CNetSession::sm_releaseFlag)
+		if ((m_ioCountAndRelease & CSession::sm_releaseFlag) == CSession::sm_releaseFlag)
 		{
 			InterlockedDecrement(&m_ioCountAndRelease);
 			return FALSE;
@@ -135,7 +139,7 @@ CNetServer *g_pNetServer = nullptr;
 		return TRUE;
 	}
 
-	bool CNetSession::PostSend(bool isSendFlag) noexcept
+	bool CSession::PostSend(bool isSendFlag) noexcept
 	{
 		int errVal;
 		int retVal;
@@ -168,7 +172,7 @@ CNetServer *g_pNetServer = nullptr;
 		}
 
 		InterlockedIncrement(&m_ioCountAndRelease);
-		if ((m_ioCountAndRelease & CNetSession::sm_releaseFlag) == CNetSession::sm_releaseFlag)
+		if ((m_ioCountAndRelease & CSession::sm_releaseFlag) == CSession::sm_releaseFlag)
 		{
 			InterlockedDecrement(&m_ioCountAndRelease);
 			InterlockedExchange(&m_sendFlag, FALSE);
@@ -186,7 +190,7 @@ CNetServer *g_pNetServer = nullptr;
 		int count;
 		for (count = 0; count < m_sendCount; count++)
 		{
-			CSerializableBuffer<FALSE> *pSBuffer;
+			CSerializableBuffer *pSBuffer;
 			// 못꺼낸 것
 			if (!m_lfSendBufferQueue.Dequeue(&pSBuffer))
 			{
@@ -196,18 +200,7 @@ CNetServer *g_pNetServer = nullptr;
 				MHLib::diagnostics::CCrashDump::Crash();
 			}
 
-			if (!pSBuffer->GetIsEnqueueHeader())
-			{
-				pSBuffer->m_isEnqueueHeader = true;
-				SNetHeader *pHeader = (SNetHeader *)pSBuffer->GetBufferPtr();
-				pHeader->code = serverSetting::packetCode; // 코드
-				pHeader->len = pSBuffer->GetDataSize();
-				pHeader->randKey = 0;
-				pHeader->checkSum = MHLib::security::CEncryption::CalCheckSum(pSBuffer->GetContentBufferPtr(), pSBuffer->GetDataSize());
-			
-				// CheckSum 부터 암호화하기 위해
-				CEncryption::Encoding(pSBuffer->GetBufferPtr() + 4, pSBuffer->GetDataSize() + 1, pHeader->randKey);
-			}
+			PreparePacket(*pSBuffer, serverSetting::packetCode, g_pServer->GetPacketMode());
 
 			wsaBuf[count].buf = pSBuffer->GetBufferPtr();
 			wsaBuf[count].len = pSBuffer->GetFullSize();
@@ -253,13 +246,13 @@ CNetServer *g_pNetServer = nullptr;
 		return TRUE;
 	}
 
-	void CNetSession::Clear() noexcept
+	void CSession::Clear() noexcept
 	{
 		for (int count = 0; count < m_sendCount; count++)
 		{
 			if (m_pSendBuffers[count]->DecreaseRef() == 0)
 			{
-				CSerializableBuffer<FALSE>::Free(m_pSendBuffers[count]);
+				CSerializableBuffer::Free(m_pSendBuffers[count]);
 			}
 		}
 
@@ -268,7 +261,7 @@ CNetServer *g_pNetServer = nullptr;
 		LONG useBufferSize = m_lfSendBufferQueue.GetUseSize();
 		for (int i = 0; i < useBufferSize; i++)
 		{
-			CSerializableBuffer<FALSE> *pBuffer;
+			CSerializableBuffer *pBuffer;
 			// 못꺼낸 것
 			if (!m_lfSendBufferQueue.Dequeue(&pBuffer))
 			{
@@ -281,7 +274,7 @@ CNetServer *g_pNetServer = nullptr;
 			// RefCount를 낮추고 0이라면 보낸 거 삭제
 			if (pBuffer->DecreaseRef() == 0)
 			{
-				CSerializableBuffer<FALSE>::Free(pBuffer);
+				CSerializableBuffer::Free(pBuffer);
 			}
 		}
 
@@ -295,14 +288,14 @@ CNetServer *g_pNetServer = nullptr;
 		useBufferSize = m_recvMsgQueue.GetUseSize();
 		for (int i = 0; i < useBufferSize; i++)
 		{
-			CSerializableBuffer<FALSE> *pBuffer;
+			CSerializableBuffer *pBuffer;
 			if (!m_recvMsgQueue.Dequeue(&pBuffer))
 			{
 				CCrashDump::Crash();
 			}
 
 			if (pBuffer->DecreaseRef() == 0)
-				CSerializableBuffer<FALSE>::Free(pBuffer);
+				CSerializableBuffer::Free(pBuffer);
 		}
 
 		m_sessionSocket = INVALID_SOCKET;
@@ -316,22 +309,26 @@ CNetServer *g_pNetServer = nullptr;
 	unsigned int NetWorkerThreadFunc(LPVOID pParam) noexcept
 	{
 		g_pLogger->RegisterLogProducer();
-		return g_pNetServer->WorkerThread();
+		return g_pServer->WorkerThread();
 	}
 
-	BOOL CNetServer::Start(const CHAR *pOpenIp, const USHORT port) noexcept
+	BOOL CServer::Start(const CHAR *pOpenIp, const USHORT port, EPacketMode packetMode) noexcept
 	{
+		if (packetMode != EPacketMode::Net && packetMode != EPacketMode::Lan)
+			return FALSE;
+
+		m_packetMode = packetMode;
 		int retVal;
 		int errVal;
 		WSAData wsaData;
 
 		m_maxSessionCount = serverSetting::maxSessionCount;
 
-		m_pSessions = new CNetSession * [serverSetting::maxSessionCount];
+		m_pSessions = new CSession * [serverSetting::maxSessionCount];
 
-		ZeroMemory((char *)m_pSessions, sizeof(CNetSession *) * serverSetting::maxSessionCount);
+		ZeroMemory((char *)m_pSessions, sizeof(CSession *) * serverSetting::maxSessionCount);
 
-		m_pAcceptExSessions = new CNetSession * [serverSetting::acceptexCount];
+		m_pAcceptExSessions = new CSession * [serverSetting::acceptexCount];
 
 		// 디스커넥트 스택 채우기
 		USHORT val = serverSetting::maxSessionCount - 1;
@@ -479,7 +476,7 @@ CNetServer *g_pNetServer = nullptr;
 		return TRUE;
 	}
 
-	void CNetServer::Stop()
+	void CServer::Stop()
 	{
 		// listen 소켓 닫기
 		InterlockedExchange(&m_isStop, TRUE);
@@ -506,12 +503,12 @@ CNetServer *g_pNetServer = nullptr;
 		}
 	}
 
-	void CNetServer::SendPacket(const UINT64 sessionId, CSerializableBuffer<FALSE> *pSBuffer) noexcept
+	void CServer::SendPacket(const UINT64 sessionId, CSerializableBuffer *pSBuffer) noexcept
 	{
-		CNetSession *pSession = m_pSessions[getIndex(sessionId)];
+		CSession *pSession = m_pSessions[getIndex(sessionId)];
 
 		InterlockedIncrement(&pSession->m_ioCountAndRelease);
-		if ((pSession->m_ioCountAndRelease & CNetSession::sm_releaseFlag) == CNetSession::sm_releaseFlag)
+		if ((pSession->m_ioCountAndRelease & CSession::sm_releaseFlag) == CSession::sm_releaseFlag)
 		{
 			if (InterlockedDecrement(&pSession->m_ioCountAndRelease) == 0)
 			{
@@ -541,13 +538,13 @@ CNetServer *g_pNetServer = nullptr;
 	}
 
 	// Sector 락이 잡힌 경우에만 PQCS
-	void CNetServer::EnqueuePacket(const UINT64 sessionId, CSerializableBuffer<FALSE> *pSBuffer) noexcept
+	void CServer::EnqueuePacket(const UINT64 sessionId, CSerializableBuffer *pSBuffer) noexcept
 	{
-		CNetSession *pSession = m_pSessions[getIndex(sessionId)];
+		CSession *pSession = m_pSessions[getIndex(sessionId)];
 
 		InterlockedIncrement(&pSession->m_ioCountAndRelease);
 		// ReleaseFlag가 이미 켜진 상황
-		if ((pSession->m_ioCountAndRelease & CNetSession::sm_releaseFlag) == CNetSession::sm_releaseFlag)
+		if ((pSession->m_ioCountAndRelease & CSession::sm_releaseFlag) == CSession::sm_releaseFlag)
 		{
 			if (InterlockedDecrement(&pSession->m_ioCountAndRelease) == 0)
 			{
@@ -574,7 +571,7 @@ CNetServer *g_pNetServer = nullptr;
 		}
 	}
 
-	void CNetServer::SendAll()
+	void CServer::SendAll()
 	{
 		for (int i = 0; i < serverSetting::maxSessionCount; i++)
 		{
@@ -585,19 +582,19 @@ CNetServer *g_pNetServer = nullptr;
 		InterlockedExchange(&m_sendAllFlag, FALSE);
 	}
 
-	void CNetServer::SendAllPqcs()
+	void CServer::SendAllPqcs()
 	{
 		if (InterlockedExchange(&m_sendAllFlag, TRUE) == FALSE)
 			PostQueuedCompletionStatus(m_iocpHandle, 0, 0, (LPOVERLAPPED)EIoOperation::SendAll);
 	}
 
-	BOOL CNetServer::Disconnect(const UINT64 sessionId, BOOL isPqcs) noexcept
+	BOOL CServer::Disconnect(const UINT64 sessionId, BOOL isPqcs) noexcept
 	{
-		CNetSession *pSession = m_pSessions[getIndex(sessionId)];
+		CSession *pSession = m_pSessions[getIndex(sessionId)];
 
 		// ReleaseFlag가 이미 켜진 상황
 		InterlockedIncrement(&pSession->m_ioCountAndRelease);
-		if ((pSession->m_ioCountAndRelease & CNetSession::sm_releaseFlag) == CNetSession::sm_releaseFlag)
+		if ((pSession->m_ioCountAndRelease & CSession::sm_releaseFlag) == CSession::sm_releaseFlag)
 		{
 			if (InterlockedDecrement(&pSession->m_ioCountAndRelease) == 0)
 			{
@@ -636,9 +633,9 @@ CNetServer *g_pNetServer = nullptr;
 		return TRUE;
 	}
 
-	BOOL CNetServer::ReleaseSession(CNetSession *pSession, BOOL isPqcs) noexcept
+	BOOL CServer::ReleaseSession(CSession *pSession, BOOL isPqcs) noexcept
 	{
-		if (InterlockedCompareExchange(&pSession->m_ioCountAndRelease, CNetSession::sm_releaseFlag, 0) != 0)
+		if (InterlockedCompareExchange(&pSession->m_ioCountAndRelease, CSession::sm_releaseFlag, 0) != 0)
 		{
 			return FALSE;
 		}
@@ -658,14 +655,14 @@ CNetServer *g_pNetServer = nullptr;
 			pSession->m_pCurrentContent->LeaveJobEnqueue(freeSessionId);
 		OnClientLeave(freeSessionId);
 
-		CNetSession::Free(pSession);
+		CSession::Free(pSession);
 		InterlockedDecrement(&m_sessionCount);
 		m_stackDisconnectIndex.Push(index);
 
 		return TRUE;
 	}
 
-	BOOL CNetServer::ReleaseSessionPqcs(CNetSession *pSession) noexcept
+	BOOL CServer::ReleaseSessionPqcs(CSession *pSession) noexcept
 	{
 		USHORT index = getIndex(pSession->m_sessionId);
 		closesocket(pSession->m_sessionSocket);
@@ -676,14 +673,14 @@ CNetServer *g_pNetServer = nullptr;
 		if (pSession->m_pCurrentContent != nullptr)
 			pSession->m_pCurrentContent->LeaveJobEnqueue(freeSessionId);
 
-		CNetSession::Free(pSession);
+		CSession::Free(pSession);
 		InterlockedDecrement(&m_sessionCount);
 		m_stackDisconnectIndex.Push(index);
 
 		return TRUE;
 	}
 
-	void CNetServer::FristPostAcceptEx() noexcept
+	void CServer::FristPostAcceptEx() noexcept
 	{
 		// 처음에 AcceptEx를 걸어두고 시작
 		for (int i = 0; i < serverSetting::acceptexCount; i++)
@@ -692,12 +689,12 @@ CNetServer *g_pNetServer = nullptr;
 		}
 	}
 
-	BOOL CNetServer::PostAcceptEx(INT index) noexcept
+	BOOL CServer::PostAcceptEx(INT index) noexcept
 	{
 		int retVal;
 		int errVal;
 
-		CNetSession *pNewAcceptEx = CNetSession::Alloc();
+		CSession *pNewAcceptEx = CSession::Alloc();
 		m_pAcceptExSessions[index] = pNewAcceptEx;
 
 		pNewAcceptEx->m_sessionSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -731,7 +728,7 @@ CNetServer *g_pNetServer = nullptr;
 		return TRUE;
 	}
 
-	BOOL CNetServer::AcceptExCompleted(CNetSession *pSession) noexcept
+	BOOL CServer::AcceptExCompleted(CSession *pSession) noexcept
 	{
 		InterlockedIncrement(&g_monitor.m_acceptTps);
 
@@ -777,7 +774,7 @@ CNetServer *g_pNetServer = nullptr;
 			return FALSE;
 		}
 
-		UINT64 combineId = CNetServer::combineIndex(index, InterlockedIncrement64(&m_currentId));
+		UINT64 combineId = CServer::combineIndex(index, InterlockedIncrement64(&m_currentId));
 
 		pSession->Init(combineId);
 
@@ -795,14 +792,14 @@ CNetServer *g_pNetServer = nullptr;
 		return TRUE;
 	}
 
-	int CNetServer::WorkerThread() noexcept
+	int CServer::WorkerThread() noexcept
 	{
 		int retVal;
 		DWORD flag = 0;
 		while (m_isWorkerRun)
 		{
 			DWORD dwTransferred = 0;
-			CNetSession *pSession = nullptr;
+			CSession *pSession = nullptr;
 			OVERLAPPED *pLpOverlapped = nullptr;
 
 			retVal = GetQueuedCompletionStatus(m_iocpHandle, &dwTransferred
@@ -869,7 +866,7 @@ CNetServer *g_pNetServer = nullptr;
 						
 						InterlockedDecrement(&pSession->m_ioCountAndRelease);
 						closesocket(pSession->m_sessionSocket);
-						CNetSession::Free(pSession);
+						CSession::Free(pSession);
 						continue;
 					}
 
@@ -918,7 +915,7 @@ CNetServer *g_pNetServer = nullptr;
 		return 0;
 	}
 
-	void CNetServer::RegisterSystemTimerEvent()
+	void CServer::RegisterSystemTimerEvent()
 	{
 		SMonitorTimerEvent *pMonitorEvent = new SMonitorTimerEvent;
 		pMonitorEvent->SetEvent();

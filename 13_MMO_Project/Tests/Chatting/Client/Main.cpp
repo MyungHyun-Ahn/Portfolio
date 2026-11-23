@@ -5,8 +5,8 @@
 #include "CommonProtocol.h"
 #include "Config.h"
 #include "Console.h"
-#include "CNetClientManager.h"
-#include "CNetClient.h"
+#include "CClientManager.h"
+#include "CClient.h"
 #include "IClientPacketHandler.g.h"
 #include "CChatNetClient.g.h"
 #include "CConsoleChatClient.h"
@@ -25,10 +25,10 @@ int main(void)
 
 	int exitCode = 0;
 	{
-		ClientNetworkLib::CNetClientManager network;
+		ClientNetworkLib::CClientManager network;
 		Chatting::CConsoleChatClient client(network, config);
 		MHLib::security::CEncryption::sm_packetKey = Chatting::kPacketKey;
-		if (network.Init(1, config.m_recvBufferBytes)
+		if (network.Init(1, config.m_recvBufferBytes, config.m_packetMode)
 			&& client.Connect(config.m_ip.c_str(), config.m_port, Chatting::kPacketCode, config.m_connectTimeoutMilliseconds))
 		{
 			while (client.IsActive() && !client.IsConnected())

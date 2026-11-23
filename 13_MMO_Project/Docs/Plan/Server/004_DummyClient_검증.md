@@ -5,7 +5,7 @@
 ## 1. 더미 동작과 책임
 
 - 원본 `07_DummyClient`는 읽기 전용 참고용이며, 타이머/APC·전역 매니저·옛 로그인 코드를 통째로 이식하지 않는다. 로그는 기존 `CLogger`를 우선 사용한다.
-- 구현 위치: `Tests/Chatting/DummyClient`. 프로세스 하나에 `CNetClientManager`와 `CDummyRunner`를 각각 하나씩 둔다. Runner는 전체 실행·종료를 조정하고, IOCP 워커는 전송과 Mailbox 발행만 담당한다. 첫 구현부터 더미를 앱 워커에 묶음으로 배정할 수 있도록 실행 소유권을 나눈다. 클라이언트마다 스레드를 만들지 않는다.
+- 구현 위치: `Tests/Chatting/DummyClient`. 프로세스 하나에 `CClientManager`와 `CDummyRunner`를 각각 하나씩 둔다. Runner는 전체 실행·종료를 조정하고, IOCP 워커는 전송과 Mailbox 발행만 담당한다. 첫 구현부터 더미를 앱 워커에 묶음으로 배정할 수 있도록 실행 소유권을 나눈다. 클라이언트마다 스레드를 만들지 않는다.
 - 실행 중 각 더미의 `Tick()`·요청·타이머·콜백·재접속은 담당 앱 워커 한 곳에서만 처리한다. 같은 객체를 여러 스레드에서 동시에 돌리지 않고, 공통 핸들러에 락을 덧씌우거나 클라이언트 경로에 TLS 풀·락프리 컨테이너를 추가하지 않는다. `WORKER_COUNT`는 기존 IOCP 워커 설정이며 앱 워커 수와 구분한다.
 - 진행 중인 요청과 최초 Ready를 포함한 결과 카운터는 워커별로 소유한다. Runner는 공통 실행 기한으로 종료를 조정하고, 다른 워커가 갱신 중인 결과를 직접 읽지 않는다. 종료 시 각 워커가 새 요청을 멈추고 담당 더미의 terminal 이벤트를 소비한 뒤 합류한다. Runner는 합류 후 최종 결과를 합산하고 공유 매니저를 `Stop()`한다.
 - `CConsoleChatClient`와 `CChatDummyClient`는 `CChatNetClient`를 직접 상속하며, 생성 송수신뿐 아니라 같은 수동 `HandleRes*()` 구현도 사용한다. 콘솔 출력과 더미의 실행·검증 정책은 별도로 둔다. 생성물 복사본이나 별도 채팅 `.lib`는 만들지 않는다. 기존 패킷 규격과 서버 코드는 바꾸지 않는다.
@@ -82,8 +82,8 @@ EXE 옆 `DummyClientConfig.conf`를 `CFileLoader`로 읽는다(UTF-16LE BOM). `I
 
 | 파일 | 책임 |
 |---|---|
-| `CChatNetClient.g.h` | `CNetClient`를 공개 상속하고 `IClientPacketHandler`를 비공개 상속하는 클래스와 `Send*()`·`Handle*()` 선언을 생성한다. 콘솔과 더미가 이 클래스를 직접 상속하며, 중간 `CChatClient` 클래스는 두지 않는다. |
-| `CChatNetClient.g.cpp` | `Send*()`·`MakePacket*()`·`onRecv()`를 생성한다. 클라이언트 `Send*()`는 패킷 생성과 `sendNetworkPacket()` 호출만 하고 채팅 상태는 바꾸지 않는다. `onRecv()`는 기존 `DispatchClientPacket()`을 호출한다. |
+| `CChatNetClient.g.h` | `CClient`를 공개 상속하고 `IClientPacketHandler`를 비공개 상속하는 클래스와 `Send*()`·`Handle*()` 선언을 생성한다. 콘솔과 더미가 이 클래스를 직접 상속하며, 중간 `CChatClient` 클래스는 두지 않는다. |
+| `CChatNetClient.g.cpp` | `Send*()`·`MakePacket*()`·`onRecv()`를 생성한다. 클라이언트 `Send*()`는 패킷 생성과 `sendPacket()` 호출만 하고 채팅 상태는 바꾸지 않는다. `onRecv()`는 기존 `DispatchClientPacket()`을 호출한다. |
 | `CChatNetClientHandlers.cpp` | 생성 디렉터리 밖에서 공통 `ReqLogin()`·`ReqSectorMove()`와 `Handle*()` 본체를 구현한다. 더미는 이 구현을 재사용하고 요청 시점과 결과 판정만 별도로 둔다. |
 | `CChatNetClientMembers.inc` | 공통 상태와 앱별 콜백을 수동 선언한다. BAT는 파일이 없을 때만 기본 템플릿으로 생성하며, 기존 파일은 덮어쓰지 않는다. |
 

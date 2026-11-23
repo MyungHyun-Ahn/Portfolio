@@ -14,6 +14,6 @@ namespace ClientNetworkLib
 	{
 		EClientEvent 									m_kind{};
 		DWORD 											m_error = 0;
-		std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>> 	m_spPacket;
+		std::shared_ptr<NetworkCommonLib::CSerializableBuffer> 	m_spPacket;
 	};
 }

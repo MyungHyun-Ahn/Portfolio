@@ -10,8 +10,8 @@
 #include "CSerializableBuffer.h"
 #include "NetworkLimits.h"
 #include "CommonProtocol.h"
-#include "CNetClientManager.h"
-#include "CNetClient.h"
+#include "CClientManager.h"
+#include "CClient.h"
 #include "MHLib/serialization/ISerializable.h"
 #include "IncludePacketAll.g.h"
 #include "IClientPacketHandler.g.h"
@@ -75,6 +75,13 @@ namespace Chatting
 		config.m_ip.assign(text.begin(), text.end());
 		if (loader.Load(kSection, L"SCENARIO", &text))
 			return "config_scenario_removed";
+		if (loader.Load(kSection, L"PACKET_MODE", &text))
+		{
+			if (text == L"Lan")
+				config.m_packetMode = NetworkCommonLib::EPacketMode::Lan;
+			else if (text != L"Net")
+				return "config_packet_mode_invalid";
+		}
 
 		constexpr INT64 kMaxAccountNo = (std::numeric_limits<INT64>::max)();
 		INT64 clientCount = static_cast<INT64>(config.m_clientCount);
@@ -88,10 +95,10 @@ namespace Chatting
 		if (!LoadNumber(loader, L"SECTOR_X", 0, kMaxSectorX - 1, config.m_sectorX)
 			|| !LoadNumber(loader, L"SECTOR_Y", 0, kMaxSectorY - 1, config.m_sectorY))
 			return "config_sector_invalid";
-		constexpr int kMinRecvBufferBytes = static_cast<int>(NetworkCommonLib::CSerializableBuffer<FALSE>::EBufferDefine::PacketMaxSize);
+		constexpr int kMinRecvBufferBytes = static_cast<int>(NetworkCommonLib::CSerializableBuffer::EBufferDefine::PacketMaxSize);
 		if (!LoadNumber(loader, L"WORKER_COUNT", 1, 16, config.m_workerCount)
 			|| !LoadNumber(loader, L"APP_WORKER_COUNT", 1, 16, config.m_appWorkerCount)
-			|| !LoadNumber(loader, L"RECV_BUFFER_BYTES", kMinRecvBufferBytes, NetworkCommonLib::kMaxNetRecvBufferBytes, config.m_recvBufferBytes))
+			|| !LoadNumber(loader, L"RECV_BUFFER_BYTES", kMinRecvBufferBytes, NetworkCommonLib::kMaxRecvBufferBytes, config.m_recvBufferBytes))
 			return "config_network_limits_invalid";
 		if (!LoadNumber(loader, L"CONNECT_INTERVAL_MS", 1, MAXDWORD, config.m_connectIntervalMilliseconds)
 			|| !LoadNumber(loader, L"CONNECT_ATTEMPTS_PER_INTERVAL", 1, MAXDWORD, config.m_connectAttemptsPerInterval))
@@ -124,7 +131,7 @@ namespace Chatting
 			SDummyRunStats m_stats;
 			std::vector<SDummySlot> m_slots;
 		};
-		ClientNetworkLib::CNetClientManager network;
+		ClientNetworkLib::CClientManager network;
 		const size_t appWorkerCount = (std::min)(m_config.m_clientCount, static_cast<size_t>(m_config.m_appWorkerCount));
 		std::vector<SAppWork> work;
 		std::vector<std::thread> workers;
@@ -155,7 +162,7 @@ namespace Chatting
 			return;
 		}
 		MHLib::security::CEncryption::sm_packetKey = kPacketKey;
-		if (!network.Init(m_config.m_workerCount, m_config.m_recvBufferBytes))
+		if (!network.Init(m_config.m_workerCount, m_config.m_recvBufferBytes, m_config.m_packetMode))
 		{
 			m_appWorkers.clear();
 			m_stats.Fail("network_init_failed");

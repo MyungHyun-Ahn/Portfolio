@@ -27,7 +27,7 @@ namespace ClientNetworkLib
 		return true;
 	}
 
-	bool CClientMailbox::pushPacket(std::shared_ptr<CSerializableBuffer<FALSE>> spPacket) noexcept
+	bool CClientMailbox::pushPacket(std::shared_ptr<CSerializableBuffer> spPacket) noexcept
 	{
 		std::lock_guard mailboxLock(m_mailboxLock);
 		constexpr size_t kMaxQueuedPackets = 512;

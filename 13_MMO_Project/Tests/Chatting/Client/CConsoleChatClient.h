@@ -5,7 +5,7 @@ namespace Chatting
 	class CConsoleChatClient : public CChatNetClient
 	{
 	public:
-		CConsoleChatClient(ClientNetworkLib::CNetClientManager &network, const SChatConfig &config)
+		CConsoleChatClient(ClientNetworkLib::CClientManager &network, const SChatConfig &config)
 			: CChatNetClient(network)
 			, m_config(config)
 		{

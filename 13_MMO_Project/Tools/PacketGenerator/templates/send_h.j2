@@ -12,12 +12,12 @@ namespace Chatting
 
 {% endif %}
 {% for packet in packets %}
-	[[nodiscard]] {% if side == 'Client' %}std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>> {% else %}NetworkCommonLib::CSerializableBuffer<FALSE> *{% endif %}MakePacket{{ packet.name }}(
+	[[nodiscard]] {% if side == 'Client' %}std::shared_ptr<NetworkCommonLib::CSerializableBuffer> {% else %}NetworkCommonLib::CSerializableBuffer *{% endif %}MakePacket{{ packet.name }}(
 		const S{{ packet.name }} &packet) noexcept;
 {% endfor %}
 
 {% if side == 'Client' %}
-	class CChatNetClient : public ClientNetworkLib::CNetClient, private IClientPacketHandler
+	class CChatNetClient : public ClientNetworkLib::CClient, private IClientPacketHandler
 {% else %}
 	class CServerPacketSender
 {% endif %}
@@ -39,10 +39,10 @@ namespace Chatting
 {% endif %}
 	protected:
 {% if side == 'Client' %}
-		using ClientNetworkLib::CNetClient::CNetClient;
+		using ClientNetworkLib::CClient::CClient;
 
 	private:
-		bool onRecv(NetworkCommonLib::CSerializableBuffer<FALSE> &message) noexcept override final;
+		bool onRecv(NetworkCommonLib::CSerializableBuffer &message) noexcept override final;
 {% for packet in receive %}
 		bool Handle{{ packet.name }}(const S{{ packet.name }} &packet) noexcept override final;
 {% endfor %}
@@ -51,11 +51,11 @@ namespace Chatting
 {% else %}
 		virtual ~C{{ side }}PacketSender() = default;
 		// 직렬화된 버퍼를 받아 호출자 참조를 확보한 뒤 전송한다.
-		[[nodiscard]] NetworkCommonLib::CSerializableBuffer<FALSE> *submitPreparedPacket(
-			UINT64 sessionId, EPacketType type, NetworkCommonLib::CSerializableBuffer<FALSE> *pPacket) noexcept;
+		[[nodiscard]] NetworkCommonLib::CSerializableBuffer *submitPreparedPacket(
+			UINT64 sessionId, EPacketType type, NetworkCommonLib::CSerializableBuffer *pPacket) noexcept;
 
 	private:
-		virtual void sendPacket(UINT64 sessionId, EPacketType type, NetworkCommonLib::CSerializableBuffer<FALSE> &packet) noexcept = 0;
+		virtual void sendPacket(UINT64 sessionId, EPacketType type, NetworkCommonLib::CSerializableBuffer &packet) noexcept = 0;
 {% endif %}
 	};
 }

@@ -1,18 +1,17 @@
 #include "ClientLifecyclePch.h"
 #include <optional>
 #include "CSerializableBuffer.h"
-#include "NetHeaders.h"
-#include "NetPacket.h"
+#include "PacketHeaders.h"
+#include "PacketFraming.h"
 #include "ClientEvent.h"
 #include "CClientMailbox.h"
-#include "CNetClientManager.h"
-#include "CNetClient.h"
+#include "CClientManager.h"
+#include "CClient.h"
 #include "NetworkLimits.h"
 #include "CRingBuffer.h"
-#include "CNetSession.h"
+#include "CSession.h"
 #include "CRecvBuffer.h"
 #include "CSerializableBufferView.h"
-#include "CLanClient.h"
 
 namespace ClientNetworkLib
 {
@@ -20,70 +19,70 @@ namespace ClientNetworkLib
 
 	class CClientLifecycleProbe
 	{
-		static_assert(std::is_same_v<decltype(CNetClientManager::m_sessions),
-			std::unordered_map<SessionId, std::shared_ptr<ClientNetworkLib::CNetSession>>>);
+		static_assert(std::is_same_v<decltype(CClientManager::m_sessions),
+			std::unordered_map<SessionId, std::shared_ptr<ClientNetworkLib::CSession>>>);
 
-		static_assert(std::is_same_v<decltype(CNetClientManager::m_mailboxes),
+		static_assert(std::is_same_v<decltype(CClientManager::m_mailboxes),
 			std::unordered_map<SessionId, std::shared_ptr<CClientMailbox>>>);
 
 	public:
-		static size_t GetMailboxCount(CNetClientManager &client)
+		static size_t GetMailboxCount(CClientManager &client)
 		{
 			std::lock_guard sessionTableLock(client.m_sessionTableLock);
 			return client.m_mailboxes.size();
 		}
 
-		static LPFN_CONNECTEX ReplaceConnectEx(CNetClientManager &client, LPFN_CONNECTEX pConnectEx)
+		static LPFN_CONNECTEX ReplaceConnectEx(CClientManager &client, LPFN_CONNECTEX pConnectEx)
 		{
 			std::lock_guard sessionTableLock(client.m_sessionTableLock);
 			return std::exchange(client.m_pConnectEx, pConnectEx);
 		}
 
-		static auto FindSession(CNetClientManager &client, SessionId sessionId)
+		static auto FindSession(CClientManager &client, SessionId sessionId)
 		{
 			return client.findSession(sessionId);
 		}
 
-		static auto GetFirstSessionEntry(CNetClientManager &client)
+		static auto GetFirstSessionEntry(CClientManager &client)
 		{
 			std::lock_guard sessionTableLock(client.m_sessionTableLock);
 			const auto first = client.m_sessions.begin();
 			return first != client.m_sessions.end() ? std::make_pair(first->first, first->second)
-				: std::pair<SessionId, std::shared_ptr<ClientNetworkLib::CNetSession>>{};
+				: std::pair<SessionId, std::shared_ptr<ClientNetworkLib::CSession>>{};
 		}
 
-		static auto LockSession(ClientNetworkLib::CNetSession &session)
+		static auto LockSession(ClientNetworkLib::CSession &session)
 		{
 			return std::unique_lock(session.m_sessionStateLock);
 		}
 
-		static int GetBufferedRecvBytes(ClientNetworkLib::CNetSession &session)
+		static int GetBufferedRecvBytes(ClientNetworkLib::CSession &session)
 		{
 			std::lock_guard sessionStateLock(session.m_sessionStateLock);
 			return session.m_recvBuffer.GetUseSize();
 		}
 
-		static int GetRecvBufferCapacity(const ClientNetworkLib::CNetSession &session)
+		static int GetRecvBufferCapacity(const ClientNetworkLib::CSession &session)
 		{
 			return session.m_recvBuffer.GetCapacity();
 		}
 
-		static bool IsAccepting(CNetClientManager &client)
+		static bool IsAccepting(CClientManager &client)
 		{
 			std::lock_guard sessionTableLock(client.m_sessionTableLock);
 			return client.m_isAccepting;
 		}
 
-		static LPFN_CONNECTEX GetCachedConnectEx(CNetClientManager &client)
+		static LPFN_CONNECTEX GetCachedConnectEx(CClientManager &client)
 		{
 			std::lock_guard sessionTableLock(client.m_sessionTableLock);
 			return client.m_pConnectEx;
 		}
 
-		static bool IsConnectPending(ClientNetworkLib::CNetSession &session)
+		static bool IsConnectPending(ClientNetworkLib::CSession &session)
 		{
 			std::lock_guard sessionStateLock(session.m_sessionStateLock);
-			if (session.m_state != ClientNetworkLib::CNetSession::EState::Connecting || session.m_ioCount != 1)
+			if (session.m_state != ClientNetworkLib::CSession::EState::Connecting || session.m_ioCount != 1)
 				return false;
 			DWORD bytes = 0;
 			DWORD flags = 0;
@@ -91,25 +90,20 @@ namespace ClientNetworkLib
 				&& WSAGetLastError() == WSA_IO_INCOMPLETE;
 		}
 
-		static HANDLE GetLanPort(CLanClientManager &manager)
-		{
-			return manager.m_iocpHandle;
-		}
-
-		static void AttachSendTestSocket(ClientNetworkLib::CNetSession &session, SOCKET socketHandle)
+		static void AttachSendTestSocket(ClientNetworkLib::CSession &session, SOCKET socketHandle)
 		{
 			std::lock_guard sessionStateLock(session.m_sessionStateLock);
 			session.m_socket = socketHandle;
-			session.m_state = ClientNetworkLib::CNetSession::EState::Connected;
+			session.m_state = ClientNetworkLib::CSession::EState::Connected;
 		}
 
-		static bool QueueSend(ClientNetworkLib::CNetSession &session, std::shared_ptr<CSerializableBuffer<FALSE>> spPacket)
+		static bool QueueSend(ClientNetworkLib::CSession &session, std::shared_ptr<CSerializableBuffer> spPacket)
 		{
 			std::lock_guard sessionStateLock(session.m_sessionStateLock);
 			return session.queueSendLocked(std::move(spPacket));
 		}
 
-		static bool CompleteSend(ClientNetworkLib::CNetSession &session, OVERLAPPED *pOverlapped, DWORD bytes, DWORD error)
+		static bool CompleteSend(ClientNetworkLib::CSession &session, OVERLAPPED *pOverlapped, DWORD bytes, DWORD error)
 		{
 			std::lock_guard sessionStateLock(session.m_sessionStateLock);
 			if (pOverlapped != &session.m_sendOverlapped || session.m_ioCount != 1)
@@ -118,7 +112,7 @@ namespace ClientNetworkLib
 			return true;
 		}
 
-		static bool FinishSendTestClose(ClientNetworkLib::CNetSession &session)
+		static bool FinishSendTestClose(ClientNetworkLib::CSession &session)
 		{
 			std::lock_guard sessionStateLock(session.m_sessionStateLock);
 			session.beginCloseLocked(ERROR_OPERATION_ABORTED);
@@ -133,8 +127,8 @@ namespace
 	using namespace NetworkCommonLib;
 	constexpr DWORD kConnectTimeoutMilliseconds = 5000;
 	constexpr int kDefaultFixtureRecvBufferBytes = 4096;
-	static_assert(std::is_same_v<decltype(&CNetClient::Disconnect), void (CNetClient::*)() noexcept>);
-	static_assert(std::is_same_v<decltype(&CNetClientManager::Disconnect), bool (CNetClientManager::*)(SessionId) noexcept>);
+	static_assert(std::is_same_v<decltype(&CClient::Disconnect), void (CClient::*)() noexcept>);
+	static_assert(std::is_same_v<decltype(&CClientManager::Disconnect), bool (CClientManager::*)(SessionId) noexcept>);
 
 	void Check(bool isPassed, const wchar_t *pCase)
 	{
@@ -159,7 +153,7 @@ namespace
 		return socketHandle;
 	}
 
-	SClientEvent WaitEvent(CNetClientManager &client, SessionId sessionId)
+	SClientEvent WaitEvent(CClientManager &client, SessionId sessionId)
 	{
 		const auto deadline = GetTickCount64() + 7000;
 		SClientEvent event{};
@@ -186,23 +180,23 @@ namespace
 		return peer;
 	}
 
-	void ExpectOnlyTerminal(CNetClientManager &client, SessionId sessionId, EClientEvent kind, DWORD error)
+	void ExpectOnlyTerminal(CClientManager &client, SessionId sessionId, EClientEvent kind, DWORD error)
 	{
 		SClientEvent event = WaitEvent(client, sessionId);
 		Check(event.m_kind == kind && event.m_error == error, L"expected terminal event and reason");
 		Check(!client.TryPopEvent(sessionId, event), L"terminal event was delivered only once");
 	}
 
-	void VerifyNetRecvRing()
+	void VerifyRecvRing(EPacketMode mode)
 	{
 		constexpr BYTE kPacketCode = 0x77;
-		constexpr int kPacketBytes = static_cast<int>(CSerializableBuffer<FALSE>::EBufferDefine::PacketMaxSize);
-		constexpr int kHeaderBytes = sizeof(SNetHeader);
+		constexpr int kPacketBytes = static_cast<int>(CSerializableBuffer::EBufferDefine::PacketMaxSize);
+		constexpr int kHeaderBytes = sizeof(SPacketHeader);
 		constexpr int kRecvBufferBytes = kPacketBytes * 2;
-		CNetClientManager client;
+		CClientManager client;
 		Check(!client.Init(1, kPacketBytes - 1), L"ring rejects capacity below a full frame");
 		Check(!client.Init(1, INT_MAX), L"ring rejects capacity that overflows cursor arithmetic");
-		Check(client.Init(1, kRecvBufferBytes), L"ring fixture initializes the manager with a custom capacity");
+		Check(client.Init(1, kRecvBufferBytes, mode), L"ring fixture initializes the manager with a custom capacity");
 		USHORT port = 0;
 		SOCKET listener = BindLoopback(port);
 		Check(listen(listener, SOMAXCONN) == 0, L"ring fixture listens");
@@ -214,13 +208,13 @@ namespace
 		Check(spSession != nullptr, L"ring fixture finds the live session");
 		Check(CClientLifecycleProbe::GetRecvBufferCapacity(*spSession) == kRecvBufferBytes, L"session uses configured ring capacity");
 
-		const auto makeFrame = [](int packetBytes, BYTE value)
+		const auto makeFrame = [mode](int packetBytes, BYTE value)
 		{
-			auto spPacket = CSerializableBuffer<FALSE>::MakeShared();
+			auto spPacket = CSerializableBuffer::MakeShared();
 			Check(spPacket != nullptr, L"allocate ring fixture frame");
 			for (int index = kHeaderBytes; index < packetBytes; ++index)
 				*spPacket << value;
-			PrepareNetPacket(*spPacket, kPacketCode);
+			PreparePacket(*spPacket, kPacketCode, mode);
 			return spPacket;
 		};
 		const auto sendBytes = [peer](const char *pBytes, int size)
@@ -277,14 +271,15 @@ namespace
 		closesocket(peer);
 		closesocket(listener);
 		client.Stop();
-		g_pLogger->WriteLogConsole(ELogLevel::Info, L"PASS: Net receive ring wrap, split header/body and adjacent frames");
+		g_pLogger->WriteLogConsole(ELogLevel::Info, L"PASS: %ls receive ring wrap, split header/body and adjacent frames",
+			mode == EPacketMode::Net ? L"Net" : L"Lan");
 	}
 
-	class CTickClient : public CNetClient
+	class CTickClient : public CClient
 	{
 	public:
-		CTickClient(CNetClientManager &network, bool rejectsPacket, DWORD expectedError) noexcept
-			: CNetClient(network)
+		CTickClient(CClientManager &network, bool rejectsPacket, DWORD expectedError) noexcept
+			: CClient(network)
 			, m_rejectsPacket(rejectsPacket)
 			, m_expectedError(expectedError)
 		{
@@ -300,7 +295,7 @@ namespace
 			return true;
 		}
 
-		bool onRecv(CSerializableBuffer<FALSE> &message) noexcept override
+		bool onRecv(CSerializableBuffer &message) noexcept override
 		{
 			Check(GetCurrentThreadId() == m_appThreadId && m_callbackCount == 1, L"Tick dispatches Packet after Connected");
 			BYTE value = 0;
@@ -334,7 +329,7 @@ namespace
 	void VerifyClientTick(bool rejectsPacket, bool sendsPeerEof)
 	{
 		constexpr BYTE kPacketCode = 0x77;
-		CNetClientManager network;
+		CClientManager network;
 		CTickClient client(network, rejectsPacket, sendsPeerEof ? ERROR_SUCCESS : ERROR_OPERATION_ABORTED);
 		Check(network.Init(1, kDefaultFixtureRecvBufferBytes), L"Tick fixture initializes the manager");
 		USHORT port = 0;
@@ -342,10 +337,10 @@ namespace
 		Check(listen(listener, SOMAXCONN) == 0, L"Tick fixture listens");
 		Check(client.Connect("127.0.0.1", port, kPacketCode, kConnectTimeoutMilliseconds), L"Tick fixture submits a connection");
 		SOCKET peer = AcceptPeer(listener);
-		auto spPacket = CSerializableBuffer<FALSE>::MakeShared();
+		auto spPacket = CSerializableBuffer::MakeShared();
 		Check(spPacket != nullptr, L"Tick fixture allocates a packet");
 		*spPacket << BYTE{42};
-		PrepareNetPacket(*spPacket, kPacketCode);
+		PreparePacket(*spPacket, kPacketCode);
 		const int frameBytes = spPacket->GetFullSize();
 		Check(send(peer, spPacket->GetBufferPtr(), frameBytes, 0) == frameBytes, L"Tick peer sends a packet");
 		const auto deadline = GetTickCount64() + 7000;
@@ -376,7 +371,7 @@ namespace
 			rejectsPacket, sendsPeerEof);
 	}
 
-	void VerifyNetSendBatch()
+	void VerifySendBatch(EPacketMode mode)
 	{
 		constexpr BYTE kPacketCode = 0x77;
 		USHORT port = 0;
@@ -394,14 +389,14 @@ namespace
 		const HANDLE completionPort = CreateIoCompletionPort(reinterpret_cast<HANDLE>(sender), nullptr, 0, 1);
 		Check(completionPort != nullptr, L"batch sender uses an IOCP consumed by the test");
 		{
-			ClientNetworkLib::CNetSession session(kPacketCode, std::make_shared<CClientMailbox>(), kDefaultFixtureRecvBufferBytes);
+			ClientNetworkLib::CSession session(kPacketCode, std::make_shared<CClientMailbox>(), kDefaultFixtureRecvBufferBytes, mode);
 			CClientLifecycleProbe::AttachSendTestSocket(session, sender);
-			constexpr DWORD kFrameBytes = sizeof(SNetHeader) + sizeof(BYTE);
+			constexpr DWORD kFrameBytes = sizeof(SPacketHeader) + sizeof(BYTE);
 			constexpr BYTE kPacketCount = 4;
-			std::array<std::weak_ptr<CSerializableBuffer<FALSE>>, kPacketCount> packets;
+			std::array<std::weak_ptr<CSerializableBuffer>, kPacketCount> packets;
 			auto enqueuePacket = [&](BYTE index)
 			{
-				auto spPacket = CSerializableBuffer<FALSE>::MakeShared();
+				auto spPacket = CSerializableBuffer::MakeShared();
 				Check(spPacket != nullptr, L"allocate batch packet");
 				*spPacket << index;
 				packets[index] = spPacket;
@@ -431,10 +426,13 @@ namespace
 				std::array<char, kFrameBytes> frame{};
 				Check(recv(peer, frame.data(), static_cast<int>(frame.size()), MSG_WAITALL) == static_cast<int>(frame.size()),
 					L"peer receives each complete frame");
-				SNetHeader header{};
+				SPacketHeader header{};
 				memcpy(&header, frame.data(), sizeof(header));
-				Check(header.code == kPacketCode && header.len == 1, L"batch preserves each Net header");
-				MHLib::security::CEncryption::Decoding(frame.data() + 4, header.len + 1, header.randKey);
+				Check(header.code == kPacketCode && header.len == 1, L"batch preserves each packet header");
+				if (mode == EPacketMode::Net)
+					MHLib::security::CEncryption::Decoding(frame.data() + 4, header.len + 1, header.randKey);
+				else
+					Check(header.randKey == 0 && header.checkSum == 0, L"LAN does not write a checksum");
 				Check(static_cast<BYTE>(frame.back()) == index, L"batch preserves packet FIFO on the wire");
 			}
 
@@ -452,114 +450,14 @@ namespace
 		}
 		CloseHandle(completionPort);
 		closesocket(peer);
-		g_pLogger->WriteLogConsole(ELogLevel::Info, L"PASS: Net batch FIFO and whole completion ownership");
+		g_pLogger->WriteLogConsole(ELogLevel::Info, L"PASS: %ls batch FIFO and whole completion ownership",
+			mode == EPacketMode::Net ? L"Net" : L"Lan");
 	}
 
-	void CheckConnectPending(CNetClientManager &client, SessionId sessionId, const wchar_t *pCase)
+	void CheckConnectPending(CClientManager &client, SessionId sessionId, const wchar_t *pCase)
 	{
 		auto spSession = CClientLifecycleProbe::FindSession(client, sessionId);
 		Check(spSession != nullptr && CClientLifecycleProbe::IsConnectPending(*spSession), pCase);
-	}
-
-	class CLanLoopbackClient : public CLanClient
-	{
-	public:
-		void OnConnect(UINT64 sessionId) noexcept override
-		{
-			m_connectedId.store(sessionId);
-		}
-
-		void OnDisconnect(UINT64 sessionId) noexcept override
-		{
-			m_disconnectedId.store(sessionId);
-		}
-
-		void OnRecv(UINT64 sessionId, std::shared_ptr<CSerializableBufferView<TRUE>> spMessage) noexcept override
-		{
-			Check(sessionId == m_connectedId.load() && m_spReceived.load() == nullptr, L"LAN delivery on active session");
-			m_spReceived.store(std::move(spMessage));
-		}
-
-		std::atomic<UINT64> m_connectedId = 0;
-		std::atomic<UINT64> m_disconnectedId = 0;
-		std::atomic<std::shared_ptr<CSerializableBufferView<TRUE>>> m_spReceived;
-	};
-
-	void VerifyLanLoopback()
-	{
-		CLanClientManager manager;
-		CLanLoopbackClient client;
-		g_pLanClientManager = &manager;
-		Check(manager.Init() && client.Init(1), L"LAN manager and one slot initialized");
-		manager.RegisterClient(&client);
-		std::thread worker([&manager] { manager.WorkerThread(); });
-		USHORT port = 0;
-		SOCKET listener = BindLoopback(port);
-		Check(listen(listener, SOMAXCONN) == 0, L"LAN listen");
-		UINT64 oldId = 0;
-		for (int attempt = 0; attempt < 2; ++attempt)
-		{
-			const auto deadline = GetTickCount64() + 7000;
-			while (!client.PostConnectEx("127.0.0.1", port))
-			{
-				Check(GetTickCount64() < deadline, L"LAN opens and reuses the sole slot");
-				Sleep(1);
-			}
-			SOCKET peer = AcceptPeer(listener);
-			while (client.m_connectedId.load() == oldId)
-			{
-				Check(GetTickCount64() < deadline, L"LAN connect installs a fresh session ID");
-				Sleep(1);
-			}
-			const auto sessionId = client.m_connectedId.load();
-			if (oldId != 0)
-				Check(!client.Disconnect(oldId), L"LAN rejects a stale ID after slot reuse");
-
-			using CLanPacket = CSerializableBuffer<TRUE>;
-			auto spMessage = CLanPacket::MakeShared();
-			Check(spMessage != nullptr, L"LAN allocates a shared send packet");
-			*spMessage << BYTE{42};
-			std::weak_ptr wpQueued = spMessage;
-			client.EnqueuePacket(sessionId, std::move(spMessage));
-			Check(!wpQueued.expired(), L"LAN queue retains a packet without a caller owner");
-			spMessage = CLanPacket::MakeShared();
-			Check(spMessage != nullptr, L"LAN allocates a second shared send packet");
-			*spMessage << BYTE{43};
-			client.SendPacket(sessionId, std::move(spMessage));
-			constexpr std::array<char, 6> kExpected{ 1, 0, 42, 1, 0, 43 };
-			std::array<char, kExpected.size()> received{};
-			const auto bytes = static_cast<int>(received.size());
-			Check(recv(peer, received.data(), bytes, MSG_WAITALL) == bytes && received == kExpected, L"LAN FIFO wire bytes");
-			Check(send(peer, kExpected.data(), 3, 0) == 3, L"LAN peer sends framed data");
-			while (client.m_spReceived.load() == nullptr)
-			{
-				Check(GetTickCount64() < deadline, L"LAN callback receives the peer frame");
-				Sleep(1);
-			}
-			Check(client.Disconnect(sessionId), L"LAN cancels its pending recv");
-			while (client.m_disconnectedId.load() != sessionId)
-			{
-				Check(GetTickCount64() < deadline, L"LAN drains before disconnect callback");
-				Sleep(1);
-			}
-			auto spView = client.m_spReceived.exchange(nullptr);
-			std::weak_ptr wpView = spView;
-			BYTE value = 0;
-			*spView >> value;
-			Check(value == 42, L"LAN view retains worker-owned receive storage after disconnect");
-			spView.reset();
-			Check(wpView.expired() && wpQueued.expired(), L"LAN releases the retained view and queued packet");
-			closesocket(peer);
-			oldId = sessionId;
-		}
-		closesocket(listener);
-		const HANDLE lanPort = CClientLifecycleProbe::GetLanPort(manager);
-		Check(PostQueuedCompletionStatus(lanPort, 0, 0, nullptr), L"stop test LAN worker");
-		worker.join();
-		CloseHandle(lanPort);
-		WSACleanup();
-		g_pLanClientManager = nullptr;
-		g_pLogger->WriteLogConsole(ELogLevel::Info, L"PASS: LAN FIFO wire, cross-thread view return, slot reuse");
 	}
 
 	BOOL PASCAL RejectConnectEx(SOCKET, const sockaddr *, int, PVOID, DWORD, LPDWORD, LPOVERLAPPED)
@@ -571,7 +469,7 @@ namespace
 	void VerifyLifecycle(DWORD workers)
 	{
 		constexpr BYTE kPacketCode = 0x77;
-		CNetClientManager client;
+		CClientManager client;
 		Check(!client.Init(0, kDefaultFixtureRecvBufferBytes) && CClientLifecycleProbe::GetCachedConnectEx(client) == nullptr,
 			L"invalid worker count leaves no cache");
 		Check(client.Init(workers, kDefaultFixtureRecvBufferBytes), L"manager initialization succeeds");
@@ -609,10 +507,10 @@ namespace
 		Check(next != 0 && next != first && next != second, L"reconnect returns a new ID");
 		SOCKET nextPeer = AcceptPeer(listener);
 
-		auto spMessage = CSerializableBuffer<FALSE>::MakeShared();
+		auto spMessage = CSerializableBuffer::MakeShared();
 		Check(spMessage != nullptr, L"allocate test packet");
 		*spMessage << static_cast<BYTE>(42);
-		PrepareNetPacket(*spMessage, kPacketCode);
+		PreparePacket(*spMessage, kPacketCode);
 		const int frameBytes = spMessage->GetFullSize();
 		Check(send(nextPeer, spMessage->GetBufferPtr(), frameBytes, 0) == frameBytes, L"peer sends a frame before app polls");
 		Check(WaitEvent(client, next).m_kind == EClientEvent::Connected, L"Connected precedes the first packet");
@@ -632,13 +530,13 @@ namespace
 		Check(!client.SendPacket(first, std::move(spMessage)) && wpRejected.expired(), L"stale ID does not retain a shared packet");
 		auto makePacket = []
 		{
-			auto spPacket = CSerializableBuffer<FALSE>::MakeShared();
+			auto spPacket = CSerializableBuffer::MakeShared();
 			Check(spPacket != nullptr, L"allocate a temporary send packet");
 			*spPacket << BYTE{42};
 			return spPacket;
 		};
 		Check(!client.SendPacket(second, nullptr) && client.SendPacket(second, makePacket()), L"survivor sends a temporary owner");
-		SNetHeader header{};
+		SPacketHeader header{};
 		const auto deadline = GetTickCount64() + 7000;
 		std::array<WSAPOLLFD, 2> peers{{ { firstPeer, POLLRDNORM, 0 }, { secondPeer, POLLRDNORM, 0 } }};
 		bool hasPacket = false;
@@ -699,10 +597,10 @@ namespace
 		auto [blockerId, spStopBlocker] = CClientLifecycleProbe::GetFirstSessionEntry(client);
 		const auto sendTarget = blockerId == next ? second : next;
 		Check(spStopBlocker != nullptr && blockerId != sendTarget, L"Stop has a distinct blocker and send target");
-		auto spRejected = CSerializableBuffer<FALSE>::MakeShared();
+		auto spRejected = CSerializableBuffer::MakeShared();
 		Check(spRejected != nullptr, L"allocate unframed shutdown packet");
 		*spRejected << static_cast<BYTE>(73);
-		std::array<char, sizeof(SNetHeader) + 1> originalFrame{};
+		std::array<char, sizeof(SPacketHeader) + 1> originalFrame{};
 		memset(spRejected->GetBufferPtr(), 0, spRejected->GetHeaderSize());
 		memcpy(originalFrame.data(), spRejected->GetBufferPtr(), originalFrame.size());
 		{
@@ -766,9 +664,11 @@ int main(void)
 	VerifyClientTick(false, true);
 	VerifyClientTick(true, true);
 	VerifyClientTick(true, false);
-	VerifyNetRecvRing();
-	VerifyNetSendBatch();
-	VerifyLanLoopback();
+	for (const auto mode : { EPacketMode::Net, EPacketMode::Lan })
+	{
+		VerifyRecvRing(mode);
+		VerifySendBatch(mode);
+	}
 	WSACleanup();
 	fflush(nullptr);
 	// 기존 정적 풀 소멸은 이 테스트 범위가 아니다.

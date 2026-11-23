@@ -9,8 +9,6 @@
 
 #include "ClientEvent.h"
 #include "CClientMailbox.h"
-#include "CNetClientManager.h"
-#include "CNetClient.h"
-#include "CNetSession.h"
-#include "ClientSetting.h"
-#include "CLanClient.h"
+#include "CClientManager.h"
+#include "CClient.h"
+#include "CSession.h"

@@ -18,7 +18,7 @@ namespace ServerNetworkLib
 #include "SBaseEvent.h"
 #include "ServerSetting.h"
 #include "CMonitor.h"
-#include "CNetServer.h"
+#include "CServer.h"
 #include "SystemEvent.h"
 #include "CBaseContents.h"
 #include "CContentsThread.h"

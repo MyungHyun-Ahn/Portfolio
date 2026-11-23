@@ -13,7 +13,7 @@ void SMonitorTimerEvent::SetEvent() noexcept
 
 void SMonitorTimerEvent::Execute(int delayFrame) noexcept
 {
-	g_monitor.Update(g_pNetServer->GetSessionCount());
+	g_monitor.Update(g_pServer->GetSessionCount());
 }
 
 void SKeyboardTimerEvent::SetEvent() noexcept
@@ -29,7 +29,7 @@ void SKeyboardTimerEvent::Execute(int delayFrame) noexcept
 {
 	// 서버 종료
 	if (GetAsyncKeyState(VK_F1))
-		ServerNetworkLib::g_pNetServer->Stop();
+		ServerNetworkLib::g_pServer->Stop();
 
 	// 프로파일러 저장
 	if (GetAsyncKeyState(VK_F2))
@@ -72,7 +72,7 @@ void SSendAllTimerEvent::SetEvent() noexcept
 
 void SSendAllTimerEvent::Execute(int delayFrame) noexcept
 {
-	ServerNetworkLib::g_pNetServer->SendAll();
+	ServerNetworkLib::g_pServer->SendAll();
 }
 
 void SExampleTimerEvent::SetEvent(int param1, double param2, int frame) noexcept

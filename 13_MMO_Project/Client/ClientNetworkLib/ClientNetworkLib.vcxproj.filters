@@ -1,22 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <ItemGroup>
-    <ClCompile Include="ClientSetting.cpp" />
-    <ClCompile Include="CLanClient.cpp" />
     <ClCompile Include="CClientMailbox.cpp" />
-    <ClCompile Include="CNetClient.cpp" />
-    <ClCompile Include="CNetClientManager.cpp" />
-    <ClCompile Include="CNetSession.cpp" />
+    <ClCompile Include="CClient.cpp" />
+    <ClCompile Include="CClientManager.cpp" />
+    <ClCompile Include="CSession.cpp" />
     <ClCompile Include="ClientNetworkLibPch.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ClientSetting.h" />
-    <ClInclude Include="CLanClient.h" />
     <ClInclude Include="CClientMailbox.h" />
     <ClInclude Include="ClientEvent.h" />
-    <ClInclude Include="CNetClient.h" />
-    <ClInclude Include="CNetClientManager.h" />
-    <ClInclude Include="CNetSession.h" />
+    <ClInclude Include="CClient.h" />
+    <ClInclude Include="CClientManager.h" />
+    <ClInclude Include="CSession.h" />
     <ClInclude Include="ClientNetworkLibPch.h" />
   </ItemGroup>
 </Project>

@@ -4,14 +4,14 @@ namespace ServerNetworkLib
 {
 void CBaseContents::MoveJobEnqueue(UINT64 sessionId, void *pObject) noexcept
 {
-	CNetSession *pSession = g_pNetServer->m_pSessions[CNetServer::getIndex(sessionId)];
+	CSession *pSession = g_pServer->m_pSessions[CServer::getIndex(sessionId)];
 
 	InterlockedIncrement(&pSession->m_ioCountAndRelease);
-	if ((pSession->m_ioCountAndRelease & CNetSession::sm_releaseFlag) == CNetSession::sm_releaseFlag)
+	if ((pSession->m_ioCountAndRelease & CSession::sm_releaseFlag) == CSession::sm_releaseFlag)
 	{
 		if (InterlockedDecrement(&pSession->m_ioCountAndRelease) == 0)
 		{
-			ServerNetworkLib::g_pNetServer->ReleaseSession(pSession);
+			ServerNetworkLib::g_pServer->ReleaseSession(pSession);
 		}
 		return;
 	}
@@ -20,7 +20,7 @@ void CBaseContents::MoveJobEnqueue(UINT64 sessionId, void *pObject) noexcept
 	{
 		if (InterlockedDecrement(&pSession->m_ioCountAndRelease) == 0)
 		{
-			ServerNetworkLib::g_pNetServer->ReleaseSession(pSession);
+			ServerNetworkLib::g_pServer->ReleaseSession(pSession);
 		}
 		return;
 	}
@@ -49,7 +49,7 @@ void CBaseContents::ProcessMoveJob() noexcept
 			break;
 
 		// 세션 찾기
-		ServerNetworkLib::CNetSession *pSession = ServerNetworkLib::g_pNetServer->m_pSessions[ServerNetworkLib::CNetServer::getIndex(pMoveJob->m_sessionId)];
+		ServerNetworkLib::CSession *pSession = ServerNetworkLib::g_pServer->m_pSessions[ServerNetworkLib::CServer::getIndex(pMoveJob->m_sessionId)];
 
 		// 여기까진 유효한 세션일 것
 		// objectPtr == nullptr이면 OnEnter 받은 쪽에서 생성
@@ -63,7 +63,7 @@ void CBaseContents::ProcessMoveJob() noexcept
 
 		if (InterlockedDecrement(&pSession->m_ioCountAndRelease) == 0)
 		{
-			ServerNetworkLib::g_pNetServer->ReleaseSession(pSession);
+			ServerNetworkLib::g_pServer->ReleaseSession(pSession);
 		}
 	}
 }
@@ -85,15 +85,15 @@ void CBaseContents::ProcessRecvMsg(int delayFrame) noexcept
 	for (auto &it : m_umapSessions)
 	{
 		UINT64 sessionId = it.first;
-		int sessionIdx = ServerNetworkLib::CNetServer::getIndex(sessionId);
-		ServerNetworkLib::CNetSession *pSession = ServerNetworkLib::g_pNetServer->m_pSessions[sessionIdx];
+		int sessionIdx = ServerNetworkLib::CServer::getIndex(sessionId);
+		ServerNetworkLib::CSession *pSession = ServerNetworkLib::g_pServer->m_pSessions[sessionIdx];
 		
 		InterlockedIncrement(&pSession->m_ioCountAndRelease);
-		if ((pSession->m_ioCountAndRelease & CNetSession::sm_releaseFlag) == CNetSession::sm_releaseFlag)
+		if ((pSession->m_ioCountAndRelease & CSession::sm_releaseFlag) == CSession::sm_releaseFlag)
 		{
 			if (InterlockedDecrement(&pSession->m_ioCountAndRelease) == 0)
 			{
-				ServerNetworkLib::g_pNetServer->ReleaseSession(pSession);
+				ServerNetworkLib::g_pServer->ReleaseSession(pSession);
 			}
 			continue;
 		}
@@ -102,7 +102,7 @@ void CBaseContents::ProcessRecvMsg(int delayFrame) noexcept
 		{
 			if (InterlockedDecrement(&pSession->m_ioCountAndRelease) == 0)
 			{
-				ServerNetworkLib::g_pNetServer->ReleaseSession(pSession);
+				ServerNetworkLib::g_pServer->ReleaseSession(pSession);
 			}
 			continue;
 		}
@@ -110,7 +110,7 @@ void CBaseContents::ProcessRecvMsg(int delayFrame) noexcept
 		LONG recvMsgCount = pSession->m_recvMsgQueue.GetUseSize();
 		for (int i = 0; i < recvMsgCount; i++)
 		{
-			CSerializableBuffer<FALSE> *pMsg;
+			CSerializableBuffer *pMsg;
 			if (!pSession->m_recvMsgQueue.Dequeue(&pMsg))
 				break;
 
@@ -118,25 +118,25 @@ void CBaseContents::ProcessRecvMsg(int delayFrame) noexcept
 			if (ret == ERecvResult::Moved)
 			{
 				if (pMsg->DecreaseRef() == 0)
-					CSerializableBuffer<FALSE>::Free(pMsg);
+					CSerializableBuffer::Free(pMsg);
 				break;
 			}
 			if (ret == ERecvResult::Failed)
 			{
-				ServerNetworkLib::g_pNetServer->Disconnect(sessionId);
+				ServerNetworkLib::g_pServer->Disconnect(sessionId);
 
 				if (pMsg->DecreaseRef() == 0)
-					CSerializableBuffer<FALSE>::Free(pMsg);
+					CSerializableBuffer::Free(pMsg);
 				break;
 			}
 
 			if (pMsg->DecreaseRef() == 0)
-				CSerializableBuffer<FALSE>::Free(pMsg);
+				CSerializableBuffer::Free(pMsg);
 		}
 
 		if (InterlockedDecrement(&pSession->m_ioCountAndRelease) == 0)
 		{
-			ServerNetworkLib::g_pNetServer->ReleaseSession(pSession);
+			ServerNetworkLib::g_pServer->ReleaseSession(pSession);
 		}
 	}
 }

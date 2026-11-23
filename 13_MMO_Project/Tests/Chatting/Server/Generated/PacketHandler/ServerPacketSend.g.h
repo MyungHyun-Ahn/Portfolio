@@ -9,20 +9,20 @@ namespace Chatting
 	struct SResLogin;
 	struct SResSectorMove;
 
-	[[nodiscard]] NetworkCommonLib::CSerializableBuffer<FALSE> *MakePacketResMessage(
+	[[nodiscard]] NetworkCommonLib::CSerializableBuffer *MakePacketResMessage(
 		const SResMessage &packet) noexcept;
-	[[nodiscard]] NetworkCommonLib::CSerializableBuffer<FALSE> *MakePacketMessageNoti(
+	[[nodiscard]] NetworkCommonLib::CSerializableBuffer *MakePacketMessageNoti(
 		const SMessageNoti &packet) noexcept;
-	[[nodiscard]] NetworkCommonLib::CSerializableBuffer<FALSE> *MakePacketResLogin(
+	[[nodiscard]] NetworkCommonLib::CSerializableBuffer *MakePacketResLogin(
 		const SResLogin &packet) noexcept;
-	[[nodiscard]] NetworkCommonLib::CSerializableBuffer<FALSE> *MakePacketResSectorMove(
+	[[nodiscard]] NetworkCommonLib::CSerializableBuffer *MakePacketResSectorMove(
 		const SResSectorMove &packet) noexcept;
 
 	class CServerPacketSender
 	{
 	public:
 		// 준비 실패 시 nullptr. 반환한 참조 1개는 호출자가 반환한다. 첫 전송 성공을 뜻하지 않는다.
-		[[nodiscard]] NetworkCommonLib::CSerializableBuffer<FALSE> *SendResMessage(
+		[[nodiscard]] NetworkCommonLib::CSerializableBuffer *SendResMessage(
 
 			UINT64 sessionId,
 			std::int64_t accountNo,
@@ -30,7 +30,7 @@ namespace Chatting
 			const std::wstring &nickname,
 			const std::wstring &message) noexcept;
 		// 준비 실패 시 nullptr. 반환한 참조 1개는 호출자가 반환한다. 첫 전송 성공을 뜻하지 않는다.
-		[[nodiscard]] NetworkCommonLib::CSerializableBuffer<FALSE> *SendNotiMessage(
+		[[nodiscard]] NetworkCommonLib::CSerializableBuffer *SendNotiMessage(
 
 			UINT64 sessionId,
 			std::int64_t accountNo,
@@ -38,13 +38,13 @@ namespace Chatting
 			const std::wstring &nickname,
 			const std::wstring &message) noexcept;
 		// 준비 실패 시 nullptr. 반환한 참조 1개는 호출자가 반환한다. 첫 전송 성공을 뜻하지 않는다.
-		[[nodiscard]] NetworkCommonLib::CSerializableBuffer<FALSE> *SendResLogin(
+		[[nodiscard]] NetworkCommonLib::CSerializableBuffer *SendResLogin(
 
 			UINT64 sessionId,
 			std::uint8_t status,
 			std::int64_t accountNo) noexcept;
 		// 준비 실패 시 nullptr. 반환한 참조 1개는 호출자가 반환한다. 첫 전송 성공을 뜻하지 않는다.
-		[[nodiscard]] NetworkCommonLib::CSerializableBuffer<FALSE> *SendResSectorMove(
+		[[nodiscard]] NetworkCommonLib::CSerializableBuffer *SendResSectorMove(
 
 			UINT64 sessionId,
 			std::int64_t accountNo,
@@ -54,10 +54,10 @@ namespace Chatting
 	protected:
 		virtual ~CServerPacketSender() = default;
 		// 직렬화된 버퍼를 받아 호출자 참조를 확보한 뒤 전송한다.
-		[[nodiscard]] NetworkCommonLib::CSerializableBuffer<FALSE> *submitPreparedPacket(
-			UINT64 sessionId, EPacketType type, NetworkCommonLib::CSerializableBuffer<FALSE> *pPacket) noexcept;
+		[[nodiscard]] NetworkCommonLib::CSerializableBuffer *submitPreparedPacket(
+			UINT64 sessionId, EPacketType type, NetworkCommonLib::CSerializableBuffer *pPacket) noexcept;
 
 	private:
-		virtual void sendPacket(UINT64 sessionId, EPacketType type, NetworkCommonLib::CSerializableBuffer<FALSE> &packet) noexcept = 0;
+		virtual void sendPacket(UINT64 sessionId, EPacketType type, NetworkCommonLib::CSerializableBuffer &packet) noexcept = 0;
 	};
 }

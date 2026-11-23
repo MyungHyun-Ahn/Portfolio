@@ -2,22 +2,23 @@
 
 namespace ClientNetworkLib
 {
-	class CNetSession;
+	class CSession;
 	class CClientMailbox;
 	struct SClientEvent;
 	class CClientLifecycleProbe;
 	using SessionId = ULONG_PTR;
 
-	class CNetClientManager
+	class CClientManager
 	{
 	public:
-		CNetClientManager() = default;
-		~CNetClientManager();
-		CNetClientManager(const CNetClientManager &) = delete;
-		CNetClientManager &operator=(const CNetClientManager &) = delete;
+		CClientManager() = default;
+		~CClientManager();
+		CClientManager(const CClientManager &) = delete;
+		CClientManager &operator=(const CClientManager &) = delete;
 
 		[[nodiscard]]
-		bool Init(DWORD workerCount, int recvBufferBytes) noexcept;
+		bool Init(DWORD workerCount, int recvBufferBytes,
+			NetworkCommonLib::EPacketMode packetMode = NetworkCommonLib::EPacketMode::Net) noexcept;
 
 		// 0은 Connect 예약에 실패함.
 		// - 0이 아닌 값은 SessionId이다.
@@ -30,7 +31,7 @@ namespace ClientNetworkLib
 
 		// MakeShared()으로 만든 새 패킷을 한 번만 넘긴다. 송신 접수 후에는 내용이나 커서를 변경하지 않는다.
 		[[nodiscard]]
-		bool SendPacket(SessionId sessionId, std::shared_ptr<NetworkCommonLib::CSerializableBuffer<FALSE>> spMessage) noexcept;
+		bool SendPacket(SessionId sessionId, std::shared_ptr<NetworkCommonLib::CSerializableBuffer> spMessage) noexcept;
 		bool Disconnect(SessionId sessionId) noexcept;
 		void Stop() noexcept;
 
@@ -40,10 +41,10 @@ namespace ClientNetworkLib
 		// - 13_MMO_Project\Tests\ClientLifecycle 프로젝트에 정의하고 사용함
 		friend class CClientLifecycleProbe;
 
-		using SSessionEntry = std::pair<SessionId, std::shared_ptr<CNetSession>>;
+		using SSessionEntry = std::pair<SessionId, std::shared_ptr<CSession>>;
 
 		[[nodiscard]]
-		std::shared_ptr<CNetSession> findSession(SessionId sessionId) noexcept;
+		std::shared_ptr<CSession> findSession(SessionId sessionId) noexcept;
 		// 전체 순회 시 테이블 락을 걸고 id와 session 스마트 포인터의 쌍을 얻는 함수
 		// - 스마트 포인터로 얻기 때문에 순회 중 객체가 삭제되지 않는 것을 보장한다. (연결은 끊길 수 있다.)
 		// - 테이블을 얻기만 하기 때문에 전체 테이블을 Lock 잡는 시간이 적다.
@@ -69,7 +70,7 @@ namespace ClientNetworkLib
 
 		// Mailbox와 세션은 수명주기가 다르다.
 		// - Disconnected를 처리하기 위해 Mailbox가 길 수 있음
-		std::unordered_map<SessionId, std::shared_ptr<CNetSession>> 	m_sessions;
+		std::unordered_map<SessionId, std::shared_ptr<CSession>> 	m_sessions;
 		std::unordered_map<SessionId, std::shared_ptr<CClientMailbox>> 					m_mailboxes;
 
 		// 세션 ID 발급 용도 - 단순 증가
@@ -79,6 +80,7 @@ namespace ClientNetworkLib
 		// - ClientManager가 서버로 Connect와 Send 요청을 보낼 수 있는 상태를 나타냄
 		bool 	m_isAccepting = false;
 		int 	m_recvBufferBytes = 0;
+		NetworkCommonLib::EPacketMode m_packetMode = NetworkCommonLib::EPacketMode::Net;
 
 		HANDLE 				m_iocpHandle = nullptr;
 		LPFN_CONNECTEX 		m_pConnectEx = nullptr;

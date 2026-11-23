@@ -4,12 +4,12 @@ namespace ClientNetworkLib
 {
 	using namespace NetworkCommonLib;
 
-	CNetClient::CNetClient(CNetClientManager &network) noexcept
+	CClient::CClient(CClientManager &network) noexcept
 		: m_network(network)
 	{
 	}
 
-	bool CNetClient::Connect(const char *pIp, USHORT port, BYTE packetCode, DWORD timeoutMilliseconds) noexcept
+	bool CClient::Connect(const char *pIp, USHORT port, BYTE packetCode, DWORD timeoutMilliseconds) noexcept
 	{
 		if (IsActive())
 			return false;
@@ -18,7 +18,7 @@ namespace ClientNetworkLib
 		return IsActive();
 	}
 
-	void CNetClient::Disconnect() noexcept
+	void CClient::Disconnect() noexcept
 	{
 		m_isConnected = false;
 		if (IsActive())
@@ -26,7 +26,7 @@ namespace ClientNetworkLib
 	}
 
 	// 클라이언트는 Tick을 가지고 매 프레임마다 이 함수를 호출한다.
-	void CNetClient::Tick() noexcept
+	void CClient::Tick() noexcept
 	{
 		if (!IsActive())
 			return;
@@ -69,17 +69,17 @@ namespace ClientNetworkLib
 		}
 	}
 
-	bool CNetClient::IsActive() const noexcept
+	bool CClient::IsActive() const noexcept
 	{
 		return m_sessionId != 0;
 	}
 
-	bool CNetClient::IsConnected() const noexcept
+	bool CClient::IsConnected() const noexcept
 	{
 		return m_isConnected;
 	}
 
-	bool CNetClient::sendNetworkPacket(std::shared_ptr<CSerializableBuffer<FALSE>> spPacket) noexcept
+	bool CClient::sendPacket(std::shared_ptr<CSerializableBuffer> spPacket) noexcept
 	{
 		return m_network.SendPacket(m_sessionId, std::move(spPacket));
 	}

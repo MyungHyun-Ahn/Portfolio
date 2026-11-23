@@ -10,10 +10,10 @@
 #include "SBaseEvent.h"
 #include "ServerSetting.h"
 #include "CMonitor.h"
-#include "CNetServer.h"
+#include "CServer.h"
 #include "CBaseContents.h"
 #include "CommonProtocol.h"
-#include "NetPacket.h"
+#include "PacketFraming.h"
 #include "CPlayer.h"
 #include "CSector.h"
 #include "MHLib/serialization/ISerializable.h"
@@ -31,18 +31,18 @@ namespace Chatting
 
 	namespace
 	{
-		void ReleaseResponse(NetworkCommonLib::CSerializableBuffer<FALSE> *pResponse) noexcept
+		void ReleaseResponse(NetworkCommonLib::CSerializableBuffer *pResponse) noexcept
 		{
 			if (pResponse != nullptr && pResponse->DecreaseRef() == 0)
-				NetworkCommonLib::CSerializableBuffer<FALSE>::Free(pResponse);
+				NetworkCommonLib::CSerializableBuffer::Free(pResponse);
 		}
 	}
 
-	void CProcessPacket::sendPacket(UINT64 sessionId, EPacketType type, NetworkCommonLib::CSerializableBuffer<FALSE> &packet) noexcept
+	void CProcessPacket::sendPacket(UINT64 sessionId, EPacketType type, NetworkCommonLib::CSerializableBuffer &packet) noexcept
 	{
 		if (type == EPacketType::ResMessage)
 			packet.SetSessionId(sessionId);
-		NetworkCommonLib::PrepareNetPacket(packet, kPacketCode);
+		NetworkCommonLib::PreparePacket(packet, kPacketCode, m_contents.m_server.GetPacketMode());
 		m_contents.m_server.SendPacket(sessionId, &packet);
 	}
 
@@ -160,7 +160,7 @@ namespace Chatting
 		auto *pNotification = MakePacketMessageNoti(notification);
 		if (pNotification == nullptr)
 		{
-			NetworkCommonLib::CSerializableBuffer<FALSE>::Free(pResponse);
+			NetworkCommonLib::CSerializableBuffer::Free(pResponse);
 			return false;
 		}
 
@@ -169,7 +169,7 @@ namespace Chatting
 		InterlockedIncrement(&ServerNetworkLib::g_monitor.m_chatMsgRes);
 		// 전파가 끝날 때까지 호출자 참조를 유지한다.
 		pNotification->IncreaseRef();
-		NetworkCommonLib::PrepareNetPacket(*pNotification, kPacketCode);
+		NetworkCommonLib::PreparePacket(*pNotification, kPacketCode, m_contents.m_server.GetPacketMode());
 		m_contents.SendSector(sessionId, pPlayer->m_sectorY, pPlayer->m_sectorX, pNotification);
 		ReleaseResponse(pNotification);
 		g_pLogger->WriteLog(ELogLevel::Debug, L"ChatServer", sessionId, std::source_location::current(),

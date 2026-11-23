@@ -202,19 +202,27 @@ def server_options_config(base, configuration):
     print("server options: custom worker counts and loopback echo verified; invalid settings rejected")
 
 
-def chat(base, configuration):
+def chat(base, configuration, packet_mode=None):
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
         port = probe.getsockname()[1]
+    options = {"PACKET_MODE": packet_mode} if packet_mode is not None else None
+    if packet_mode is not None:
+        for side in ("Server", "Client"):
+            with launch(base, configuration, side, f"invalid-{side}", port,
+                        server_options={"PACKET_MODE": "Invalid"}) as invalid:
+                wait_text(invalid, "PACKET_MODE must be Net or Lan")
+                assert invalid[0].wait(timeout=8) == 2
     with ExitStack() as cleanup:
-        server = cleanup.enter_context(launch(base, configuration, "Server", "server", port))
+        server = cleanup.enter_context(launch(base, configuration, "Server", "server", port, server_options=options))
         wait_text(server, f"event=server_ready port={port}", legacy=f"READY chat test-only port={port}")
         nicknames = ("가", "나" * 17 + "😀")
         assert [len(name.encode("utf-16-le")) // 2 for name in nicknames] == [1, 19]
         with launch(base, configuration, "Client", "over-limit", port, nickname=nicknames[1] + "가") as invalid:
             assert invalid[0].wait(timeout=8) == 2
             wait_text(invalid, "NICKNAME is missing or invalid")
-        clients = [cleanup.enter_context(launch(base, configuration, "Client", label, port, nickname=nickname))
+        clients = [cleanup.enter_context(launch(base, configuration, "Client", label, port,
+                                               nickname=nickname, server_options=options))
                    for label, nickname in zip(("a", "b"), nicknames)]
         for client in clients:
             wait_text(client, "READY account=")
@@ -475,7 +483,8 @@ if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
     mode = sys.argv[1]
     configuration = sys.argv[2] if len(sys.argv) > 2 else "Release"
-    case = {"bind": bind_failure, "chat": chat, "log-interval": log_interval_config,
+    case = {"bind": bind_failure, "chat": chat, "chat-lan": lambda base, config: chat(base, config, "Lan"),
+            "log-interval": log_interval_config,
             "session-limit": session_limit_config, "server-options": server_options_config, "metrics": metrics}[mode]
     evidence = os.environ.get("MMO_SERVER_EVENT_EVIDENCE")
     if evidence:
