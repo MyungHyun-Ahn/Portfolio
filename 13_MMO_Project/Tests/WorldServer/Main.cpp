@@ -151,6 +151,7 @@ namespace WorldServer
 		constexpr std::size_t kSampleCount = 4;
 		std::binary_semaphore samplesReady{0};
 		std::vector<int> samples;
+		std::function<void()> recordSample;
 		CContentsRuntime runtime(1, kFrameInterval);
 		auto upFramed = std::make_unique<CTestContents>(21, true);
 		auto &framed = *upFramed;
@@ -165,16 +166,16 @@ namespace WorldServer
 		if (frameStarted)
 			std::this_thread::sleep_for(kFrameInterval * kSampleCount);
 
-		bool submitted = true;
-		for (std::size_t i = 0; i < kSampleCount && submitted; ++i)
+		// 각 순회에서 표본을 하나씩 남기고 다음 순회에 다시 확인한다.
+		recordSample = [&runtime, &sampleHandle, &framed, &samples, &samplesReady, &recordSample]
 		{
-			submitted = runtime.PostCompletion(sampleHandle, [&framed, &samples, &samplesReady]
-				{
-					samples.push_back(framed.m_frameCount);
-					if (samples.size() == kSampleCount)
-						samplesReady.release();
-				});
-		}
+			samples.push_back(framed.m_frameCount);
+			if (samples.size() == kSampleCount)
+				samplesReady.release();
+			else
+				(void)runtime.PostCompletion(sampleHandle, recordSample);
+		};
+		const bool submitted = runtime.PostCompletion(sampleHandle, recordSample);
 		framed.m_releaseFrame.release();
 		const bool finished = submitted && samplesReady.try_acquire_for(kWaitTimeout);
 		runtime.Stop();
@@ -291,17 +292,20 @@ namespace WorldServer
 
 		const bool completed = postedWhilePending && queuedRan.try_acquire_for(kWaitTimeout);
 		const bool rejectedCurrentWorker = completed && !runtime.RequestDelegate(31, 1);
-		const bool postedAfterTransfer = completed && runtime.PostCompletion(handle, [&contents]
+		const bool postedAfterTransfer = completed && runtime.PostCompletion(handle, [&contents, &queuedRan]
 			{
 				contents.RecordCompletion(3);
+				queuedRan.release();
 			});
+		const bool continuedAfterTransfer = postedAfterTransfer && queuedRan.try_acquire_for(kWaitTimeout);
 		runtime.Stop();
 		if (!frameStarted || !rejectedInvalid || !postedBeforeRequest || !requested || !rejectedPending)
 			return 31;
-		if (!completed || !rejectedCurrentWorker || !postedAfterTransfer || runtime.RequestDelegate(31, 0))
+		if (!completed || !rejectedCurrentWorker || !continuedAfterTransfer || runtime.RequestDelegate(31, 0))
 			return 32;
 		if (contents.m_didOverlap || contents.m_completed != std::vector<int>{1, 2, 3}
-			|| contents.m_completionFrameCounts[0] != 2 || contents.m_completionFrameCounts[1] != 3
+			|| contents.m_completionFrameCounts[0] != 2 || contents.m_completionFrameCounts[1] != 2
+			|| contents.m_completionFrameCounts[2] < 3
 			|| contents.m_frameThreads.size() < 3
 			|| contents.m_frameThreads.front() == contents.m_completionThread)
 			return 33;
@@ -355,15 +359,16 @@ namespace WorldServer
 				contents.RecordCompletion(2);
 				transferredRan.release();
 			});
-		const bool witnessed = queued && runtime.PostCompletion(witnessHandle, [&witness]
+		const bool witnessed = queued && runtime.PostCompletion(witnessHandle, [&runtime, &witnessHandle, &witness, &witnessRan]
 			{
 				witness.RecordCompletion(1);
-			}) && runtime.PostCompletion(witnessHandle, [&witness, &witnessRan]
-			{
-				witness.RecordCompletion(2);
-				witnessRan.release();
+				(void)runtime.PostCompletion(witnessHandle, [&witness, &witnessRan]
+					{
+						witness.RecordCompletion(2);
+						witnessRan.release();
+					});
 			});
-		// 목적지가 두 번째 순회에 도달할 때까지 출발 콜백을 놓지 않는다.
+		// 첫 완료에서 두 번째를 게시해 같은 묶음에서 실행되지 않게 한다.
 		const bool destinationProgress = witnessed && witnessRan.try_acquire_for(kWaitTimeout);
 		releaseCallback.release();
 		const bool transferred = destinationProgress && transferredRan.try_acquire_for(kWaitTimeout);
@@ -493,6 +498,114 @@ namespace WorldServer
 		return wokeAgain && completed == kProducerCount * kPostsPerProducer ? 0 : 71;
 	}
 
+	// 첫 방문에 확인한 완료를 모두 FIFO로 실행하고 새 완료는 다음 방문으로 넘긴다.
+	int RunCompletionBatchTest(int initialCount)
+	{
+		std::binary_semaphore gateStarted{0};
+		std::binary_semaphore releaseGate{0};
+		std::binary_semaphore tailRan{0};
+		std::vector<int> order;
+		bool lateAccepted = false;
+		CContentsRuntime runtime(1, 1h);
+		for (ContentsInstanceId id = 101; id <= 103; ++id)
+		{
+			if (!runtime.RegisterContents(std::make_unique<CTestContents>(id, false), false, 0))
+				return 100;
+		}
+		const auto gate = runtime.GetContentsHandle(101);
+		const auto batch = runtime.GetContentsHandle(102);
+		const auto peer = runtime.GetContentsHandle(103);
+		if (!runtime.Start())
+			return 100;
+		const bool gated = runtime.PostCompletion(gate, [&gateStarted, &releaseGate]
+			{
+				gateStarted.release();
+				releaseGate.acquire();
+			}) && gateStarted.try_acquire_for(kWaitTimeout);
+		bool queued = gated && runtime.PostCompletion(batch, [&runtime, &batch, &order, &tailRan, &lateAccepted, initialCount]
+			{
+				order.push_back(1);
+				lateAccepted = runtime.PostCompletion(batch, [&order, &tailRan, initialCount]
+					{
+						order.push_back(initialCount + 1);
+						tailRan.release();
+					});
+			});
+		for (int sequence = 2; sequence <= initialCount && queued; ++sequence)
+		{
+			queued = runtime.PostCompletion(batch, [&order, sequence]
+				{
+					order.push_back(sequence);
+				});
+		}
+		queued = queued && runtime.PostCompletion(peer, [&order]
+			{
+				order.push_back(0);
+			});
+		releaseGate.release();
+		const bool completed = queued && tailRan.try_acquire_for(kWaitTimeout);
+		runtime.Stop();
+		std::vector<int> expected;
+		for (int sequence = 1; sequence <= initialCount + 1; ++sequence)
+		{
+			expected.push_back(sequence);
+			if (sequence == initialCount)
+				expected.push_back(0);
+		}
+		return completed && lateAccepted && order == expected ? 0 : 101;
+	}
+
+	// 뒤쪽 엔트리의 프레임 시각이 와도 이미 확인한 완료를 마친다.
+	int RunCompletionBatchOverrunTest()
+	{
+		constexpr auto kFrameInterval = 100ms;
+		std::binary_semaphore gateStarted{0};
+		std::binary_semaphore releaseGate{0};
+		std::binary_semaphore firstStarted{0};
+		std::binary_semaphore releaseFirst{0};
+		std::binary_semaphore frameVisitDone{0};
+		int framesBefore = 0;
+		int framesAfter = 0;
+		CContentsRuntime runtime(1, kFrameInterval);
+		auto upFramed = std::make_unique<CTestContents>(113, false);
+		auto &framed = *upFramed;
+		if (!runtime.RegisterContents(std::make_unique<CTestContents>(111, false), false, 0)
+			|| !runtime.RegisterContents(std::make_unique<CTestContents>(112, false), false, 0)
+			|| !runtime.RegisterContents(std::move(upFramed), true, 0))
+			return 110;
+		const auto gate = runtime.GetContentsHandle(111);
+		const auto batch = runtime.GetContentsHandle(112);
+		const auto frameHandle = runtime.GetContentsHandle(113);
+		if (!runtime.Start())
+			return 110;
+		const bool gated = runtime.PostCompletion(gate, [&gateStarted, &releaseGate]
+			{
+				gateStarted.release();
+				releaseGate.acquire();
+			}) && gateStarted.try_acquire_for(kWaitTimeout);
+		const bool queued = gated && runtime.PostCompletion(batch, [&framed, &framesBefore, &firstStarted, &releaseFirst]
+			{
+				framesBefore = framed.m_frameCount;
+				firstStarted.release();
+				releaseFirst.acquire();
+			}) && runtime.PostCompletion(batch, [&framed, &framesAfter]
+			{
+				framesAfter = framed.m_frameCount;
+			});
+		releaseGate.release();
+		const bool started = queued && firstStarted.try_acquire_for(kWaitTimeout);
+		if (started)
+			std::this_thread::sleep_for(kFrameInterval * 2);
+		const bool witnessQueued = started && runtime.PostCompletion(frameHandle, [&frameVisitDone]
+			{
+				frameVisitDone.release();
+			});
+		releaseFirst.release();
+		const bool completed = witnessQueued && frameVisitDone.try_acquire_for(kWaitTimeout);
+		runtime.Stop();
+		return completed && framesAfter == framesBefore && framed.m_frameCount > framesAfter ? 0 : 111;
+	}
+
 	struct SSchedulerTestPolicy
 	{
 		// 이동 없음, 자기 자신, 정상 인계 순으로 후보를 반환한다.
@@ -616,5 +729,11 @@ int main(void)
 	if (wakeResult != 0)
 		return wakeResult;
 	const int stopResult = WorldServer::RunDelegateStopTest();
-	return stopResult != 0 ? stopResult : WorldServer::RunSchedulerTest();
+	if (stopResult != 0)
+		return stopResult;
+	const int batchResult = WorldServer::RunCompletionBatchTest(65);
+	if (batchResult != 0)
+		return batchResult;
+	const int overrunResult = WorldServer::RunCompletionBatchOverrunTest();
+	return overrunResult != 0 ? overrunResult : WorldServer::RunSchedulerTest();
 }

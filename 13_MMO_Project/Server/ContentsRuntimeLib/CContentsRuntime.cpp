@@ -261,27 +261,26 @@ namespace ContentsRuntimeLib
 
 				if (entry.pDelegateWorker == nullptr)
 				{
-					std::function<void()> completion;
+					auto &mailbox = *entry.upContents->m_spMailbox;
+					std::size_t completionCount;
 					{
-						auto &mailbox = *entry.upContents->m_spMailbox;
-						// 2. completionLock
+						// 이번 프레임에 쌓여 있던 완료만 처리하고 새로 들어온 완료는 남겨 둔다.
 						std::lock_guard completionLock(mailbox.completionLock);
-						if (!mailbox.completionQueue.empty())
+						completionCount = mailbox.completionQueue.size();
+					}
+					for (std::size_t i = 0; i < completionCount && entry.pDelegateWorker == nullptr; ++i)
+					{
+						std::function<void()> completion;
 						{
+							// 락을 걸고 완료 콜백 1개를 꺼낸다.
+							std::lock_guard completionLock(mailbox.completionLock);
 							completion.swap(mailbox.completionQueue.front());
 							mailbox.completionQueue.pop_front();
 						}
-					}
-					// 순회당 최대 한 건을 락 밖에서 실행하고 캡처도 해제한다.
-					if (completion)
-					{
 						workLock.unlock();
-
-						// 완료 콜백 실행
+						// 완료 콜백은 락을 걸지 않고 수행한다.
 						completion();
 						completion = nullptr;
-
-						// 1. workLock
 						workLock.lock();
 						didWork = true;
 					}
