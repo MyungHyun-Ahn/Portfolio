@@ -3,6 +3,7 @@
 namespace ContentsRuntimeLib
 {
 	class CContentsRuntime;
+	struct SWorkerTimingSnapshot;
 
 	struct SDelegateCandidate
 	{
@@ -13,7 +14,7 @@ namespace ContentsRuntimeLib
 	class CContentsScheduler final : public IContents
 	{
 	public:
-		using SelectCandidate = std::function<std::optional<SDelegateCandidate>()>;
+		using SelectCandidate = std::function<std::optional<SDelegateCandidate>(const std::vector<SWorkerTimingSnapshot> &)>;
 
 		// 기존 워커에서 평가할 주기와 후보 선택 정책을 지정한다.
 		CContentsScheduler(ContentsInstanceId instanceId, CContentsRuntime &runtime,

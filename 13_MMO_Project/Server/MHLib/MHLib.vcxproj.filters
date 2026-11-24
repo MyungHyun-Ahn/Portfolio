@@ -71,6 +71,9 @@
     <ClInclude Include="includes\MHLib\utils\CProfileManager.h">
       <Filter>includes\MHLib\utils</Filter>
     </ClInclude>
+    <ClInclude Include="includes\MHLib\utils\CScopedExecutionTimer.h">
+      <Filter>includes\MHLib\utils</Filter>
+    </ClInclude>
     <ClInclude Include="includes\MHLib\utils\CSingleton.h">
       <Filter>includes\MHLib\utils</Filter>
     </ClInclude>

@@ -2,11 +2,26 @@
 #include "IContents.h"
 #include "ContentsHandle.h"
 #include "CContentsRuntime.h"
+#include "MHLib/utils/CScopedExecutionTimer.h"
 #include <atomic>
 #include <semaphore>
 
 namespace ContentsRuntimeLib
 {
+	// 워커가 끝낸 순회의 시간과 프레임 수를 함께 보관한다.
+	struct SWorkerTiming final : MHLib::utils::IExecutionTimeSink
+	{
+		// workLock 아래에서 순회 시간과 프레임 한 건을 기록한다.
+		void Record(std::chrono::steady_clock::duration elapsed) noexcept override
+		{
+			totalTime += elapsed;
+			++frameCount;
+		}
+
+		std::chrono::steady_clock::duration totalTime{};
+		std::size_t frameCount = 0;
+	};
+
 	struct CContentsRuntime::SEntry
 	{
 		std::unique_ptr<IContents> upContents;
@@ -17,12 +32,13 @@ namespace ContentsRuntimeLib
 
 	struct CContentsRuntime::SWorker
 	{
-		// 실행 목록·인계 큐, 인계 요청과 워커 종료 상태를 보호한다.
+		// 실행 목록·인계 큐, 인계 요청과 워커 종료 상태, 완료 순회 누계를 보호한다.
 		std::mutex 			workLock;
 		std::list<SEntry> 	entries;
 		std::list<SEntry> 	delegateQueue;
 		std::thread 		thread;
 		bool 				isStopping = false;
+		SWorkerTiming timing;
 
 		std::binary_semaphore 	wakeSignal{0};
 		std::atomic<bool> 		wakePending = false;
@@ -221,6 +237,19 @@ namespace ContentsRuntimeLib
 		return true;
 	}
 
+	std::vector<SWorkerTimingSnapshot> CContentsRuntime::TakeWorkerTimings()
+	{
+		std::vector<SWorkerTimingSnapshot> timings;
+		timings.reserve(m_workers.size());
+		for (std::size_t i = 0; i < m_workers.size(); ++i)
+		{
+			auto &worker = *m_workers[i];
+			std::lock_guard workLock(worker.workLock);
+			timings.push_back({i, std::exchange(worker.timing.totalTime, {}), std::exchange(worker.timing.frameCount, 0)});
+		}
+		return timings;
+	}
+
 	void CContentsRuntime::runWorker(SWorker &worker)
 	{
 		using Clock = std::chrono::steady_clock;
@@ -237,86 +266,89 @@ namespace ContentsRuntimeLib
 
 			bool didWork = false;
 			auto nextWakeTime = Clock::time_point::max();
-			for (auto next = worker.entries.begin(); next != worker.entries.end();)
 			{
-				const auto current = next++;
-				auto &entry = *current;
-				if (entry.pDelegateWorker == nullptr && entry.usesFrame && !worker.isStopping)
+				MHLib::utils::CScopedExecutionTimer timer(worker.timing);
+				for (auto next = worker.entries.begin(); next != worker.entries.end();)
 				{
-					const auto now = Clock::now();
-					if (entry.nextFrameTime <= now)
+					const auto current = next++;
+					auto &entry = *current;
+					if (entry.pDelegateWorker == nullptr && entry.usesFrame && !worker.isStopping)
 					{
-						// 예정 시각을 한 주기만 전진시키고, 남은 프레임은 다음 순회에서 처리한다.
-						entry.nextFrameTime += frameInterval;
-						workLock.unlock();
-						entry.upContents->OnFrame();
-
-						// 1. workLock
-						workLock.lock();
-						didWork = true;
-					}
-					if (entry.nextFrameTime < nextWakeTime)
-						nextWakeTime = entry.nextFrameTime;
-				}
-
-				if (entry.pDelegateWorker == nullptr)
-				{
-					auto &mailbox = *entry.upContents->m_spMailbox;
-					std::size_t completionCount;
-					{
-						// 이번 프레임에 쌓여 있던 완료만 처리하고 새로 들어온 완료는 남겨 둔다.
-						std::lock_guard completionLock(mailbox.completionLock);
-						completionCount = mailbox.completionQueue.size();
-					}
-					for (std::size_t i = 0; i < completionCount && entry.pDelegateWorker == nullptr; ++i)
-					{
-						std::function<void()> completion;
+						const auto now = Clock::now();
+						if (entry.nextFrameTime <= now)
 						{
-							// 락을 걸고 완료 콜백 1개를 꺼낸다.
-							std::lock_guard completionLock(mailbox.completionLock);
-							completion.swap(mailbox.completionQueue.front());
-							mailbox.completionQueue.pop_front();
+							// 예정 시각을 한 주기만 전진시키고, 남은 프레임은 다음 순회에서 처리한다.
+							entry.nextFrameTime += frameInterval;
+							workLock.unlock();
+							entry.upContents->OnFrame();
+
+							// 1. workLock
+							workLock.lock();
+							didWork = true;
 						}
+						if (entry.nextFrameTime < nextWakeTime)
+							nextWakeTime = entry.nextFrameTime;
+					}
+
+					if (entry.pDelegateWorker == nullptr)
+					{
+						auto &mailbox = *entry.upContents->m_spMailbox;
+						std::size_t completionCount;
+						{
+							// 이번 프레임에 쌓여 있던 완료만 처리하고 새로 들어온 완료는 남겨 둔다.
+							std::lock_guard completionLock(mailbox.completionLock);
+							completionCount = mailbox.completionQueue.size();
+						}
+						for (std::size_t i = 0; i < completionCount && entry.pDelegateWorker == nullptr; ++i)
+						{
+							std::function<void()> completion;
+							{
+								// 락을 걸고 완료 콜백 1개를 꺼낸다.
+								std::lock_guard completionLock(mailbox.completionLock);
+								completion.swap(mailbox.completionQueue.front());
+								mailbox.completionQueue.pop_front();
+							}
+							workLock.unlock();
+							// 완료 콜백은 락을 걸지 않고 수행한다.
+							completion();
+							completion = nullptr;
+							workLock.lock();
+							didWork = true;
+						}
+					}
+
+					// 넘기기로 결정된 Worker를 다른 스레드로 Entry를 넘긴다.
+					if (entry.pDelegateWorker != nullptr)
+					{
+						// 실행 경계에서 락 순서를 맞춘다. 이 노드를 옮길 수 있는 것은 현재 워커뿐이다.
 						workLock.unlock();
-						// 완료 콜백은 락을 걸지 않고 수행한다.
-						completion();
-						completion = nullptr;
+
+						// 1. m_registrationLock
+						std::lock_guard registrationLock(m_registrationLock);
+						// 2. workLock
 						workLock.lock();
+						SWorker &destination = *entry.pDelegateWorker;
+						if (m_state == EState::Running)
+						{
+							// 3. destinationWorkLock
+							std::lock_guard destinationWorkLock(destination.workLock);
+							auto &route = m_routes.find(entry.upContents->GetInstanceId())->second;
+							auto &mailbox = *entry.upContents->m_spMailbox;
+							// 4. completionLock
+							std::lock_guard completionLock(mailbox.completionLock);
+							// 노드와 완료 접수 경로를 같이 넘기고, 목적지가 편입할 때까지 추가 인계를 막는다.
+							destination.delegateQueue.splice(destination.delegateQueue.end(), worker.entries, current);
+							route.pWorker = &destination;
+							mailbox.pWorker = &destination;
+							destination.SignalWork();
+						}
+						else
+						{
+							entry.pDelegateWorker = nullptr;
+						}
+						// 락을 놓은 사이에 들어온 작업과 취소 후 남은 완료 큐를 다시 확인한다.
 						didWork = true;
 					}
-				}
-
-				// 넘기기로 결정된 Worker를 다른 스레드로 Entry를 넘긴다.
-				if (entry.pDelegateWorker != nullptr)
-				{
-					// 실행 경계에서 락 순서를 맞춘다. 이 노드를 옮길 수 있는 것은 현재 워커뿐이다.
-					workLock.unlock();
-
-					// 1. m_registrationLock
-					std::lock_guard registrationLock(m_registrationLock);
-					// 2. workLock
-					workLock.lock();
-					SWorker &destination = *entry.pDelegateWorker;
-					if (m_state == EState::Running)
-					{
-						// 3. destinationWorkLock
-						std::lock_guard destinationWorkLock(destination.workLock);
-						auto &route = m_routes.find(entry.upContents->GetInstanceId())->second;
-						auto &mailbox = *entry.upContents->m_spMailbox;
-						// 4. completionLock
-						std::lock_guard completionLock(mailbox.completionLock);
-						// 노드와 완료 접수 경로를 같이 넘기고, 목적지가 편입할 때까지 추가 인계를 막는다.
-						destination.delegateQueue.splice(destination.delegateQueue.end(), worker.entries, current);
-						route.pWorker = &destination;
-						mailbox.pWorker = &destination;
-						destination.SignalWork();
-					}
-					else
-					{
-						entry.pDelegateWorker = nullptr;
-					}
-					// 락을 놓은 사이에 들어온 작업과 취소 후 남은 완료 큐를 다시 확인한다.
-					didWork = true;
 				}
 			}
 

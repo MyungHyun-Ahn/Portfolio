@@ -4,6 +4,13 @@ namespace ContentsRuntimeLib
 {
 	class ContentsHandle;
 
+	struct SWorkerTimingSnapshot
+	{
+		std::size_t workerIndex;
+		std::chrono::steady_clock::duration totalTime;
+		std::size_t frameCount;
+	};
+
 	class CContentsRuntime final
 	{
 	public:
@@ -36,6 +43,10 @@ namespace ContentsRuntimeLib
 		// true는 접수만 뜻한다. 담당 워커가 실행 경계에서 인계하며, Stop이 먼저면 취소한다.
 		[[nodiscard]]
 		bool RequestDelegate(ContentsInstanceId instanceId, std::size_t destinationWorkerIndex);
+
+		// 워커별 완료 순회의 누계를 가져오고 같은 락 안에서 초기화한다.
+		[[nodiscard]]
+		std::vector<SWorkerTimingSnapshot> TakeWorkerTimings();
 
 	private:
 		friend struct SCompletionMailbox;

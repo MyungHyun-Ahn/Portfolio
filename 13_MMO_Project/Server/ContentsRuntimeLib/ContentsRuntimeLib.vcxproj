@@ -32,6 +32,7 @@
       <PrecompiledHeaderFile>ContentsRuntimeLibPch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderOutputFile>$(IntDir)ContentsRuntimeLibPch.pch</PrecompiledHeaderOutputFile>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\MHLib\includes;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>

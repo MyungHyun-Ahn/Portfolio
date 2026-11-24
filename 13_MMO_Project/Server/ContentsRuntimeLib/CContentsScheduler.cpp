@@ -29,7 +29,7 @@ namespace ContentsRuntimeLib
 		if (std::chrono::duration_cast<std::chrono::milliseconds>(now - *m_lastEvaluationTime) < m_evaluationInterval)
 			return;
 
-		const auto candidate = m_selectCandidate();
+		const auto candidate = m_selectCandidate(m_runtime.TakeWorkerTimings());
 		if (candidate && candidate->instanceId != GetInstanceId())
 			(void)m_runtime.RequestDelegate(candidate->instanceId, candidate->destinationWorkerIndex);
 		m_lastEvaluationTime = Clock::now();

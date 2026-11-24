@@ -262,6 +262,7 @@ namespace WorldServer
 	{
 		constexpr auto kFrameInterval = 100ms;
 		std::counting_semaphore<> queuedRan{0};
+
 		CContentsRuntime runtime(2, kFrameInterval);
 		auto upContents = std::make_unique<CTestContents>(31, true);
 		auto &contents = *upContents;
@@ -319,6 +320,10 @@ namespace WorldServer
 			if (thread != contents.m_completionThread)
 				return 35;
 		}
+		const auto timings = runtime.TakeWorkerTimings();
+		if (timings.size() != 2 || timings[0].frameCount < 2 || timings[0].totalTime < 2 * kFrameInterval
+			|| timings[1].frameCount == 0)
+			return 36;
 		return 0;
 	}
 
@@ -606,12 +611,74 @@ namespace WorldServer
 		return completed && framesAfter == framesBefore && framed.m_frameCount > framesAfter ? 0 : 111;
 	}
 
+	// 작업 없는 순회도 한 프레임으로 세고, 진행 중인 순회는 누계에서 제외한다.
+	int RunWorkerTimingTest()
+	{
+		using Clock = std::chrono::steady_clock;
+		std::binary_semaphore framedRan{0};
+		std::binary_semaphore completionRan{0};
+		Clock::duration completionTime{};
+		CContentsRuntime runtime(3, 100ms);
+		auto upFramed = std::make_unique<CTestContents>(121, true);
+		auto &framed = *upFramed;
+		if (!runtime.RegisterContents(std::move(upFramed), true, 0) ||
+			!runtime.RegisterContents(std::make_unique<CTestContents>(122, false), false, 1))
+			return 120;
+		const auto frameHandle = runtime.GetContentsHandle(121);
+		const auto completionHandle = runtime.GetContentsHandle(122);
+		if (!runtime.Start())
+			return 120;
+		const bool frameStarted = framed.m_frameStarted.try_acquire_for(kWaitTimeout);
+		const auto heldSince = Clock::now();
+		const bool posted = frameStarted && runtime.PostCompletion(frameHandle, [&framedRan, &completionTime]
+			{
+				const auto start = Clock::now();
+				std::this_thread::sleep_for(10ms);
+				completionTime = Clock::now() - start;
+				framedRan.release();
+			}) && runtime.PostCompletion(completionHandle, [&completionRan]
+			{
+				std::this_thread::sleep_for(10ms);
+				completionRan.release();
+			});
+		const auto beforeFrameEnds = runtime.TakeWorkerTimings();
+		const auto duringFrame = runtime.TakeWorkerTimings();
+		if (posted)
+			std::this_thread::sleep_for(20ms);
+		const auto frameHoldTime = Clock::now() - heldSince;
+		framed.m_releaseFrame.release();
+		const bool completed = posted && framedRan.try_acquire_for(kWaitTimeout) && completionRan.try_acquire_for(kWaitTimeout);
+		runtime.Stop();
+		const auto timings = runtime.TakeWorkerTimings();
+		const auto cleared = runtime.TakeWorkerTimings();
+		if (!completed || timings.size() != 3 || beforeFrameEnds.size() != 3 || duringFrame.size() != 3 || cleared.size() != 3)
+			return 121;
+		if (duringFrame[0].totalTime != Clock::duration::zero() || duringFrame[0].frameCount != 0
+			|| timings[0].totalTime < frameHoldTime + completionTime
+			|| timings[0].frameCount < 2
+			|| beforeFrameEnds[1].totalTime + duringFrame[1].totalTime + timings[1].totalTime < 10ms
+			|| beforeFrameEnds[1].frameCount + duringFrame[1].frameCount + timings[1].frameCount < 2
+			|| beforeFrameEnds[2].frameCount + duringFrame[2].frameCount + timings[2].frameCount == 0)
+			return 122;
+		for (std::size_t i = 0; i < timings.size(); ++i)
+		{
+			if (timings[i].workerIndex != i || cleared[i].totalTime != Clock::duration::zero() || cleared[i].frameCount != 0)
+				return 123;
+		}
+		return 0;
+	}
+
 	struct SSchedulerTestPolicy
 	{
 		// 이동 없음, 자기 자신, 정상 인계 순으로 후보를 반환한다.
-		std::optional<SDelegateCandidate> operator()()
+		std::optional<SDelegateCandidate> operator()(const std::vector<ContentsRuntimeLib::SWorkerTimingSnapshot> &timings)
 		{
 			const auto now = std::chrono::steady_clock::now();
+			for (const auto &timing : timings)
+			{
+				if (timing.workerIndex == 2 && timing.frameCount != 0)
+					didReadTiming = true;
+			}
 			if (evaluationCount != 0 && now - lastEvaluation < 20ms)
 				didEvaluateEarly = true;
 			lastEvaluation = now;
@@ -628,6 +695,7 @@ namespace WorldServer
 		std::chrono::steady_clock::time_point lastEvaluation{};
 		int evaluationCount = 0;
 		bool didEvaluateEarly = false;
+		bool didReadTiming = false;
 	};
 
 	// 고정 정책을 실제 워커에서 평가하고 기존 Delegate 경로로 인계하는지 확인한다.
@@ -669,7 +737,7 @@ namespace WorldServer
 		const bool ran = posted && completed.try_acquire_for(kWaitTimeout) && completed.try_acquire_for(kWaitTimeout)
 			&& completed.try_acquire_for(kWaitTimeout);
 		runtime.Stop();
-		return ran && !policy.didEvaluateEarly && source.m_completionThread == destination.m_completionThread
+		return ran && policy.didReadTiming && !policy.didEvaluateEarly && source.m_completionThread == destination.m_completionThread
 			&& schedulerThread != destination.m_completionThread ? 0 : 92;
 	}
 
@@ -735,5 +803,8 @@ int main(void)
 	if (batchResult != 0)
 		return batchResult;
 	const int overrunResult = WorldServer::RunCompletionBatchOverrunTest();
-	return overrunResult != 0 ? overrunResult : WorldServer::RunSchedulerTest();
+	if (overrunResult != 0)
+		return overrunResult;
+	const int timingResult = WorldServer::RunWorkerTimingTest();
+	return timingResult != 0 ? timingResult : WorldServer::RunSchedulerTest();
 }
