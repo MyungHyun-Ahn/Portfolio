@@ -11,6 +11,7 @@
 #include "Config.h"
 #include "Console.h"
 #include "IContents.h"
+#include "ContentsHandle.h"
 #include "CContentsRuntime.h"
 #include "CChatServer.h"
 #include "CMetricsExporter.h"

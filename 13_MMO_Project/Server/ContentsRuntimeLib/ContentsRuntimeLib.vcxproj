@@ -37,6 +37,7 @@
   <ItemGroup>
     <ClInclude Include="ContentsRuntimeLibPch.h" />
     <ClInclude Include="IContents.h" />
+    <ClInclude Include="ContentsHandle.h" />
     <ClInclude Include="CContentsRuntime.h" />
     <ClCompile Include="ContentsRuntimeLibPch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
     <ClCompile Include="IContents.cpp" />

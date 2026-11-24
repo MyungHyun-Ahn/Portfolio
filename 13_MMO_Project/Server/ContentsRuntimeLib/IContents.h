@@ -5,6 +5,7 @@ namespace ContentsRuntimeLib
 	using ContentsInstanceId = std::uint64_t;
 
 	class CContentsRuntime;
+	struct SCompletionMailbox;
 
 	class IContents
 	{
@@ -29,7 +30,6 @@ namespace ContentsRuntimeLib
 
 	private:
 		const ContentsInstanceId m_instanceId;
-		std::mutex m_completionLock;
-		std::deque<std::function<void()>> m_completionQueue;
+		std::shared_ptr<SCompletionMailbox> m_spMailbox;
 	};
 }

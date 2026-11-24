@@ -21,6 +21,7 @@ namespace Chatting
 	private:
 		static constexpr ContentsRuntimeLib::ContentsInstanceId kChatContentsId = 1;
 		ContentsRuntimeLib::CContentsRuntime m_runtime;
+		ContentsRuntimeLib::ContentsHandle m_completionHandle;
 		CChatContents *m_pContents = nullptr;
 	};
 }

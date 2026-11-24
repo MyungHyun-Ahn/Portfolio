@@ -3,6 +3,7 @@
   <ItemGroup>
     <ClInclude Include="ContentsRuntimeLibPch.h" />
     <ClInclude Include="IContents.h" />
+    <ClInclude Include="ContentsHandle.h" />
     <ClInclude Include="CContentsRuntime.h" />
     <ClCompile Include="ContentsRuntimeLibPch.cpp" />
     <ClCompile Include="IContents.cpp" />

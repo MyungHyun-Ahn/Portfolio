@@ -12,6 +12,7 @@
 #include "CMonitor.h"
 #include "CServer.h"
 #include "IContents.h"
+#include "ContentsHandle.h"
 #include "CContentsRuntime.h"
 #include "CommonProtocol.h"
 #include "PacketFraming.h"

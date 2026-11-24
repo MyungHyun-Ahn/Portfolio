@@ -8,6 +8,7 @@
 #include "SBaseEvent.h"
 #include "CServer.h"
 #include "IContents.h"
+#include "ContentsHandle.h"
 #include "CContentsRuntime.h"
 #include "ChatMetrics.h"
 #include "CMonitor.h"

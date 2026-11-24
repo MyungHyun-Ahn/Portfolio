@@ -10,6 +10,7 @@
 #include "CMonitor.h"
 #include "CServer.h"
 #include "IContents.h"
+#include "ContentsHandle.h"
 #include "CContentsRuntime.h"
 #include "CommonProtocol.h"
 #include "CSector.h"
@@ -38,6 +39,7 @@ namespace Chatting
 			m_pContents = nullptr;
 			return false;
 		}
+		m_completionHandle = m_runtime.GetContentsHandle(kChatContentsId);
 		return m_runtime.Start();
 	}
 
@@ -56,13 +58,13 @@ namespace Chatting
 	{
 		g_pLogger->WriteLog(ELogLevel::Debug, L"ChatServer", sessionId, std::source_location::current(),
 			L"event=session_accepted session_id=%llu | 세션의 접속을 수락했습니다.", sessionId);
-		if (!m_runtime.PostCompletion(kChatContentsId, std::bind_front(&CChatContents::OnEnter, m_pContents, sessionId)))
+		if (!m_runtime.PostCompletion(m_completionHandle, std::bind_front(&CChatContents::OnEnter, m_pContents, sessionId)))
 			Disconnect(sessionId);
 	}
 
 	void CChatServer::OnClientLeave(UINT64 sessionId) noexcept
 	{
-		(void)m_runtime.PostCompletion(kChatContentsId, std::bind_front(&CChatContents::OnLeave, m_pContents, sessionId));
+		(void)m_runtime.PostCompletion(m_completionHandle, std::bind_front(&CChatContents::OnLeave, m_pContents, sessionId));
 	}
 
 	void CChatServer::OnRecv(UINT64 /*sessionId*/, NetworkCommonLib::CSerializableBufferView * /*pMessage*/) noexcept

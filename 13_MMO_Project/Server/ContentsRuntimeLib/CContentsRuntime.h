@@ -2,6 +2,8 @@
 
 namespace ContentsRuntimeLib
 {
+	class ContentsHandle;
+
 	class CContentsRuntime final
 	{
 	public:
@@ -22,16 +24,21 @@ namespace ContentsRuntimeLib
 		// 새 요청을 닫고 미확정 인계를 취소한다. 접수된 콜백을 처리한 뒤 워커를 종료한다.
 		void Stop();
 
-		// 외부 스레드에서 ID로 완료를 접수한다. 콜백은 호출 스레드에서 실행하지 않는다.
+		// 시작 전에 등록된 인스턴스의 Handle을 얻는다. 없으면 빈 Handle을 반환한다.
+		[[nodiscard]]
+		ContentsHandle GetContentsHandle(ContentsInstanceId instanceId);
+
+		// 외부 스레드에서 완료를 접수한다. true는 큐 삽입 성공이며 실행 완료가 아니다.
 		// 프레임과 완료 콜백에서 빠져나온 예외는 복구하지 않는다.
 		[[nodiscard]]
-		bool PostCompletion(ContentsInstanceId instanceId, std::function<void()> completion);
+		bool PostCompletion(const ContentsHandle &handle, std::function<void()> completion);
 
 		// true는 접수만 뜻한다. 담당 워커가 실행 경계에서 인계하며, Stop이 먼저면 취소한다.
 		[[nodiscard]]
 		bool RequestDelegate(ContentsInstanceId instanceId, std::size_t destinationWorkerIndex);
 
 	private:
+		friend struct SCompletionMailbox;
 		struct SWorker;
 		struct SEntry;
 		struct SRoute
@@ -51,11 +58,11 @@ namespace ContentsRuntimeLib
 		void runWorker(SWorker &worker);
 
 	private:
-		const std::chrono::milliseconds m_frameInterval;
+		const std::chrono::milliseconds 				m_frameInterval;
 		// 런타임 상태와 배정 경로를 보호하며, 워커의 작업 락보다 먼저 잡는다.
-		std::mutex m_registrationLock;
-		std::unordered_map<ContentsInstanceId, SRoute> m_routes;
-		EState m_state = EState::Registering;
-		std::vector<std::unique_ptr<SWorker>> m_workers;
+		std::mutex 										m_registrationLock;
+		std::unordered_map<ContentsInstanceId, SRoute> 	m_routes;
+		EState 											m_state = EState::Registering;
+		std::vector<std::unique_ptr<SWorker>> 			m_workers;
 	};
 }

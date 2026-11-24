@@ -16,6 +16,7 @@ namespace ServerNetworkLib
 #include "MHLib/utils/CFileLoader.h"
 #include "IContents.h"
 #include "CContentsRuntime.h"
+#include "ContentsHandle.h"
 #include "FixedMapsProtocol.h"
 #include "FixedMapsMoveQueue.h"
 #include "MHLib/serialization/ISerializable.h"
@@ -33,6 +34,7 @@ namespace WorldServer
 	using MHLib::utils::ELogLevel;
 	using MHLib::utils::g_pLogger;
 	using ContentsRuntimeLib::CContentsRuntime;
+	using ContentsRuntimeLib::ContentsHandle;
 	using ContentsRuntimeLib::IContents;
 
 	class CMapHost;
@@ -319,6 +321,12 @@ namespace WorldServer
 		{
 		}
 
+		// 워커와 네트워크를 시작하기 전에 한 번만 설정한다.
+		void SetCompletionHandle(const ContentsHandle &handle) noexcept
+		{
+			m_completionHandle = handle;
+		}
+
 		void AddConnection(UINT64 sessionId, UINT64 characterId)
 		{
 			if (m_upMap)
@@ -333,7 +341,7 @@ namespace WorldServer
 
 		bool PostChange(UINT64 sessionId)
 		{
-			return m_runtime.PostCompletion(GetInstanceId(), [this, sessionId]
+			return m_runtime.PostCompletion(m_completionHandle, [this, sessionId]
 			{
 				if (m_upMap)
 					m_upMap->completeChange(sessionId);
@@ -381,7 +389,7 @@ namespace WorldServer
 			m_hasRequestedTestDelegate = true;
 			if (m_runtime.RequestDelegate(GetInstanceId(), 1))
 			{
-				(void)m_runtime.PostCompletion(GetInstanceId(), [this]
+				(void)m_runtime.PostCompletion(m_completionHandle, [this]
 					{
 						g_pLogger->WriteLogConsole(ELogLevel::Debug,
 							L"event=map_delegate_continued map=%llu thread_id=%lu | 새 워커에서 맵 실행을 재개했습니다.",
@@ -393,6 +401,7 @@ namespace WorldServer
 	private:
 		CMoveQueue &m_moveQueue;
 		CContentsRuntime &m_runtime;
+		ContentsHandle m_completionHandle;
 		const std::chrono::milliseconds m_idleGrace;
 		std::unique_ptr<CMapInstance> m_upMap;
 		bool m_hasLoggedDestroyDeferred = false;
@@ -418,6 +427,8 @@ namespace WorldServer
 				m_mapHosts[index] = upHost.get();
 				if (!m_runtime.RegisterContents(std::move(upHost), true, index))
 					return false;
+				m_completionHandles[index] = m_runtime.GetContentsHandle(mapId);
+				m_mapHosts[index]->SetCompletionHandle(m_completionHandles[index]);
 			}
 
 			if (!m_runtime.Start())
@@ -446,7 +457,7 @@ namespace WorldServer
 				return;
 			}
 			auto *pHost = m_mapHosts[mapId - kFirstMapId];
-			if (!m_runtime.PostCompletion(mapId, [pHost, sessionId, characterId]
+			if (!m_runtime.PostCompletion(m_completionHandles[mapId - kFirstMapId], [pHost, sessionId, characterId]
 			{
 				pHost->AddConnection(sessionId, characterId);
 			}))
@@ -466,7 +477,7 @@ namespace WorldServer
 				return;
 			}
 			auto *pHost = m_mapHosts[mapId - kFirstMapId];
-			(void)m_runtime.PostCompletion(mapId, [pHost, sessionId]
+			(void)m_runtime.PostCompletion(m_completionHandles[mapId - kFirstMapId], [pHost, sessionId]
 			{
 				pHost->RemoveConnection(sessionId);
 			});
@@ -495,6 +506,7 @@ namespace WorldServer
 		CMoveQueue m_moveQueue;
 		CContentsRuntime m_runtime{2, 5ms};
 		std::array<CMapHost *, 2> m_mapHosts{};
+		std::array<ContentsHandle, 2> m_completionHandles;
 	};
 
 
