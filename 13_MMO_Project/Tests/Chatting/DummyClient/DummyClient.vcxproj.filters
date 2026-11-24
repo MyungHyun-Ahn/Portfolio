@@ -3,8 +3,8 @@
   <ItemGroup>
     <Filter Include="DummyClient" />
     <Filter Include="Client" />
-    <Filter Include="Client\Generated" />
-    <Filter Include="Client\Generated\PacketHandler" />
+    <Filter Include="Generated" />
+    <Filter Include="Generated\Client" />
     <Filter Include="Common" />
   </ItemGroup>
   <ItemGroup>
@@ -26,11 +26,11 @@
     <ClCompile Include="..\Common\Config.cpp">
       <Filter>Common</Filter>
     </ClCompile>
-    <ClCompile Include="..\Client\Generated\PacketHandler\CChatNetClient.g.cpp">
-      <Filter>Client\Generated\PacketHandler</Filter>
+    <ClCompile Include="..\..\..\Common\Packet\Chatting\Generated\Client\CChatNetClient.g.cpp">
+      <Filter>Generated\Client</Filter>
     </ClCompile>
-    <ClCompile Include="..\Client\Generated\PacketHandler\ClientPacketDispatch.g.cpp">
-      <Filter>Client\Generated\PacketHandler</Filter>
+    <ClCompile Include="..\..\..\Common\Packet\Chatting\Generated\Client\ClientPacketDispatch.g.cpp">
+      <Filter>Generated\Client</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -49,14 +49,14 @@
     <ClInclude Include="SDummyRunStats.h">
       <Filter>DummyClient</Filter>
     </ClInclude>
-    <ClInclude Include="..\Client\Generated\PacketHandler\CChatNetClient.g.h">
-      <Filter>Client\Generated\PacketHandler</Filter>
+    <ClInclude Include="..\..\..\Common\Packet\Chatting\Generated\Client\CChatNetClient.g.h">
+      <Filter>Generated\Client</Filter>
     </ClInclude>
-    <ClInclude Include="..\Client\Generated\PacketHandler\ClientPacketDispatch.g.h">
-      <Filter>Client\Generated\PacketHandler</Filter>
+    <ClInclude Include="..\..\..\Common\Packet\Chatting\Generated\Client\ClientPacketDispatch.g.h">
+      <Filter>Generated\Client</Filter>
     </ClInclude>
-    <ClInclude Include="..\Client\Generated\PacketHandler\IClientPacketHandler.g.h">
-      <Filter>Client\Generated\PacketHandler</Filter>
+    <ClInclude Include="..\..\..\Common\Packet\Chatting\Generated\Client\IClientPacketHandler.g.h">
+      <Filter>Generated\Client</Filter>
     </ClInclude>
     <ClInclude Include="..\Client\ChatType.h">
       <Filter>Client</Filter>

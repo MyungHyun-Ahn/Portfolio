@@ -7,6 +7,9 @@
 #include <atomic>
 #include <memory>
 #include <array>
+#include <functional>
+#include <vector>
+#include <utility>
 #include <charconv>
 #include <io.h>
 #include <cstddef>

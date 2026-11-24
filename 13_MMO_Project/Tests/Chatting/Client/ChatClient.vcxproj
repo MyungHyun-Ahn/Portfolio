@@ -36,7 +36,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderOutputFile>$(IntDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\Common;$(ProjectDir)Generated\PacketHandler;$(ProjectDir)..\..\..\Common\Packet\Struct;$(ProjectDir)..\..\..\Common\NetworkCommon;$(ProjectDir)..\..\..\Client\ClientNetworkLib;$(ProjectDir)..\..\..\Server\MHLib\includes;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\Common;$(ProjectDir)..\..\..\Common\Packet\Chatting\Generated\Client;$(ProjectDir)..\..\..\Common\Packet\Chatting\Generated\Common;$(ProjectDir)..\..\..\Common\NetworkCommon;$(ProjectDir)..\..\..\Client\ClientNetworkLib;$(ProjectDir)..\..\..\Server\MHLib\includes;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <RuntimeLibrary Condition="'$(Configuration)' == 'Debug'">MultiThreadedDebugDLL</RuntimeLibrary>
       <RuntimeLibrary Condition="'$(Configuration)' == 'Release'">MultiThreadedDLL</RuntimeLibrary>
@@ -56,8 +56,8 @@
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="CConsoleChatClient.cpp" />
     <ClCompile Include="CChatNetClientHandlers.cpp" />
-    <ClCompile Include="Generated\PacketHandler\CChatNetClient.g.cpp" />
-    <ClCompile Include="Generated\PacketHandler\ClientPacketDispatch.g.cpp" />
+    <ClCompile Include="..\..\..\Common\Packet\Chatting\Generated\Client\CChatNetClient.g.cpp" />
+    <ClCompile Include="..\..\..\Common\Packet\Chatting\Generated\Client\ClientPacketDispatch.g.cpp" />
     <ClCompile Include="..\Common\Console.cpp" />
     <ClCompile Include="..\Common\Config.cpp" />
   </ItemGroup>
@@ -66,9 +66,9 @@
     <ClInclude Include="CConsoleChatClient.h" />
     <ClInclude Include="CChatNetClientMembers.inc" />
     <ClInclude Include="ChatType.h" />
-    <ClInclude Include="Generated\PacketHandler\CChatNetClient.g.h" />
-    <ClInclude Include="Generated\PacketHandler\ClientPacketDispatch.g.h" />
-    <ClInclude Include="Generated\PacketHandler\IClientPacketHandler.g.h" />
+    <ClInclude Include="..\..\..\Common\Packet\Chatting\Generated\Client\CChatNetClient.g.h" />
+    <ClInclude Include="..\..\..\Common\Packet\Chatting\Generated\Client\ClientPacketDispatch.g.h" />
+    <ClInclude Include="..\..\..\Common\Packet\Chatting\Generated\Client\IClientPacketHandler.g.h" />
     <ClInclude Include="..\Common\CommonProtocol.h" />
     <ClInclude Include="..\Common\Console.h" />
     <ClInclude Include="..\Common\Config.h" />

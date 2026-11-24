@@ -2,13 +2,17 @@
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <limits>
+#include <vector>
 #include "MHLib/serialization/ISerializable.h"
 #include "CSerializableBuffer.h"
-#include "../../Common/Packet/Struct/PacketTypes.g.h"
-#include "../../Common/Packet/Struct/Chatting/Login.g.h"
-#include "../../Common/Packet/Struct/Chatting/Chatting.g.h"
-#include "../Chatting/Server/Generated/PacketHandler/ServerPacketSend.g.h"
+#include "../../Common/Packet/Chatting/Generated/Common/PacketTypes.g.h"
+#include "../../Common/Packet/Chatting/Generated/Common/Chatting/Login.g.h"
+#include "../../Common/Packet/Chatting/Generated/Common/Chatting/Chatting.g.h"
+#include "../../Common/Packet/Chatting/Generated/Client/ClientPacketDispatch.g.h"
+#include "../../Common/Packet/Chatting/Generated/Client/IClientPacketHandler.g.h"
+#include "../../Common/Packet/Chatting/Generated/Server/ServerPacketSend.g.h"
 #include "../Chatting/Common/CommonProtocol.h"
 
 #ifdef NDEBUG
@@ -283,6 +287,59 @@ void TestServerPacketBuilder()
 	assert(spInvalid.GetRealPtr() == nullptr && CSerializableBuffer::GetPoolUsage() == usage);
 }
 
+class CTestClientPacketHandler final : public Chatting::IClientPacketHandler
+{
+public:
+	bool HandleResLogin(const Chatting::SResLogin &response) noexcept override
+	{
+		++m_calls;
+		return response.m_status == 1 && response.m_accountNo == 42;
+	}
+
+	bool HandleResSectorMove(const Chatting::SResSectorMove &) noexcept override
+	{
+		return false;
+	}
+
+	bool HandleResMessage(const Chatting::SResMessage &) noexcept override
+	{
+		return false;
+	}
+
+	bool HandleMessageNoti(const Chatting::SMessageNoti &) noexcept override
+	{
+		return false;
+	}
+
+	int m_calls = 0;
+};
+
+void TestClientDispatch()
+{
+	CTestClientPacketHandler first;
+	CTestClientPacketHandler second;
+	char loginWire[] = {2, 0, 1, 42, 0, 0, 0, 0, 0, 0, 0};
+	CBuffer buffer;
+	const auto load = [&buffer, &loginWire](int size)
+	{
+		buffer.Clear();
+		assert(buffer.Enqueue(loginWire, size));
+	};
+	load(sizeof(loginWire) - 1);
+	assert(!Chatting::DispatchClientPacket(buffer, first));
+	load(sizeof(loginWire));
+	buffer << std::uint8_t{0};
+	assert(!Chatting::DispatchClientPacket(buffer, first));
+	buffer.Clear();
+	buffer << std::uint16_t{65535};
+	assert(!Chatting::DispatchClientPacket(buffer, first));
+	assert(first.m_calls == 0);
+	load(sizeof(loginWire));
+	assert(Chatting::DispatchClientPacket(buffer, first) && first.m_calls == 1 && second.m_calls == 0);
+	load(sizeof(loginWire));
+	assert(Chatting::DispatchClientPacket(buffer, second) && first.m_calls == 1 && second.m_calls == 1);
+}
+
 int main(void)
 {
 	TestFixedCapacity();
@@ -296,4 +353,5 @@ int main(void)
 	TestPoolReset();
 	TestRawBufferBoundaries();
 	TestServerPacketBuilder();
+	TestClientDispatch();
 }

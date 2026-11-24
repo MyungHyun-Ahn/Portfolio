@@ -1,0 +1,11 @@
+{
+  "files": {
+    "ClientPacketDispatch.g.cpp": "8b63c3856977afbbb5d4fa742f3c4279bbfb39cc424722a11407e8e8f363a133",
+    "ClientPacketDispatch.g.h": "d84c4a1fb635a80406fe8f55f25edbf0b175c8a48f2bdd45023b73a0da6aec37",
+    "IClientPacketHandler.g.h": "3e42050758d2cf40f37792bdea795cf3560fa8ec16b65544c0b048a5f1256e81",
+    "WorldClient.g.cpp": "9d0d79dfcfaa9b2323767756c8728414d48fc6f25b87e3b2167b704ec4efbb64",
+    "WorldClient.g.h": "a0a88614e0fe954220bd65b50b12200436ce2d86841a8214cfbb19d69d59522b"
+  },
+  "role": "Client",
+  "version": 1
+}

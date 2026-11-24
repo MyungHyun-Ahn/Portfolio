@@ -32,7 +32,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\Server\ContentsRuntimeLib;$(ProjectDir)..\..\Server\NetworkLib;$(ProjectDir)..\..\Client\ClientNetworkLib;$(ProjectDir)..\..\Common\NetworkCommon;$(ProjectDir)..\..\Server\MHLib\includes;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\Server\ContentsRuntimeLib;$(ProjectDir)..\..\Server\NetworkLib;$(ProjectDir)..\..\Client\ClientNetworkLib;$(ProjectDir)..\..\Common\NetworkCommon;$(ProjectDir)..\..\Server\MHLib\includes;$(ProjectDir);$(ProjectDir)..\..\Common\Packet\World\Generated\Common;$(ProjectDir)..\..\Common\Packet\World\Generated\Client;$(ProjectDir)..\..\Common\Packet\World\Generated\Server;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
@@ -45,6 +45,17 @@
     <ClCompile Include="pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
     <ClCompile Include="FixedMaps.cpp" />
     <ClInclude Include="FixedMapsProtocol.h" />
+    <ClInclude Include="..\..\Common\Packet\World\Generated\Client\WorldClient.g.h" />
+    <ClInclude Include="WorldClientMembers.inc" />
+    <ClCompile Include="..\..\Common\Packet\World\Generated\Client\WorldClient.g.cpp" />
+    <ClInclude Include="..\..\Common\Packet\World\Generated\Client\ClientPacketDispatch.g.h" />
+    <ClInclude Include="..\..\Common\Packet\World\Generated\Client\IClientPacketHandler.g.h" />
+    <ClCompile Include="..\..\Common\Packet\World\Generated\Client\ClientPacketDispatch.g.cpp" />
+    <ClInclude Include="..\..\Common\Packet\World\Generated\Server\ServerPacketSend.g.h" />
+    <ClCompile Include="..\..\Common\Packet\World\Generated\Server\ServerPacketSend.g.cpp" />
+    <ClInclude Include="..\..\Common\Packet\World\Generated\Server\ServerPacketDispatch.g.h" />
+    <ClInclude Include="..\..\Common\Packet\World\Generated\Server\IServerPacketHandler.g.h" />
+    <ClCompile Include="..\..\Common\Packet\World\Generated\Server\ServerPacketDispatch.g.cpp" />
     <None Include="test_fixed_maps.py" />
     <ProjectReference Include="..\..\Server\ContentsRuntimeLib\ContentsRuntimeLib.vcxproj">
       <Project>{A8ABC43B-4934-4E64-BEBE-DA29D29080BB}</Project>

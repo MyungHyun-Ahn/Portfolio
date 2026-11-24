@@ -6,7 +6,7 @@
 #include "CClient.h"
 #include "MHLib/serialization/ISerializable.h"
 #include "IncludePacketAll.g.h"
-#include "IClientPacketHandler.g.h"
+#include "ClientPacketDispatch.g.h"
 #include "CChatNetClient.g.h" // 실제 선언 부가 여기에 자동 생성됨
 
 namespace Chatting

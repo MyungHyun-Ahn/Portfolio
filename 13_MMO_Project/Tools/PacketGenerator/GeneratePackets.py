@@ -41,6 +41,7 @@ NAME = re.compile(r'[A-Za-z][A-Za-z0-9]{0,79}')
 FIELD_NAME = re.compile(r'[a-z][a-z0-9]*(?:_[a-z][a-z0-9]*)*')
 DEVICE = re.compile(r'CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9]', re.I)
 MANIFEST = '.packet-generator.json'
+GENERATED_MARKER = b'// PacketGenerator generated file. Do not edit.\n'
 INTEGER_TYPES = {f'{sign}int{width}': f'std::{sign}int{width}_t'
                  for width in (8, 16, 32, 64) for sign in ('', 'u')}
 FIXED_TYPES = {'utf16_fixed': ('WCHAR', 'code_units'),
@@ -55,10 +56,10 @@ CPP_PARAMETER_RESERVED = set('''
     switch template this thread_local throw true try typedef typeid typename union unsigned using virtual void
     volatile wchar_t while xor xor_eq interface near far small pascal cdecl std
 '''.split()) | {'packet', 'sessionId', 'spPacket'}
-SEND_STEMS = {'Client': 'CChatNetClient', 'Server': 'ServerPacketSend'}
-SIDE_OUTPUTS = {side: {f'{stem}.g.{ext}' for stem in (SEND_STEMS[side], f'{side}PacketDispatch') for ext in ('h', 'cpp')}
-                | {f'I{side}PacketHandler.g.h'} for side in SEND_STEMS}
-# 이전 manifest가 소유한 클라이언트 파일만 이름 변경 시 정리할 수 있다.
+SIDE_OUTPUTS = {side: {f'{side}PacketDispatch.g.{ext}' for ext in ('h', 'cpp')}
+                | {f'I{side}PacketHandler.g.h'} for side in ('Client', 'Server')}
+SIDE_OUTPUTS['Server'].update(f'ServerPacketSend.g.{ext}' for ext in ('h', 'cpp'))
+# 이전 manifest가 소유한 클라이언트 송신 파일도 이름 변경 시 정리한다.
 SIDE_OUTPUTS['Client'].update(f'ClientPacketSend.g.{ext}' for ext in ('h', 'cpp'))
 
 
@@ -145,7 +146,7 @@ def parse_field(value):
             cpp_type = 'std::wstring'
         else:
             raise GenerationError(f'unsupported type: {field_type!r}')
-    return dict(member=member, cpp_type=cpp_type, copy_by_ref=field_type not in INTEGER_TYPES)
+    return dict(member=member, cpp_type=cpp_type, copy_by_ref=field_type not in INTEGER_TYPES, field_type=field_type)
 
 
 def parse_packet(value):
@@ -259,12 +260,13 @@ def load_protocol(root):
     return contents, packets, reserved
 
 
-def render_protocol(contents, packets, reserved):
+def render_protocol(contents, packets, reserved, namespace, client_class, members):
     environment = Environment(loader=FileSystemLoader(Path(__file__).parent / 'templates'), undefined=StrictUndefined,
                               autoescape=False, trim_blocks=True, lstrip_blocks=True, keep_trailing_newline=True)
 
     def render(template, **values):
-        return ('// PacketGenerator generated file. Do not edit.\n' + environment.get_template(template).render(**values)).encode()
+        text = environment.get_template(template).render(namespace=namespace, client_class=client_class, members=members, **values)
+        return GENERATED_MARKER + text.encode()
 
     common = {'PacketTypes.g.h': render('types.j2', packets=sorted(reserved + packets, key=lambda packet: packet['id']))}
     includes = ['PacketTypes.g.h']
@@ -278,11 +280,12 @@ def render_protocol(contents, packets, reserved):
     for side, send_direction in (('Client', 'client_to_server'), ('Server', 'server_to_client')):
         send = [packet for packet in packets if packet['direction'] == send_direction]
         receive = [packet for packet in packets if packet['direction'] != send_direction]
-        send_stem = SEND_STEMS[side]
+        send_stem = client_class if side == 'Client' else 'ServerPacketSend'
         sides.append({f'{send_stem}.g.{ext}': render(f'send_{ext}.j2', side=side, packets=send,
                                                    receive=receive, send_stem=send_stem)
                       for ext in ('h', 'cpp')} |
-                     {f'{side}PacketDispatch.g.{ext}': render(f'dispatch_{ext}.j2', side=side, packets=receive)
+                     {f'{side}PacketDispatch.g.{ext}': render(f'dispatch_{ext}.j2', side=side, packets=receive,
+                                                               table_size=max((p['id'] for p in receive), default=0) + 1)
                       for ext in ('h', 'cpp')} |
                      {f'I{side}PacketHandler.g.h': render('handler.j2', side=side, packets=receive)})
     return (common, *sides)
@@ -294,7 +297,9 @@ def digest(data):
 
 def check_output_name(role, name):
     if role != 'Common':
-        return name in SIDE_OUTPUTS[role]
+        return (name in SIDE_OUTPUTS[role] or
+                (role == 'Client' and any(name.endswith(ext) and NAME.fullmatch(name[:-len(ext)])
+                                          and not DEVICE.fullmatch(name[:-len(ext)]) for ext in ('.g.h', '.g.cpp'))))
     if name in ('PacketTypes.g.h', 'IncludePacketAll.g.h'):
         return True
     parts = name.split('/')
@@ -343,10 +348,12 @@ def plan_output(root, role, files):
     for name, checksum in before.items():
         target = checked_path(root, name)
         # Git의 Windows 체크아웃에서 바뀐 줄바꿈은 수동 수정으로 보지 않는다.
-        if target.exists() and (not target.is_file() or digest(target.read_bytes().replace(b'\r\n', b'\n')) != checksum):
-            raise GenerationError(f'modified generated output: {target}')
-        if name not in files and target.exists():
-            removals.append(target)
+        if target.exists():
+            data = target.read_bytes().replace(b'\r\n', b'\n') if target.is_file() else b''
+            if not data.startswith(GENERATED_MARKER) or digest(data) != checksum:
+                raise GenerationError(f'modified generated output: {target}')
+            if name not in files:
+                removals.append(target)
     old_names = {name.casefold(): name for name in before}
     for name, data in files.items():
         target = checked_path(root, name)
@@ -388,7 +395,7 @@ def publish(plans):
 
 
 def create_client_members(path):
-    data = (Path(__file__).parent / 'templates' / path.name).read_bytes()
+    data = b'// Handwritten protocol client members. Add client state and member declarations here.\n'
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         file = path.open('xb')
@@ -398,7 +405,12 @@ def create_client_members(path):
         file.write(data)
 
 
-def generate(schema, common, client, server, client_members=None):
+def generate(schema, common, client, server, namespace, client_class, client_members=None):
+    check_packet_name(namespace, 'namespace')
+    check_packet_name(client_class, 'client class')
+    if client_class.casefold() in {'clientpacketdispatch', 'cclientpacketdispatch', 'iserverpackethandler',
+                                   'iclientpackethandler', 'cserverpacketsender', 'cserverpacketdispatch'}:
+        raise GenerationError(f'invalid client class: {client_class}')
     paths = [path.absolute() for path in (schema, common, client, server)]
     for path in paths:
         if any(is_link(parent) for parent in (path, *path.parents)):
@@ -411,14 +423,18 @@ def generate(schema, common, client, server, client_members=None):
         raise GenerationError(f'schema directory not found: {paths[0]}')
     if client_members is not None:
         client_members = client_members.absolute()
-        if client_members.name != 'CChatNetClientMembers.inc' or any(
+        if client_members.name != f'{client_class}Members.inc' or any(
             is_link(parent) for parent in (client_members, *client_members.parents)
         ):
             raise GenerationError(f'invalid client members path: {client_members}')
         client_members = client_members.resolve()
         if client_members.is_dir() or any(client_members.is_relative_to(root) for root in paths):
             raise GenerationError(f'client members must be outside generation roots: {client_members}')
-    outputs = render_protocol(*load_protocol(paths[0]))
+    contents, packets, reserved = load_protocol(paths[0])
+    if any(client_class == f"S{packet['name']}" for packet in packets):
+        raise GenerationError(f'client class collides with packet DTO: {client_class}')
+    outputs = render_protocol(contents, packets, reserved, namespace, client_class,
+                              client_members.name if client_members else None)
     plans = [plan_output(root, role, files) for root, role, files in zip(paths[1:], ('Common', 'Client', 'Server'), outputs)]
     publish(plans)
     if client_members is not None and not client_members.exists():
@@ -429,10 +445,13 @@ def main():
     parser = argparse.ArgumentParser(description='Generate C++ packet DTOs, builders and dispatchers from YAML.')
     for option in ('schema-dir', 'common-out', 'client-out', 'server-out'):
         parser.add_argument(f'--{option}', type=Path, required=True)
+    parser.add_argument('--namespace', required=True)
+    parser.add_argument('--client-class', required=True)
     parser.add_argument('--client-members-out', type=Path, help='Create the handwritten client scaffold if missing.')
     args = parser.parse_args()
     try:
-        generate(args.schema_dir, args.common_out, args.client_out, args.server_out, args.client_members_out)
+        generate(args.schema_dir, args.common_out, args.client_out, args.server_out,
+                 args.namespace, args.client_class, args.client_members_out)
     except (GenerationError, OSError) as error:
         parser.exit(1, f'Packet generator: {error}\n')
 

@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -32,9 +33,9 @@ class GeneratorTests(unittest.TestCase):
         self.source.write_text(NOTI, encoding='utf-8')
         self.common, self.client, self.server = (self.root / name for name in ('common', 'client', 'server'))
 
-    def generate(self, *, schema=None, client=None, extra=()):
+    def generate(self, *, schema=None, client=None, namespace='Chatting', client_class='CChatNetClient', extra=()):
         return subprocess.run([
-            sys.executable, str(CLI), '--schema-dir', str(schema or self.schema),
+            sys.executable, str(CLI), '--namespace', namespace, '--client-class', client_class, '--schema-dir', str(schema or self.schema),
             '--common-out', str(self.common), '--client-out', str(client or self.client),
             '--server-out', str(self.server), *extra,
         ], cwd=self.root, capture_output=True, text=True, encoding='utf-8')
@@ -42,16 +43,42 @@ class GeneratorTests(unittest.TestCase):
     def assert_generated(self, result):
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_configured_protocol_has_independent_client_and_view_dispatch(self):
+        self.assert_generated(self.generate(namespace='World', client_class='WorldClient'))
+        client = (self.client / 'WorldClient.g.h').read_text(encoding='utf-8')
+        dispatch = (self.server / 'ServerPacketDispatch.g.cpp').read_text(encoding='utf-8')
+        self.assertIn('namespace World', client)
+        self.assertNotIn('Chatting', client + dispatch)
+        self.assertIn('CSerializableBufferView &message', dispatch)
+        header = (self.server / 'ServerPacketDispatch.g.h').read_text(encoding='utf-8')
+        self.assertIn('DispatchServerPacket', header)
+        interface = (self.server / 'IServerPacketHandler.g.h').read_text(encoding='utf-8')
+        self.assertIn('virtual bool HandlePulseNoti(UINT64 sessionId, const SPulseNoti &packet) noexcept = 0;', interface)
+        self.assertIn('&IServerPacketHandler::HandlePulseNoti', dispatch)
+        self.assertIn('return kFuncTable[opcode](sessionId, message, handler);', dispatch)
+        self.assertNotIn('[handler', header + dispatch)
+        self.assertNotIn('BindPulseNoti', header + dispatch)
+        self.assertNotIn('switch', dispatch)
+
+    def test_dto_deserializes_view_without_dispatch_field_readers(self):
+        self.assert_generated(self.generate())
+        dto = (self.common / 'System/Pulse.g.h').read_text(encoding='utf-8')
+        dispatch = (self.server / 'ServerPacketDispatch.g.cpp').read_text(encoding='utf-8')
+        self.assertIn('Deserialize(NetworkCommonLib::CSerializableBuffer &buffer) noexcept override', dto)
+        self.assertIn('Deserialize(NetworkCommonLib::CSerializableBufferView &view) noexcept', dto)
+        self.assertRegex(dto, r'view\s*>> m_accountNo;\s*return view\.IsValid\(\);')
+        self.assertNotIn('view.Dequeue', dto)
+        self.assertIn('packet.Deserialize(message) && message.GetDataSize() == 0', dispatch)
+        self.assertNotIn('ReadField', dispatch)
+        self.assertNotIn('DecodeServerPulseNoti', dispatch)
+        self.assertNotIn('m_accountNo', dispatch)
+
     def test_client_members_created_only_when_missing(self):
         members = self.root / 'manual' / 'CChatNetClientMembers.inc'
         options = ('--client-members-out', str(members))
         self.assert_generated(self.generate(extra=options))
-        self.assertRegex(members.read_bytes(), rb'bool ReqLogin\([^;]+&sessionKey\) noexcept;')
-        self.assertIn(b'bool ReqSectorMove(', members.read_bytes())
-        self.assertNotIn(b'm_initialSector', members.read_bytes())
-        self.assertNotIn(b'enum class ELoginState', members.read_bytes())
-        self.assertNotIn(b'struct SSectorPosition', members.read_bytes())
-        self.assertNotIn(b'submitChatRequest', members.read_bytes())
+        self.assertIn(b'Handwritten protocol client members', members.read_bytes())
+        self.assertNotIn(b'Chatting', members.read_bytes())
         self.assertNotIn(members.name, (self.client / '.packet-generator.json').read_text())
 
         members.write_bytes(b'// user-owned declaration\r\n')
@@ -61,6 +88,34 @@ class GeneratorTests(unittest.TestCase):
         members.write_bytes(b'')
         self.assert_generated(self.generate(extra=options))
         self.assertEqual(b'', members.read_bytes())
+
+    @unittest.skipUnless(os.name == 'nt', 'BAT wrapper requires Windows')
+    def test_bat_creates_handwritten_client_members_for_both_protocols(self):
+        tool = self.root / 'Tools/PacketGenerator'
+        shutil.copytree(CLI.parent / 'templates', tool / 'templates')
+        for name in ('GeneratePackets.py', 'GeneratePackets.bat'):
+            shutil.copyfile(CLI.parent / name, tool / name)
+        env = dict(os.environ, PACKET_GENERATOR_PYTHON=sys.executable)
+        for protocol, client_class, client_dir in (
+            ('Chatting', 'CChatNetClient', 'Chatting/Client'),
+            ('World', 'WorldClient', 'WorldServer'),
+        ):
+            with self.subTest(protocol=protocol):
+                packet = self.root / 'Common/Packet' / protocol
+                schema = packet / 'Schema/System/Pulse.yaml'
+                schema.parent.mkdir(parents=True)
+                schema.write_text(NOTI, encoding='utf-8')
+                members = self.root / 'Tests' / client_dir / f'{client_class}Members.inc'
+                command = ['cmd.exe', '/d', '/c', r'Tools\PacketGenerator\GeneratePackets.bat', protocol]
+                self.assert_generated(subprocess.run(command, cwd=self.root, env=env, capture_output=True, text=True))
+                self.assertTrue(members.is_file())
+                output = packet / 'Generated/Client'
+                self.assertIn(f'#include "{members.name}"', (output / f'{client_class}.g.h').read_text(encoding='utf-8'))
+                self.assertNotIn(members.name, (output / '.packet-generator.json').read_text(encoding='utf-8'))
+                members.write_bytes(b'// handwritten\r\n')
+                before = (members.read_bytes(), members.stat().st_mtime_ns)
+                self.assert_generated(subprocess.run(command, cwd=self.root, env=env, capture_output=True, text=True))
+                self.assertEqual(before, (members.read_bytes(), members.stat().st_mtime_ns))
 
     def test_invalid_schema_does_not_create_client_members(self):
         members = self.root / 'manual' / 'CChatNetClientMembers.inc'
@@ -77,15 +132,15 @@ class GeneratorTests(unittest.TestCase):
         self.assert_generated(self.generate())
         self.assertIn('SPulseNoti', (self.common / 'System/Pulse.g.h').read_text())
         self.assertIn('MakePacketPulseNoti', (self.client / 'CChatNetClient.g.h').read_text(encoding='utf-8'))
-        self.assertNotIn('HandlePulseNoti', (self.client / 'IClientPacketHandler.g.h').read_text())
-        self.assertIn('HandlePulseNoti', (self.server / 'IServerPacketHandler.g.h').read_text())
+        self.assertNotIn('HandlePulseNoti', (self.client / 'IClientPacketHandler.g.h').read_text(encoding='utf-8'))
+        self.assertIn('HandlePulseNoti', (self.server / 'IServerPacketHandler.g.h').read_text(encoding='utf-8'))
         self.assertNotIn('MakePacketPulseNoti', (self.server / 'ServerPacketSend.g.h').read_text(encoding='utf-8'))
         before = self.snapshot()
         self.assert_generated(self.generate())
         self.assertEqual(before, self.snapshot())
 
     def test_production_packet_contract(self):
-        self.assert_generated(self.generate(schema=ROOT / 'Common/Packet/Schema'))
+        self.assert_generated(self.generate(schema=ROOT / 'Common/Packet/Chatting/Schema'))
         enum = (self.common / 'PacketTypes.g.h').read_text()
         for name, number in zip(('ChatServer', 'ReqLogin', 'ResLogin', 'ReqSectorMove', 'ResSectorMove',
                                  'ReqMessage', 'ResMessage', 'HeartbeatNoti', 'MessageNoti'), range(9)):
@@ -105,8 +160,8 @@ class GeneratorTests(unittest.TestCase):
             dto = chatting.split(f'struct S{name}', 1)[1].split('\n\t};', 1)[0]
             self.assertRegex(dto, r'buffer\s*<< m_accountNo\s*<< m_id\s*<< m_nickname\s*<< m_message;')
             self.assertRegex(dto, r'buffer\s*>> m_accountNo\s*>> m_id\s*>> m_nickname\s*>> m_message;')
-            self.assertIn(f'Handle{name}', (self.client / 'ClientPacketDispatch.g.cpp').read_text(encoding='utf-8'))
-            self.assertNotIn(f'Handle{name}', (self.server / 'ServerPacketDispatch.g.cpp').read_text(encoding='utf-8'))
+            self.assertIn(f'&IClientPacketHandler::Handle{name}', (self.client / 'ClientPacketDispatch.g.cpp').read_text(encoding='utf-8'))
+            self.assertNotIn(f'&IServerPacketHandler::Handle{name}', (self.server / 'ServerPacketDispatch.g.cpp').read_text(encoding='utf-8'))
         self.assertIn('std::same_as<TPacket, SMessageNoti>', (self.server / 'ServerPacketSend.g.h').read_text(encoding='utf-8'))
         self.assertIn('MHLib::serialization::ISerializable', login)
         self.assertRegex(login, r'buffer\s*<< m_accountNo\s*<< m_id\s*<< m_nickname\s*<< m_sessionKey')
@@ -127,21 +182,27 @@ class GeneratorTests(unittest.TestCase):
         manual.write_text('// handwritten', encoding='utf-8')
         manual_before = (manual.read_bytes(), manual.stat().st_mtime_ns)
 
-        production_schema = ROOT / 'Common/Packet/Schema'
-        self.assert_generated(self.generate(schema=production_schema))
+        production_schema = ROOT / 'Common/Packet/Chatting/Schema'
+        self.assert_generated(self.generate(schema=production_schema, extra=('--client-members-out', str(manual))))
         current = json.loads(manifest.read_text(encoding='utf-8'))['files']
         for suffix in ('h', 'cpp'):
             self.assertFalse((self.client / f'ClientPacketSend.g.{suffix}').exists())
             self.assertIn(f'CChatNetClient.g.{suffix}', current)
         header = (self.client / 'CChatNetClient.g.h').read_text(encoding='utf-8')
         self.assertIn('#include "CChatNetClientMembers.inc"', header)
-        for response in ('Login', 'SectorMove', 'Message'):
-            self.assertIn(f'bool HandleRes{response}(const SRes{response} &packet) noexcept override final;', header)
-        production_server = ROOT / 'Tests/Chatting/Server/Generated/PacketHandler'
+        self.assertIn('private IClientPacketHandler', header)
+        self.assertIn('HandleResSectorMove(const SResSectorMove &packet) noexcept override final', header)
+        interface = (self.client / 'IClientPacketHandler.g.h').read_text(encoding='utf-8')
+        self.assertIn('virtual bool HandleResSectorMove(const SResSectorMove &packet) noexcept = 0;', interface)
+        dispatch = (self.client / 'ClientPacketDispatch.g.cpp').read_text(encoding='utf-8')
+        self.assertIn('&IClientPacketHandler::HandleResSectorMove', dispatch)
+        self.assertNotIn('BindResSectorMove', dispatch)
+        self.assertNotIn('[handler', dispatch)
+        production_server = ROOT / 'Common/Packet/Chatting/Generated/Server'
         for path in production_server.iterdir():
             self.assertEqual(path.read_bytes().replace(b'\r\n', b'\n'), (self.server / path.name).read_bytes())
         before = self.snapshot()
-        self.assert_generated(self.generate(schema=production_schema))
+        self.assert_generated(self.generate(schema=production_schema, extra=('--client-members-out', str(manual))))
         self.assertEqual(before, self.snapshot())
         self.assertEqual(manual_before, (manual.read_bytes(), manual.stat().st_mtime_ns))
 
@@ -161,12 +222,12 @@ class GeneratorTests(unittest.TestCase):
         self.assertEqual(header.count('return buffer.IsValid();'), 2)
 
     def test_direct_builder_and_dispatch(self):
-        self.assert_generated(self.generate(schema=ROOT / 'Common/Packet/Schema'))
+        self.assert_generated(self.generate(schema=ROOT / 'Common/Packet/Chatting/Schema'))
         for side, root, packet in (('Client', self.client, 'ReqLogin'), ('Server', self.server, 'ResLogin')):
             with self.subTest(side=side):
                 send_stem = 'CChatNetClient' if side == 'Client' else 'ServerPacketSend'
                 send = (root / f'{send_stem}.g.cpp').read_text(encoding='utf-8')
-                dispatch = (root / f'{side}PacketDispatch.g.cpp').read_text()
+                dispatch = (root / f'{side}PacketDispatch.g.cpp').read_text(encoding='utf-8')
                 header = (root / f'{send_stem}.g.h').read_text(encoding='utf-8')
                 if side == 'Client':
                     self.assertIn('std::shared_ptr<NetworkCommonLib::CSerializableBuffer>', header)
@@ -184,19 +245,26 @@ class GeneratorTests(unittest.TestCase):
                     self.assertRegex(header, r'if \(!spBuffer->IsValid\(\)\)\s*return \{\};')
                     for manual in ('IncreaseRef(', 'DecreaseRef(', '::Free('):
                         self.assertNotIn(manual, header + send)
-                self.assertEqual(dispatch.count('message >> type;'), int(side == 'Client'))
-                self.assertRegex(dispatch, r'message >> packet;\s*return message.IsValid\(\)'
-                                 r' && message.GetDataSize\(\) == 0\s*&& handler.Handle')
+                dispatch_header = (root / f'{side}PacketDispatch.g.h').read_text(encoding='utf-8')
+                if side == 'Client':
+                    self.assertIn('opcode >= kFuncTable.size() || !kFuncTable[opcode]', dispatch)
+                    self.assertIn('message.GetDataSize() == 0 && (handler.*Handler)(packet)', dispatch)
+                    self.assertIn('message >> packet;', dispatch)
+                else:
+                    self.assertIn('opcode >= kFuncTable.size() || !kFuncTable[opcode]', dispatch)
+                    self.assertRegex(login, r'view\s*>> m_accountNo\s*>> m_id\s*>> m_nickname\s*>> m_sessionKey;')
+                    self.assertIn('packet.Deserialize(message) && message.GetDataSize() == 0 && (handler.*Handler)(sessionId, packet)', dispatch)
+                    self.assertNotIn('CSerializableBuffer::MakeShared', dispatch)
                 for obsolete in ('PacketCodec', 'PacketBufferAdapter', 'CPacketBufferWriter', 'CPacketBufferReader'):
                     self.assertNotIn(obsolete, send + dispatch)
 
     def test_generated_senders_use_field_arguments_and_distinct_ownership(self):
-        self.assert_generated(self.generate(schema=ROOT / 'Common/Packet/Schema'))
+        self.assert_generated(self.generate(schema=ROOT / 'Common/Packet/Chatting/Schema'))
         client = (self.client / 'CChatNetClient.g.h').read_text(encoding='utf-8')
         server = (self.server / 'ServerPacketSend.g.h').read_text(encoding='utf-8')
         client_cpp = (self.client / 'CChatNetClient.g.cpp').read_text(encoding='utf-8')
-        server_cpp = (self.server / 'ServerPacketSend.g.cpp').read_text()
-        self.assertIn('class CChatNetClient : public ClientNetworkLib::CClient, private IClientPacketHandler', client)
+        server_cpp = (self.server / 'ServerPacketSend.g.cpp').read_text(encoding='utf-8')
+        self.assertIn('class CChatNetClient : public ClientNetworkLib::CClient', client)
         self.assertRegex(client, r'private:\s*bool onRecv\(NetworkCommonLib::CSerializableBuffer &message\) noexcept override final;')
         self.assertRegex(client_cpp, r'bool CChatNetClient::onRecv\(NetworkCommonLib::CSerializableBuffer &message\) noexcept\s*'
                                      r'\{\s*return DispatchClientPacket\(message, \*this\);\s*\}')
@@ -204,6 +272,8 @@ class GeneratorTests(unittest.TestCase):
         self.assertNotIn('CClientPacketSender', client + client_cpp)
         self.assertNotIn('virtual bool sendPacket(', client)
         self.assertIn('class CServerPacketSender', server)
+        for generated in (client, client_cpp, server, server_cpp):
+            self.assertNotRegex(generated, r'\bSend\w*\(\n[ \t]*\n')
         self.assertRegex(client, r'bool SendReqMessage\(\s*std::int64_t accountNo,\s*const std::wstring &message\) noexcept;')
         self.assertRegex(client, r'bool SendNotiHeartbeat\(\s*std::int64_t accountNo\) noexcept;')
         self.assertRegex(client, r'const std::wstring &id,\s*const std::wstring &nickname,\s*'
@@ -221,7 +291,8 @@ class GeneratorTests(unittest.TestCase):
         for name in ('ReqLogin', 'ReqSectorMove', 'ReqMessage', 'HeartbeatNoti'):
             self.assertIn(f'return this->sendPacket(MakePacket{name}(packet));', client_cpp)
         self.assertNotIn('submitChatRequest', client_cpp)
-        self.assertRegex(server_cpp, r'catch \(const std::bad_alloc &\)\s*\{\s*return false;')
+        self.assertNotRegex(server_cpp, r'\b(?:try|catch)\b')
+        self.assertNotIn('#include <new>', server_cpp)
         self.assertIn('bool SendPacket(UINT64 sessionId, const ServerNetworkLib::SendPacketPtr &spPacket) noexcept;', server)
         self.assertIn('return SendPacket(sessionId, MakePacket(packet));', server_cpp)
         self.assertNotIn('submitPreparedPacket', server + server_cpp)
@@ -237,14 +308,14 @@ class GeneratorTests(unittest.TestCase):
         self.source.with_name('Ready.yaml').write_text(empty + '    fields: []\n', encoding='utf-8')
         self.assert_generated(self.generate())
         server = (self.server / 'ServerPacketSend.g.h').read_text(encoding='utf-8')
-        server_cpp = (self.server / 'ServerPacketSend.g.cpp').read_text()
+        server_cpp = (self.server / 'ServerPacketSend.g.cpp').read_text(encoding='utf-8')
         self.assertRegex(server, r'bool SendNotiPulse\(\s*UINT64 sessionId,\s*std::int64_t sessionIdValue,\s*'
                                  r'std::uint8_t packetValue2,\s*std::uint8_t classValue,\s*std::uint8_t packetValue\) noexcept;')
         self.assertRegex(server, r'bool SendNotiReady\(\s*UINT64 sessionId\) noexcept;')
         self.assertIn('packet.m_sessionId = sessionIdValue;', server_cpp)
         self.assertIn('packet.m_packet = packetValue2;', server_cpp)
         self.assertNotIn('SendNotiPulse', (self.client / 'CChatNetClient.g.h').read_text(encoding='utf-8'))
-        self.assertIn('HandlePulseNoti', (self.client / 'IClientPacketHandler.g.h').read_text())
+        self.assertIn('HandlePulseNoti', (self.client / 'IClientPacketHandler.g.h').read_text(encoding='utf-8'))
 
     def test_generated_send_name_collision_is_rejected_before_writing(self):
         self.assert_generated(self.generate())
@@ -357,6 +428,21 @@ class GeneratorTests(unittest.TestCase):
         replaced = self.common / 'System/Pulse.g.h'
         replaced.write_text('handwritten')
         self.source.rename(self.source.with_name('Renamed.yaml'))
+        before = self.snapshot()
+        result = self.generate()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('modified generated output', result.stderr)
+        self.assertEqual(before, self.snapshot())
+
+    def test_client_manifest_does_not_claim_handwritten_files(self):
+        self.assert_generated(self.generate())
+        manual = self.client / 'Manual.g.h'
+        data = b'// handwritten\n'
+        manual.write_bytes(data)
+        manifest = self.client / '.packet-generator.json'
+        record = json.loads(manifest.read_text(encoding='utf-8'))
+        record['files'][manual.name] = hashlib.sha256(data).hexdigest()
+        manifest.write_text(json.dumps(record), encoding='utf-8')
         before = self.snapshot()
         result = self.generate()
         self.assertNotEqual(result.returncode, 0)

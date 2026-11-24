@@ -1,6 +1,10 @@
 #pragma once
+{% if side == 'Client' %}
 
-namespace Chatting
+#include "IClientPacketHandler.g.h"
+{% endif %}
+
+namespace {{ namespace }}
 {
 {% for packet in packets %}
 	struct S{{ packet.name }};
@@ -33,7 +37,7 @@ namespace Chatting
 {% endif %}
 
 {% if side == 'Client' %}
-	class CChatNetClient : public ClientNetworkLib::CClient, private IClientPacketHandler
+	class {{ client_class }} : public ClientNetworkLib::CClient, private IClientPacketHandler
 {% else %}
 	class CServerPacketSender
 {% endif %}
@@ -45,7 +49,7 @@ namespace Chatting
 
 {% endif %}
 {% for packet in packets %}
-		{{ '[[nodiscard]] ' if side == 'Client' else '' }}{{ packet.send_result }}{{ packet.send_name }}({% if packet.send_parameters %}{{ '\n' }}
+		{{ '[[nodiscard]] ' if side == 'Client' else '' }}{{ packet.send_result }}{{ packet.send_name }}({% if packet.send_parameters %}{{ '\n' -}}
 {% for parameter in packet.send_parameters %}
 			{{ parameter }}{{ ',' if not loop.last else ') noexcept;' }}
 {% endfor %}
@@ -58,14 +62,21 @@ namespace Chatting
 	protected:
 {% if side == 'Client' %}
 		using ClientNetworkLib::CClient::CClient;
+{% if not members %}
+{% for packet in receive %}
+		bool Handle{{ packet.name }}(const S{{ packet.name }} &packet) noexcept override = 0;
+{% endfor %}
+{% endif %}
 
 	private:
 		bool onRecv(NetworkCommonLib::CSerializableBuffer &message) noexcept override final;
+{% if members %}
 {% for packet in receive %}
 		bool Handle{{ packet.name }}(const S{{ packet.name }} &packet) noexcept override final;
 {% endfor %}
 
-#include "CChatNetClientMembers.inc"
+#include "{{ members }}"
+{% endif %}
 {% else %}
 		virtual ~C{{ side }}PacketSender() = default;
 

@@ -17,6 +17,13 @@ namespace ServerNetworkLib
 #include "IContents.h"
 #include "CContentsRuntime.h"
 #include "FixedMapsProtocol.h"
+#include "MHLib/serialization/ISerializable.h"
+#include "IncludePacketAll.g.h"
+#include "ClientPacketDispatch.g.h"
+#include "ServerPacketDispatch.g.h"
+#include "IServerPacketHandler.g.h"
+#include "WorldClient.g.h"
+#include "ServerPacketSend.g.h"
 
 namespace WorldServer
 {
@@ -27,7 +34,7 @@ namespace WorldServer
 	using ContentsRuntimeLib::CContentsRuntime;
 	using ContentsRuntimeLib::IContents;
 
-	class CMapInstance final : public IContents
+	class CMapInstance final : public IContents, private CServerPacketSender, private IServerPacketHandler
 	{
 	public:
 		CMapInstance(UINT64 mapId, CServer &network) noexcept
@@ -65,41 +72,35 @@ namespace WorldServer
 				{
 					if (!m_network.TryPopRecvPacket(sessionId, upPacket))
 						break;
-					onRecv(sessionId, *upPacket);
+					if (!DispatchServerPacket(sessionId, *upPacket, *this))
+						(void)SendResAdd(sessionId, GetInstanceId(), m_total, static_cast<std::uint16_t>(EAddResult::InvalidRequest));
 				}
 			}
 		}
 
 	private:
-		void onRecv(UINT64 sessionId, CSerializableBufferView &message) noexcept
+		bool HandleReqAdd(UINT64 sessionId, const SReqAdd &packet) noexcept override
 		{
+			if (packet.m_amount == 0 || packet.m_amount > UINT64_MAX - m_total)
+				return false;
+
 			const auto mapId = GetInstanceId();
-			auto result = EAddResult::InvalidRequest;
-			if (message.GetDataSize() == kRequestBytes)
-			{
-				unsigned short opcode = 0;
-				UINT64 requestedMap = 0;
-				UINT32 amount = 0;
-				message >> opcode >> requestedMap;
-				if (message.Dequeue(reinterpret_cast<char *>(&amount), sizeof(amount)) && opcode == kReqAdd
-					&& amount != 0 && amount <= UINT64_MAX - m_total)
-				{
-					if (requestedMap == mapId)
-					{
-						m_total += amount;
-						result = EAddResult::Applied;
-					}
-					else
-						result = EAddResult::WrongMap;
-				}
-			}
-			auto spPacket = SendPacketPtr::MakeShared();
-			*spPacket << kResAdd << mapId << m_total << static_cast<unsigned short>(result);
-			m_network.SendPacket(sessionId, spPacket.GetRealPtr());
+			const bool isOwnMap = packet.m_mapId == mapId;
+			if (isOwnMap)
+				m_total += packet.m_amount;
+			const auto result = isOwnMap ? EAddResult::Applied : EAddResult::WrongMap;
+			(void)SendResAdd(sessionId, mapId, m_total, static_cast<std::uint16_t>(result));
+			return true;
+		}
+
+		void sendPacket(UINT64 sessionId, NetworkCommonLib::CSerializableBuffer &packet) noexcept override
+		{
+			m_network.SendPacket(sessionId, &packet);
 		}
 
 	private:
 		CServer &m_network;
+
 		std::vector<UINT64> m_connections;
 		UINT64 m_total = 0;
 	};
@@ -117,12 +118,14 @@ namespace WorldServer
 				if (!m_runtime.RegisterContents(std::move(upMap), true, index))
 					return false;
 			}
+
 			if (!m_runtime.Start())
 				return false;
 			return Start("127.0.0.1", port, NetworkCommonLib::EPacketMode::Lan) != FALSE;
 		}
 
 	private:
+
 		bool OnConnectionRequest(const WCHAR *pIp, USHORT) noexcept override
 		{
 			return wcscmp(pIp, L"127.0.0.1") == 0;
@@ -172,25 +175,40 @@ namespace WorldServer
 		}
 
 	private:
+
 		CContentsRuntime m_runtime{2, 5ms};
 		std::array<CMapInstance *, 2> m_maps{};
 	};
 
-	class CHeadlessClient final : public ClientNetworkLib::CClient
+
+	// 맵 응답의 결과 범위를 확인한 뒤 클라이언트 콜백을 실행한다.
+	bool WorldClient::HandleResAdd(const SResAdd &packet) noexcept
+	{
+		if (packet.m_result > static_cast<std::uint16_t>(EAddResult::InvalidRequest))
+			return false;
+		return onAddResponse(packet);
+	}
+
+	class CHeadlessClient final : public WorldClient
 	{
 	public:
 		explicit CHeadlessClient(ClientNetworkLib::CClientManager &network) noexcept
-			: CClient(network)
+			: WorldClient(network)
 		{
 		}
 
+		// 정상 송신은 WorldClient를 사용하고, 이 경로는 디스패치 거절 데이터만 만든다.
 		[[nodiscard]]
-		bool SendReqAdd(UINT64 mapId, UINT32 amount, unsigned short opcode = kReqAdd) noexcept
+		bool SendRejectedRequest(std::uint16_t opcode, bool hasAmount, bool hasTrailingByte = false) noexcept
 		{
 			auto spPacket = NetworkCommonLib::CSerializableBuffer::MakeShared();
 			if (!spPacket)
 				return false;
-			*spPacket << opcode << mapId << amount;
+			*spPacket << opcode << kSecondMapId;
+			if (hasAmount)
+				*spPacket << std::uint32_t{1};
+			if (hasTrailingByte)
+				*spPacket << std::uint8_t{0};
 			return sendPacket(std::move(spPacket));
 		}
 
@@ -202,18 +220,9 @@ namespace WorldServer
 			return true;
 		}
 
-		bool onRecv(NetworkCommonLib::CSerializableBuffer &packet) noexcept override
+		bool onAddResponse(const SResAdd &packet) noexcept override
 		{
-			if (packet.GetDataSize() != kResponseBytes)
-				return false;
-			unsigned short opcode = 0;
-			unsigned short result = 0;
-			SAddResponse response{};
-			packet >> opcode >> response.mapId >> response.total >> result;
-			if (opcode != kResAdd || result > static_cast<unsigned short>(EAddResult::InvalidRequest))
-				return false;
-			response.result = static_cast<EAddResult>(result);
-			m_responses.push_back(response);
+			m_responses.push_back({packet.m_mapId, packet.m_total, static_cast<EAddResult>(packet.m_result)});
 			return true;
 		}
 
@@ -256,8 +265,10 @@ namespace WorldServer
 		if (!second.SendReqAdd(kSecondMapId, 10) || !first.SendReqAdd(kFirstMapId, 1) || !first.SendReqAdd(kFirstMapId, 5)
 			|| !first.SendReqAdd(kSecondMapId, 100) || !second.SendReqAdd(kFirstMapId, 100)
 			|| !first.SendReqAdd(kFirstMapId, 3) || !second.SendReqAdd(kSecondMapId, 4)
-			|| !second.SendReqAdd(kSecondMapId, 1, kInvalidOpcode)
-			|| !WaitForResponses(first, 5, &second) || !WaitForResponses(second, 4, &first))
+			|| !second.SendRejectedRequest(kInvalidOpcode, true) || !second.SendRejectedRequest(0, true)
+			|| !second.SendRejectedRequest(static_cast<std::uint16_t>(SReqAdd::kPacketType), false)
+			|| !second.SendRejectedRequest(static_cast<std::uint16_t>(SReqAdd::kPacketType), true, true)
+			|| !WaitForResponses(first, 5, &second) || !WaitForResponses(second, 7, &first))
 			return false;
 
 		using enum EAddResult;
@@ -265,7 +276,8 @@ namespace WorldServer
 			{1, 1, Applied}, {1, 2, Applied}, {1, 7, Applied}, {1, 7, WrongMap}, {1, 10, Applied}
 		};
 		const std::vector<SAddResponse> secondExpected{
-			{2, 10, Applied}, {2, 10, WrongMap}, {2, 14, Applied}, {2, 14, InvalidRequest}
+			{2, 10, Applied}, {2, 10, WrongMap}, {2, 14, Applied}, {2, 14, InvalidRequest},
+			{2, 14, InvalidRequest}, {2, 14, InvalidRequest}, {2, 14, InvalidRequest}
 		};
 		if (first.m_responses != firstExpected || second.m_responses != secondExpected)
 			return false;
@@ -287,7 +299,7 @@ namespace WorldServer
 
 		network.Stop();
 		g_pLogger->WriteLogConsole(ELogLevel::Info,
-			L"event=fixed_maps_pass first=1,2,7,7,10 second=10,10,14,14 reconnected=15 | 루프백 검증을 통과했습니다.");
+			L"event=fixed_maps_pass first=1,2,7,7,10 second=10,10,14,14,14,14,14 reconnected=15 | 루프백 검증을 통과했습니다.");
 		return true;
 	}
 }

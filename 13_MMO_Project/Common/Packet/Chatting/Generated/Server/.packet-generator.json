@@ -1,0 +1,11 @@
+{
+  "files": {
+    "IServerPacketHandler.g.h": "fe4453090d050a7982a74f2face7914658f970db6fce618168fe1d4295128e9c",
+    "ServerPacketDispatch.g.cpp": "0e80439f2f15edb2bae13b4f75db75950b057430ef25f04083fec9e615053e92",
+    "ServerPacketDispatch.g.h": "2ae3afea06ec26a72b8e5707a678c64fe7edcb757a395ca3841b2248cecd1b16",
+    "ServerPacketSend.g.cpp": "81c2ab9b81aacf1acc7d4e2ab064d93e8f1bdb47e1bbd5079c09592c88e56e0b",
+    "ServerPacketSend.g.h": "d7aefe8dd362387c82a99bc82adfe5be5496d0189e8eeefe0aebc79948b27954"
+  },
+  "role": "Server",
+  "version": 1
+}

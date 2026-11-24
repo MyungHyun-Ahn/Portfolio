@@ -1,0 +1,55 @@
+// PacketGenerator generated file. Do not edit.
+#include "pch.h"
+#include "NetworkCommonLibPch.h"
+#include "MHLib/serialization/ISerializable.h"
+#include <functional>
+#include <utility>
+#include <vector>
+#include "IncludePacketAll.g.h"
+#include "ClientPacketDispatch.g.h"
+#include "IClientPacketHandler.g.h"
+
+namespace Chatting
+{
+	namespace
+	{
+		using PacketFunction = std::function<bool(NetworkCommonLib::CSerializableBuffer &, IClientPacketHandler &)>;
+
+		// 본문 검증에 성공하면 등록된 수신 핸들러를 호출한다.
+		template<typename TPacket, bool (IClientPacketHandler::*Handler)(const TPacket &) noexcept>
+		bool HandlePacket(NetworkCommonLib::CSerializableBuffer &message, IClientPacketHandler &handler) noexcept
+		{
+			TPacket packet;
+			message >> packet;
+			return message.IsValid() && message.GetDataSize() == 0 && (handler.*Handler)(packet);
+		}
+
+		// 수신 방향의 패킷 핸들러를 opcode별로 한 번 등록한다.
+		std::vector<PacketFunction> MakePacketFunctionTable()
+		{
+			std::vector<PacketFunction> funcTable(9);
+			funcTable[static_cast<std::uint16_t>(EPacketType::ResMessage)] =
+				HandlePacket<SResMessage, &IClientPacketHandler::HandleResMessage>;
+			funcTable[static_cast<std::uint16_t>(EPacketType::MessageNoti)] =
+				HandlePacket<SMessageNoti, &IClientPacketHandler::HandleMessageNoti>;
+			funcTable[static_cast<std::uint16_t>(EPacketType::ResLogin)] =
+				HandlePacket<SResLogin, &IClientPacketHandler::HandleResLogin>;
+			funcTable[static_cast<std::uint16_t>(EPacketType::ResSectorMove)] =
+				HandlePacket<SResSectorMove, &IClientPacketHandler::HandleResSectorMove>;
+			return funcTable;
+		}
+
+		const auto kFuncTable = MakePacketFunctionTable();
+	}
+
+	bool DispatchClientPacket(NetworkCommonLib::CSerializableBuffer &message, IClientPacketHandler &handler) noexcept
+	{
+		std::uint16_t opcode = 0;
+		message >> opcode;
+		if (!message.IsValid())
+			return false;
+		if (opcode >= kFuncTable.size() || !kFuncTable[opcode])
+			return false;
+		return kFuncTable[opcode](message, handler);
+	}
+}

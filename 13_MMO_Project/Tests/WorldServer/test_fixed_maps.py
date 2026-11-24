@@ -46,7 +46,7 @@ def run(executable):
                 wait_for_server_log(server, log_path, rb'event=fixed_maps_ready port=' + str(port).encode() + rb'\b', 10)
                 configure(client_dir, 'Client', port)
                 result = subprocess.run([executable], cwd=client_dir, capture_output=True, timeout=20)
-                expected = b'event=fixed_maps_pass first=1,2,7,7,10 second=10,10,14,14 reconnected=15'
+                expected = b'event=fixed_maps_pass first=1,2,7,7,10 second=10,10,14,14,14,14,14 reconnected=15'
                 assert result.returncode == 0 and expected in result.stdout, (result, log_path.read_bytes())
                 workers = re.findall(
                     rb'event=map_connection_entered map=([12]) thread_id=([1-9]\d*) session_id=([1-9]\d*)\b',

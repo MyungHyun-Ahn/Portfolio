@@ -251,7 +251,12 @@ def chat(base, configuration, packet_mode=None):
         assert len(workers) == 2
         contents_workers = event(server, "NetworkLib", "Info", "-", "threadFunc",
                                  r"event=contents_worker_started \| .+")
-        assert len(contents_workers) == 2
+        # 구 워커는 시스템 타이머 전용이다. 채팅 진입·처리·삭제는 다른 한 워커에서 실행한다.
+        assert len(contents_workers) == 1
+        def worker_id(line):
+            return re.search(r"\[ChatServer\]\[(\d+)\]|\[NetworkLib\]\[(\d+)\]", line).group(0).split("[")[-1][:-1]
+
+        chat_workers = set()
         for function, payload, count in (
             ("OnAccept", r"event=session_accepted session_id=\2 \| .+", 2),
             (r"\w+", r"event=session_enter \| 세션이 콘텐츠에 진입했습니다\.", 2),
@@ -261,13 +266,17 @@ def chat(base, configuration, packet_mode=None):
         ):
             lines = event(server, "ChatServer", "Debug", r"[1-9]\d*", function, payload, on_console=False)
             assert len(lines) == count
-        event(server, "ChatServer", "Debug", r"[1-9]\d*", "OnLeave",
-              r"event=session_leave \| 세션이 콘텐츠를 떠났습니다\.", on_console=False)
+            if function != "OnAccept":
+                chat_workers.update(map(worker_id, lines))
+        leaves = event(server, "ChatServer", "Debug", r"[1-9]\d*", "OnLeave",
+                       r"event=session_leave \| 세션이 콘텐츠를 떠났습니다\.", on_console=False)
+        assert len(leaves) == 2 and {worker_id(line) for line in leaves} == chat_workers
+        assert len(chat_workers) == 1 and worker_id(contents_workers[0]) not in chat_workers
         assert len(ready) == 1
         send(server, "/exit")
         assert server[0].wait(timeout=8) == 0
         print(f"chat: two clients READY, one self echo and one peer delivery per message, exits=0/0/0; {ready[0]}")
-        print("chat: contents_worker_started=2; session_accepted/enter, login, sector and chat Debug events in file only")
+        print("chat: one Chatting owner worker (distinct from the NetworkLib system timer); session_accepted/enter, login, sector and chat Debug events in file only")
         print("chat: 1/19-code-unit nicknames preserved, including Korean and emoji; 20-code-unit config rejected")
 
 

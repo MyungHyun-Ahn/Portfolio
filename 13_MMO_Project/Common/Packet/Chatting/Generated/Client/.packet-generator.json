@@ -1,0 +1,11 @@
+{
+  "files": {
+    "CChatNetClient.g.cpp": "97e3737bf24a997045afbb36076a4d6b315bff5ef1c780b5b66dc0e42d3943ea",
+    "CChatNetClient.g.h": "1f28aac711ede638486aa66bca4e68bfc72525c440a80a2e9ff4b3d90f0a21e5",
+    "ClientPacketDispatch.g.cpp": "d70c99ddd3ffcde6532a7a857ce89635801cbf768590a0ae41154568fd8fd441",
+    "ClientPacketDispatch.g.h": "596f7335acbd1e8399c21445b2824d2c307f8620ad29cb8e5613eb758353f312",
+    "IClientPacketHandler.g.h": "db5bd603a8b0701947c1f435ff19e1350a0d95288e28329242604ab096426977"
+  },
+  "role": "Client",
+  "version": 1
+}

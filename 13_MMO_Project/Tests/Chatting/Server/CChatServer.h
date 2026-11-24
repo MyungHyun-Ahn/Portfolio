@@ -7,7 +7,10 @@ namespace Chatting
 	class CChatServer : public ServerNetworkLib::CServer
 	{
 	public:
-		CChatServer() noexcept;
+		CChatServer(std::size_t contentsWorkerCount, std::chrono::milliseconds frameInterval);
+		[[nodiscard]]
+		bool StartContents();
+		void StopContents();
 		bool OnConnectionRequest(const WCHAR *pIp, USHORT port) noexcept override;
 		void OnAccept(UINT64 sessionId) noexcept override;
 		void OnClientLeave(UINT64 sessionId) noexcept override;
@@ -16,7 +19,8 @@ namespace Chatting
 		void RegisterContentTimerEvent() noexcept override;
 
 	private:
-		// 서버와 콘텐츠는 프로세스 종료까지 유지한다.
-		CChatContents *m_pContents;
+		static constexpr ContentsRuntimeLib::ContentsInstanceId kChatContentsId = 1;
+		ContentsRuntimeLib::CContentsRuntime m_runtime;
+		CChatContents *m_pContents = nullptr;
 	};
 }

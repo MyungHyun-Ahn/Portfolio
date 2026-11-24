@@ -1,9 +1,21 @@
 #pragma once
 
-namespace Chatting
+namespace {{ namespace }}
 {
-	class I{{ side }}PacketHandler;
+{% for packet in packets %}
+	struct S{{ packet.name }};
+{% endfor %}
 
-	[[nodiscard]] bool Dispatch{{ side }}Packet({% if side == 'Server' %}std::uint16_t type, UINT64 sessionId,
-		{% endif %}NetworkCommonLib::CSerializableBuffer &message, I{{ side }}PacketHandler &handler) noexcept;
+{% if side == 'Server' %}
+	class IServerPacketHandler;
+
+	[[nodiscard]]
+	bool DispatchServerPacket(UINT64 sessionId, NetworkCommonLib::CSerializableBufferView &message,
+		IServerPacketHandler &handler, std::uint16_t *outOpcode = nullptr) noexcept;
+{% else %}
+	class IClientPacketHandler;
+
+	[[nodiscard]]
+	bool DispatchClientPacket(NetworkCommonLib::CSerializableBuffer &message, IClientPacketHandler &handler) noexcept;
+{% endif %}
 }

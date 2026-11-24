@@ -36,7 +36,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderOutputFile>$(IntDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\Common;$(ProjectDir)Generated\PacketHandler;$(ProjectDir)..\..\..\Common\Packet\Struct;$(ProjectDir)..\..\..\Common\NetworkCommon;$(ProjectDir)..\..\..\Server\NetworkLib;$(ProjectDir)..\..\..\Server\MHLib\includes;$(ProjectDir)..\..\..\Server\MetricsLib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\Common;$(ProjectDir)..\..\..\Common\Packet\Chatting\Generated\Server;$(ProjectDir)..\..\..\Common\Packet\Chatting\Generated\Common;$(ProjectDir)..\..\..\Common\NetworkCommon;$(ProjectDir)..\..\..\Server\NetworkLib;$(ProjectDir)..\..\..\Server\MHLib\includes;$(ProjectDir)..\..\..\Server\MetricsLib;$(ProjectDir)..\..\..\Server\ContentsRuntimeLib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <RuntimeLibrary Condition="'$(Configuration)' == 'Debug'">MultiThreadedDebugDLL</RuntimeLibrary>
       <RuntimeLibrary Condition="'$(Configuration)' == 'Release'">MultiThreadedDLL</RuntimeLibrary>
@@ -61,8 +61,8 @@
     <ClCompile Include="CChatServer.cpp" />
     <ClCompile Include="CChatContents.cpp" />
     <ClCompile Include="CProcessPacket.cpp" />
-    <ClCompile Include="Generated\PacketHandler\ServerPacketSend.g.cpp" />
-    <ClCompile Include="Generated\PacketHandler\ServerPacketDispatch.g.cpp" />
+    <ClCompile Include="..\..\..\Common\Packet\Chatting\Generated\Server\ServerPacketSend.g.cpp" />
+    <ClCompile Include="..\..\..\Common\Packet\Chatting\Generated\Server\ServerPacketDispatch.g.cpp" />
     <ClCompile Include="..\Common\Console.cpp" />
     <ClCompile Include="..\Common\Config.cpp" />
   </ItemGroup>
@@ -75,14 +75,17 @@
     <ClInclude Include="CPlayer.h" />
     <ClInclude Include="CSector.h" />
     <ClInclude Include="CProcessPacket.h" />
-    <ClInclude Include="Generated\PacketHandler\ServerPacketSend.g.h" />
-    <ClInclude Include="Generated\PacketHandler\ServerPacketDispatch.g.h" />
-    <ClInclude Include="Generated\PacketHandler\IServerPacketHandler.g.h" />
+    <ClInclude Include="..\..\..\Common\Packet\Chatting\Generated\Server\ServerPacketSend.g.h" />
+    <ClInclude Include="..\..\..\Common\Packet\Chatting\Generated\Server\ServerPacketDispatch.g.h" />
+    <ClInclude Include="..\..\..\Common\Packet\Chatting\Generated\Server\IServerPacketHandler.g.h" />
     <ClInclude Include="..\Common\CommonProtocol.h" />
     <ClInclude Include="..\Common\Console.h" />
     <ClInclude Include="..\Common\Config.h" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\..\Server\ContentsRuntimeLib\ContentsRuntimeLib.vcxproj">
+      <Project>{A8ABC43B-4934-4E64-BEBE-DA29D29080BB}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\..\..\Common\NetworkCommon\NetworkCommonLib.vcxproj">
       <Project>{71D436B7-5958-42E7-A5D6-117397ACE88B}</Project>
     </ProjectReference>

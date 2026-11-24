@@ -10,6 +10,8 @@
 #include "CommonProtocol.h"
 #include "Config.h"
 #include "Console.h"
+#include "IContents.h"
+#include "CContentsRuntime.h"
 #include "CChatServer.h"
 #include "CMetricsExporter.h"
 #include "ChatMetrics.h"
@@ -61,8 +63,8 @@ int main(void)
 	ServerNetworkLib::serverSetting::acceptexCount = config.m_acceptExCount;
 	ServerNetworkLib::serverSetting::iocpWorkerThread = config.m_iocpWorkerCount;
 	ServerNetworkLib::serverSetting::iocpActiveThread = config.m_iocpConcurrency;
-	ServerNetworkLib::serverSetting::contentsThreadCount = config.m_contentsWorkerCount;
-	ServerNetworkLib::serverSetting::maxContentsFps = config.m_contentsFps;
+	// 구 워커 한 개는 NetworkLib의 시스템 타이머만 처리한다.
+	ServerNetworkLib::serverSetting::contentsThreadCount = 1;
 	ServerNetworkLib::serverSetting::packetCode = Chatting::kPacketCode;
 	MHLib::security::CEncryption::sm_packetKey = Chatting::kPacketKey;
 	MHLib::utils::g_pProfileManager = MHLib::utils::CProfileManager::GetInstance();
@@ -71,7 +73,17 @@ int main(void)
 		L" | 서버 시작 설정을 적용했습니다.", config.m_acceptExCount, config.m_iocpWorkerCount, config.m_iocpConcurrency,
 		config.m_contentsWorkerCount, config.m_logQueueCapacity);
 
-	auto *pServer = new Chatting::CChatServer;
+	auto *pServer = new Chatting::CChatServer(static_cast<std::size_t>(config.m_contentsWorkerCount),
+		std::chrono::milliseconds{1000 / config.m_contentsFps});
+	if (!pServer->StartContents())
+	{
+		g_pLogger->WriteLog(ELogLevel::Error, L"ChatServer", 0, std::source_location::current(),
+			L"event=contents_start_failed | 채팅 콘텐츠 런타임을 시작하지 못했습니다.");
+		stopMetrics();
+		g_pLogger->Stop();
+		delete pServer;
+		return 1;
+	}
 	ServerNetworkLib::g_pServer = pServer;
 	std::atomic<bool> isReturned = false;
 	std::atomic<bool> isStarted = false;
@@ -90,6 +102,7 @@ int main(void)
 		auto result = Chatting::PollInput(pending, highSurrogate, line);
 		if (result == Chatting::EInputResult::End || (result == Chatting::EInputResult::Line && line == "/exit"))
 		{
+			pServer->StopContents();
 			g_pLogger->WriteLog(ELogLevel::Info, L"ChatServer", 0, std::source_location::current(),
 				L"event=server_process_exit | 서버 프로세스를 종료합니다. NetworkLib 정상 종료 처리는 보류 중입니다.");
 			stopMetrics();
@@ -99,6 +112,7 @@ int main(void)
 		Sleep(10);
 	}
 	serverThread.join();
+	pServer->StopContents();
 	const bool didStart = isStarted.load();
 	if (didStart)
 	{

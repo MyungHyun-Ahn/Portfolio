@@ -4,7 +4,7 @@
     <Filter Include="Client" />
     <Filter Include="Common" />
     <Filter Include="Generated" />
-    <Filter Include="Generated\PacketHandler" />
+    <Filter Include="Generated\Client" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -19,11 +19,11 @@
     <ClCompile Include="CChatNetClientHandlers.cpp">
       <Filter>Client</Filter>
     </ClCompile>
-    <ClCompile Include="Generated\PacketHandler\CChatNetClient.g.cpp">
-      <Filter>Generated\PacketHandler</Filter>
+    <ClCompile Include="..\..\..\Common\Packet\Chatting\Generated\Client\CChatNetClient.g.cpp">
+      <Filter>Generated\Client</Filter>
     </ClCompile>
-    <ClCompile Include="Generated\PacketHandler\ClientPacketDispatch.g.cpp">
-      <Filter>Generated\PacketHandler</Filter>
+    <ClCompile Include="..\..\..\Common\Packet\Chatting\Generated\Client\ClientPacketDispatch.g.cpp">
+      <Filter>Generated\Client</Filter>
     </ClCompile>
     <ClCompile Include="..\Common\Console.cpp">
       <Filter>Common</Filter>
@@ -45,14 +45,14 @@
     <ClInclude Include="ChatType.h">
       <Filter>Client</Filter>
     </ClInclude>
-    <ClInclude Include="Generated\PacketHandler\CChatNetClient.g.h">
-      <Filter>Generated\PacketHandler</Filter>
+    <ClInclude Include="..\..\..\Common\Packet\Chatting\Generated\Client\CChatNetClient.g.h">
+      <Filter>Generated\Client</Filter>
     </ClInclude>
-    <ClInclude Include="Generated\PacketHandler\ClientPacketDispatch.g.h">
-      <Filter>Generated\PacketHandler</Filter>
+    <ClInclude Include="..\..\..\Common\Packet\Chatting\Generated\Client\ClientPacketDispatch.g.h">
+      <Filter>Generated\Client</Filter>
     </ClInclude>
-    <ClInclude Include="Generated\PacketHandler\IClientPacketHandler.g.h">
-      <Filter>Generated\PacketHandler</Filter>
+    <ClInclude Include="..\..\..\Common\Packet\Chatting\Generated\Client\IClientPacketHandler.g.h">
+      <Filter>Generated\Client</Filter>
     </ClInclude>
     <ClInclude Include="..\Common\CommonProtocol.h">
       <Filter>Common</Filter>

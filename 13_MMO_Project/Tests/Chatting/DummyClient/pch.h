@@ -2,6 +2,9 @@
 
 #include "NetworkCommonLibPch.h"
 #include <array>
+#include <functional>
+#include <vector>
+#include <utility>
 #include <atomic>
 #include <chrono>
 #include <cstdint>

@@ -7,7 +7,7 @@
 #include "Console.h"
 #include "CClientManager.h"
 #include "CClient.h"
-#include "IClientPacketHandler.g.h"
+#include "ClientPacketDispatch.g.h"
 #include "CChatNetClient.g.h"
 #include "CConsoleChatClient.h"
 

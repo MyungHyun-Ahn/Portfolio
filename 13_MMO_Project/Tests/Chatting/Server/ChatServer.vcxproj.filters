@@ -5,7 +5,7 @@
     <Filter Include="Server" />
     <Filter Include="Server\ServerMetrics" />
     <Filter Include="Generated" />
-    <Filter Include="Generated\PacketHandler" />
+    <Filter Include="Generated\Server" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -29,11 +29,11 @@
     <ClCompile Include="CProcessPacket.cpp">
       <Filter>Server</Filter>
     </ClCompile>
-    <ClCompile Include="Generated\PacketHandler\ServerPacketSend.g.cpp">
-      <Filter>Generated\PacketHandler</Filter>
+    <ClCompile Include="..\..\..\Common\Packet\Chatting\Generated\Server\ServerPacketSend.g.cpp">
+      <Filter>Generated\Server</Filter>
     </ClCompile>
-    <ClCompile Include="Generated\PacketHandler\ServerPacketDispatch.g.cpp">
-      <Filter>Generated\PacketHandler</Filter>
+    <ClCompile Include="..\..\..\Common\Packet\Chatting\Generated\Server\ServerPacketDispatch.g.cpp">
+      <Filter>Generated\Server</Filter>
     </ClCompile>
     <ClCompile Include="..\Common\Console.cpp">
       <Filter>Common</Filter>
@@ -67,14 +67,14 @@
     <ClInclude Include="CProcessPacket.h">
       <Filter>Server</Filter>
     </ClInclude>
-    <ClInclude Include="Generated\PacketHandler\ServerPacketSend.g.h">
-      <Filter>Generated\PacketHandler</Filter>
+    <ClInclude Include="..\..\..\Common\Packet\Chatting\Generated\Server\ServerPacketSend.g.h">
+      <Filter>Generated\Server</Filter>
     </ClInclude>
-    <ClInclude Include="Generated\PacketHandler\ServerPacketDispatch.g.h">
-      <Filter>Generated\PacketHandler</Filter>
+    <ClInclude Include="..\..\..\Common\Packet\Chatting\Generated\Server\ServerPacketDispatch.g.h">
+      <Filter>Generated\Server</Filter>
     </ClInclude>
-    <ClInclude Include="Generated\PacketHandler\IServerPacketHandler.g.h">
-      <Filter>Generated\PacketHandler</Filter>
+    <ClInclude Include="..\..\..\Common\Packet\Chatting\Generated\Server\IServerPacketHandler.g.h">
+      <Filter>Generated\Server</Filter>
     </ClInclude>
     <ClInclude Include="..\Common\CommonProtocol.h">
       <Filter>Common</Filter>

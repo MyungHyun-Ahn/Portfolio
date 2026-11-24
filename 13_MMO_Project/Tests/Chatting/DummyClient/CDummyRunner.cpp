@@ -14,7 +14,7 @@
 #include "CClient.h"
 #include "MHLib/serialization/ISerializable.h"
 #include "IncludePacketAll.g.h"
-#include "IClientPacketHandler.g.h"
+#include "ClientPacketDispatch.g.h"
 #include "CChatNetClient.g.h"
 #include "Config.h"
 #include "SDummyConfig.h"

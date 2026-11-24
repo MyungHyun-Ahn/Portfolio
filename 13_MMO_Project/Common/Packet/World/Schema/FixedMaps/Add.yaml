@@ -1,0 +1,14 @@
+packets:
+  - name: ReqAdd
+    id: 1
+    kind: req
+    fields:
+      - { name: map_id, type: uint64 }
+      - { name: amount, type: uint32 }
+  - name: ResAdd
+    id: 2
+    kind: res
+    fields:
+      - { name: map_id, type: uint64 }
+      - { name: total, type: uint64 }
+      - { name: result, type: uint16 }

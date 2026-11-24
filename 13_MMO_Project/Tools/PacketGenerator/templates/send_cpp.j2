@@ -2,8 +2,13 @@
 {% if side == 'Client' %}
 #include <utility>
 {% endif %}
-{% if packets | selectattr('copies_string') | list %}
+{% if side == 'Client' and packets | selectattr('copies_string') | list %}
 #include <new>
+{% endif %}
+{% if side == 'Server' %}
+#include "ServerNetworkLibPch.h"
+{% else %}
+#include "NetworkCommonLibPch.h"
 {% endif %}
 #include "CSerializableBuffer.h"
 #include "MHLib/serialization/ISerializable.h"
@@ -11,12 +16,11 @@
 {% if side == 'Client' %}
 #include "CClientManager.h"
 #include "CClient.h"
-#include "IClientPacketHandler.g.h"
 #include "ClientPacketDispatch.g.h"
 {% endif %}
 #include "{{ send_stem }}.g.h"
 
-namespace Chatting
+namespace {{ namespace }}
 {
 {% if side == 'Client' %}
 {% for packet in packets %}
@@ -40,7 +44,7 @@ namespace Chatting
 {% endif %}
 {% endfor %}
 
-	bool CChatNetClient::onRecv(NetworkCommonLib::CSerializableBuffer &message) noexcept
+	bool {{ client_class }}::onRecv(NetworkCommonLib::CSerializableBuffer &message) noexcept
 	{
 		return DispatchClientPacket(message, *this);
 	}
@@ -56,7 +60,7 @@ namespace Chatting
 {% endif %}
 {% for packet in packets %}
 
-	{{ packet.send_result }}{{ 'CChatNetClient' if side == 'Client' else 'CServerPacketSender' }}::{{ packet.send_name }}({% if packet.send_parameters %}{{ '\n' }}
+	{{ packet.send_result }}{{ client_class if side == 'Client' else 'CServerPacketSender' }}::{{ packet.send_name }}({% if packet.send_parameters %}{{ '\n' -}}
 {% for parameter in packet.send_parameters %}
 		{{ parameter }}{{ ',' if not loop.last else ') noexcept' }}
 {% endfor %}
@@ -64,10 +68,10 @@ namespace Chatting
 {% endif %}
 	{
 		S{{ packet.name }} packet;
-{% for field in packet.fields if field.cpp_type != 'std::wstring' %}
+{% for field in packet.fields if side == 'Server' or field.cpp_type != 'std::wstring' %}
 		packet.{{ field.member }} = {{ field.argument }};
 {% endfor %}
-{% if packet.copies_string %}
+{% if side == 'Client' and packet.copies_string %}
 		try
 		{
 {% for field in packet.fields if field.cpp_type == 'std::wstring' %}

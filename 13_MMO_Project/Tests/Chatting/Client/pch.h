@@ -9,6 +9,8 @@
 #include <optional>
 #include <utility>
 #include <array>
+#include <functional>
+#include <vector>
 #include <charconv>
 #include <io.h>
 #include <cstddef>

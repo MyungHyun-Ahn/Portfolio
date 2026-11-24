@@ -31,6 +31,7 @@ private:
 		// Rear는 end - start
 		m_rear = offsetEnd - offsetStart;
 		m_readHeaderSize = 0;
+		m_isValid = true;
 	}
 
 	void init(const std::shared_ptr<CRecvBuffer> &spRecvBuffer, int offsetStart, int offsetEnd) noexcept
@@ -41,6 +42,7 @@ private:
 		m_front = (int)CSerializableBuffer::EBufferDefine::HeaderSize;
 		m_rear = offsetEnd - offsetStart;
 		m_readHeaderSize = 0;
+		m_isValid = true;
 	}
 
 	// 이거 하고서는 Copy를 꼭 해줘야함
@@ -66,6 +68,7 @@ private:
 		m_front = (int)CSerializableBuffer::EBufferDefine::HeaderSize;
 		m_rear = 0;
 		m_readHeaderSize = 0;
+		m_isValid = true;
 	}
 
 	inline void clear() noexcept
@@ -83,6 +86,7 @@ private:
 		}
 		m_pBuffer = nullptr;
 		m_sessionId = 0;
+		m_isValid = false;
 	}
 	// 이걸 보고 헤더가 딜레이 된 것이라면 지연처리 작업
 	inline USHORT isReadHeaderSize() noexcept
@@ -144,148 +148,51 @@ public:
 public:
 	bool Dequeue(char *outBuffer, int size) noexcept;
 
-	// 데이터 넣는 건 필요 없음
-	inline CSerializableBufferView &operator>>(char &outValue) noexcept
+	// 읽기 실패는 다음 View 초기화까지 유지한다.
+	[[nodiscard]]
+	bool IsValid() const noexcept
 	{
-		if (GetDataSize() < sizeof(char))
-		{
-			__debugbreak();
-		}
+		return m_isValid;
+	}
 
-		outValue = *(char *)(m_pBuffer + m_front);
-		moveReadPos(sizeof(char));
-
+	// 기본형을 경계 검사 후 읽는다.
+	template<typename TValue>
+		requires (std::is_same_v<TValue, char> || std::is_same_v<TValue, signed char> || std::is_same_v<TValue, unsigned char>
+			|| std::is_same_v<TValue, short> || std::is_same_v<TValue, unsigned short> || std::is_same_v<TValue, int>
+			|| std::is_same_v<TValue, unsigned int> || std::is_same_v<TValue, long> || std::is_same_v<TValue, unsigned long>
+			|| std::is_same_v<TValue, long long> || std::is_same_v<TValue, unsigned long long>
+			|| std::is_same_v<TValue, float> || std::is_same_v<TValue, double>)
+	CSerializableBufferView &operator>>(TValue &outValue) noexcept
+	{
+		readBytes(&outValue, sizeof(outValue));
 		return *this;
 	}
 
-	inline CSerializableBufferView &operator>>(unsigned char &outValue) noexcept
+	// 고정 길이 바이트 배열 또는 UTF-16 배열을 읽는다.
+	template<typename TChar, std::size_t kCount> requires (std::is_same_v<TChar, char> || std::is_same_v<TChar, wchar_t>)
+	CSerializableBufferView &operator>>(std::array<TChar, kCount> &outValue) noexcept
 	{
-		if (GetDataSize() < sizeof(unsigned char))
-		{
-			__debugbreak();
-		}
-
-		outValue = *(unsigned char *)(m_pBuffer + m_front);
-		moveReadPos(sizeof(unsigned char));
-
+		readBytes(outValue.data(), kCount * sizeof(TChar));
 		return *this;
 	}
 
-	inline CSerializableBufferView &operator>>(short &outValue) noexcept
+	// UTF-16 코드 단위 수가 남은 본문에 들어가는지 확인한 뒤 문자열을 읽는다.
+	CSerializableBufferView &operator>>(std::wstring &outValue) noexcept
 	{
-		if (GetDataSize() < sizeof(short))
+		std::uint32_t codeUnitCount = 0;
+		*this >> codeUnitCount;
+		if (!m_isValid)
+			return *this;
+
+		const int remaining = GetDataSize();
+		if (remaining < 0 || codeUnitCount > static_cast<std::size_t>(remaining) / sizeof(wchar_t))
 		{
-			__debugbreak();
+			m_isValid = false;
+			return *this;
 		}
 
-		outValue = *(short *)(m_pBuffer + m_front);
-		moveReadPos(sizeof(short));
-
-		return *this;
-	}
-
-	inline CSerializableBufferView &operator>>(unsigned short &outValue) noexcept
-	{
-		if (GetDataSize() < sizeof(unsigned short))
-		{
-			__debugbreak();
-		}
-
-		outValue = *(unsigned short *)(m_pBuffer + m_front);
-		moveReadPos(sizeof(unsigned short));
-
-		return *this;
-	}
-
-	inline CSerializableBufferView &operator>>(int &outValue) noexcept
-	{
-		if (GetDataSize() < sizeof(int))
-		{
-			__debugbreak();
-		}
-
-		outValue = *(int *)(m_pBuffer + m_front);
-		moveReadPos(sizeof(int));
-
-		return *this;
-	}
-
-	inline CSerializableBufferView &operator>>(long &outValue) noexcept
-	{
-		if (GetDataSize() < sizeof(long))
-		{
-			__debugbreak();
-		}
-
-		outValue = *(long *)(m_pBuffer + m_front);
-		moveReadPos(sizeof(long));
-
-		return *this;
-	}
-
-	inline CSerializableBufferView &operator>>(unsigned long &outValue) noexcept
-	{
-		if (GetDataSize() < sizeof(unsigned long))
-		{
-			__debugbreak();
-		}
-
-		outValue = *(unsigned long *)(m_pBuffer + m_front);
-		moveReadPos(sizeof(unsigned long));
-
-		return *this;
-	}
-
-	inline CSerializableBufferView &operator>>(float &outValue) noexcept
-	{
-		if (GetDataSize() < sizeof(float))
-		{
-			__debugbreak();
-		}
-
-		outValue = *(float *)(m_pBuffer + m_front);
-		moveReadPos(sizeof(float));
-
-		return *this;
-	}
-
-	inline CSerializableBufferView &operator>>(__int64 &outValue) noexcept
-	{
-		int size = GetDataSize();
-		if (size < sizeof(__int64))
-		{
-			__debugbreak();
-		}
-
-		outValue = *(__int64 *)(m_pBuffer + m_front);
-		moveReadPos(sizeof(__int64));
-
-		return *this;
-	}
-
-	inline CSerializableBufferView &operator>>(unsigned __int64 &outValue) noexcept
-	{
-		if (GetDataSize() < sizeof(unsigned __int64))
-		{
-			__debugbreak();
-		}
-
-		outValue = *(unsigned __int64 *)(m_pBuffer + m_front);
-		moveReadPos(sizeof(unsigned __int64));
-
-		return *this;
-	}
-
-	inline CSerializableBufferView &operator>>(double &outValue) noexcept
-	{
-		if (GetDataSize() < sizeof(double))
-		{
-			__debugbreak();
-		}
-
-		outValue = *(double *)(m_pBuffer + m_front);
-		moveReadPos(sizeof(double));
-
+		outValue.resize(codeUnitCount);
+		readBytes(outValue.data(), codeUnitCount * sizeof(wchar_t));
 		return *this;
 	}
 
@@ -303,6 +210,25 @@ public:
 
 
 private:
+	// 범위를 벗어난 읽기는 복사와 커서 이동 없이 실패한다.
+	void readBytes(void *pOut, std::size_t size) noexcept
+	{
+		if (!m_isValid)
+			return;
+
+		const int remaining = GetDataSize();
+		if (remaining < 0 || size > static_cast<std::size_t>(remaining))
+		{
+			m_isValid = false;
+			return;
+		}
+		if (size != 0)
+		{
+			std::memcpy(pOut, m_pBuffer + m_front, size);
+			moveReadPos(static_cast<int>(size));
+		}
+	}
+
 	char *m_pBuffer = nullptr;
 	int m_bufferSize = 0;
 	int m_headerFront = 0;
@@ -315,6 +241,7 @@ private:
 	// 사이즈 헤더 조차도 밀림을 방지하기 위한 버퍼
 	char m_delayedHeader[(int)CSerializableBuffer::EBufferDefine::HeaderSize];
 	USHORT m_readHeaderSize = 0;
+	bool m_isValid = false;
 
 	LONG			m_refCount = 0;
 	UINT64			m_sessionId = 0;

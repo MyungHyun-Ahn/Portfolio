@@ -9,36 +9,41 @@
 #include "ServerSetting.h"
 #include "CMonitor.h"
 #include "CServer.h"
-#include "CBaseContents.h"
-#include "SystemEvent.h"
-#include "CContentsThread.h"
+#include "IContents.h"
+#include "CContentsRuntime.h"
 #include "CommonProtocol.h"
 #include "CSector.h"
-#include "IServerPacketHandler.g.h"
 #include "ServerPacketSend.g.h"
+#include "IServerPacketHandler.g.h"
 #include "CProcessPacket.h"
 #include "CChatContents.h"
 #include "CChatServer.h"
-#include "ChatMetrics.h"
 
 namespace Chatting
 {
 	using MHLib::utils::ELogLevel;
 	using MHLib::utils::g_pLogger;
 
-	struct SChatFrameEvent : public ServerNetworkLib::SContentsFrameEvent
+	CChatServer::CChatServer(std::size_t contentsWorkerCount, std::chrono::milliseconds frameInterval)
+		: m_runtime(contentsWorkerCount, frameInterval)
 	{
-		void Execute(int delayFrame) noexcept override
-		{
-			ServerNetworkLib::SContentsFrameEvent::Execute(delayFrame);
-			m_pBaseContent->OnLoopEnd();
-			RecordCompletedChatFrame();
-		}
-	};
+	}
 
-	CChatServer::CChatServer() noexcept
-		: m_pContents(new CChatContents(*this))
+	bool CChatServer::StartContents()
 	{
+		auto upContents = std::make_unique<CChatContents>(kChatContentsId, *this);
+		m_pContents = upContents.get();
+		if (!m_runtime.RegisterContents(std::move(upContents), true, 0))
+		{
+			m_pContents = nullptr;
+			return false;
+		}
+		return m_runtime.Start();
+	}
+
+	void CChatServer::StopContents()
+	{
+		m_runtime.Stop();
 	}
 
 	bool CChatServer::OnConnectionRequest(const WCHAR *pIp, USHORT /*port*/) noexcept
@@ -51,17 +56,18 @@ namespace Chatting
 	{
 		g_pLogger->WriteLog(ELogLevel::Debug, L"ChatServer", sessionId, std::source_location::current(),
 			L"event=session_accepted session_id=%llu | 세션의 접속을 수락했습니다.", sessionId);
-		m_pContents->MoveJobEnqueue(sessionId, nullptr);
+		if (!m_runtime.PostCompletion(kChatContentsId, std::bind_front(&CChatContents::OnEnter, m_pContents, sessionId)))
+			Disconnect(sessionId);
 	}
 
-	void CChatServer::OnClientLeave(UINT64 /*sessionId*/) noexcept
+	void CChatServer::OnClientLeave(UINT64 sessionId) noexcept
 	{
-		// NetworkLib의 LeaveJobEnqueue 이후 콘텐츠 프레임에서 정리한다.
+		(void)m_runtime.PostCompletion(kChatContentsId, std::bind_front(&CChatContents::OnLeave, m_pContents, sessionId));
 	}
 
 	void CChatServer::OnRecv(UINT64 /*sessionId*/, NetworkCommonLib::CSerializableBufferView * /*pMessage*/) noexcept
 	{
-		// 현재 NetworkLib는 CBaseContents의 수신 큐를 사용한다.
+		// 수신 큐의 View는 Chatting 콘텐츠 프레임에서만 꺼낸다.
 	}
 
 	void CChatServer::OnError(int errorCode, WCHAR *pMessage) noexcept
@@ -73,9 +79,6 @@ namespace Chatting
 
 	void CChatServer::RegisterContentTimerEvent() noexcept
 	{
-		auto *pEvent = new SChatFrameEvent;
-		pEvent->SetEvent(m_pContents, ServerNetworkLib::serverSetting::maxContentsFps);
-		ServerNetworkLib::CContentsThread::EnqueueEvent(pEvent);
 		g_pLogger->WriteLog(ELogLevel::Info, L"ChatServer", 0, std::source_location::current(),
 			L"event=server_ready port=%u | 테스트 채팅 서버가 준비되었습니다.", ServerNetworkLib::serverSetting::openPort);
 	}
