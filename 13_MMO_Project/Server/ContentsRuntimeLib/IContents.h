@@ -29,6 +29,7 @@ namespace ContentsRuntimeLib
 
 	private:
 		const ContentsInstanceId m_instanceId;
+		std::mutex m_completionLock;
 		std::deque<std::function<void()>> m_completionQueue;
 	};
 }

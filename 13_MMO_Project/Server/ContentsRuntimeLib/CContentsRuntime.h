@@ -19,7 +19,7 @@ namespace ContentsRuntimeLib
 		[[nodiscard]]
 		bool Start() noexcept;
 
-		// 새 완료 접수를 닫고 접수된 콜백을 처리한 뒤 워커를 종료한다.
+		// 새 요청을 닫고 미확정 인계를 취소한다. 접수된 콜백을 처리한 뒤 워커를 종료한다.
 		void Stop();
 
 		// 외부 스레드에서 ID로 완료를 접수한다. 콜백은 호출 스레드에서 실행하지 않는다.
@@ -27,11 +27,16 @@ namespace ContentsRuntimeLib
 		[[nodiscard]]
 		bool PostCompletion(ContentsInstanceId instanceId, std::function<void()> completion);
 
+		// true는 접수만 뜻한다. 담당 워커가 실행 경계에서 인계하며, Stop이 먼저면 취소한다.
+		[[nodiscard]]
+		bool RequestDelegate(ContentsInstanceId instanceId, std::size_t destinationWorkerIndex);
+
 	private:
 		struct SWorker;
+		struct SEntry;
 		struct SRoute
 		{
-			IContents *pContents;
+			SEntry *pEntry;
 			SWorker *pWorker;
 		};
 
@@ -47,7 +52,7 @@ namespace ContentsRuntimeLib
 
 	private:
 		const std::chrono::milliseconds m_frameInterval;
-		// 등록과 완료 접수를 보호하며, 필요하면 워커의 작업 락보다 먼저 잡는다.
+		// 런타임 상태와 배정 경로를 보호하며, 워커의 작업 락보다 먼저 잡는다.
 		std::mutex m_registrationLock;
 		std::unordered_map<ContentsInstanceId, SRoute> m_routes;
 		EState m_state = EState::Registering;

@@ -55,6 +55,30 @@ def migration_round_trip(port, wait, release, log):
     assert log().count(b'event=move_detached ') == log().count(b'event=move_attached ') == 2
 
 
+def manual_delegate(port, wait, release, log):
+    with socket.create_connection(('127.0.0.1', port), timeout=3) as peer:
+        entered = wait(rb'event=map_connection_entered map=1 thread_id=(\d+) session_id=(\d+)\b')
+        release('release-change')
+        peer.sendall(frame(1, 'QI', 1, 7) + frame(5, 'QI', 1, 37))
+        assert receive(peer) == (2, 1, 7, 0)
+        assert receive(peer) == (6, 1, 37, 0)
+        original = wait(rb'event=character_change_completed map=1 thread_id=' + entered[1]
+                        + rb' session_id=' + entered[2] + rb' character_id=(\d+) value=37\b')
+
+        release('delegate-map-1')
+        transferred = wait(rb'event=map_delegate_continued map=1 thread_id=(\d+)\b')
+        assert transferred[1] != entered[1]
+        peer.sendall(frame(1, 'QI', 1, 3) + frame(5, 'QI', 1, 5))
+        assert receive(peer) == (2, 1, 10, 0)
+        assert receive(peer) == (6, 1, 42, 0)
+        wait(rb'event=character_change_completed map=1 thread_id=' + transferred[1]
+             + rb' session_id=' + entered[2] + rb' character_id=' + original[1] + rb' value=42\b')
+    wait(rb'event=map_connection_removed map=1 thread_id=' + transferred[1] + rb' session_id=' + entered[2] + rb'\b')
+    events = log()
+    assert events.count(b'event=map_delegate_continued ') == events.count(b'event=map_connection_entered ') == 1
+    assert b'event=move_detached ' not in events and b'event=move_attached ' not in events
+
+
 def assert_no_response(peer):
     assert not select.select([peer], [], [], 0.05)[0], 'packet arrived before the test gate released'
 
@@ -285,7 +309,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('executable', type=lambda path: Path(path).resolve(strict=True))
     scenarios = {case.__name__: case for case in (
-        migration_round_trip, delayed_change, close_order, disconnect_in_transit, busy_destination, destroy_empty_map)}
+        migration_round_trip, delayed_change, close_order, disconnect_in_transit, busy_destination, destroy_empty_map,
+        manual_delegate)}
     parser.add_argument('--case', choices=scenarios)
     args = parser.parse_args()
     if args.case:

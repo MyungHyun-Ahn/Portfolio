@@ -350,6 +350,7 @@ namespace WorldServer
 			if (!m_upMap)
 				return;
 			m_upMap->RunFrame();
+			requestTestDelegate();
 			if (m_idleGrace == 0ms || !m_upMap->HasIdleGraceElapsed(m_idleGrace))
 			{
 				m_hasLoggedDestroyDeferred = false;
@@ -371,11 +372,31 @@ namespace WorldServer
 		}
 
 	private:
+		// 파일 신호는 루프백 테스트에서만 수동 인계를 한 번 제출한다.
+		void requestTestDelegate()
+		{
+			if (!m_upMap->m_usesTestControls || GetInstanceId() != kFirstMapId || m_hasRequestedTestDelegate
+				|| !CMapInstance::hasTestSignal(L"delegate-map-1"))
+				return;
+			m_hasRequestedTestDelegate = true;
+			if (m_runtime.RequestDelegate(GetInstanceId(), 1))
+			{
+				(void)m_runtime.PostCompletion(GetInstanceId(), [this]
+					{
+						g_pLogger->WriteLogConsole(ELogLevel::Debug,
+							L"event=map_delegate_continued map=%llu thread_id=%lu | 새 워커에서 맵 실행을 재개했습니다.",
+							GetInstanceId(), GetCurrentThreadId());
+					});
+			}
+		}
+
+	private:
 		CMoveQueue &m_moveQueue;
 		CContentsRuntime &m_runtime;
 		const std::chrono::milliseconds m_idleGrace;
 		std::unique_ptr<CMapInstance> m_upMap;
 		bool m_hasLoggedDestroyDeferred = false;
+		bool m_hasRequestedTestDelegate = false;
 	};
 
 	bool CMapInstance::postChange(UINT64 sessionId)
