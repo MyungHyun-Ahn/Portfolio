@@ -14,6 +14,16 @@ namespace WorldServer
 		InvalidRequest
 	};
 
+	enum class EMoveResult : unsigned short
+	{
+		Moved,
+		InvalidTarget,
+		Closed,
+		Busy,
+		InvalidRequest,
+		Disconnected // 내부 결과로만 사용한다.
+	};
+
 	struct SAddResponse
 	{
 		UINT64 mapId;

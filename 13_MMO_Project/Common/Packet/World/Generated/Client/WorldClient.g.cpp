@@ -28,6 +28,38 @@ namespace WorldServer
 		return spBuffer;
 	}
 
+	std::shared_ptr<NetworkCommonLib::CSerializableBuffer> MakePacketReqChange(const SReqChange &packet) noexcept
+	{
+		auto spBuffer = NetworkCommonLib::CSerializableBuffer::MakeShared();
+		if (spBuffer == nullptr)
+		{
+			return nullptr;
+		}
+
+		*spBuffer << static_cast<std::uint16_t>(EPacketType::ReqChange) << packet;
+		if (!spBuffer->IsValid())
+		{
+			return nullptr;
+		}
+		return spBuffer;
+	}
+
+	std::shared_ptr<NetworkCommonLib::CSerializableBuffer> MakePacketReqMove(const SReqMove &packet) noexcept
+	{
+		auto spBuffer = NetworkCommonLib::CSerializableBuffer::MakeShared();
+		if (spBuffer == nullptr)
+		{
+			return nullptr;
+		}
+
+		*spBuffer << static_cast<std::uint16_t>(EPacketType::ReqMove) << packet;
+		if (!spBuffer->IsValid())
+		{
+			return nullptr;
+		}
+		return spBuffer;
+	}
+
 	bool WorldClient::onRecv(NetworkCommonLib::CSerializableBuffer &message) noexcept
 	{
 		return DispatchClientPacket(message, *this);
@@ -41,5 +73,23 @@ namespace WorldServer
 		packet.m_mapId = mapId;
 		packet.m_amount = amount;
 		return this->sendPacket(MakePacketReqAdd(packet));
+	}
+
+	bool WorldClient::SendReqChange(
+		std::uint64_t mapId,
+		std::uint32_t amount) noexcept
+	{
+		SReqChange packet;
+		packet.m_mapId = mapId;
+		packet.m_amount = amount;
+		return this->sendPacket(MakePacketReqChange(packet));
+	}
+
+	bool WorldClient::SendReqMove(
+		std::uint64_t targetMapId) noexcept
+	{
+		SReqMove packet;
+		packet.m_targetMapId = targetMapId;
+		return this->sendPacket(MakePacketReqMove(packet));
 	}
 }

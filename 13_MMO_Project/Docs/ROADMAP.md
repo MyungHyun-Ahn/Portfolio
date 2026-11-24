@@ -2,10 +2,10 @@
 ## 현재 목표
 ### 서버 작업 순서
 
-`ContentsRuntime`의 [1차 구현 계획](Plan/Server/009_ContentsRuntime_1차_계획.md#phase별-구현-및-검증-순서)은 **Phase 2까지 완료**했다. 선행 작업인 패킷 생성기 개편과 채팅 콘텐츠 이전도 구현·검증 및 사용자 검수를 마쳤다. 다음 작업은 Phase 3 캐릭터 맵 이동이다.
+`ContentsRuntime`의 [1차 구현 계획](Plan/Server/009_ContentsRuntime_1차_계획.md#phase별-구현-및-검증-순서)은 **Phase 3까지 완료**했다. 선행 작업인 패킷 생성기 개편과 채팅 콘텐츠 이전도 구현·검증 및 사용자 검수를 마쳤다. 다음 작업은 Phase 4 수동 Delegate다.
 
 - [x] **패킷 생성기 개편:** Chatting·World 생성물 분리, 양방향 opcode 자동 등록, DTO의 수신 View 직접 역직렬화, `<클래스명>Members.inc` 공통 규약 구현·검증 및 사용자 검수 완료. [개편 기록](Plan/Server/002_패킷_생성기_추가계획.md#후속-계획-패킷-생성기-개편)
-- [ ] **Phase 3 — 캐릭터 맵 이동:** 완료 콜백 처리 후 예약·인계하고, 목적지에서 수신 재개.
+
 - [ ] **Phase 4 — 수동 Delegate:** 같은 맵의 실행권만 다른 워커에 인계.
 - [ ] **Phase 5 — 관리 콘텐츠와 정책 교체 경계:** 기존 워커에서 검증용 정책으로 인계 요청 제출.
 - [ ] **Phase 6 — 프레임 예산 기반 자동 Delegate:** 불균형이 지속될 때만 옮기고 프레임 시작 지연으로 효과 확인.
@@ -20,6 +20,7 @@
 ### ContentsRuntime
 - [x] **Phase 1 — ContentsRuntimeLib와 고정 워커 배정:** 테스트용 WorldServer에서 프레임·완료 콜백의 직렬 실행, 밀린 프레임 처리와 워커 종료를 검증했고 사용자 코드 확인을 마쳤다. [구현 및 검증 범위](Plan/Server/009_ContentsRuntime_1차_계획.md#phase-1--contentsruntimelib와-고정-워커-배정)
 - [x] **Phase 2 — 고정 배정 맵과 실제 수신 연결:** 두 고정 맵의 `OnFrame()`이 자기 소속 연결의 수신 패킷을 처리하는 것을 루프백에서 검증했고 사용자 코드 확인을 마쳤다. [구현 및 검증 범위](Plan/Server/009_ContentsRuntime_1차_계획.md#phase-2--고정-배정-맵과-실제-수신-연결)
+- [x] **Phase 3 — 캐릭터 맵 이동:** 공용 라이브러리 변경 없이 테스트 WorldServer에서 맵 이동, 목적지 수신 재개, 빈 맵 파괴 및 경합을 검증했고 사용자 확인을 마쳤다. [구현 및 검증 범위](Plan/Server/009_ContentsRuntime_1차_계획.md#phase-3--캐릭터-맵-이동)
 
 ### 2차 완료 항목
 - [x] **서버 패킷 경로 개선: 송신 RefCount 정리** — 공용 `SendPacketPtr`로 콘텐츠의 수동 송신 참조 관리를 제거했고 사용자 확인을 마쳤다. `Net` 수신 복호화·체크섬 통합도 완료했다. [개선 계획](Plan/Server/007_서버_패킷_경로_개선_계획.md)

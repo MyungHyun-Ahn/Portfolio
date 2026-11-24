@@ -1,0 +1,14 @@
+packets:
+  - name: ReqMove
+    id: 3
+    kind: req
+    fields:
+      - { name: target_map_id, type: uint64 }
+  - name: ResMove
+    id: 4
+    kind: res
+    fields:
+      - { name: map_id, type: uint64 }
+      - { name: character_value, type: uint64 }
+      - { name: result, type: uint16 }
+

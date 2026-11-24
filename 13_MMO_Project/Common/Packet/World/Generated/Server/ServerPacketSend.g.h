@@ -4,10 +4,14 @@
 namespace WorldServer
 {
 	struct SResAdd;
+	struct SResChange;
+	struct SResMove;
 
 	template<typename TPacket>
 		requires (
-			std::same_as<TPacket, SResAdd>)
+			std::same_as<TPacket, SResAdd> ||
+			std::same_as<TPacket, SResChange> ||
+			std::same_as<TPacket, SResMove>)
 	[[nodiscard]]
 	ServerNetworkLib::SendPacketPtr MakePacket(const TPacket &packet) noexcept
 	{
@@ -28,6 +32,16 @@ namespace WorldServer
 			UINT64 sessionId,
 			std::uint64_t mapId,
 			std::uint64_t total,
+			std::uint16_t result) noexcept;
+		bool SendResChange(
+			UINT64 sessionId,
+			std::uint64_t mapId,
+			std::uint64_t characterValue,
+			std::uint16_t result) noexcept;
+		bool SendResMove(
+			UINT64 sessionId,
+			std::uint64_t mapId,
+			std::uint64_t characterValue,
 			std::uint16_t result) noexcept;
 
 	protected:

@@ -4,6 +4,8 @@
 namespace WorldServer
 {
 	struct SReqAdd;
+	struct SReqChange;
+	struct SReqMove;
 
 	class IServerPacketHandler;
 

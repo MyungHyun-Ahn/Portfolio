@@ -4,6 +4,8 @@
 namespace WorldServer
 {
 	struct SResAdd;
+	struct SResChange;
+	struct SResMove;
 
 	class IClientPacketHandler;
 

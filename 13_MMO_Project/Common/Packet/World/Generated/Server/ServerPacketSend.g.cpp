@@ -29,4 +29,30 @@ namespace WorldServer
 		packet.m_result = result;
 		return SendPacket(sessionId, MakePacket(packet));
 	}
+
+	bool CServerPacketSender::SendResChange(
+		UINT64 sessionId,
+		std::uint64_t mapId,
+		std::uint64_t characterValue,
+		std::uint16_t result) noexcept
+	{
+		SResChange packet;
+		packet.m_mapId = mapId;
+		packet.m_characterValue = characterValue;
+		packet.m_result = result;
+		return SendPacket(sessionId, MakePacket(packet));
+	}
+
+	bool CServerPacketSender::SendResMove(
+		UINT64 sessionId,
+		std::uint64_t mapId,
+		std::uint64_t characterValue,
+		std::uint16_t result) noexcept
+	{
+		SResMove packet;
+		packet.m_mapId = mapId;
+		packet.m_characterValue = characterValue;
+		packet.m_result = result;
+		return SendPacket(sessionId, MakePacket(packet));
+	}
 }

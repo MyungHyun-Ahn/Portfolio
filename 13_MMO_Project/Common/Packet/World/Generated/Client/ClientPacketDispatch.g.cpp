@@ -27,9 +27,13 @@ namespace WorldServer
 		// 수신 방향의 패킷 핸들러를 opcode별로 한 번 등록한다.
 		std::vector<PacketFunction> MakePacketFunctionTable()
 		{
-			std::vector<PacketFunction> funcTable(3);
+			std::vector<PacketFunction> funcTable(7);
 			funcTable[static_cast<std::uint16_t>(EPacketType::ResAdd)] =
 				HandlePacket<SResAdd, &IClientPacketHandler::HandleResAdd>;
+			funcTable[static_cast<std::uint16_t>(EPacketType::ResChange)] =
+				HandlePacket<SResChange, &IClientPacketHandler::HandleResChange>;
+			funcTable[static_cast<std::uint16_t>(EPacketType::ResMove)] =
+				HandlePacket<SResMove, &IClientPacketHandler::HandleResMove>;
 			return funcTable;
 		}
 

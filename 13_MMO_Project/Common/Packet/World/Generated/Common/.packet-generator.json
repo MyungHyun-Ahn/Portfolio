@@ -1,9 +1,11 @@
 {
   "files": {
     "FixedMaps/Add.g.h": "2f40964bf33d68becc10767d650269954aff3d5921cf184ff7dcef015e0d4614",
-    "FixedMaps/FixedMapsPacketAll.g.h": "ca2f52bda9f3c7bd3ea55c66c06f79952c1b7241737b901b4ef8b38608d69616",
+    "FixedMaps/Change.g.h": "fb8b3d99b20211e5cf92b23ca483fc1f0e632bc8e2491c04972dc76b961e6291",
+    "FixedMaps/FixedMapsPacketAll.g.h": "21f09aa5198b6f97d044fb5e41da5462469cf0b4a58c36b8f38886624ffb045c",
+    "FixedMaps/Move.g.h": "bc46cf9f46688052488411e656a9f9b02c519ba367d1998e0f7bb0998356dda1",
     "IncludePacketAll.g.h": "61e122e2ebda55513e4c0e1d51a371974cb8cb26670638952104b43ef72f6981",
-    "PacketTypes.g.h": "b503d5ffe03e7edead3ef183ed87e1f764b013807863f03d224db36ae08d6d68"
+    "PacketTypes.g.h": "c8e4cbbe9b25b697ed64c17110f4b488c46fa4333298befedb99efedf2158160"
   },
   "role": "Common",
   "version": 1

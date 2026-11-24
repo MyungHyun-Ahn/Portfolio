@@ -3,11 +3,20 @@
   <ItemGroup><Filter Include="Generated" /></ItemGroup>
   <ItemGroup><Filter Include="Generated\Client" /></ItemGroup>
   <ItemGroup><Filter Include="Generated\Server" /></ItemGroup>
+  <ItemGroup><Filter Include="Generated\Common" /></ItemGroup>
+  <ItemGroup><Filter Include="Generated\Common\FixedMaps" /></ItemGroup>
+  <ItemGroup><Filter Include="Schema" /></ItemGroup>
+  <ItemGroup><Filter Include="Schema\FixedMaps" /></ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="FixedMaps.cpp" />
     <ClInclude Include="FixedMapsProtocol.h" />
+    <ClInclude Include="FixedMapsMoveQueue.h" />
+    <ClInclude Include="..\..\Common\Packet\World\Generated\Common\FixedMaps\Change.g.h"><Filter>Generated\Common\FixedMaps</Filter></ClInclude>
+    <ClInclude Include="..\..\Common\Packet\World\Generated\Common\FixedMaps\Move.g.h"><Filter>Generated\Common\FixedMaps</Filter></ClInclude>
+    <None Include="..\..\Common\Packet\World\Schema\FixedMaps\Change.yaml"><Filter>Schema\FixedMaps</Filter></None>
+    <None Include="..\..\Common\Packet\World\Schema\FixedMaps\Move.yaml"><Filter>Schema\FixedMaps</Filter></None>
     <ClInclude Include="..\..\Common\Packet\World\Generated\Client\WorldClient.g.h"><Filter>Generated\Client</Filter></ClInclude>
     <ClInclude Include="WorldClientMembers.inc" />
     <ClCompile Include="..\..\Common\Packet\World\Generated\Client\WorldClient.g.cpp"><Filter>Generated\Client</Filter></ClCompile>

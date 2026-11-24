@@ -45,6 +45,11 @@
     <ClCompile Include="pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
     <ClCompile Include="FixedMaps.cpp" />
     <ClInclude Include="FixedMapsProtocol.h" />
+    <ClInclude Include="FixedMapsMoveQueue.h" />
+    <ClInclude Include="..\..\Common\Packet\World\Generated\Common\FixedMaps\Change.g.h" />
+    <ClInclude Include="..\..\Common\Packet\World\Generated\Common\FixedMaps\Move.g.h" />
+    <None Include="..\..\Common\Packet\World\Schema\FixedMaps\Change.yaml" />
+    <None Include="..\..\Common\Packet\World\Schema\FixedMaps\Move.yaml" />
     <ClInclude Include="..\..\Common\Packet\World\Generated\Client\WorldClient.g.h" />
     <ClInclude Include="WorldClientMembers.inc" />
     <ClCompile Include="..\..\Common\Packet\World\Generated\Client\WorldClient.g.cpp" />
