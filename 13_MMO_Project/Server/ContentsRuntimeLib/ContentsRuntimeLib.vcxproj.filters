@@ -5,8 +5,12 @@
     <ClInclude Include="IContents.h" />
     <ClInclude Include="ContentsHandle.h" />
     <ClInclude Include="CContentsRuntime.h" />
+    <ClInclude Include="CContentsScheduler.h" />
+    <ClInclude Include="ContentsDelegatePolicies.h" />
     <ClCompile Include="ContentsRuntimeLibPch.cpp" />
     <ClCompile Include="IContents.cpp" />
     <ClCompile Include="CContentsRuntime.cpp" />
+    <ClCompile Include="CContentsScheduler.cpp" />
+    <ClCompile Include="ContentsDelegatePolicies.cpp" />
   </ItemGroup>
 </Project>

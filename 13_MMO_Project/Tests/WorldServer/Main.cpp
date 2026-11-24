@@ -2,11 +2,14 @@
 #include "IContents.h"
 #include "ContentsHandle.h"
 #include "CContentsRuntime.h"
+#include "CContentsScheduler.h"
 
 namespace WorldServer
 {
 	using namespace std::chrono_literals;
 	using ContentsRuntimeLib::CContentsRuntime;
+	using ContentsRuntimeLib::CContentsScheduler;
+	using ContentsRuntimeLib::SDelegateCandidate;
 	using ContentsRuntimeLib::ContentsHandle;
 	using ContentsRuntimeLib::ContentsInstanceId;
 	using ContentsRuntimeLib::IContents;
@@ -490,6 +493,73 @@ namespace WorldServer
 		return wokeAgain && completed == kProducerCount * kPostsPerProducer ? 0 : 71;
 	}
 
+	struct SSchedulerTestPolicy
+	{
+		// 이동 없음, 자기 자신, 정상 인계 순으로 후보를 반환한다.
+		std::optional<SDelegateCandidate> operator()()
+		{
+			const auto now = std::chrono::steady_clock::now();
+			if (evaluationCount != 0 && now - lastEvaluation < 20ms)
+				didEvaluateEarly = true;
+			lastEvaluation = now;
+			if (++evaluationCount == 2)
+				return SDelegateCandidate{93, 1};
+			if (evaluationCount == 3)
+				return SDelegateCandidate{91, 1};
+			if (evaluationCount == 4)
+				didSubmit.release();
+			return std::nullopt;
+		}
+
+		std::binary_semaphore didSubmit{0};
+		std::chrono::steady_clock::time_point lastEvaluation{};
+		int evaluationCount = 0;
+		bool didEvaluateEarly = false;
+	};
+
+	// 고정 정책을 실제 워커에서 평가하고 기존 Delegate 경로로 인계하는지 확인한다.
+	int RunSchedulerTest()
+	{
+		SSchedulerTestPolicy policy;
+		std::counting_semaphore<> completed{0};
+		std::thread::id schedulerThread;
+		CContentsRuntime runtime(3, 1ms);
+		auto upSource = std::make_unique<CTestContents>(91, false);
+		auto &source = *upSource;
+		auto upDestination = std::make_unique<CTestContents>(92, false);
+		auto &destination = *upDestination;
+		if (!runtime.RegisterContents(std::move(upSource), false, 0)
+			|| !runtime.RegisterContents(std::move(upDestination), false, 1)
+			|| !runtime.RegisterContents(std::make_unique<CContentsScheduler>(93, runtime, 20ms, std::ref(policy)), true, 2))
+			return 90;
+
+		const auto sourceHandle = runtime.GetContentsHandle(91);
+		const auto destinationHandle = runtime.GetContentsHandle(92);
+		const auto schedulerHandle = runtime.GetContentsHandle(93);
+		if (!runtime.Start())
+			return 91;
+
+		const bool submitted = policy.didSubmit.try_acquire_for(kWaitTimeout);
+		const bool posted = submitted && runtime.PostCompletion(sourceHandle, [&source, &completed]
+			{
+				source.RecordCompletion(1);
+				completed.release();
+			}) && runtime.PostCompletion(destinationHandle, [&destination, &completed]
+			{
+				destination.RecordCompletion(1);
+				completed.release();
+			}) && runtime.PostCompletion(schedulerHandle, [&schedulerThread, &completed]
+			{
+				schedulerThread = std::this_thread::get_id();
+				completed.release();
+			});
+		const bool ran = posted && completed.try_acquire_for(kWaitTimeout) && completed.try_acquire_for(kWaitTimeout)
+			&& completed.try_acquire_for(kWaitTimeout);
+		runtime.Stop();
+		return ran && !policy.didEvaluateEarly && source.m_completionThread == destination.m_completionThread
+			&& schedulerThread != destination.m_completionThread ? 0 : 92;
+	}
+
 	// 인계 확정 전에 종료하면 접수된 완료를 출발 워커에서 비운다.
 	int RunDelegateStopTest()
 	{
@@ -543,5 +613,8 @@ int main(void)
 	if (delegateQueueResult != 0)
 		return delegateQueueResult;
 	const int wakeResult = WorldServer::RunCompletionWakeTest();
-	return wakeResult != 0 ? wakeResult : WorldServer::RunDelegateStopTest();
+	if (wakeResult != 0)
+		return wakeResult;
+	const int stopResult = WorldServer::RunDelegateStopTest();
+	return stopResult != 0 ? stopResult : WorldServer::RunSchedulerTest();
 }
