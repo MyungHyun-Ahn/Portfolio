@@ -35,7 +35,12 @@ def receive(peer):
 
 def migration_round_trip(port, wait, release, log):
     with socket.create_connection(('127.0.0.1', port), timeout=3) as peer:
-        peer.sendall(frame(1, 'QI', 1, 1))
+        request = frame(1, 'QI', 1, 1)
+        peer.sendall(request[:3])
+        assert not select.select([peer], [], [], 0.05)[0], 'response to an incomplete header'
+        peer.sendall(request[3:8])
+        assert not select.select([peer], [], [], 0.05)[0], 'response to an incomplete payload'
+        peer.sendall(request[8:])
         assert receive(peer) == (2, 1, 1, 0)
         peer.sendall(frame(3, 'Q', 999) + frame(3, 'Q', 1) + frame(3, '') + frame(3, 'QB', 2, 0))
         assert [receive(peer) for _ in range(4)] == [(4, 1, 0, 1)] * 2 + [(4, 1, 0, 4)] * 2

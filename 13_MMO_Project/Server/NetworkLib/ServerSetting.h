@@ -12,10 +12,5 @@ namespace serverSetting
 	extern INT useZeroCopy;
 	extern INT maxSessionCount;
 	extern INT acceptexCount;
-
-	// Contents
-	extern INT contentsThreadCount;
-	extern INT maxContentsFps;
-	extern INT delayFrame;
 }
 }

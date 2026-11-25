@@ -6,16 +6,10 @@ using SendPacketPtr = MHLib::utils::CSmartPtr<NetworkCommonLib::CSerializableBuf
 // View의 소유권을 콘텐츠 단으로 넘기기 위한 목적
 using RecvPacketPtr = std::unique_ptr<CSerializableBufferView, decltype(&CSerializableBufferView::Free)>;
 
-struct SContentsFrameEvent;
-class CBaseContents;
-
-
 	class CSession
 	{
 	public:
 		friend class CServer;
-		friend class CBaseContents;
-		friend struct SContentsFrameEvent;
 
 		CSession() noexcept
 			: m_sessionSocket(INVALID_SOCKET)
@@ -138,9 +132,6 @@ class CBaseContents;
 
 		// 총 460바이트
 
-		// ContentPtr
-		CBaseContents *m_pCurrentContent = nullptr;
-
 		inline static MHLib::memory::CTlsMemoryPoolManager<CSession, 16, 4> sm_sessionPool =
 			MHLib::memory::CTlsMemoryPoolManager<CSession, 16, 4>();
 		inline static LONG sm_releaseFlag = 0x80000000;
@@ -151,9 +142,6 @@ class CBaseContents;
 	class CServer
 	{
 	public:
-		friend class CBaseContents;
-		friend struct SContentsFrameEvent;
-
 		BOOL Start(const CHAR *pOpenIp, const USHORT port, EPacketMode packetMode = EPacketMode::Net) noexcept;
 		EPacketMode GetPacketMode() const noexcept { return m_packetMode; }
 		// Start 호출 스레드가 반환하고 합류한 뒤에만 조회한다.
@@ -179,7 +167,6 @@ class CBaseContents;
 
 		virtual void OnAccept(const UINT64 sessionId) noexcept = 0;
 		virtual void OnClientLeave(const UINT64 sessionId) noexcept = 0;
-		virtual void OnRecv(const UINT64 sessionId, CSerializableBufferView *pMessage) noexcept = 0;
 
 
 		virtual void OnError(int errorcode, WCHAR *pErrMsg) noexcept = 0;
@@ -211,7 +198,8 @@ class CBaseContents;
 	public:
 		int WorkerThread() noexcept;
 
-		virtual void RegisterContentTimerEvent() noexcept = 0;
+		// IOCP 워커를 모두 시작한 뒤 준비 완료를 통지한다.
+		virtual void OnServerReady() noexcept = 0;
 
 	private:
 		// Session

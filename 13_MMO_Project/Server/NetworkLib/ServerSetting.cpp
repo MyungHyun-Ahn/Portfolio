@@ -12,9 +12,5 @@ namespace serverSetting
 	INT useZeroCopy = 0;
 	INT maxSessionCount = 20000;
 	INT acceptexCount = 100;
-
-	INT contentsThreadCount = 4;
-	INT maxContentsFps = 25;
-	INT delayFrame = 10;
 }
 }

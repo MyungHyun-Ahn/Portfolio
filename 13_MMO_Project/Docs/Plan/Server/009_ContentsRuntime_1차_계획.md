@@ -118,7 +118,7 @@ bool TryPopRecvPacket(UINT64 sessionId, RecvPacketPtr &outPacket) noexcept;
 
 ## ContentsRuntimeLib 분리안
 
-**Phase 1 런타임은 `Server/ContentsRuntimeLib`에 분리했다.** 지금 채팅 서버에 쓰이는 `CBaseContents`와 `CContentsThread`는 `Server/NetworkLib`에 그대로 유지한다. 새 런타임은 아래 경계를 따른다.
+**Phase 1 런타임은 `Server/ContentsRuntimeLib`에 분리했다.** 당시 채팅 서버가 사용하던 `CBaseContents`와 `CContentsThread`는 Phase 1에서는 유지했고, 채팅 이전 후 [별도 정리 계획](012_구버전_콘텐츠_런타임과_모니터_제거_계획.md)에서 제거했다. 현행 런타임은 아래 경계를 따른다.
 
 새 라이브러리에는 이전 `ContentsRuntime` 구현을 별도로 보존하지 않는다. 남아 있는 원본은 수정하지 않고, `FContentThread`의 워커 등록·시작·종료(`join`)와 작업 도착 또는 다음 프레임 시각에 워커를 깨우는 방식만 참고한다. 기존 라우팅과 Delegate·Work Stealing 정책은 첫 구현에 이식하지 않는다.
 

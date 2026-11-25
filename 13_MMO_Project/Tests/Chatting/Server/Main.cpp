@@ -71,8 +71,6 @@ int main(void)
 	ServerNetworkLib::serverSetting::acceptexCount = config.m_acceptExCount;
 	ServerNetworkLib::serverSetting::iocpWorkerThread = config.m_iocpWorkerCount;
 	ServerNetworkLib::serverSetting::iocpActiveThread = config.m_iocpConcurrency;
-	// 구 콘텐츠 워커 설정은 제거 단계까지 유지한다.
-	ServerNetworkLib::serverSetting::contentsThreadCount = 1;
 	ServerNetworkLib::serverSetting::packetCode = Chatting::kPacketCode;
 	MHLib::security::CEncryption::sm_packetKey = Chatting::kPacketKey;
 	MHLib::utils::g_pProfileManager = MHLib::utils::CProfileManager::GetInstance();

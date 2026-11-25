@@ -5,7 +5,6 @@
 #include "CSerializableBuffer.h"
 #include "CRecvBuffer.h"
 #include "CSerializableBufferView.h"
-#include "SBaseEvent.h"
 #include "ServerSetting.h"
 #include "CServer.h"
 #include "IContents.h"
@@ -66,11 +65,6 @@ namespace Chatting
 		(void)m_runtime.PostCompletion(m_completionHandle, std::bind_front(&CChatContents::OnLeave, m_pContents, sessionId));
 	}
 
-	void CChatServer::OnRecv(UINT64 /*sessionId*/, NetworkCommonLib::CSerializableBufferView * /*pMessage*/) noexcept
-	{
-		// 수신 큐의 View는 Chatting 콘텐츠 프레임에서만 꺼낸다.
-	}
-
 	void CChatServer::OnError(int errorCode, WCHAR *pMessage) noexcept
 	{
 		g_pLogger->WriteLog(ELogLevel::Error, L"ChatServer", 0, std::source_location::current(),
@@ -78,7 +72,7 @@ namespace Chatting
 			errorCode, pMessage != nullptr ? pMessage : L"");
 	}
 
-	void CChatServer::RegisterContentTimerEvent() noexcept
+	void CChatServer::OnServerReady() noexcept
 	{
 		g_pLogger->WriteLog(ELogLevel::Info, L"ChatServer", 0, std::source_location::current(),
 			L"event=server_ready port=%u | 테스트 채팅 서버가 준비되었습니다.", ServerNetworkLib::serverSetting::openPort);

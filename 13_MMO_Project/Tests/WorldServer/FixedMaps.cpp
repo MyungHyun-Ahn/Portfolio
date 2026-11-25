@@ -590,19 +590,13 @@ namespace WorldServer
 			});
 		}
 
-		void OnRecv(UINT64, CSerializableBufferView *) noexcept override
-		{
-			// 수신은 맵의 OnFrame에서 처리한다.
-		}
-
 		void OnError(int errorCode, WCHAR *) noexcept override
 		{
 			g_pLogger->WriteLogConsole(ELogLevel::Error, L"event=fixed_maps_network_error code=%d | 네트워크 오류입니다.", errorCode);
 		}
 
-		void RegisterContentTimerEvent() noexcept override
+		void OnServerReady() noexcept override
 		{
-			// 맵은 기존 콘텐츠 타이머에 등록하지 않는다.
 			g_pLogger->WriteLogConsole(ELogLevel::Info,
 				L"event=fixed_maps_ready port=%u | 고정 맵 테스트 서버가 준비되었습니다.",
 				static_cast<unsigned>(serverSetting::openPort));
@@ -788,7 +782,6 @@ int main(void)
 	serverSetting::acceptexCount = 2;
 	serverSetting::iocpWorkerThread = 2;
 	serverSetting::iocpActiveThread = 2;
-	serverSetting::contentsThreadCount = 1;
 	serverSetting::openPort = port;
 	serverSetting::packetCode = kFixedMapsPacketCode;
 	CFixedMapServer server(autoDelegate == 1);

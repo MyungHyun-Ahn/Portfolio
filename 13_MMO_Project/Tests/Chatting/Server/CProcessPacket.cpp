@@ -7,7 +7,6 @@
 #include "CSerializableBuffer.h"
 #include "CRecvBuffer.h"
 #include "CSerializableBufferView.h"
-#include "SBaseEvent.h"
 #include "ServerSetting.h"
 #include "ChatMetrics.h"
 #include "CServer.h"

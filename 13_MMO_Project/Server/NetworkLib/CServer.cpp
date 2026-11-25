@@ -447,7 +447,6 @@ CServer *g_pServer = nullptr;
 
 		m_sessionSocket = INVALID_SOCKET;
 		m_sessionId = 0;
-		m_pCurrentContent = nullptr;
 		if (m_pRecvBuffer != nullptr && m_pRecvBuffer->DecreaseRef() == 0)
 			CRecvBuffer::Free(m_pRecvBuffer);
 		m_pRecvBuffer = nullptr;
@@ -594,13 +593,6 @@ CServer *g_pServer = nullptr;
 		FristPostAcceptEx();
 
 		m_hasStartedBackgroundWork = true;
-		for (int i = 0; i < serverSetting::contentsThreadCount; i++)
-		{
-			CContentsThread *pContentsThread = new CContentsThread;
-			pContentsThread->Create();
-		}
-
-		CContentsThread::RunAll();
 
 		// CreateWorkerThread
 		for (int i = 1; i <= serverSetting::iocpWorkerThread; i++)
@@ -620,7 +612,7 @@ CServer *g_pServer = nullptr;
 				L"event=worker_started worker_index=%d | 네트워크 워커를 시작했습니다.", i);
 		}
 
-		RegisterContentTimerEvent();
+		OnServerReady();
 
 		WaitForMultipleObjects((DWORD)m_arrWorkerThreads.size(), m_arrWorkerThreads.data(), TRUE, INFINITE);
 
@@ -774,8 +766,6 @@ CServer *g_pServer = nullptr;
 		USHORT index = getIndex(pSession->m_sessionId);
 		UINT64 freeSessionId = pSession->m_sessionId;
 	
-		if (pSession->m_pCurrentContent != nullptr)
-			pSession->m_pCurrentContent->LeaveJobEnqueue(freeSessionId);
 		OnClientLeave(freeSessionId);
 
 		CSession::Free(pSession);
@@ -792,9 +782,6 @@ CServer *g_pServer = nullptr;
 		UINT64 freeSessionId = pSession->m_sessionId;
 
 		OnClientLeave(freeSessionId);
-
-		if (pSession->m_pCurrentContent != nullptr)
-			pSession->m_pCurrentContent->LeaveJobEnqueue(freeSessionId);
 
 		CSession::Free(pSession);
 		InterlockedDecrement(&m_sessionCount);

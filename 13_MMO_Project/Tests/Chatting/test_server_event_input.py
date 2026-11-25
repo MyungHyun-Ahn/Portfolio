@@ -62,12 +62,12 @@ def launch(base, configuration, side, label, port, levels=None, log_interval=Non
             process.wait(timeout=8)
 
 
-def wait_text(child, needle, legacy=None):
+def wait_text(child, needle, legacy=None, *, count=1):
     process, output = child
     deadline = time.monotonic() + 10
     while True:
         text = output.read_bytes().decode("utf-8")
-        if needle in text or (legacy and legacy in text):
+        if text.count(needle) >= count or (legacy and text.count(legacy) >= count):
             return
         if process.poll() is not None or time.monotonic() >= deadline:
             raise AssertionError(f"{output}: missing {needle!r}; exit={process.poll()}; tail={text[-1500:]!r}")
@@ -176,16 +176,15 @@ def server_options_config(base, configuration):
         wait_text(server, "event=server_config acceptex_count=8 iocp_worker_count=3 iocp_concurrency=2"
                   " contents_worker_count=1 log_queue_capacity=2048")
         wait_text(server, "event=worker_started worker_index=3")
-        wait_text(server, "event=contents_worker_started")
         workers = event(server, "NetworkLib", "Info", "-", "Start", r"event=worker_started worker_index=\d+ \| .+")
-        contents = event(server, "NetworkLib", "Info", "-", "threadFunc", r"event=contents_worker_started \| .+")
-        assert len(workers) == 3 and len(contents) == 1
+        assert len(workers) == 3
         with launch(base, configuration, "Client", "custom-client", port) as client:
             wait_text(client, "READY account=")
             send(client, "custom server config")
             wait_text(client, ": custom server config")
             send(client, "/exit")
             assert client[0].wait(timeout=8) == 0
+        assert "event=contents_worker_started" not in server[1].read_text(encoding="utf-8"), "legacy content worker started"
         send(server, "/exit")
         assert server[0].wait(timeout=8) == 0
 
@@ -239,24 +238,21 @@ def chat(base, configuration, packet_mode=None):
             assert [line.split(" name=", 1)[1] for line in text.splitlines() if "CHAT account=" in line] == [
                 f"{name}: {message}" for name, message in zip(nicknames, messages)
             ], text
-        wait_text((server[0], server_log_path(server[1])), "event=session_leave")
-        # 모니터 타이머가 실행될 시간을 준 뒤 주기 콘솔 출력만 사라졌는지 확인한다.
-        time.sleep(2.2)
+        wait_text((server[0], server_log_path(server[1])), "event=session_leave", count=2)
         stdout = server[1].read_text(encoding="utf-8")
         assert "Server monitoring info" not in stdout, "legacy monitor output appeared during chat"
-        ready = event(server, "ChatServer", "Info", "-", "RegisterContentTimerEvent",
+        assert "event=contents_worker_started" not in stdout, "legacy content worker started"
+        ready = event(server, "ChatServer", "Info", "-", "OnServerReady",
                       rf"event=server_ready port={port} \| 테스트 채팅 서버가 준비되었습니다\.")
         workers = event(server, "NetworkLib", "Info", "-", "Start",
                         r"event=worker_started worker_index=\d+ \| 네트워크 워커를 시작했습니다\.")
         assert len(workers) == 2
-        contents_workers = event(server, "NetworkLib", "Info", "-", "threadFunc",
-                                 r"event=contents_worker_started \| .+")
-        # 구 워커는 시스템 타이머 전용이다. 채팅 진입·처리·삭제는 다른 한 워커에서 실행한다.
-        assert len(contents_workers) == 1
+        assert len(ready) == 1 and all(stdout.index(line) < stdout.index(ready[0]) for line in workers)
         def worker_id(line):
             return re.search(r"\[ChatServer\]\[(\d+)\]|\[NetworkLib\]\[(\d+)\]", line).group(0).split("[")[-1][:-1]
 
         chat_workers = set()
+        accept_workers = set()
         for function, payload, count in (
             ("OnAccept", r"event=session_accepted session_id=\2 \| .+", 2),
             (r"\w+", r"event=session_enter \| 세션이 콘텐츠에 진입했습니다\.", 2),
@@ -266,13 +262,14 @@ def chat(base, configuration, packet_mode=None):
         ):
             lines = event(server, "ChatServer", "Debug", r"[1-9]\d*", function, payload, on_console=False)
             assert len(lines) == count
-            if function != "OnAccept":
+            if function == "OnAccept":
+                accept_workers.update(map(worker_id, lines))
+            else:
                 chat_workers.update(map(worker_id, lines))
         leaves = event(server, "ChatServer", "Debug", r"[1-9]\d*", "OnLeave",
                        r"event=session_leave \| 세션이 콘텐츠를 떠났습니다\.", on_console=False)
         assert len(leaves) == 2 and {worker_id(line) for line in leaves} == chat_workers
-        assert len(chat_workers) == 1 and worker_id(contents_workers[0]) not in chat_workers
-        assert len(ready) == 1
+        assert len(chat_workers) == 1 and chat_workers.isdisjoint(accept_workers)
         send(server, "/exit")
         assert server[0].wait(timeout=8) == 0
         print(f"chat: two clients READY, one self echo and one peer delivery per message, exits=0/0/0; {ready[0]}")

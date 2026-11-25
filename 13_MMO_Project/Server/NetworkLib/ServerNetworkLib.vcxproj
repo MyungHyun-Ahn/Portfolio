@@ -172,20 +172,14 @@
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
   <ItemGroup>
-    <ClCompile Include="CBaseContents.cpp" />
     <ClCompile Include="CServer.cpp" />
     <ClCompile Include="ServerNetworkLibPch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="ServerSetting.cpp" />
-    <ClCompile Include="SystemEvent.cpp" />
-    <ClInclude Include="CBaseContents.h" />
-    <ClInclude Include="CContentsThread.h" />
     <ClInclude Include="CServer.h" />
     <ClInclude Include="ServerNetworkLibPch.h" />
-    <ClInclude Include="SBaseEvent.h" />
     <ClInclude Include="ServerSetting.h" />
-    <ClInclude Include="SystemEvent.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Common\NetworkCommon\NetworkCommonLib.vcxproj">
