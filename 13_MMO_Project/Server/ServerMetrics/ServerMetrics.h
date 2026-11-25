@@ -1,14 +1,8 @@
 #pragma once
 
-/*
-// 공통 서버 수집 지표를 모아둡니다.
-// - 이는 각자의 서버 프로젝트에 추가한 뒤 컴파일 합니다.
-// - 서버 메모리, CPU 이용률 등을 수집합니다.
-*/
 namespace ServerNetworkLib
 {
-	enum class EMonitorInterval;
-	struct SMonitorSnapshot;
+	class CServer;
 }
 
 namespace MetricsLib
@@ -18,7 +12,18 @@ namespace MetricsLib
 
 namespace ServerMetrics
 {
-	// 같은 표본에 담긴 누적값과 유효한 초당값을 추가한다.
-	void AppendIntervalMetric(const ServerNetworkLib::SMonitorSnapshot &sample, ServerNetworkLib::EMonitorInterval interval, const std::string &name, MetricsLib::SMetricsSnapshot &outMetrics);
-	void AppendCommonMetrics(const ServerNetworkLib::SMonitorSnapshot &sample, MetricsLib::SMetricsSnapshot &outMetrics);
+	class CServerMetrics
+	{
+	public:
+		// 로그 스레드에서만 구간 카운터를 읽고 리셋한다.
+		void Collect(ServerNetworkLib::CServer &server, double elapsedSeconds, MetricsLib::SMetricsSnapshot &outMetrics);
+
+	private:
+		UINT64 m_acceptCompletions = 0;
+		UINT64 m_receivedPackets = 0;
+		UINT64 m_sentPackets = 0;
+		UINT64 m_workDelegations = 0;
+		UINT64 m_workSteals = 0;
+		UINT64 m_sendBatchLimitHits = 0;
+	};
 }

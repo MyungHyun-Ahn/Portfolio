@@ -1,22 +1,11 @@
 #include "pch.h"
-#include "CMonitor.h"
 #include "MetricsSnapshot.h"
-#include "../../../Server/ServerMetrics/ServerMetrics.h"
 #include "ChatMetrics.h"
 
 namespace Chatting
 {
 	namespace
 	{
-		struct SChatCounts
-		{
-			std::uint64_t m_contentUpdates = 0;
-			std::uint64_t m_loginRequests = 0;
-			std::uint64_t m_sectorMoveRequests = 0;
-			std::uint64_t m_messageRequests = 0;
-			std::uint64_t m_messageSendRequests = 0;
-		};
-
 		std::atomic<std::uint64_t> g_chatContentUpdates{0};
 		std::atomic<std::uint64_t> g_chatLoginRequests{0};
 		std::atomic<std::uint64_t> g_chatSectorMoveRequests{0};
@@ -70,40 +59,15 @@ namespace Chatting
 		++g_completedChatFrames;
 	}
 
-	std::function<bool(MetricsLib::SMetricsSnapshot &)> MakeChatMetricsCollector()
+	void CChatMetrics::Collect(double elapsedSeconds, MetricsLib::SMetricsSnapshot &outMetrics)
 	{
-		return [lastSampleMilliseconds = ULONGLONG{0}, nextCheck = std::chrono::steady_clock::time_point{},
-			lastChatSample = std::chrono::steady_clock::time_point{}, previous = SChatCounts{}]
-			(MetricsLib::SMetricsSnapshot &outMetrics) mutable
-		{
-			const auto now = std::chrono::steady_clock::now();
-			if (now < nextCheck)
-				return false;
-			nextCheck = now + std::chrono::milliseconds(100);
-
-			const auto spSample = ServerNetworkLib::g_monitor.GetSnapshot();
-			if (!spSample || lastSampleMilliseconds == spSample->m_sampledAtMilliseconds)
-				return false;
-			const auto &sample = *spSample;
-			lastSampleMilliseconds = sample.m_sampledAtMilliseconds;
-
-			// 공용 표본과 함께 게시하되 채팅 카운터를 읽은 시각은 따로 기록한다.
-			ServerMetrics::AppendCommonMetrics(sample, outMetrics);
-			const auto chatSampleTime = std::chrono::steady_clock::now();
-			const double elapsedSeconds = lastChatSample == std::chrono::steady_clock::time_point{} ? 0.0
-				: std::chrono::duration<double>(chatSampleTime - lastChatSample).count();
-			lastChatSample = chatSampleTime;
-			AppendChatCounter("chat_content_updates", g_chatContentUpdates.load(), previous.m_contentUpdates, elapsedSeconds, outMetrics);
-			AppendChatCounter("chat_login_requests", g_chatLoginRequests.load(), previous.m_loginRequests, elapsedSeconds, outMetrics);
-			AppendChatCounter("chat_sector_move_requests", g_chatSectorMoveRequests.load(), previous.m_sectorMoveRequests,
-				elapsedSeconds, outMetrics);
-			AppendChatCounter("chat_message_requests", g_chatMessageRequests.load(), previous.m_messageRequests,
-				elapsedSeconds, outMetrics);
-			AppendChatCounter("chat_message_send_requests", g_chatMessageSendRequests.load(), previous.m_messageSendRequests,
-				elapsedSeconds, outMetrics);
-			outMetrics.m_counters.push_back({"chat_content_frames_total", g_completedChatFrames.load(), {}});
-
-			return true;
-		};
+		AppendChatCounter("chat_content_updates", g_chatContentUpdates.load(), m_previousContentUpdates, elapsedSeconds, outMetrics);
+		AppendChatCounter("chat_login_requests", g_chatLoginRequests.load(), m_previousLoginRequests, elapsedSeconds, outMetrics);
+		AppendChatCounter("chat_sector_move_requests", g_chatSectorMoveRequests.load(), m_previousSectorMoveRequests,
+			elapsedSeconds, outMetrics);
+		AppendChatCounter("chat_message_requests", g_chatMessageRequests.load(), m_previousMessageRequests, elapsedSeconds, outMetrics);
+		AppendChatCounter("chat_message_send_requests", g_chatMessageSendRequests.load(), m_previousMessageSendRequests,
+			elapsedSeconds, outMetrics);
+		outMetrics.m_counters.push_back({"chat_content_frames_total", g_completedChatFrames.load(), {}});
 	}
 }

@@ -620,7 +620,6 @@ CServer *g_pServer = nullptr;
 				L"event=worker_started worker_index=%d | 네트워크 워커를 시작했습니다.", i);
 		}
 
-		RegisterSystemTimerEvent();
 		RegisterContentTimerEvent();
 
 		WaitForMultipleObjects((DWORD)m_arrWorkerThreads.size(), m_arrWorkerThreads.data(), TRUE, INFINITE);

@@ -276,7 +276,7 @@ def chat(base, configuration, packet_mode=None):
         send(server, "/exit")
         assert server[0].wait(timeout=8) == 0
         print(f"chat: two clients READY, one self echo and one peer delivery per message, exits=0/0/0; {ready[0]}")
-        print("chat: one Chatting owner worker (distinct from the NetworkLib system timer); session_accepted/enter, login, sector and chat Debug events in file only")
+        print("chat: one Chatting owner worker; session_accepted/enter, login, sector and chat Debug events in file only")
         print("chat: 1/19-code-unit nicknames preserved, including Korean and emoji; 20-code-unit config rejected")
 
 
@@ -504,7 +504,7 @@ def metrics(base, configuration):
                     server_options={**options, **invalid}) as server:
             assert server[0].wait(timeout=5) == 2
             wait_text(server, next(iter(invalid)))
-    print("metrics: configured alternate loopback, live CMonitor snapshot, shutdown/port reuse, bind collision and config checks")
+    print("metrics: configured alternate loopback, live logger-collected snapshot, shutdown/port reuse, bind collision and config checks")
 
 
 if __name__ == "__main__":

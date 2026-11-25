@@ -2,7 +2,6 @@
 #include <pdhmsg.h>
 #include <cmath>
 #include <string_view>
-#include "SNetworkCounters.h"
 
 namespace ServerNetworkLib
 {
@@ -103,7 +102,6 @@ void CMonitor::Update(LONG sessions) noexcept
 	auto &snapshot = *spNext;
 	snapshot.m_sessions = sessions;
 	snapshot.m_processName = m_processName;
-	updateServer(snapshot);
 	updateCpuTime(snapshot);
 	auto &memory = snapshot.m_memory;
 	memory.cb = sizeof(memory);
@@ -205,35 +203,6 @@ void CMonitor::updateCpuTime(SMonitorSnapshot &outSnapshot) noexcept
 	m_ftProcessLastUser = user;
 }
 
-void CMonitor::updateServer(SMonitorSnapshot &outSnapshot) noexcept
-{
-	const auto nowMilliseconds = GetTickCount64();
-	const auto elapsedMilliseconds = nowMilliseconds - m_lastServerMilliseconds;
-	outSnapshot.m_hasIntervalRates = m_hasServerSample && elapsedMilliseconds > 0;
-	// 교환 연산의 반환값을 사용해 샘플링과 리셋 사이에 증가분을 잃지 않는다.
-	LONG *counters[] = {&g_networkCounters.m_acceptTps, &g_networkCounters.m_recvTps, &g_networkCounters.m_sendTps,
-		&m_delWork, &m_stealWork, &g_networkCounters.m_maxSendCount};
-	static_assert(_countof(counters) == SMonitorSnapshot::kIntervalCount);
-	for (size_t index = 0; index < _countof(counters); ++index)
-	{
-		// 첫 표본도 누적값에는 반영하되, 처리율은 두 표본 사이의 구간에서만 계산한다.
-		if (!m_hasServerSample || outSnapshot.m_hasIntervalRates)
-		{
-			const auto count = static_cast<ULONG>(InterlockedExchange(counters[index], 0));
-			m_totals[index] += count;
-			if (outSnapshot.m_hasIntervalRates)
-				outSnapshot.m_rates[index] = 1000.0 * count / static_cast<double>(elapsedMilliseconds);
-		}
-		outSnapshot.m_totals[index] = m_totals[index];
-	}
-	m_lastServerMilliseconds = nowMilliseconds;
-	m_hasServerSample = true;
-	outSnapshot.m_sampledAtMilliseconds = nowMilliseconds;
-	outSnapshot.m_accepted = static_cast<UINT64>(InterlockedCompareExchange64(&g_networkCounters.m_acceptTotal, 0, 0));
-	outSnapshot.m_sendCalls = static_cast<UINT64>(InterlockedCompareExchange64(&g_networkCounters.m_sendCallCount, 0, 0));
-	outSnapshot.m_sendPending = static_cast<UINT64>(InterlockedCompareExchange64(&g_networkCounters.m_sendPendingCount, 0, 0));
-}
-
 void CMonitor::updatePdh(SMonitorSnapshot &outSnapshot) noexcept
 {
 	if (m_pdhQuery == nullptr || PdhCollectQueryData(m_pdhQuery) != ERROR_SUCCESS)
@@ -242,8 +211,9 @@ void CMonitor::updatePdh(SMonitorSnapshot &outSnapshot) noexcept
 	if (const auto availableMemoryMegabytes = ReadPdhValue(m_availableMemoryCounter))
 		outSnapshot.m_availableMemoryBytes = *availableMemoryMegabytes * (1024.0 * 1024.0);
 	outSnapshot.m_tcpV4RetransmittedSegmentsPerSecond = ReadPdhValue(m_tcpV4RetransmittedSegmentsCounter);
-	if (outSnapshot.m_hasIntervalRates)
+	if (m_hasPdhSample)
 		updateNicRates(outSnapshot);
+	m_hasPdhSample = true;
 }
 
 void CMonitor::updateNicRates(SMonitorSnapshot &outSnapshot) noexcept

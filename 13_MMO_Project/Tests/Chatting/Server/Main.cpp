@@ -15,6 +15,8 @@
 #include "CContentsRuntime.h"
 #include "CChatServer.h"
 #include "CMetricsExporter.h"
+#include "CSystemMetrics.h"
+#include "../../../Server/ServerMetrics/ServerMetrics.h"
 #include "ChatMetrics.h"
 
 int main(void)
@@ -36,12 +38,15 @@ int main(void)
 	g_pLogger->RegisterLogProducer();
 
 	MetricsLib::CMetricsExporter metricsExporter;
+	std::optional<MetricsLib::CSystemMetrics> systemMetrics;
+	ServerMetrics::CServerMetrics serverMetrics;
+	Chatting::CChatMetrics chatMetrics;
 	if (config.m_metricsPort != 0)
 	{
 		uint16_t boundPort = 0;
 		if (metricsExporter.Start(config.m_metricsBindAddress, config.m_metricsPort, boundPort))
 		{
-			g_pLogger->SetPeriodicCallback(metricsExporter.CreatePublishCallback(Chatting::MakeChatMetricsCollector()));
+			systemMetrics.emplace();
 			g_pLogger->WriteLog(ELogLevel::Info, L"ChatServer", 0, std::source_location::current(),
 				L"event=metrics_started port=%u | 메트릭 리스너를 시작했습니다.", static_cast<unsigned>(boundPort));
 		}
@@ -52,10 +57,11 @@ int main(void)
 				static_cast<unsigned>(config.m_metricsPort));
 		}
 	}
-	const auto stopMetrics = [&metricsExporter]
+	const auto stopMetrics = [&metricsExporter, &systemMetrics]
 	{
 		g_pLogger->SetPeriodicCallback({});
 		metricsExporter.Stop();
+		systemMetrics.reset();
 	};
 
 	ServerNetworkLib::serverSetting::openIp = config.m_ip;
@@ -64,7 +70,7 @@ int main(void)
 	ServerNetworkLib::serverSetting::acceptexCount = config.m_acceptExCount;
 	ServerNetworkLib::serverSetting::iocpWorkerThread = config.m_iocpWorkerCount;
 	ServerNetworkLib::serverSetting::iocpActiveThread = config.m_iocpConcurrency;
-	// 구 워커 한 개는 NetworkLib의 시스템 타이머만 처리한다.
+	// 구 콘텐츠 워커 설정은 제거 단계까지 유지한다.
 	ServerNetworkLib::serverSetting::contentsThreadCount = 1;
 	ServerNetworkLib::serverSetting::packetCode = Chatting::kPacketCode;
 	MHLib::security::CEncryption::sm_packetKey = Chatting::kPacketKey;
@@ -86,6 +92,26 @@ int main(void)
 		return 1;
 	}
 	ServerNetworkLib::g_pServer = pServer;
+	if (systemMetrics)
+	{
+		g_pLogger->SetPeriodicCallback(metricsExporter.CreatePublishCallback(
+			[pServer, &systemMetrics, &serverMetrics, &chatMetrics, lastSample = std::chrono::steady_clock::time_point{}]
+			(MetricsLib::SMetricsSnapshot &outMetrics) mutable
+			{
+				const auto now = std::chrono::steady_clock::now();
+				const bool hasPreviousSample = lastSample != std::chrono::steady_clock::time_point{};
+				if (hasPreviousSample && now - lastSample < std::chrono::seconds{1})
+					return false;
+
+				// 목표 주기 대신 같은 수집 콜백의 실제 표본 간격을 사용한다.
+				const double elapsedSeconds = hasPreviousSample ? std::chrono::duration<double>(now - lastSample).count() : 0.0;
+				lastSample = now;
+				serverMetrics.Collect(*pServer, elapsedSeconds, outMetrics);
+				chatMetrics.Collect(elapsedSeconds, outMetrics);
+				systemMetrics->Collect(outMetrics);
+				return true;
+			}));
+	}
 	std::atomic<bool> isReturned = false;
 	std::atomic<bool> isStarted = false;
 	std::thread serverThread([&]()

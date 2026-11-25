@@ -1,72 +1,44 @@
 #include "ServerNetworkLibPch.h"
 #include "MetricsSnapshot.h"
+#include "SNetworkCounters.h"
 #include "ServerMetrics.h"
 
 namespace ServerMetrics
 {
-	void AppendIntervalMetric(const ServerNetworkLib::SMonitorSnapshot &sample, ServerNetworkLib::EMonitorInterval interval,
-		const std::string &name, MetricsLib::SMetricsSnapshot &outMetrics)
+	namespace
 	{
-		const auto index = static_cast<size_t>(interval);
-		if (index >= ServerNetworkLib::SMonitorSnapshot::kIntervalCount)
-			return;
-		outMetrics.m_counters.push_back({name + "_total", sample.m_totals[index], {}});
-		if (sample.m_hasIntervalRates)
-			outMetrics.m_gauges.push_back({name + "_per_second", sample.m_rates[index], {}});
+		// 교환한 증가분은 첫 표본에도 누계에 더하고 처리율은 유효한 구간에서만 추가한다.
+		void AppendIntervalMetric(const std::string &name, LONG &rawCount, UINT64 &total, double elapsedSeconds,
+			MetricsLib::SMetricsSnapshot &outMetrics)
+		{
+			const auto count = static_cast<ULONG>(InterlockedExchange(&rawCount, 0));
+			total += count;
+			outMetrics.m_counters.push_back({name + "_total", total, {}});
+			if (elapsedSeconds > 0.0)
+				outMetrics.m_gauges.push_back({name + "_per_second", static_cast<double>(count) / elapsedSeconds, {}});
+		}
 	}
 
-	void AppendCommonMetrics(const ServerNetworkLib::SMonitorSnapshot &sample, MetricsLib::SMetricsSnapshot &outMetrics)
+	void CServerMetrics::Collect(ServerNetworkLib::CServer &server, double elapsedSeconds, MetricsLib::SMetricsSnapshot &outMetrics)
 	{
-		using ServerNetworkLib::EMonitorInterval;
-		AppendIntervalMetric(sample, EMonitorInterval::AcceptCompletions, "net_accept_completions", outMetrics);
-		AppendIntervalMetric(sample, EMonitorInterval::ReceivedPackets, "net_received_packets", outMetrics);
-		AppendIntervalMetric(sample, EMonitorInterval::SentPackets, "net_sent_packets", outMetrics);
-		// 작업 분배는 공통 지표지만 기존 수집 이름은 유지한다.
-		AppendIntervalMetric(sample, EMonitorInterval::WorkDelegations, "chat_work_delegations", outMetrics);
-		AppendIntervalMetric(sample, EMonitorInterval::WorkSteals, "chat_work_steals", outMetrics);
-		AppendIntervalMetric(sample, EMonitorInterval::SendBatchLimitHits, "net_send_batch_limit_hits", outMetrics);
+		auto &networkCounters = NetworkCommonLib::g_networkCounters;
+		AppendIntervalMetric("net_accept_completions", networkCounters.m_acceptTps, m_acceptCompletions, elapsedSeconds, outMetrics);
+		AppendIntervalMetric("net_received_packets", networkCounters.m_recvTps, m_receivedPackets, elapsedSeconds, outMetrics);
+		AppendIntervalMetric("net_sent_packets", networkCounters.m_sendTps, m_sentPackets, elapsedSeconds, outMetrics);
+		AppendIntervalMetric("net_send_batch_limit_hits", networkCounters.m_maxSendCount, m_sendBatchLimitHits, elapsedSeconds, outMetrics);
 
+		// 구 워커의 분배·스틸 지표는 Phase 3.3 전까지 같은 이름으로 게시한다.
+		auto &monitor = ServerNetworkLib::g_monitor;
+		AppendIntervalMetric("chat_work_delegations", monitor.m_delWork, m_workDelegations, elapsedSeconds, outMetrics);
+		AppendIntervalMetric("chat_work_steals", monitor.m_stealWork, m_workSteals, elapsedSeconds, outMetrics);
+
+		const auto accepted = static_cast<UINT64>(InterlockedCompareExchange64(&networkCounters.m_acceptTotal, 0, 0));
+		const auto sendCalls = static_cast<UINT64>(InterlockedCompareExchange64(&networkCounters.m_sendCallCount, 0, 0));
+		const auto sendPending = static_cast<UINT64>(InterlockedCompareExchange64(&networkCounters.m_sendPendingCount, 0, 0));
 		auto &counters = outMetrics.m_counters;
-		auto &gauges = outMetrics.m_gauges;
-		counters.push_back({"net_sessions_accepted_total", sample.m_accepted, {}});
-		counters.push_back({"net_wsasend_calls_total", sample.m_sendCalls, {}});
-		counters.push_back({"net_wsasend_pending_total", sample.m_sendPending, {}});
-		gauges.push_back({"net_sessions", static_cast<double>(sample.m_sessions), {}});
-		if (!sample.m_processName.empty())
-			gauges.push_back({"process_info", 1.0, {{"process", sample.m_processName}}});
-
-		constexpr const char *kCpuModes[] = {"total", "user", "kernel"};
-		for (size_t index = 0; index < _countof(kCpuModes); ++index)
-		{
-			if (sample.m_hasHostCpu)
-				gauges.push_back({"host_cpu_usage_ratio", sample.m_hostCpu[index], {{"mode", kCpuModes[index]}}});
-			if (sample.m_hasProcessCpu)
-				gauges.push_back({"process_cpu_usage_ratio", sample.m_processCpu[index], {{"mode", kCpuModes[index]}}});
-		}
-
-		if (sample.m_hasMemory)
-		{
-			const auto &memory = sample.m_memory;
-			counters.push_back({"process_page_faults_total", sample.m_pageFaults, {}});
-			gauges.push_back({"process_working_set_bytes", static_cast<double>(memory.WorkingSetSize), {}});
-			gauges.push_back({"process_peak_working_set_bytes", static_cast<double>(memory.PeakWorkingSetSize), {}});
-			gauges.push_back({"process_paged_pool_bytes", static_cast<double>(memory.QuotaPagedPoolUsage), {}});
-			gauges.push_back({"process_peak_paged_pool_bytes", static_cast<double>(memory.QuotaPeakPagedPoolUsage), {}});
-			gauges.push_back({"process_nonpaged_pool_bytes", static_cast<double>(memory.QuotaNonPagedPoolUsage), {}});
-			gauges.push_back({"process_peak_nonpaged_pool_bytes", static_cast<double>(memory.QuotaPeakNonPagedPoolUsage), {}});
-			gauges.push_back({"process_commit_bytes", static_cast<double>(memory.PagefileUsage), {}});
-			gauges.push_back({"process_peak_commit_bytes", static_cast<double>(memory.PeakPagefileUsage), {}});
-			gauges.push_back({"process_private_bytes", static_cast<double>(memory.PrivateUsage), {}});
-		}
-
-		// 유효하지 않은 PDH 표본은 0 대신 시계열을 생략한다.
-		if (sample.m_nonpagedPoolBytes)
-			gauges.push_back({"host_nonpaged_pool_bytes", *sample.m_nonpagedPoolBytes, {}});
-		if (sample.m_availableMemoryBytes)
-			gauges.push_back({"host_available_memory_bytes", *sample.m_availableMemoryBytes, {}});
-		if (sample.m_tcpV4RetransmittedSegmentsPerSecond)
-			gauges.push_back({"host_tcpv4_retransmitted_segments_per_second", *sample.m_tcpV4RetransmittedSegmentsPerSecond, {}});
-		for (const auto &nic : sample.m_nicRates)
-			gauges.push_back({"host_nic_total_bytes_per_second", nic.m_totalBytesPerSecond, {{"interface", nic.m_interfaceName}}});
+		counters.push_back({"net_sessions_accepted_total", accepted, {}});
+		counters.push_back({"net_wsasend_calls_total", sendCalls, {}});
+		counters.push_back({"net_wsasend_pending_total", sendPending, {}});
+		outMetrics.m_gauges.push_back({"net_sessions", static_cast<double>(server.GetSessionCount()), {}});
 	}
 }
