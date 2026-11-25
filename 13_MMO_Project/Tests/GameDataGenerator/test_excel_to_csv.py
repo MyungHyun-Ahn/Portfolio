@@ -499,6 +499,26 @@ class ExcelToCsvTests(unittest.TestCase):
             expected[0][1] = "OtherProfile"
             self.assertEqual(list(csv.reader(file)), expected)
 
+    @unittest.skipUnless(os.name == "nt", "Windows file sharing required")
+    def test_locked_later_csv_rolls_back_the_first_sheet(self):
+        self.write_two_sheet_workbook()
+        self.run_generator()
+        other = self.output / "OtherProfile.csv"
+        before = {p.name: p.read_bytes() for p in self.output.iterdir()}
+        candidate = self.root / "candidate.xlsx"
+        replace_cell(self.xlsx, candidate, "C15", "n", "451")
+        replace_cell(candidate, self.xlsx, "C15", "n", "452", sheet_path="xl/worksheets/sheet2.xml")
+
+        with other.open("rb"):
+            message = self.run_generator(success=False)
+        self.assertEqual(self.csv.read_bytes(), before[self.csv.name], "Earlier CSV was not rolled back")
+        self.assertIn(other.name, message)
+        self.assertEqual({p.name: p.read_bytes() for p in self.output.iterdir()}, before)
+
+        self.run_generator()
+        self.assertNotEqual(self.csv.read_bytes(), before[self.csv.name])
+        self.assertNotEqual(other.read_bytes(), before[other.name])
+
     def test_formula_and_error_cells_leave_existing_csv_untouched(self):
         self.run_generator()
         prior = self.csv.read_bytes()

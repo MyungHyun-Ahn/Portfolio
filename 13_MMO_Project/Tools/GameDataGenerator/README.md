@@ -57,7 +57,9 @@ dotnet run --project Tools/GameDataGenerator -c Release -- --emit GameData/Csv G
 - `GetMessage`, `GetObject`, `GetRValue`, `GetGValue`, `GetBValue`를 만드는 `#Field` 이름은 Windows 매크로와 충돌하므로 산출물 생성 전에 거절한다.
 - C++ 사용부는 PCH에서 `MHLib`의 `CLogger`와 `<array>`, `<memory>` 등 필요한 표준 헤더를 공급한 뒤 대상의 `GameDataAll.g.h`를 포함하고 `CGameDataReader.cpp`를 링크한다. `Common`, `GameData/Generated`, `GameData`를 include 경로에 둔다. 비동기 로거는 `Load(dir)` 전에 시작하고 현재 스레드를 로거에 등록한다. 워커를 시작하기 전에 성공한 묶음을 확보하고, `GameData::Server::Player::CPlayerMovementTableBase::Find(id)`처럼 정적으로 조회한다. `Find()` 본문은 대상의 묶음 헤더에 생성되므로 조회하는 소스는 집계 헤더를 사용한다. PK가 없거나 묶음이 없으면 `nullptr`이다. 대상별로 동시에 하나의 묶음만 소유하며, 마지막 조회 워커가 끝난 뒤 해제한다.
 
-바이너리의 바이트 계약은 [게임 데이터 생성기 계획](../../Docs/Plan/Common/001_게임데이터_생성기_계획.md#바이너리와-배포-경계)을 따른다. 생성 `Load()`는 [`CGameDataReader`](../../Common/GameData/CGameDataReader.h)에 필드 판독을 연결하며 파일이 끝까지 정상일 때만 행·PK 조회를 바꾼다. MSVC x64 환경에서 `GAME_DATA_TEST_MSVC=1`을 설정하고 `python -B Tests/GameDataGenerator/test_csv_to_artifacts.py -v`를 실행하면 두 대상의 C++ 판독 시험을 포함한다. 앱 등록과 전체 묶음의 I/O 실패 복구는 후속 작업이다.
+Excel→CSV와 `--emit`은 각각 이번 실행의 후보 파일을 모두 확인한 뒤 교체한다. 교체 중 I/O 오류가 나면 이전 파일로 복구를 시도한다. 콘솔 출력이 취소되어 복구가 중단되면 실패한 산출물 변경만 마지막 정상 상태로 되돌리고 다시 실행한다. 성공한 결과만 Git에 올린다. `--emit`은 산출물 트리 내부의 junction을 거절하며 루트 상위는 별도로 제한하지 않는다. 교체·복구는 Windows 로컬 파일 시스템의 단일 볼륨에서 검증했다. 같은 출력에는 생성기를 동시에 실행하지 않고 교체 중에는 읽지 않는다. 강제 종료·전원 장애와 볼륨 간 복구는 지원 범위 밖이다.
+
+바이너리의 바이트 계약은 [게임 데이터 생성기 계획](../../Docs/Plan/Common/001_게임데이터_생성기_계획.md#바이너리와-배포-경계)을 따른다. 생성 `Load()`는 [`CGameDataReader`](../../Common/GameData/CGameDataReader.h)에 필드 판독을 연결하며 파일이 끝까지 정상일 때만 행·PK 조회를 바꾼다. MSVC x64 환경에서 `GAME_DATA_TEST_MSVC=1`을 설정하고 `python -B Tests/GameDataGenerator/test_csv_to_artifacts.py -v`를 실행하면 두 대상의 C++ 판독 시험을 포함한다. 실제 앱 등록은 후속 작업이다.
 
 ## C++ 데이터 조회 예제
 

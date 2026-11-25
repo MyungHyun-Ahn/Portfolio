@@ -5,8 +5,8 @@ internal static class Program
         bool isEmit = args.Length != 0 && args[0] == "--emit";
         if (isEmit ? args.Length < 4 : args.Length is not (0 or 2))
         {
-            Console.Error.WriteLine("Usage: GameDataGenerator [excel-directory csv-directory]");
-            Console.Error.WriteLine("       GameDataGenerator --emit csv-directory output-directory table-name [table-name ...]");
+            WriteDiagnostic(Console.Error, "Usage: GameDataGenerator [excel-directory csv-directory]");
+            WriteDiagnostic(Console.Error, "       GameDataGenerator --emit csv-directory output-directory table-name [table-name ...]");
             return 1;
         }
 
@@ -36,15 +36,27 @@ internal static class Program
             CsvWriter.WriteDirectory(csvDirectory, tables);
             foreach (CsvTable table in tables)
             {
-                Console.WriteLine(Path.Combine(csvDirectory, table.Name + ".csv"));
+                WriteDiagnostic(Console.Out, Path.Combine(csvDirectory, table.Name + ".csv"));
             }
 
             return 0;
         }
         catch (Exception exception)
         {
-            Console.Error.WriteLine(exception.Message);
+            WriteDiagnostic(Console.Error, exception.Message);
             return 1;
+        }
+    }
+
+    // 콘솔 쓰기 실패로 파일 복구를 중단하거나 게시 결과를 바꾸지 않는다.
+    internal static void WriteDiagnostic(TextWriter writer, string message)
+    {
+        try
+        {
+            writer.WriteLine(message);
+        }
+        catch (Exception exception) when (exception is IOException or ObjectDisposedException or UnauthorizedAccessException)
+        {
         }
     }
 

@@ -5,23 +5,15 @@ internal static class CsvWriter
     private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
     private static readonly char[] QuoteTriggers = [',', '"', '\r', '\n'];
 
-    // 검증된 시트를 모두 임시 위치에 쓴 뒤 대상 CSV만 교체한다.
+    // 이번에 변환한 CSV만 함께 게시한다.
     public static void WriteDirectory(string csvDirectory, IReadOnlyList<CsvTable> tables)
     {
-        Directory.CreateDirectory(csvDirectory);
-        string candidateDirectory = Path.Combine(csvDirectory, $".game-data-csv-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(candidateDirectory);
-        try
+        using var batch = new OutputBatch(csvDirectory);
+        foreach (CsvTable table in tables)
         {
-            foreach (CsvTable table in tables)
+            using var memory = new MemoryStream();
+            using (var writer = new StreamWriter(memory, Utf8, leaveOpen: true))
             {
-                string fileName = table.Name + ".csv";
-                if (Directory.Exists(Path.Combine(csvDirectory, fileName)))
-                {
-                    throw new IOException($"The CSV destination is a directory: {fileName}.");
-                }
-
-                using var writer = new StreamWriter(Path.Combine(candidateDirectory, fileName), append: false, Utf8);
                 writer.NewLine = "\r\n";
                 foreach (string[] row in table.Rows)
                 {
@@ -37,24 +29,9 @@ internal static class CsvWriter
                 }
             }
 
-            foreach (CsvTable table in tables)
-            {
-                string fileName = table.Name + ".csv";
-                File.Move(Path.Combine(candidateDirectory, fileName), Path.Combine(csvDirectory, fileName), overwrite: true);
-            }
+            batch.Stage(Path.Combine(csvDirectory, table.Name + ".csv"), memory.ToArray());
         }
-        finally
-        {
-            try
-            {
-                Directory.Delete(candidateDirectory, recursive: true);
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-            {
-                // 정리 실패는 원래 오류나 이미 완료된 교체 결과를 가리지 않는다.
-                Console.Error.WriteLine($"Warning: Could not clean '{candidateDirectory}': {exception.Message}");
-            }
-        }
+        batch.Commit();
     }
 
     private static void WriteField(TextWriter writer, string value)

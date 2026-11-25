@@ -391,7 +391,7 @@ internal static class GameDataArtifacts
         writer.Write(bytes);
     }
 
-    // 모든 후보를 먼저 쓴다. 전체 파일 교체의 복구는 Phase 0.7의 범위다.
+    // 생성물과 최초 수기 파일을 함께 게시하되 기존 수기 파일은 건드리지 않는다.
     private static void Publish(string outputDirectory, Dictionary<string, byte[]> artifacts, Dictionary<string, byte[]> manualTables)
     {
         CheckStaleOutputs(outputDirectory, artifacts.Keys.ToHashSet(StringComparer.Ordinal));
@@ -402,113 +402,87 @@ internal static class GameDataArtifacts
             throw new InvalidDataException("The generated output must be separate from its sibling Tables directory.");
         }
         string manualDirectory = Path.Combine(parent, "Tables");
-        foreach (string path in manualTables.Keys)
+        using var batch = new OutputBatch(outputDirectory);
+        foreach ((string path, byte[] bytes) in artifacts)
+        {
+            batch.Stage(Path.Combine(outputDirectory, path), bytes);
+        }
+        foreach ((string path, byte[] bytes) in manualTables)
         {
             string destination = Path.Combine(manualDirectory, path);
-            if (Directory.Exists(destination) || File.Exists(manualDirectory) || File.Exists(Path.GetDirectoryName(destination)))
+            if (!File.Exists(destination))
             {
-                throw new IOException($"Invalid manual table destination: {destination}.");
+                batch.Stage(destination, bytes, createOnly: true);
             }
         }
-        string candidate = Path.Combine(outputDirectory, $".game-data-output-{Guid.NewGuid():N}");
+        batch.Commit();
         foreach (string path in artifacts.Keys)
         {
-            string destination = Path.Combine(outputDirectory, path);
-            if (Directory.Exists(destination) || File.Exists(Path.GetDirectoryName(destination)))
-            {
-                throw new IOException($"Invalid artifact destination: {destination}.");
-            }
-        }
-        Directory.CreateDirectory(candidate);
-        try
-        {
-            foreach ((string path, byte[] bytes) in artifacts)
-            {
-                string staged = Path.Combine(candidate, path);
-                Directory.CreateDirectory(Path.GetDirectoryName(staged)!);
-                File.WriteAllBytes(staged, bytes);
-            }
-            var stagedManualTables = new List<string>();
-            foreach ((string path, byte[] bytes) in manualTables)
-            {
-                string destination = Path.Combine(manualDirectory, path);
-                if (File.Exists(destination))
-                {
-                    continue;
-                }
-                string staged = Path.Combine(candidate, "Tables", path);
-                Directory.CreateDirectory(Path.GetDirectoryName(staged)!);
-                File.WriteAllBytes(staged, bytes);
-                stagedManualTables.Add(path);
-            }
-            foreach (string path in artifacts.Keys)
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(outputDirectory, path))!);
-            }
-            foreach (string path in stagedManualTables)
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(manualDirectory, path))!);
-            }
-            foreach (string path in artifacts.Keys)
-            {
-                File.Move(Path.Combine(candidate, path), Path.Combine(outputDirectory, path), overwrite: true);
-            }
-            foreach (string path in stagedManualTables)
-            {
-                string destination = Path.Combine(manualDirectory, path);
-                try
-                {
-                    File.Move(Path.Combine(candidate, "Tables", path), destination, overwrite: false);
-                    Console.WriteLine(destination);
-                }
-                catch (IOException) when (File.Exists(destination))
-                {
-                    // 최초 생성 경쟁에서도 먼저 생긴 사용자 파일을 보존한다.
-                }
-            }
-        }
-        finally
-        {
-            try
-            {
-                Directory.Delete(candidate, recursive: true);
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-            {
-                Console.Error.WriteLine($"Warning: Could not clean '{candidate}': {exception.Message}");
-            }
-        }
-        foreach (string path in artifacts.Keys)
-        {
-            Console.WriteLine(Path.Combine(outputDirectory, path));
+            Program.WriteDiagnostic(Console.Out, Path.Combine(outputDirectory, path));
         }
     }
 
     // 대상 변경으로 빠진 기존 파일을 새 산출물 묶음에 섞지 않는다.
     private static void CheckStaleOutputs(string outputDirectory, HashSet<string> expected)
     {
+        if (!CheckArtifactRoot(outputDirectory))
+        {
+            return;
+        }
+        CheckArtifactRoot(Path.Combine(outputDirectory, "Data"));
         foreach (string relativeDirectory in new[] { "Common", "Server", "Client", Path.Combine("Data", "Server"), Path.Combine("Data", "Client") })
         {
             string directory = Path.Combine(outputDirectory, relativeDirectory);
-            if (!Directory.Exists(directory))
+            if (CheckArtifactRoot(directory))
             {
-                continue;
-            }
-            var options = new EnumerationOptions
-            {
-                RecurseSubdirectories = true,
-                AttributesToSkip = FileAttributes.ReparsePoint,
-                IgnoreInaccessible = false,
-            };
-            foreach (string file in Directory.EnumerateFiles(directory, "*", options))
-            {
-                string extension = Path.GetExtension(file).ToLowerInvariant();
-                string path = Path.GetRelativePath(outputDirectory, file);
-                if (extension is ".h" or ".sdat" or ".cdat" or ".dat" && !expected.Contains(path))
-                {
-                    throw new InvalidDataException($"Stale artifact '{path}'. Use a fresh output directory for the new selection.");
-                }
+                CheckArtifactDirectory(new DirectoryInfo(directory), outputDirectory, expected);
             }
         }
+    }
+
+    private static void CheckArtifactDirectory(DirectoryInfo directory, string outputDirectory, HashSet<string> expected)
+    {
+        foreach (FileSystemInfo entry in directory.EnumerateFileSystemInfos())
+        {
+            // 링크를 따라가면 묶음 밖 파일이 섞이거나 검사를 건너뛰게 된다.
+            if ((entry.Attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                throw new InvalidDataException($"Linked artifact path '{Path.GetRelativePath(outputDirectory, entry.FullName)}'. Use a fresh output directory.");
+            }
+            if (entry is DirectoryInfo child)
+            {
+                CheckArtifactDirectory(child, outputDirectory, expected);
+                continue;
+            }
+            string extension = entry.Extension.ToLowerInvariant();
+            string path = Path.GetRelativePath(outputDirectory, entry.FullName);
+            if (extension is ".h" or ".sdat" or ".cdat" or ".dat" && !expected.Contains(path))
+            {
+                throw new InvalidDataException($"Stale artifact '{path}'. Use a fresh output directory for the new selection.");
+            }
+        }
+    }
+
+    // 경로가 없을 때만 건너뛴다. 권한·I/O 오류는 호출자에게 그대로 전달한다.
+    private static bool CheckArtifactRoot(string directory)
+    {
+        FileAttributes attributes;
+        try
+        {
+            attributes = File.GetAttributes(directory);
+        }
+        catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return false;
+        }
+        if ((attributes & FileAttributes.ReparsePoint) != 0)
+        {
+            throw new InvalidDataException($"Linked artifact path '{directory}'. Use a fresh output directory.");
+        }
+        if ((attributes & FileAttributes.Directory) == 0)
+        {
+            throw new IOException($"Invalid artifact directory: '{directory}'.");
+        }
+        return true;
     }
 }

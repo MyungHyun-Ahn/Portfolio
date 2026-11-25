@@ -146,6 +146,67 @@ class CsvToArtifactsTests(unittest.TestCase):
         self.assertEqual(manual_client.read_bytes(), client_modified)
         self.assertEqual(manual_server.read_bytes(), sentinel)
 
+    @unittest.skipUnless(os.name == 'nt', 'Windows file sharing required')
+    def test_locked_client_binary_rolls_back_generated_bundle(self):
+        self.run_emit('PlayerMovement')
+        server = 'Data/Server/Player/PlayerMovement.sdat'
+        client = 'Data/Client/Player/PlayerMovement.cdat'
+        before = self.snapshot()
+        manual_client = self.tables / 'Client/CPlayerMovementTable.h'
+        manual_client.unlink()
+        manual_before = self.snapshot(self.tables)
+        directories = {p for p in self.root.rglob('*') if p.is_dir()}
+        rows = [row.copy() for row in ROWS]
+        rows[14][2] = '451'
+        rows[14][4] = '1001'
+        write_csv(self.player, rows)
+
+        # Windows의 일반 읽기 핸들은 열려 있는 파일의 이름 변경을 막는다.
+        with (self.output / client).open('rb'):
+            message = self.run_emit('PlayerMovement', success=False)
+        after_failure = self.snapshot()
+        self.assertEqual(after_failure[server], before[server], 'Earlier server binary was not rolled back')
+        self.assertIn('PlayerMovement.cdat', message)
+        self.assertEqual(after_failure, before)
+        self.assertEqual(self.snapshot(self.tables), manual_before)
+        self.assertEqual({p for p in self.root.rglob('*') if p.is_dir()}, directories)
+
+        self.run_emit('PlayerMovement')
+        after_retry = self.snapshot()
+        self.assertEqual({path for path in before if before[path] != after_retry[path]}, {server, client})
+        self.assertTrue(manual_client.is_file())
+
+    def test_missing_and_corrupt_staged_binaries_preserve_outputs(self):
+        project = Path(__file__).with_name('OutputBatchTests.csproj').resolve()
+        workbook = ROOT / 'GameData/Excel/Player.xlsx'
+        result = subprocess.run(['dotnet', 'run', '--project', str(project), '-c', 'Release', '--', str(self.root), str(workbook)],
+                                cwd=self.root, capture_output=True, check=False, timeout=60)
+        self.assertEqual(result.returncode, 0, (result.stdout, result.stderr))
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows junction required')
+    def test_stale_workbook_junction_blocks_publication(self):
+        self.run_emit('PlayerMovement')
+        before = self.snapshot()
+        manual_before = self.snapshot(self.tables)
+        former_workbook = self.root / 'OldProfile'
+        former_workbook.mkdir()
+        old_header = former_workbook / 'Old.h'
+        old_header.write_bytes(b'// Previous artifact')
+        junction = self.output / 'Server/OldProfile'
+        command = f'"{os.environ["COMSPEC"]}" /d /c mklink /J "{junction}" "{former_workbook}"'
+        result = subprocess.run(command, cwd=self.root, capture_output=True, check=False, timeout=20)
+        self.assertEqual(result.returncode, 0, (result.stdout, result.stderr))
+        rows = [row.copy() for row in ROWS]
+        rows[14][2] = '451'
+        write_csv(self.player, rows)
+        try:
+            self.assertIn('OldProfile', self.run_emit('PlayerMovement', success=False))
+            self.assertEqual(old_header.read_bytes(), b'// Previous artifact')
+        finally:
+            junction.rmdir()
+        self.assertEqual(self.snapshot(), before)
+        self.assertEqual(self.snapshot(self.tables), manual_before)
+
     def test_bundle_loader_uses_projected_file_names_under_one_directory(self):
         rows = [row.copy() for row in ROWS]
         rows[0][1] = 'ServerOnly'
