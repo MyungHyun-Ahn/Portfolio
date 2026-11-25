@@ -79,6 +79,62 @@ def manual_delegate(port, wait, release, log):
     assert b'event=move_detached ' not in events and b'event=move_attached ' not in events
 
 
+
+def automatic_delegate(port, wait, release, log):
+    sample = rb'event=auto_delegate_sample seq=(\d+) source_us=(\d+) elapsed_us=(\d+) map1_worker=(\d+) pending=([01])\b'
+    with socket.create_connection(('127.0.0.1', port), timeout=3) as peer:
+        entered = wait(rb'event=map_connection_entered map=1 thread_id=(\d+) session_id=(\d+)\b')
+        release('release-change')
+        peer.sendall(frame(1, 'QI', 1, 7) + frame(5, 'QI', 1, 37))
+        assert receive(peer) == (2, 1, 7, 0)
+        assert receive(peer) == (6, 1, 37, 0)
+        original = wait(rb'event=character_change_completed map=1 thread_id=' + entered[1]
+                        + rb' session_id=' + entered[2] + rb' character_id=(\d+) value=37\b')
+        wait(rb'event=auto_delegate_sample seq=2\b')
+        release('auto-delegate-pulse')
+        pulse = wait(rb'event=auto_delegate_pulse map=1\b')
+        high = wait(rb'event=auto_delegate_pulse_high seq=(\d+)\b')
+        assert high.start() > pulse.start()
+        high_seq = int(high[1])
+        wait(rb'event=auto_delegate_sample seq=' + str(high_seq + 3).encode() + rb'\b')
+        pulse_samples = [tuple(map(int, row.groups())) for row in re.finditer(sample, log())
+                         if high_seq <= int(row[1]) <= high_seq + 3]
+        assert len(pulse_samples) == 4, pulse_samples
+        assert all(elapsed > 0 and worker == 0 and not pending for _, _, elapsed, worker, pending in pulse_samples)
+        assert pulse_samples[0][1] * 5 >= pulse_samples[0][2] * 4, pulse_samples
+        assert all(work * 5 < elapsed * 4 for _, work, elapsed, _, _ in pulse_samples[1:]), pulse_samples
+        assert b'event=auto_delegate_proposed ' not in log()
+
+        last_before_load = max(int(row[1]) for row in re.finditer(sample, log()))
+        release('auto-delegate-sustained')
+        proposed = wait(rb'event=auto_delegate_proposed seq=(\d+) map=1 destination=1\b')
+        accepted = wait(rb'event=auto_delegate_accepted seq=(\d+) map=1 destination=1\b')
+        assert int(accepted[1]) == int(proposed[1]) + 1
+        sustained = [tuple(map(int, row.groups())) for row in re.finditer(sample, log())
+                     if last_before_load < int(row[1]) <= int(proposed[1])]
+        assert len(sustained) >= 5 and sustained[-1][1] * 5 >= sustained[-1][2] * 4, sustained
+        high_pairs = [i for i, (a, b) in enumerate(zip(sustained, sustained[1:]), 1)
+                      if a[1] * 5 >= a[2] * 4 and b[1] * 5 >= b[2] * 4]
+        assert high_pairs, sustained
+        observed = sustained[high_pairs[0] + 1:]
+        assert len(observed) >= 3 and sum(row[2] for row in observed) >= 600_000, sustained
+        adopted = wait(rb'event=auto_delegate_sample seq=(\d+) source_us=\d+ elapsed_us=\d+ map1_worker=1 pending=0\b')
+        assert int(adopted[1]) >= int(accepted[1])
+        peer.sendall(frame(1, 'QI', 1, 3) + frame(5, 'QI', 1, 5))
+        assert receive(peer) == (2, 1, 10, 0)
+        assert receive(peer) == (6, 1, 42, 0)
+        continued = wait(rb'event=character_change_completed map=1 thread_id=(\d+) session_id=' + entered[2]
+                         + rb' character_id=' + original[1] + rb' value=42\b')
+        assert continued[1] != entered[1]
+        wait(rb'event=auto_delegate_sample seq=' + str(int(adopted[1]) + 4).encode() + rb'\b')
+    wait(rb'event=map_connection_removed map=1 thread_id=' + continued[1] + rb' session_id=' + entered[2] + rb'\b')
+    events = log()
+    assert events.count(b'event=auto_delegate_proposed ') == events.count(b'event=auto_delegate_accepted ') == 1
+    assert b'event=map_delegate_continued ' not in events
+    assert b'event=move_detached ' not in events and b'event=move_attached ' not in events
+    print(f'event=fixed_maps_auto_measure_pass pulse_seq={high_seq} proposal_seq={int(proposed[1])} adoption_seq={int(adopted[1])}')
+
+
 def assert_no_response(peer):
     assert not select.select([peer], [], [], 0.05)[0], 'packet arrived before the test gate released'
 
@@ -238,10 +294,10 @@ def destroy_empty_map(port, wait, release, log):
 DESTROY_IDLE_MILLISECONDS = 1000
 
 
-def configure(directory, role, port, controls=False, destroy_idle_milliseconds=0):
+def configure(directory, role, port, controls=False, destroy_idle_milliseconds=0, auto_delegate=False):
     (directory / 'FixedMaps.conf').write_text(
         f'FixedMaps:\n-Role={role};\n-Port={port};\n-Controls={int(controls)};\n'
-        f'-DestroyIdleMilliseconds={destroy_idle_milliseconds};\n', encoding='utf-16')
+        f'-DestroyIdleMilliseconds={destroy_idle_milliseconds};\n-AutoDelegate={int(auto_delegate)};\n', encoding='utf-16')
 
 
 def wait_for_server_log(server, log_path, pattern, timeout_seconds):
@@ -268,7 +324,8 @@ def run(executable, scenario=None):
             probe.bind(('127.0.0.1', 0))
             port = probe.getsockname()[1]
         configure(server_dir, 'Server', port, controls=scenario not in (None, migration_round_trip),
-                  destroy_idle_milliseconds=DESTROY_IDLE_MILLISECONDS if scenario is destroy_empty_map else 0)
+                  destroy_idle_milliseconds=DESTROY_IDLE_MILLISECONDS if scenario is destroy_empty_map else 0,
+                  auto_delegate=scenario is automatic_delegate)
         log_path = server_dir / 'stdout'
         with log_path.open('wb') as output, subprocess.Popen(
             [executable], cwd=server_dir, stdin=subprocess.DEVNULL,
@@ -277,7 +334,8 @@ def run(executable, scenario=None):
             try:
                 wait_for_server_log(server, log_path, rb'event=fixed_maps_ready port=' + str(port).encode() + rb'\b', 10)
                 if scenario:
-                    scenario(port, lambda pattern: wait_for_server_log(server, log_path, pattern, 3),
+                    timeout_seconds = 6 if scenario is automatic_delegate else 3
+                    scenario(port, lambda pattern: wait_for_server_log(server, log_path, pattern, timeout_seconds),
                              lambda name: (server_dir / name).touch(), log_path.read_bytes)
                     assert server.poll() is None, (server.returncode, log_path.read_bytes())
                     print(f'event=fixed_maps_migration_pass case={scenario.__name__}')
@@ -310,7 +368,7 @@ if __name__ == '__main__':
     parser.add_argument('executable', type=lambda path: Path(path).resolve(strict=True))
     scenarios = {case.__name__: case for case in (
         migration_round_trip, delayed_change, close_order, disconnect_in_transit, busy_destination, destroy_empty_map,
-        manual_delegate)}
+        manual_delegate, automatic_delegate)}
     parser.add_argument('--case', choices=scenarios)
     args = parser.parse_args()
     if args.case:

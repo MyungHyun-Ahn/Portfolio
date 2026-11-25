@@ -16,6 +16,8 @@ namespace ServerNetworkLib
 #include "MHLib/utils/CFileLoader.h"
 #include "IContents.h"
 #include "CContentsRuntime.h"
+#include "CContentsScheduler.h"
+#include "ContentsDelegatePolicies.h"
 #include "ContentsHandle.h"
 #include "FixedMapsProtocol.h"
 #include "FixedMapsMoveQueue.h"
@@ -34,8 +36,16 @@ namespace WorldServer
 	using MHLib::utils::ELogLevel;
 	using MHLib::utils::g_pLogger;
 	using ContentsRuntimeLib::CContentsRuntime;
+	using ContentsRuntimeLib::CContentsScheduler;
 	using ContentsRuntimeLib::ContentsHandle;
 	using ContentsRuntimeLib::IContents;
+
+	constexpr auto kAutoDelegateFrameInterval = 200ms;
+	// 한 평가에 두 맵의 완료 방문이 모두 잡히도록 프레임 두 번마다 수집한다.
+	constexpr auto kAutoDelegateEvaluationInterval = 350ms;
+	constexpr auto kAutoDelegateObservationPeriod = 600ms;
+	constexpr auto kAutoDelegateSchedulerId = 3;
+	constexpr std::size_t kAutoDelegateSchedulerWorker = 2;
 
 	class CMapHost;
 
@@ -312,11 +322,12 @@ namespace WorldServer
 	{
 	public:
 		CMapHost(UINT64 mapId, CServer &network, CMoveQueue &moveQueue, CContentsRuntime &runtime, bool usesTestControls,
-			std::chrono::milliseconds idleGrace)
+			std::chrono::milliseconds idleGrace, bool usesAutoDelegate)
 			: IContents(mapId)
 			, m_moveQueue(moveQueue)
 			, m_runtime(runtime)
 			, m_idleGrace(idleGrace)
+			, m_usesAutoDelegate(usesAutoDelegate)
 			, m_upMap(std::make_unique<CMapInstance>(mapId, network, moveQueue, *this, usesTestControls))
 		{
 		}
@@ -358,7 +369,10 @@ namespace WorldServer
 			if (!m_upMap)
 				return;
 			m_upMap->RunFrame();
-			requestTestDelegate();
+			if (m_usesAutoDelegate)
+				applyAutoDelegateTestDelay();
+			else
+				requestTestDelegate();
 			if (m_idleGrace == 0ms || !m_upMap->HasIdleGraceElapsed(m_idleGrace))
 			{
 				m_hasLoggedDestroyDeferred = false;
@@ -380,6 +394,20 @@ namespace WorldServer
 		}
 
 	private:
+		// 실제 맵 방문에 테스트 지연만 추가한다. 런타임에 전달되는 계측값은 바꾸지 않는다.
+		void applyAutoDelegateTestDelay()
+		{
+			if (!m_didRunAutoDelegatePulse && GetInstanceId() == kFirstMapId
+				&& CMapInstance::hasTestSignal(L"auto-delegate-pulse"))
+			{
+				m_didRunAutoDelegatePulse = true;
+				g_pLogger->WriteLogConsole(ELogLevel::Debug, L"event=auto_delegate_pulse map=1 | 맵 프레임 한 번을 지연합니다.");
+				std::this_thread::sleep_for(520ms);
+			}
+			if (CMapInstance::hasTestSignal(L"auto-delegate-sustained"))
+				std::this_thread::sleep_for(105ms);
+		}
+
 		// 파일 신호는 루프백 테스트에서만 수동 인계를 한 번 제출한다.
 		void requestTestDelegate()
 		{
@@ -403,9 +431,11 @@ namespace WorldServer
 		CContentsRuntime &m_runtime;
 		ContentsHandle m_completionHandle;
 		const std::chrono::milliseconds m_idleGrace;
+		const bool m_usesAutoDelegate;
 		std::unique_ptr<CMapInstance> m_upMap;
 		bool m_hasLoggedDestroyDeferred = false;
 		bool m_hasRequestedTestDelegate = false;
+		bool m_didRunAutoDelegatePulse = false;
 	};
 
 	bool CMapInstance::postChange(UINT64 sessionId)
@@ -413,9 +443,77 @@ namespace WorldServer
 		return m_host.PostChange(sessionId);
 	}
 
+	// 실제 스냅샷을 정책에 그대로 넘기고 시험에서 판정할 근거만 남긴다.
+	struct SAutoDelegateTestPolicy
+	{
+		using Clock = std::chrono::steady_clock;
+
+		std::optional<ContentsRuntimeLib::SDelegateCandidate> operator()(const ContentsRuntimeLib::SEntryTimings &snapshot,
+			const std::optional<ContentsRuntimeLib::SDelegateSubmitResult> &lastSubmit)
+		{
+			const auto now = Clock::now();
+			const auto previous = std::exchange(previousEvaluation, now);
+			const auto elapsed = previous ? now - *previous : Clock::duration{};
+			const auto candidate = policy.EvaluateAt(snapshot, now, lastSubmit);
+			Clock::duration sourceTime{};
+			std::size_t mapWorker = snapshot.workerCount;
+			bool isDelegating = false;
+			std::size_t mapVisits = 0;
+			for (const auto &entry : snapshot.entries)
+			{
+				if (entry.workerIndex == 0 && entry.visitCount != 0 && entry.totalTime >= Clock::duration{})
+					sourceTime += entry.totalTime;
+				if (entry.instanceId == kFirstMapId)
+				{
+					mapWorker = entry.workerIndex;
+					isDelegating = entry.isDelegating;
+					mapVisits = entry.visitCount;
+				}
+			}
+			++evaluationCount;
+			g_pLogger->WriteLogConsole(ELogLevel::Debug,
+				L"event=auto_delegate_sample seq=%zu source_us=%lld elapsed_us=%lld map1_worker=%zu pending=%u map1_visits=%zu"
+				L" | 실제 맵 방문 표본을 평가했습니다.", evaluationCount,
+				static_cast<long long>(std::chrono::duration_cast<std::chrono::microseconds>(sourceTime).count()),
+				static_cast<long long>(std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count()),
+				mapWorker, static_cast<unsigned>(isDelegating), mapVisits);
+			if (!didLogHigh && elapsed > Clock::duration{} && sourceTime * 5 >= elapsed * 4)
+			{
+				didLogHigh = true;
+				g_pLogger->WriteLogConsole(ELogLevel::Debug,
+					L"event=auto_delegate_pulse_high seq=%zu | 실제 표본에서 첫 과부하를 관측했습니다.", evaluationCount);
+			}
+			if (lastSubmit && lastSubmit->status == ContentsRuntimeLib::EDelegateSubmitStatus::Accepted)
+			{
+				g_pLogger->WriteLogConsole(ELogLevel::Debug,
+					L"event=auto_delegate_accepted seq=%zu map=%llu destination=%zu | 런타임이 인계 요청을 접수했습니다.",
+					evaluationCount, lastSubmit->candidate.instanceId, lastSubmit->candidate.destinationWorkerIndex);
+			}
+			if (candidate)
+			{
+				g_pLogger->WriteLogConsole(ELogLevel::Debug,
+					L"event=auto_delegate_proposed seq=%zu map=%llu destination=%zu | 정책이 인계 후보를 반환했습니다.",
+					evaluationCount, candidate->instanceId, candidate->destinationWorkerIndex);
+			}
+			return candidate;
+		}
+
+		ContentsRuntimeLib::DelegatePolicies::CPersistentOverloadDelegatePolicy policy{
+			{kAutoDelegateObservationPeriod, 3}, {kFirstMapId}};
+		std::optional<Clock::time_point> previousEvaluation;
+		std::size_t evaluationCount = 0;
+		bool didLogHigh = false;
+	};
+
 	class CFixedMapServer final : public CServer
 	{
 	public:
+		explicit CFixedMapServer(bool usesAutoDelegate)
+			: m_usesAutoDelegate(usesAutoDelegate)
+			, m_runtime(usesAutoDelegate ? 3 : 2, usesAutoDelegate ? kAutoDelegateFrameInterval : 5ms)
+		{
+		}
+
 		[[nodiscard]]
 		bool Run(USHORT port, bool usesTestControls, std::chrono::milliseconds idleGrace)
 		{
@@ -423,14 +521,23 @@ namespace WorldServer
 			{
 				const auto mapId = index + kFirstMapId;
 				auto upHost = std::make_unique<CMapHost>(mapId, *this, m_moveQueue, m_runtime, usesTestControls,
-					mapId == kSecondMapId ? idleGrace : 0ms);
+					mapId == kSecondMapId ? idleGrace : 0ms, m_usesAutoDelegate);
 				m_mapHosts[index] = upHost.get();
-				if (!m_runtime.RegisterContents(std::move(upHost), true, index))
+				if (!m_runtime.RegisterContents(std::move(upHost), true, m_usesAutoDelegate ? 0 : index))
 					return false;
 				m_completionHandles[index] = m_runtime.GetContentsHandle(mapId);
 				m_mapHosts[index]->SetCompletionHandle(m_completionHandles[index]);
 			}
 
+			// 자동 검증에서만 두 맵을 한 워커에 두고 빈 목적지와 관리 워커를 분리한다.
+			if (m_usesAutoDelegate)
+			{
+				m_autoDelegatePolicy.emplace();
+				auto upScheduler = std::make_unique<CContentsScheduler>(kAutoDelegateSchedulerId, m_runtime,
+					kAutoDelegateEvaluationInterval, std::ref(*m_autoDelegatePolicy));
+				if (!m_runtime.RegisterContents(std::move(upScheduler), true, kAutoDelegateSchedulerWorker))
+					return false;
+			}
 			if (!m_runtime.Start())
 				return false;
 			return Start("127.0.0.1", port, NetworkCommonLib::EPacketMode::Lan) != FALSE;
@@ -504,7 +611,9 @@ namespace WorldServer
 	private:
 
 		CMoveQueue m_moveQueue;
-		CContentsRuntime m_runtime{2, 5ms};
+		const bool m_usesAutoDelegate;
+		std::optional<SAutoDelegateTestPolicy> m_autoDelegatePolicy;
+		CContentsRuntime m_runtime;
 		std::array<CMapHost *, 2> m_mapHosts{};
 		std::array<ContentsHandle, 2> m_completionHandles;
 	};
@@ -651,14 +760,17 @@ int main(void)
 	loader.Parse(L"FixedMaps.conf");
 	INT64 configuredPort = -1;
 	INT64 controls = 0;
+	INT64 autoDelegate = 0;
 	INT64 destroyIdleMilliseconds = 0;
 	std::wstring role;
 	loader.Load(L"FixedMaps", L"Controls", &controls);
+	loader.Load(L"FixedMaps", L"AutoDelegate", &autoDelegate);
 	loader.Load(L"FixedMaps", L"DestroyIdleMilliseconds", &destroyIdleMilliseconds);
 	if (!loader.Load(L"FixedMaps", L"Role", &role) || !loader.Load(L"FixedMaps", L"Port", &configuredPort)
 		|| configuredPort <= 0 || configuredPort > USHRT_MAX || (role != L"Server" && role != L"Client")
 		|| (controls != 0 && controls != 1) || destroyIdleMilliseconds < 0 || destroyIdleMilliseconds > 60'000
-		|| (destroyIdleMilliseconds != 0 && (controls != 1 || role != L"Server")))
+		|| (destroyIdleMilliseconds != 0 && (controls != 1 || role != L"Server"))
+		|| (autoDelegate != 0 && (autoDelegate != 1 || controls != 1 || role != L"Server" || destroyIdleMilliseconds != 0)))
 	{
 		g_pLogger->WriteLogConsole(ELogLevel::Error, L"event=fixed_maps_bad_config | 테스트 설정이 잘못되었습니다.");
 		return 2;
@@ -679,7 +791,7 @@ int main(void)
 	serverSetting::contentsThreadCount = 1;
 	serverSetting::openPort = port;
 	serverSetting::packetCode = kFixedMapsPacketCode;
-	CFixedMapServer server;
+	CFixedMapServer server(autoDelegate == 1);
 	g_pServer = &server;
 	// 테스트 실행기가 이 프로세스만 회수한다. 기존 네트워크 Stop은 사용하지 않는다.
 	ExitProcess(server.Run(port, controls == 1, std::chrono::milliseconds{destroyIdleMilliseconds}) ? 0 : 1);

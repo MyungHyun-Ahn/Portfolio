@@ -4,11 +4,23 @@ namespace ContentsRuntimeLib
 {
 	class ContentsHandle;
 
-	struct SWorkerTimingSnapshot
+	// TakeEntryTimings()가 반환하는 원본 계측값
+	struct SEntryTimingSnapshot
 	{
-		std::size_t workerIndex;
+		ContentsInstanceId 					instanceId;
+		std::size_t 						workerIndex;
 		std::chrono::steady_clock::duration totalTime;
-		std::size_t frameCount;
+		std::size_t 						visitCount;
+		bool 								isDelegating;
+		// 인계 요청부터 편입 뒤 첫 수집까지 전환 구간으로 표시한다.
+		bool didRequestDelegate;
+	};
+
+	// 전체 워커 수와 엔트리별 방문 표본을 같은 수집 결과에 담는다.
+	struct SEntryTimings
+	{
+		std::size_t 						workerCount;
+		std::vector<SEntryTimingSnapshot> 	entries;
 	};
 
 	class CContentsRuntime final
@@ -31,22 +43,22 @@ namespace ContentsRuntimeLib
 		// 새 요청을 닫고 미확정 인계를 취소한다. 접수된 콜백을 처리한 뒤 워커를 종료한다.
 		void Stop();
 
-		// 시작 전에 등록된 인스턴스의 Handle을 얻는다. 없으면 빈 Handle을 반환한다.
-		[[nodiscard]]
-		ContentsHandle GetContentsHandle(ContentsInstanceId instanceId);
-
 		// 외부 스레드에서 완료를 접수한다. true는 큐 삽입 성공이며 실행 완료가 아니다.
 		// 프레임과 완료 콜백에서 빠져나온 예외는 복구하지 않는다.
 		[[nodiscard]]
-		bool PostCompletion(const ContentsHandle &handle, std::function<void()> completion);
+		bool 		PostCompletion(const ContentsHandle &handle, std::function<void()> completion);
 
 		// true는 접수만 뜻한다. 담당 워커가 실행 경계에서 인계하며, Stop이 먼저면 취소한다.
 		[[nodiscard]]
-		bool RequestDelegate(ContentsInstanceId instanceId, std::size_t destinationWorkerIndex);
+		bool 		RequestDelegate(ContentsInstanceId instanceId, std::size_t destinationWorkerIndex);
 
-		// 워커별 완료 순회의 누계를 가져오고 같은 락 안에서 초기화한다.
+		// 시작 전에 등록된 인스턴스의 Handle을 얻는다. 없으면 빈 Handle을 반환한다.
 		[[nodiscard]]
-		std::vector<SWorkerTimingSnapshot> TakeWorkerTimings();
+		ContentsHandle 	GetContentsHandle(ContentsInstanceId instanceId);
+
+		// 엔트리별 완료 방문 누계와 배정을 가져오고 누계를 초기화한다.
+		[[nodiscard]]
+		SEntryTimings TakeEntryTimings();
 
 	private:
 		friend struct SCompletionMailbox;

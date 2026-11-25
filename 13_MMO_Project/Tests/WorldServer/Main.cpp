@@ -3,6 +3,7 @@
 #include "ContentsHandle.h"
 #include "CContentsRuntime.h"
 #include "CContentsScheduler.h"
+#include "ContentsDelegatePolicies.h"
 
 namespace WorldServer
 {
@@ -282,6 +283,7 @@ namespace WorldServer
 			});
 		const bool requested = runtime.RequestDelegate(31, 1);
 		const bool rejectedPending = !runtime.RequestDelegate(31, 1);
+		const auto pendingTimings = runtime.TakeEntryTimings().entries;
 		const bool postedWhilePending = runtime.PostCompletion(handle, [&contents, &queuedRan]
 			{
 				contents.RecordCompletion(2);
@@ -320,9 +322,12 @@ namespace WorldServer
 			if (thread != contents.m_completionThread)
 				return 35;
 		}
-		const auto timings = runtime.TakeWorkerTimings();
-		if (timings.size() != 2 || timings[0].frameCount < 2 || timings[0].totalTime < 2 * kFrameInterval
-			|| timings[1].frameCount == 0)
+		const auto timings = runtime.TakeEntryTimings().entries;
+		if (pendingTimings.size() != 1 || pendingTimings[0].instanceId != 31 || pendingTimings[0].workerIndex != 0
+			|| !pendingTimings[0].isDelegating || !pendingTimings[0].didRequestDelegate
+			|| timings.size() != 1 || timings[0].instanceId != 31 || timings[0].workerIndex != 1
+			|| timings[0].visitCount < 3 || timings[0].totalTime < 2 * kFrameInterval
+			|| timings[0].isDelegating || !timings[0].didRequestDelegate)
 			return 36;
 		return 0;
 	}
@@ -611,58 +616,48 @@ namespace WorldServer
 		return completed && framesAfter == framesBefore && framed.m_frameCount > framesAfter ? 0 : 111;
 	}
 
-	// 작업 없는 순회도 한 프레임으로 세고, 진행 중인 순회는 누계에서 제외한다.
-	int RunWorkerTimingTest()
+	// 같은 워커에서 실행한 콘텐츠도 방문 시간을 각자 기록한다.
+	int RunEntryTimingTest()
 	{
 		using Clock = std::chrono::steady_clock;
-		std::binary_semaphore framedRan{0};
-		std::binary_semaphore completionRan{0};
-		Clock::duration completionTime{};
-		CContentsRuntime runtime(3, 100ms);
+		std::binary_semaphore completed{0};
+		CContentsRuntime runtime(2, 100ms);
 		auto upFramed = std::make_unique<CTestContents>(121, true);
 		auto &framed = *upFramed;
-		if (!runtime.RegisterContents(std::move(upFramed), true, 0) ||
-			!runtime.RegisterContents(std::make_unique<CTestContents>(122, false), false, 1))
+		if (!runtime.RegisterContents(std::move(upFramed), true, 0)
+			|| !runtime.RegisterContents(std::make_unique<CTestContents>(122, false), false, 0))
 			return 120;
-		const auto frameHandle = runtime.GetContentsHandle(121);
-		const auto completionHandle = runtime.GetContentsHandle(122);
+		const auto handle = runtime.GetContentsHandle(122);
 		if (!runtime.Start())
 			return 120;
-		const bool frameStarted = framed.m_frameStarted.try_acquire_for(kWaitTimeout);
-		const auto heldSince = Clock::now();
-		const bool posted = frameStarted && runtime.PostCompletion(frameHandle, [&framedRan, &completionTime]
-			{
-				const auto start = Clock::now();
-				std::this_thread::sleep_for(10ms);
-				completionTime = Clock::now() - start;
-				framedRan.release();
-			}) && runtime.PostCompletion(completionHandle, [&completionRan]
+		const bool started = framed.m_frameStarted.try_acquire_for(kWaitTimeout);
+		const auto baseline = runtime.TakeEntryTimings();
+		const auto duringFrame = runtime.TakeEntryTimings().entries;
+		const auto start = Clock::now();
+		const bool posted = started && runtime.PostCompletion(handle, [&completed]
 			{
 				std::this_thread::sleep_for(10ms);
-				completionRan.release();
+				completed.release();
 			});
-		const auto beforeFrameEnds = runtime.TakeWorkerTimings();
-		const auto duringFrame = runtime.TakeWorkerTimings();
 		if (posted)
 			std::this_thread::sleep_for(20ms);
-		const auto frameHoldTime = Clock::now() - heldSince;
+		const auto frameHoldTime = Clock::now() - start;
 		framed.m_releaseFrame.release();
-		const bool completed = posted && framedRan.try_acquire_for(kWaitTimeout) && completionRan.try_acquire_for(kWaitTimeout);
+		const bool ran = posted && completed.try_acquire_for(kWaitTimeout);
 		runtime.Stop();
-		const auto timings = runtime.TakeWorkerTimings();
-		const auto cleared = runtime.TakeWorkerTimings();
-		if (!completed || timings.size() != 3 || beforeFrameEnds.size() != 3 || duringFrame.size() != 3 || cleared.size() != 3)
+		const auto timings = runtime.TakeEntryTimings().entries;
+		const auto cleared = runtime.TakeEntryTimings().entries;
+		if (!ran || baseline.workerCount != 2 || baseline.entries.size() != 2
+			|| duringFrame.size() != 2 || timings.size() != 2 || cleared.size() != 2)
 			return 121;
-		if (duringFrame[0].totalTime != Clock::duration::zero() || duringFrame[0].frameCount != 0
-			|| timings[0].totalTime < frameHoldTime + completionTime
-			|| timings[0].frameCount < 2
-			|| beforeFrameEnds[1].totalTime + duringFrame[1].totalTime + timings[1].totalTime < 10ms
-			|| beforeFrameEnds[1].frameCount + duringFrame[1].frameCount + timings[1].frameCount < 2
-			|| beforeFrameEnds[2].frameCount + duringFrame[2].frameCount + timings[2].frameCount == 0)
+		if (duringFrame[0].visitCount != 0 || duringFrame[1].visitCount != 0
+			|| timings[0].instanceId != 121 || timings[0].workerIndex != 0 || timings[0].totalTime < frameHoldTime
+			|| timings[1].instanceId != 122 || timings[1].workerIndex != 0 || timings[1].totalTime < 10ms
+			|| timings[0].visitCount == 0 || timings[1].visitCount == 0)
 			return 122;
-		for (std::size_t i = 0; i < timings.size(); ++i)
+		for (const auto &timing : cleared)
 		{
-			if (timings[i].workerIndex != i || cleared[i].totalTime != Clock::duration::zero() || cleared[i].frameCount != 0)
+			if (timing.totalTime != Clock::duration::zero() || timing.visitCount != 0)
 				return 123;
 		}
 		return 0;
@@ -671,12 +666,13 @@ namespace WorldServer
 	struct SSchedulerTestPolicy
 	{
 		// 이동 없음, 자기 자신, 정상 인계 순으로 후보를 반환한다.
-		std::optional<SDelegateCandidate> operator()(const std::vector<ContentsRuntimeLib::SWorkerTimingSnapshot> &timings)
+		std::optional<SDelegateCandidate> operator()(const ContentsRuntimeLib::SEntryTimings &timings,
+			const std::optional<ContentsRuntimeLib::SDelegateSubmitResult> &lastSubmit)
 		{
 			const auto now = std::chrono::steady_clock::now();
-			for (const auto &timing : timings)
+			for (const auto &timing : timings.entries)
 			{
-				if (timing.workerIndex == 2 && timing.frameCount != 0)
+				if (timing.instanceId == 93 && timing.workerIndex == 2 && timing.visitCount != 0)
 					didReadTiming = true;
 			}
 			if (evaluationCount != 0 && now - lastEvaluation < 20ms)
@@ -684,24 +680,43 @@ namespace WorldServer
 			lastEvaluation = now;
 			if (++evaluationCount == 2)
 				return SDelegateCandidate{93, 1};
+			using ContentsRuntimeLib::EDelegateSubmitStatus;
 			if (evaluationCount == 3)
-				return SDelegateCandidate{91, 1};
+			{
+				didReadSubmitResults = lastSubmit && lastSubmit->candidate.instanceId == 93
+					&& lastSubmit->status == EDelegateSubmitStatus::NotSubmitted;
+				return SDelegateCandidate{91, timings.workerCount};
+			}
 			if (evaluationCount == 4)
+			{
+				didReadSubmitResults = didReadSubmitResults && lastSubmit && lastSubmit->candidate.instanceId == 91
+					&& lastSubmit->candidate.destinationWorkerIndex == timings.workerCount
+					&& lastSubmit->status == EDelegateSubmitStatus::Rejected;
+				return SDelegateCandidate{91, 1};
+			}
+			if (evaluationCount == 5)
+				didReadSubmitResults = didReadSubmitResults && lastSubmit && lastSubmit->candidate.instanceId == 91
+					&& lastSubmit->candidate.destinationWorkerIndex == 1 && lastSubmit->status == EDelegateSubmitStatus::Accepted;
+			if (evaluationCount == 6)
+			{
+				didReadSubmitResults = didReadSubmitResults && !lastSubmit;
 				didSubmit.release();
+			}
 			return std::nullopt;
 		}
 
 		std::binary_semaphore didSubmit{0};
 		std::chrono::steady_clock::time_point lastEvaluation{};
 		int evaluationCount = 0;
+		bool didReadSubmitResults = false;
 		bool didEvaluateEarly = false;
 		bool didReadTiming = false;
 	};
 
-	// 고정 정책을 실제 워커에서 평가하고 기존 Delegate 경로로 인계하는지 확인한다.
-	int RunSchedulerTest()
+	// 같은 스케줄러 생성자에 정책을 주입해 기존 Delegate 경로를 확인한다.
+	template <typename TPolicy>
+	int RunSchedulerTest(TPolicy &policy, bool useEmptyDestination = false)
 	{
-		SSchedulerTestPolicy policy;
 		std::counting_semaphore<> completed{0};
 		std::thread::id schedulerThread;
 		CContentsRuntime runtime(3, 1ms);
@@ -710,7 +725,8 @@ namespace WorldServer
 		auto upDestination = std::make_unique<CTestContents>(92, false);
 		auto &destination = *upDestination;
 		if (!runtime.RegisterContents(std::move(upSource), false, 0)
-			|| !runtime.RegisterContents(std::move(upDestination), false, 1)
+			|| (useEmptyDestination && !runtime.RegisterContents(std::make_unique<CTestContents>(90, false), false, 0))
+			|| (!useEmptyDestination && !runtime.RegisterContents(std::move(upDestination), false, 1))
 			|| !runtime.RegisterContents(std::make_unique<CContentsScheduler>(93, runtime, 20ms, std::ref(policy)), true, 2))
 			return 90;
 
@@ -725,21 +741,248 @@ namespace WorldServer
 			{
 				source.RecordCompletion(1);
 				completed.release();
-			}) && runtime.PostCompletion(destinationHandle, [&destination, &completed]
+			}) && (useEmptyDestination || runtime.PostCompletion(destinationHandle, [&destination, &completed]
 			{
 				destination.RecordCompletion(1);
 				completed.release();
-			}) && runtime.PostCompletion(schedulerHandle, [&schedulerThread, &completed]
+			})) && runtime.PostCompletion(schedulerHandle, [&schedulerThread, &completed]
 			{
 				schedulerThread = std::this_thread::get_id();
 				completed.release();
 			});
 		const bool ran = posted && completed.try_acquire_for(kWaitTimeout) && completed.try_acquire_for(kWaitTimeout)
-			&& completed.try_acquire_for(kWaitTimeout);
+			&& (useEmptyDestination || completed.try_acquire_for(kWaitTimeout));
 		runtime.Stop();
-		return ran && policy.didReadTiming && !policy.didEvaluateEarly && source.m_completionThread == destination.m_completionThread
-			&& schedulerThread != destination.m_completionThread ? 0 : 92;
+		return ran && policy.didReadTiming && !policy.didEvaluateEarly && source.m_completionThread != schedulerThread
+			&& (useEmptyDestination || source.m_completionThread == destination.m_completionThread) ? 0 : 92;
 	}
+
+	struct SDelegatePolicyFixture
+	{
+		// 워커 부하와 평가 간격을 고정하여 정책만 시험한다.
+		std::optional<SDelegateCandidate> Evaluate(ContentsRuntimeLib::DelegatePolicies::CPersistentOverloadDelegatePolicy &policy,
+			std::chrono::milliseconds sourceTime, bool didRequestDelegate = false)
+		{
+			now += 100ms;
+			return policy.EvaluateAt({3, {{90, 0, sourceTime - 20ms, 1, false, false}, {91, 0, 20ms, 1, false, didRequestDelegate},
+				{92, 1, 30ms, 1, false, false}, {93, 2, 10ms, 1, false, false}}}, now);
+		}
+
+		std::chrono::steady_clock::time_point now{};
+	};
+
+	// 과부하의 지속과 회복을 구분하고 근거 없는 인계는 하지 않는다.
+	int RunPersistentPolicyTest()
+	{
+		using namespace ContentsRuntimeLib::DelegatePolicies;
+		SDelegatePolicyFixture fixture;
+		CPersistentOverloadDelegatePolicy policy({200ms, 2}, {90, 91});
+		for (const auto sourceTime : {90ms, 90ms, 90ms, 60ms, 60ms, 90ms, 90ms, 90ms})
+		{
+			if (fixture.Evaluate(policy, sourceTime))
+				return 130;
+		}
+		const auto selected = fixture.Evaluate(policy, 90ms);
+		if (!selected || selected->instanceId != 91 || selected->destinationWorkerIndex != 2)
+			return 131;
+		const ContentsRuntimeLib::SEntryTimings pending{3, {{90, 0, 70ms, 1, false, false}, {91, 0, 20ms, 1, true, true},
+			{92, 1, 30ms, 1, false, false}, {93, 2, 10ms, 1, false, false}}};
+		const ContentsRuntimeLib::SDelegateSubmitResult accepted{*selected, ContentsRuntimeLib::EDelegateSubmitStatus::Accepted};
+		if (policy.EvaluateAt(pending, fixture.now += 100ms, accepted))
+			return 132;
+		for (int i = 0; i < 5; ++i)
+		{
+			if (policy.EvaluateAt(pending, fixture.now += 100ms))
+				return 132;
+		}
+
+		CPersistentOverloadDelegatePolicy noFacts({200ms, 2});
+		const CContentsScheduler::SelectCandidate directPolicy = std::ref(noFacts);
+		if (directPolicy({2, {{91, 0, 90ms, 1, false, false}, {92, 1, 30ms, 1, false, false}}}, std::nullopt))
+			return 133;
+		CPersistentOverloadDelegatePolicy unknownDestination({200ms, 2}, {90, 91});
+		for (int i = 0; i < 6; ++i)
+		{
+			fixture.now += 100ms;
+			const std::vector<ContentsRuntimeLib::SEntryTimingSnapshot> timings{
+				{90, 0, 70ms, 1, false, false}, {91, 0, 20ms, 1, false, false}, {92, 1, {}, 0, false, false}};
+			if (noFacts.EvaluateAt({2, {{91, 0, 90ms, 1, false, false}, {92, 1, 30ms, 1, false, false}}}, fixture.now)
+				|| unknownDestination.EvaluateAt({2, timings}, fixture.now))
+				return 133;
+		}
+		CPersistentOverloadDelegatePolicy mixedAssignment({200ms, 2}, {90, 91});
+		for (int i = 0; i < 4; ++i)
+		{
+			if (fixture.Evaluate(mixedAssignment, 90ms))
+				return 134;
+		}
+		if (fixture.Evaluate(mixedAssignment, 90ms, true))
+			return 134;
+		for (int i = 0; i < 3; ++i)
+		{
+			if (fixture.Evaluate(mixedAssignment, 90ms))
+				return 134;
+		}
+		if (!fixture.Evaluate(mixedAssignment, 90ms))
+			return 134;
+		return 0;
+	}
+
+	// 빈 워커만 부하 0으로 보고 미계측과 인계 대기를 제외한다.
+	int RunEmptyWorkerPolicyTest()
+	{
+		using namespace ContentsRuntimeLib;
+		using namespace DelegatePolicies;
+		CPersistentOverloadDelegatePolicy empty({200ms, 2}, {91});
+		CPersistentOverloadDelegatePolicy unmeasured({200ms, 2}, {91});
+		CPersistentOverloadDelegatePolicy inbound({200ms, 2}, {91});
+		SEntryTimings timings{2, {{90, 0, 70ms, 1, false, false}, {91, 0, 20ms, 1, false, false}}};
+		auto zeroVisits = timings;
+		zeroVisits.entries.push_back({92, 1, {}, 0, false, false});
+		auto pending = timings;
+		pending.entries.push_back({92, 1, {}, 0, true, true});
+		for (int i = 0; i < 5; ++i)
+		{
+			const auto now = std::chrono::steady_clock::time_point{} + i * 100ms;
+			const auto candidate = empty.EvaluateAt(timings, now);
+			if (unmeasured.EvaluateAt(zeroVisits, now) || inbound.EvaluateAt(i == 3 ? pending : timings, now))
+				return 135;
+			if (i < 4 ? candidate.has_value() : !candidate || candidate->instanceId != 91 || candidate->destinationWorkerIndex != 1)
+				return 136;
+		}
+		return 0;
+	}
+
+	// 접수 거절 뒤에는 다른 쌍을 시도하고, 접수된 요청은 편입까지 한 건만 유지한다.
+	int RunDelegateRetryPolicyTest()
+	{
+		using namespace ContentsRuntimeLib;
+		using namespace DelegatePolicies;
+		using Clock = std::chrono::steady_clock;
+		const SEntryTimings before{3, {{90, 0, 60ms, 1, false, false}, {91, 0, 30ms, 1, false, false}}};
+		CPersistentOverloadDelegatePolicy policy({200ms, 2}, {91});
+		Clock::time_point now{};
+		std::optional<SDelegateCandidate> candidate;
+		for (int i = 0; i < 5; ++i, now += 100ms)
+			candidate = policy.EvaluateAt(before, now);
+		if (!candidate || candidate->instanceId != 91 || candidate->destinationWorkerIndex != 1)
+			return 137;
+		if (policy.EvaluateAt(before, now, SDelegateSubmitResult{*candidate, EDelegateSubmitStatus::Rejected}))
+			return 138;
+		for (int i = 0; i < 4; ++i)
+			candidate = policy.EvaluateAt(before, now += 100ms);
+		if (!candidate || candidate->instanceId != 91 || candidate->destinationWorkerIndex != 2)
+			return 139;
+
+		auto pending = before;
+		pending.entries[1].isDelegating = true;
+		pending.entries[1].didRequestDelegate = true;
+		if (policy.EvaluateAt(pending, now += 100ms, SDelegateSubmitResult{*candidate, EDelegateSubmitStatus::Accepted}))
+			return 140;
+		for (int i = 0; i < 8; ++i)
+		{
+			if (policy.EvaluateAt(pending, now += 100ms))
+				return 140;
+		}
+		pending.entries[1].workerIndex = 2;
+		if (policy.EvaluateAt(pending, now += 100ms))
+			return 140;
+		pending.entries[1].isDelegating = false;
+		if (policy.EvaluateAt(pending, now += 100ms))
+			return 141;
+
+		// 편입 이후 이전 워커는 한가하고 목적지에서 역이동 이득이 나더라도 첫 관찰에는 막는다.
+		SEntryTimings after{3, {{90, 0, 10ms, 1, false, false}, {91, 2, 30ms, 1, false, false},
+			{92, 2, 60ms, 1, false, false}, {93, 1, 50ms, 1, false, false}}};
+		for (int i = 0; i < 4; ++i)
+		{
+			if (policy.EvaluateAt(after, now += 100ms))
+				return 142;
+		}
+		for (int i = 0; i < 4; ++i)
+			candidate = policy.EvaluateAt(after, now += 100ms);
+		if (!candidate || candidate->instanceId != 91 || candidate->destinationWorkerIndex != 0)
+			return 143;
+		return 0;
+	}
+
+	// 제출 결과가 없거나 편입 후 표본이 부족해도 판단을 다시 시작할 수 있다.
+	int RunIncompleteDelegateFeedbackTest()
+	{
+		using namespace ContentsRuntimeLib;
+		using namespace DelegatePolicies;
+		const SEntryTimings before{3, {{90, 0, 45ms, 1, false, false}, {91, 0, 30ms, 1, false, false},
+			{94, 0, 15ms, 1, false, false}}};
+		CPersistentOverloadDelegatePolicy missingResult({200ms, 2}, {91, 94});
+		CPersistentOverloadDelegatePolicy missingTiming({200ms, 2}, {91, 94});
+		std::chrono::steady_clock::time_point now{};
+		std::optional<SDelegateCandidate> first, second;
+		for (int i = 0; i < 5; ++i, now += 100ms)
+		{
+			first = missingResult.EvaluateAt(before, now);
+			second = missingTiming.EvaluateAt(before, now);
+		}
+		if (!first || !second || second->instanceId != 91 || second->destinationWorkerIndex != 1)
+			return 145;
+		SEntryTimings adopted{3, {{90, 0, 65ms, 1, false, false}, {91, 1, {}, 0, false, true}, {94, 0, 25ms, 1, false, false}}};
+		if (missingResult.EvaluateAt(before, now)
+			|| missingTiming.EvaluateAt(adopted, now, SDelegateSubmitResult{*second, EDelegateSubmitStatus::Accepted}))
+			return 146;
+		adopted.entries[1].didRequestDelegate = false;
+		for (int i = 0; i < 4; ++i)
+		{
+			now += 100ms;
+			first = missingResult.EvaluateAt(before, now);
+			if (missingTiming.EvaluateAt(adopted, now))
+				return 147;
+		}
+		if (!first)
+			return 148;
+		if (missingTiming.EvaluateAt(adopted, now += 100ms))
+			return 149;
+		second = missingTiming.EvaluateAt(adopted, now += 100ms);
+		return second && second->instanceId == 94 && second->destinationWorkerIndex == 2 ? 0 : 150;
+	}
+
+	struct SPersistentSchedulerTestPolicy
+	{
+		// 실제 평가 호출에서 받은 스냅샷을 확인하고 부하 판단에는 시험값을 쓴다.
+		std::optional<SDelegateCandidate> operator()(const ContentsRuntimeLib::SEntryTimings &timings,
+			const std::optional<ContentsRuntimeLib::SDelegateSubmitResult> &lastSubmit)
+		{
+			for (const auto &timing : timings.entries)
+			{
+				if (timing.instanceId == 93 && timing.workerIndex == 2 && timing.visitCount != 0)
+					didReadTiming = true;
+				if (timing.instanceId == 91 && timing.workerIndex == 1 && !timing.isDelegating && !didSignal)
+				{
+					didSignal = true;
+				}
+			}
+			auto input = timings;
+			for (auto &timing : input.entries)
+			{
+				timing.totalTime = timing.instanceId == 91 ? 20ms : 70ms;
+				timing.visitCount = 1;
+			}
+			const auto candidate = policy.EvaluateAt(input, fixture.now += 100ms, lastSubmit);
+			if (didSignal && !didNotify)
+			{
+				didNotify = true;
+				didSubmit.release();
+			}
+			return candidate;
+		}
+
+		SDelegatePolicyFixture fixture;
+		ContentsRuntimeLib::DelegatePolicies::CPersistentOverloadDelegatePolicy policy{
+			{200ms, 2}, {91}};
+		std::binary_semaphore didSubmit{0};
+		bool didReadTiming = false;
+		bool didEvaluateEarly = false;
+		bool didSignal = false;
+		bool didNotify = false;
+	};
 
 	// 인계 확정 전에 종료하면 접수된 완료를 출발 워커에서 비운다.
 	int RunDelegateStopTest()
@@ -805,6 +1048,27 @@ int main(void)
 	const int overrunResult = WorldServer::RunCompletionBatchOverrunTest();
 	if (overrunResult != 0)
 		return overrunResult;
-	const int timingResult = WorldServer::RunWorkerTimingTest();
-	return timingResult != 0 ? timingResult : WorldServer::RunSchedulerTest();
+	const int timingResult = WorldServer::RunEntryTimingTest();
+	if (timingResult != 0)
+		return timingResult;
+	const int policyResult = WorldServer::RunPersistentPolicyTest();
+	if (policyResult != 0)
+		return policyResult;
+	const int emptyWorkerResult = WorldServer::RunEmptyWorkerPolicyTest();
+	if (emptyWorkerResult != 0)
+		return emptyWorkerResult;
+	const int retryPolicyResult = WorldServer::RunDelegateRetryPolicyTest();
+	if (retryPolicyResult != 0)
+		return retryPolicyResult;
+	const int incompleteFeedbackResult = WorldServer::RunIncompleteDelegateFeedbackTest();
+	if (incompleteFeedbackResult != 0)
+		return incompleteFeedbackResult;
+	WorldServer::SSchedulerTestPolicy fixed;
+	const int fixedResult = WorldServer::RunSchedulerTest(fixed);
+	if (fixedResult != 0)
+		return fixedResult;
+	if (!fixed.didReadSubmitResults)
+		return 144;
+	WorldServer::SPersistentSchedulerTestPolicy persistent;
+	return WorldServer::RunSchedulerTest(persistent, true);
 }
