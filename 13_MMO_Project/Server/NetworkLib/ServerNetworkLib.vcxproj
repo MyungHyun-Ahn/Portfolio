@@ -173,11 +173,13 @@
   </ImportGroup>
   <ItemGroup>
     <ClCompile Include="CServer.cpp" />
+    <ClCompile Include="CSession.cpp" />
     <ClCompile Include="ServerNetworkLibPch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="ServerSetting.cpp" />
     <ClInclude Include="CServer.h" />
+    <ClInclude Include="CSession.h" />
     <ClInclude Include="ServerNetworkLibPch.h" />
     <ClInclude Include="ServerSetting.h" />
   </ItemGroup>

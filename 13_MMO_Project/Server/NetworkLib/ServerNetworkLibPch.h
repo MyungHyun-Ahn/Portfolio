@@ -12,3 +12,4 @@ namespace ServerNetworkLib
 
 #include "ServerSetting.h"
 #include "CServer.h"
+#include "CSession.h"
