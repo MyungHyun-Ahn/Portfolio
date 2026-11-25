@@ -16,26 +16,6 @@ void SMonitorTimerEvent::Execute(int delayFrame) noexcept
 	g_monitor.Update(g_pServer->GetSessionCount());
 }
 
-void SKeyboardTimerEvent::SetEvent() noexcept
-{
-	// execute = std::bind(&KeyBoardTimerEvent::Execute, this);
-	m_isRunning = true;
-	m_isTimerEvent = true;
-	m_timeMilliseconds = 1000; // 1초
-	m_nextExecuteTime = timeGetTime(); // 현재 시각
-}
-
-void SKeyboardTimerEvent::Execute(int delayFrame) noexcept
-{
-	// 서버 종료
-	if (GetAsyncKeyState(VK_F1))
-		ServerNetworkLib::g_pServer->Stop();
-
-	// 프로파일러 저장
-	if (GetAsyncKeyState(VK_F2))
-		g_pProfileManager->DataOutToFile();
-}
-
 SContentsFrameEvent::~SContentsFrameEvent()
 {
 	delete m_pBaseContent;

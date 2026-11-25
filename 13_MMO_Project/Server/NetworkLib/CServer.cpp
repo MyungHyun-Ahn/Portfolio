@@ -1080,10 +1080,5 @@ CServer *g_pServer = nullptr;
 		pMonitorEvent->SetEvent();
 		CContentsThread::EnqueueEvent(pMonitorEvent);
 		// CContentThread::s_arrContentThreads[2]->EnqueueEventMy(pMonitorEvent);
-
-		SKeyboardTimerEvent *pKeyBoardEvent = new SKeyboardTimerEvent;
-		pKeyBoardEvent->SetEvent();
-		CContentsThread::EnqueueEvent(pKeyBoardEvent);
-		// CContentThread::s_arrContentThreads[2]->EnqueueEventMy(pKeyBoardEvent);
 	}
 }
