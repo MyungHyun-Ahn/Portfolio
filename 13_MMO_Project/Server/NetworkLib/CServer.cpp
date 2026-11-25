@@ -931,10 +931,11 @@ CServer *g_pServer = nullptr;
 		m_pSessions[index] = pSession;
 
 		// 서버 중단 상태면 연결 끊기
+		// * 이미 등록·카운트된 세션이므로 TRUE를 반환해 정상 해제 경로(OnAccept → 수신 취소 → ReleaseSession)로 보낸다.
 		if (m_isStop)
 		{
 			Disconnect(combineId);
-			return FALSE;
+			return TRUE;
 		}
 
 		return TRUE;
