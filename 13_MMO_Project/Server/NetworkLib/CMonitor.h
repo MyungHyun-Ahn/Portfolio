@@ -76,10 +76,6 @@ private:
 	UINT64 m_pageFaults = 0;
 
 public:
-	LONG m_acceptTps = 0;
-	INT64 m_acceptTotal = 0;
-	INT64 m_sendPendingCount = 0;
-	INT64 m_sendCallCount = 0;
 	LONG m_delWork = 0;
 	LONG m_stealWork = 0;
 

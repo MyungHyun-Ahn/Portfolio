@@ -211,7 +211,7 @@ void CMonitor::updateServer(SMonitorSnapshot &outSnapshot) noexcept
 	const auto elapsedMilliseconds = nowMilliseconds - m_lastServerMilliseconds;
 	outSnapshot.m_hasIntervalRates = m_hasServerSample && elapsedMilliseconds > 0;
 	// 교환 연산의 반환값을 사용해 샘플링과 리셋 사이에 증가분을 잃지 않는다.
-	LONG *counters[] = {&m_acceptTps, &g_networkCounters.m_recvTps, &g_networkCounters.m_sendTps,
+	LONG *counters[] = {&g_networkCounters.m_acceptTps, &g_networkCounters.m_recvTps, &g_networkCounters.m_sendTps,
 		&m_delWork, &m_stealWork, &g_networkCounters.m_maxSendCount};
 	static_assert(_countof(counters) == SMonitorSnapshot::kIntervalCount);
 	for (size_t index = 0; index < _countof(counters); ++index)
@@ -229,9 +229,9 @@ void CMonitor::updateServer(SMonitorSnapshot &outSnapshot) noexcept
 	m_lastServerMilliseconds = nowMilliseconds;
 	m_hasServerSample = true;
 	outSnapshot.m_sampledAtMilliseconds = nowMilliseconds;
-	outSnapshot.m_accepted = static_cast<UINT64>(InterlockedCompareExchange64(&m_acceptTotal, 0, 0));
-	outSnapshot.m_sendCalls = static_cast<UINT64>(InterlockedCompareExchange64(&m_sendCallCount, 0, 0));
-	outSnapshot.m_sendPending = static_cast<UINT64>(InterlockedCompareExchange64(&m_sendPendingCount, 0, 0));
+	outSnapshot.m_accepted = static_cast<UINT64>(InterlockedCompareExchange64(&g_networkCounters.m_acceptTotal, 0, 0));
+	outSnapshot.m_sendCalls = static_cast<UINT64>(InterlockedCompareExchange64(&g_networkCounters.m_sendCallCount, 0, 0));
+	outSnapshot.m_sendPending = static_cast<UINT64>(InterlockedCompareExchange64(&g_networkCounters.m_sendPendingCount, 0, 0));
 }
 
 void CMonitor::updatePdh(SMonitorSnapshot &outSnapshot) noexcept

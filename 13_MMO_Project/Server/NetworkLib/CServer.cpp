@@ -359,7 +359,7 @@ CServer *g_pServer = nullptr;
 		InterlockedAnd(&m_sendFlag, TRUE);
 
 		ZeroMemory((m_pMyOverlappedStartAddr + 2), sizeof(OVERLAPPED));
-		InterlockedIncrement64(&g_monitor.m_sendCallCount);
+		InterlockedIncrement64(&g_networkCounters.m_sendCallCount);
 		{
 			PROFILE_BEGIN(0, "WSASend");
 			retVal = WSASend(m_sessionSocket, wsaBuf, m_sendCount, nullptr, 0, (LPOVERLAPPED)(m_pMyOverlappedStartAddr + 2), NULL);
@@ -382,7 +382,7 @@ CServer *g_pServer = nullptr;
 			}
 			else
 			{
-				InterlockedIncrement64(&g_monitor.m_sendPendingCount);
+				InterlockedIncrement64(&g_networkCounters.m_sendPendingCount);
 				if (m_cancelIoCalled)
 				{
 					CancelIoEx((HANDLE)m_sessionSocket, nullptr);
@@ -878,7 +878,7 @@ CServer *g_pServer = nullptr;
 
 	BOOL CServer::AcceptExCompleted(CSession *pSession) noexcept
 	{
-		InterlockedIncrement(&g_monitor.m_acceptTps);
+		InterlockedIncrement(&g_networkCounters.m_acceptTps);
 
 		int retVal;
 		int errVal;
@@ -927,7 +927,7 @@ CServer *g_pServer = nullptr;
 		pSession->Init(combineId);
 
 		InterlockedIncrement(&m_sessionCount);
-		InterlockedIncrement64(&g_monitor.m_acceptTotal);
+		InterlockedIncrement64(&g_networkCounters.m_acceptTotal);
 		m_pSessions[index] = pSession;
 
 		// 서버 중단 상태면 연결 끊기

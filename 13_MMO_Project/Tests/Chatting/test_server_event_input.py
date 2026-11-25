@@ -414,7 +414,9 @@ def metrics(base, configuration):
         assert initial["net_sessions"] == 0
         assert initial["process_working_set_bytes"] > 0
         assert initial["process_nonpaged_pool_bytes"] > 0
+        assert initial["net_accept_completions_total"] == 0
         assert initial["net_sessions_accepted_total"] == 0
+        assert initial["net_wsasend_calls_total"] == initial["net_wsasend_pending_total"] == 0
         wait_text(server, f"event=server_ready port={chat_port}")
         idle_rates = wait_metrics(address, metrics_port, lambda values: "net_accept_completions_per_second" in values
                                   and "chat_message_requests_per_second" in values)
@@ -449,10 +451,11 @@ def metrics(base, configuration):
             active = wait_metrics(address, metrics_port, lambda values: values.get("net_sessions") == 1
                                   and values.get("chat_message_send_requests_total", 0) >= 1
                                   and values.get("net_sent_packets_total", 0) >= 3)
-            assert active["net_sessions_accepted_total"] == 1
+            assert active["net_accept_completions_total"] == active["net_sessions_accepted_total"] == 1
             assert active["net_received_packets_total"] >= 3
             assert active["net_sent_packets_total"] >= 3
             assert active["net_wsasend_calls_total"] >= 1
+            assert 0 <= active["net_wsasend_pending_total"] <= active["net_wsasend_calls_total"]
             assert active["chat_login_requests_total"] == 1
             assert active["chat_sector_move_requests_total"] == 1
             assert active["chat_content_updates_total"] >= 3
@@ -465,6 +468,9 @@ def metrics(base, configuration):
                             and values.get("chat_message_requests_per_second") == 0
                             and values.get("chat_message_send_requests_per_second") == 0)
         assert idle["net_received_packets_total"] == active["net_received_packets_total"]
+        assert idle["net_accept_completions_total"] == idle["net_sessions_accepted_total"] == 1
+        assert idle["net_wsasend_calls_total"] >= active["net_wsasend_calls_total"]
+        assert idle["net_wsasend_pending_total"] >= active["net_wsasend_pending_total"]
         assert idle["chat_message_requests_total"] == idle["chat_message_send_requests_total"] == 1
         send(server, "/exit")
         assert server[0].wait(timeout=8) == 0
