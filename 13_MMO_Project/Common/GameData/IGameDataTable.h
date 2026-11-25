@@ -11,7 +11,11 @@ namespace GameData
 		[[nodiscard]]
 		virtual bool Load(const std::filesystem::path& path) = 0;
 
-		// 다른 테이블이나 공개 상태에 의존하지 않고 로컬 규칙만 검사한다.
+		// 모든 테이블을 읽은 뒤 필요한 파생 데이터를 준비한다.
+		[[nodiscard]]
+		virtual bool Init() = 0;
+
+		// 모든 테이블을 초기화한 뒤 읽기 전용으로 규칙을 검사한다.
 		[[nodiscard]]
 		virtual bool Validate() const = 0;
 	};

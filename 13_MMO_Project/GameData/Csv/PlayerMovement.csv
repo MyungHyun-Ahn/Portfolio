@@ -1,6 +1,6 @@
 #Table,PlayerMovement,,,
 #Target,Shared,,,
-,,,,
+#Workbook,Player,,,
 #Key,Primary,,,
 #Scope,Shared,Server,Server,Client
 #Type,uint32,uint32,uint32,uint32

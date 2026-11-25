@@ -1,6 +1,6 @@
 #pragma once
 
-namespace GameData::Client
+namespace GameData::Client::Player
 {
 	struct SPlayerMovementRow
 	{

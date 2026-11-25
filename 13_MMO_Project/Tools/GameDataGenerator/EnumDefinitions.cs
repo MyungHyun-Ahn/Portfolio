@@ -21,7 +21,7 @@ internal sealed class EnumDefinitions
         PTRDIFF_MIN PTRDIFF_MAX SIG_ATOMIC_MIN SIG_ATOMIC_MAX SIZE_MAX WCHAR_MIN WCHAR_MAX WINT_MIN WINT_MAX
         NULL EOF CHAR_BIT CHAR_MIN CHAR_MAX SCHAR_MIN SCHAR_MAX UCHAR_MAX SHRT_MIN SHRT_MAX USHRT_MAX
         LONG_MIN LONG_MAX ULONG_MAX LLONG_MIN LLONG_MAX ULLONG_MAX MB_LEN_MAX
-        ERROR NO_ERROR TRUE FALSE IN OUT OPTIONAL CONST DELETE VOID WINAPI APIENTRY CALLBACK
+        ERROR NO_ERROR TRUE FALSE IN OUT OPTIONAL CONST DELETE VOID WINAPI APIENTRY CALLBACK MAX_PATH
         GetMessage SendMessage PostMessage GetObject DrawText CreateFile DeleteFile CreateWindow
         """.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries), StringComparer.Ordinal);
 
@@ -67,11 +67,12 @@ internal sealed class EnumDefinitions
             {
                 throw Error("A", "Expected exactly three fields.");
             }
-            if (!IsGeneratedEnumName(type) || type is "Server" or "Client" or "IGameDataTable")
+            if (!IsGeneratedCppName(type) || type is "Server" or "Client" or "IGameDataTable" or
+                "CGameDataReader" or "EGameDataReadResult" or "SGameDataFormat")
             {
                 throw Error("A", "Invalid enum type name for the GameData namespace.");
             }
-            if (!IsGeneratedEnumName(name) || name == type)
+            if (!IsGeneratedCppName(name) || name == type)
             {
                 throw Error("B", "Invalid enum member name.");
             }
@@ -190,7 +191,7 @@ internal sealed class EnumDefinitions
         !ReservedNames.Contains(name);
 
     // 소비자가 먼저 포함하는 표준 헤더와 Windows 헤더의 주요 매크로 이름은 생성하지 않는다.
-    private static bool IsGeneratedEnumName(string name)
+    internal static bool IsGeneratedCppName(string name)
     {
         if (!IsCppName(name) || GeneratedEnumMacros.Contains(name))
         {

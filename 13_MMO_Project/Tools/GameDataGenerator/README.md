@@ -18,7 +18,7 @@ dotnet run --project Tools/GameDataGenerator -c Release
 dotnet run --project Tools/GameDataGenerator -c Release -- sample/Excel sample/Csv
 ```
 
-CSV는 UTF-8(BOM 없음), 레코드 구분은 CRLF다. 셀 안의 CRLF·CR은 LF로 맞추고 그 밖의 문자는 보존한다. 쉼표·따옴표·개행이 있는 필드는 인용한다. 1~14행 메타데이터와 값 사이의 빈칸을 유지한다. `#Allowed`는 11행, `#Description`은 13행, `#Field`는 14행이며 데이터는 15행부터 시작한다. 끝의 서식뿐인 행은 내보내지 않는다. 수식·오류 셀이나 잘못된 선언을 발견하면 위치를 출력하고 기존 CSV를 바꾸지 않는다.
+CSV는 UTF-8(BOM 없음), 레코드 구분은 CRLF다. 셀 안의 CRLF·CR은 LF로 맞추고 그 밖의 문자는 보존한다. 쉼표·따옴표·개행이 있는 필드는 인용한다. Excel의 3행은 빈 구분 행으로 유지하고 CSV에서만 `#Workbook,Player,...`처럼 확장자 없는 원본 파일명을 기록한다. 파일명은 C++ 네임스페이스와 Windows 폴더에 그대로 쓸 수 있는 식별자여야 한다. `#Allowed`는 11행, `#Description`은 13행, `#Field`는 14행이며 데이터는 15행부터 시작한다. 끝의 서식뿐인 행은 내보내지 않는다. 수식·오류 셀이나 잘못된 선언을 발견하면 위치를 출력하고 기존 CSV를 바꾸지 않는다.
 
 데이터 행의 `int32`·`uint32` 값은 Excel 숫자 셀의 정수여야 한다. `#Required=true`의 빈칸과 `#Min`, `#Max`, `#Allowed`를 위반한 값은 거절한다. PK는 테이블마다 `1..4294967295`의 고유한 값이어야 한다. `#Default`는 선택 컬럼에만 선언할 수 있고 같은 타입·범위·허용값 검사를 받는다. CSV에는 기본값 선언과 원본 빈칸을 그대로 남긴다. 완전히 빈 행은 데이터 레코드로 검사하지 않는다. 어느 입력에서든 검증에 실패하면 CSV 쓰기를 시작하지 않는다.
 
@@ -49,13 +49,42 @@ dotnet run --project Tools/GameDataGenerator -c Release -- --emit GameData/Csv G
 
 이 모드에서는 Excel을 열지 않는다. 입력 목록은 확장자를 뺀 CSV 이름으로 명시한다. 여러 테이블과 참조 대상을 함께 선택하며, Enum을 사용하면 목록에 `Enum`도 넣는다. 선택하지 않은 CSV는 읽지 않는다. 검증에 실패하면 쓰기를 시작하지 않는다. 생성 전용 출력 디렉터리를 넘긴다. 현재 출력 목록에 없는 `.h`·`.sdat`·`.cdat` 또는 이전 형식의 `.dat`가 생성 디렉터리에 남아 있으면 새 출력 디렉터리를 요구하며 기존 파일을 자동 삭제하지 않는다.
 
-- `Server/`와 `Client/`에는 각 대상의 행 헤더를, `Data/Server/`에는 `.sdat`, `Data/Client/`에는 `.cdat`를 내보낸다. `#Target`에 해당하는 테이블의 `Shared`와 그 대상의 `#Scope` 필드만 헤더와 바이너리에 같은 순서로 쓴다.
-- `Common/GameDataEnums.h`는 공용이다. 선택된 `Enum.csv`에서만 선언을 만들며, 선택하지 않으면 Enum 선언이 없다. 일반 행 헤더는 `GameData::Server`/`GameData::Client`의 `S<Table>Row`와 행 밖의 `<Table>Format` 네임스페이스를 담는다. 바이너리 검증에 쓰는 버전·대상·테이블 이름·스키마 해시는 `<Table>Format`에 둔다.
+- `Server/<Workbook>/`와 `Client/<Workbook>/`에는 `<Sheet>.h`와 `<Sheet>.TableBase.g.h`를 내보낸다. 바이너리는 `Data/Server/<Workbook>/<Sheet>.sdat`와 `Data/Client/<Workbook>/<Sheet>.cdat`에 둔다. `#Target`에 해당하는 테이블의 `Shared`와 그 대상의 `#Scope` 필드만 행 헤더·생성 `Load()`·바이너리에 같은 순서로 반영한다.
+- `GameDataAll.g.h`와 `CGameDataTables.g.h`는 대상 루트에 생성한다. `CGameDataTables::Load(dir)`에 대상 디렉터리(`Data/Server` 또는 `Data/Client`)만 넘기면 생성 목록에서 상대 경로를 붙이고 `IGameDataTable` 배열을 **전체 `Load()` → 전체 `Init()` → 전체 `Validate()`** 순으로 순회한다. `CLogger`로 테이블별 완료는 `Debug`, 모든 테이블이 통과한 단계는 `Info`, 실패는 대상·단계·상대 경로와 함께 `Error`로 기록한다. 실패하면 `nullptr`을 반환한다.
+- 생성 루트의 형제 디렉터리 `Tables/{Server,Client}/C<Table>Table.h`는 파일이 없을 때만 만든다. 기존 수기 파일은 읽거나 덮어쓰거나 삭제하지 않으며 생성물 목록에도 넣지 않는다. 최초 골격의 `Validate()`는 실패하도록 두고, 테이블 규칙은 파일 소유자가 구현한다. `Init()`도 수기 함수이며 할 일이 없으면 성공만 반환한다.
+- `Common/GameDataEnums.h`는 공용이다. 선택된 `Enum.csv`에서만 선언을 만들며, 선택하지 않으면 Enum 선언이 없다. 행, 테이블 베이스, 수기 테이블은 `GameData::<Target>::<Workbook>`에 속한다. 바이너리 검증에 쓰는 포맷 상수는 그 안의 `<Sheet>Format`에 둔다. 기존 시트를 다른 워크북으로 옮기면 수기 헤더의 네임스페이스도 직접 맞춘다. `--emit`은 그 파일을 고치지 않는다.
 - 행은 대상별 필드마다 읽기 전용 `Get<Field>() const noexcept`를 제공한다. 필수 숫자와 Enum은 값으로, 문자열·배열·선택값은 `const` 참조로 반환한다. 선택값의 미입력 상태를 그대로 확인할 수 있고, 반환된 참조는 원본 행의 수명을 넘겨 보관하지 않는다.
 - `GetMessage`, `GetObject`, `GetRValue`, `GetGValue`, `GetBValue`를 만드는 `#Field` 이름은 Windows 매크로와 충돌하므로 산출물 생성 전에 거절한다.
-- C++ 사용부에서 `<cstdint>`와 필드 타입에 필요한 `<string>`, `<vector>`, `<optional>`을 먼저 공급한다. Enum 필드가 있으면 공용 Enum 헤더도 행 헤더보다 먼저 포함한다. 수기로 작성한 `IGameDataTable.h`를 쓸 때는 `<filesystem>`을 먼저 공급한다.
+- C++ 사용부는 PCH에서 `MHLib`의 `CLogger`와 `<array>`, `<memory>` 등 필요한 표준 헤더를 공급한 뒤 대상의 `GameDataAll.g.h`를 포함하고 `CGameDataReader.cpp`를 링크한다. `Common`, `GameData/Generated`, `GameData`를 include 경로에 둔다. 비동기 로거는 `Load(dir)` 전에 시작하고 현재 스레드를 로거에 등록한다. 워커를 시작하기 전에 성공한 묶음을 확보하고, `GameData::Server::Player::CPlayerMovementTableBase::Find(id)`처럼 정적으로 조회한다. `Find()` 본문은 대상의 묶음 헤더에 생성되므로 조회하는 소스는 집계 헤더를 사용한다. PK가 없거나 묶음이 없으면 `nullptr`이다. 대상별로 동시에 하나의 묶음만 소유하며, 마지막 조회 워커가 끝난 뒤 해제한다.
 
-바이너리의 바이트 계약은 [게임 데이터 생성기 계획](../../Docs/Plan/Common/001_게임데이터_생성기_계획.md#바이너리와-배포-경계)을 따른다. 독립 C++ 판독기와 전체 묶음의 I/O 실패 복구는 후속 작업이다.
+바이너리의 바이트 계약은 [게임 데이터 생성기 계획](../../Docs/Plan/Common/001_게임데이터_생성기_계획.md#바이너리와-배포-경계)을 따른다. 생성 `Load()`는 [`CGameDataReader`](../../Common/GameData/CGameDataReader.h)에 필드 판독을 연결하며 파일이 끝까지 정상일 때만 행·PK 조회를 바꾼다. MSVC x64 환경에서 `GAME_DATA_TEST_MSVC=1`을 설정하고 `python -B Tests/GameDataGenerator/test_csv_to_artifacts.py -v`를 실행하면 두 대상의 C++ 판독 시험을 포함한다. 앱 등록과 전체 묶음의 I/O 실패 복구는 후속 작업이다.
+
+## C++ 데이터 조회 예제
+
+```cpp
+#include "Server/GameDataAll.g.h" // 프로젝트 PCH 다음에 포함
+```
+
+서버 시작 시 대상 디렉터리를 한 번 로드하고, 반환된 묶음은 워커가 종료할 때까지 보관한다.
+
+```cpp
+auto pGameDataTables = GameData::Server::CGameDataTables::Load(serverDataDirectory);
+if (pGameDataTables == nullptr)
+{
+	return false; // 서버 시작 실패
+}
+```
+
+게임 로직에서는 필요한 PK로 조회한다. PK가 없으면 `Find()`는 `nullptr`을 반환한다.
+
+```cpp
+const auto* pRow = GameData::Server::Player::CPlayerMovementTableBase::Find(playerMovementDataId);
+if (pRow != nullptr)
+{
+	const auto moveSpeedCmPerSecond = pRow->GetMoveSpeedCmPerSecond();
+	// 이동 처리에 사용한다.
+}
+```
 
 ## 검증
 

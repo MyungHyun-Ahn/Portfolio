@@ -3,7 +3,7 @@ using ClosedXML.Excel;
 
 internal sealed record DataColumn(string Name, string MemberName, string GetterName, string Scope, FieldDeclaration Field);
 internal sealed record DataRow(int RecordNumber, string?[] Values);
-internal sealed record DataTable(string Name, string Target, DataColumn[] Columns, List<DataRow> Rows,
+internal sealed record DataTable(string Name, string WorkbookName, string Target, DataColumn[] Columns, List<DataRow> Rows,
     int KeyIndex, Dictionary<uint, int> PrimaryKeys)
 {
     public string Location(int column, int row) => $"{Name}.csv!{XLHelper.GetColumnLetterFromNumber(column + 2)}{row}:";
@@ -23,13 +23,15 @@ internal static class CsvDataTables
             throw new InvalidDataException($"{source}!A1: Missing table metadata or invalid column count.");
         }
         int width = rows[0].Length;
+        const int workbookIndex = WorkbookParser.WorkbookRow - 1;
         for (int row = 0; row < rows.Count; ++row)
         {
             if (rows[row].Length != width)
             {
                 throw new InvalidDataException($"{source}!A{row + 1}: Expected {width} CSV fields.");
             }
-            string expected = row < labels.Length ? labels[row] : string.Empty;
+            string expected = row == workbookIndex ? WorkbookParser.WorkbookLabel :
+                row < labels.Length ? labels[row] : string.Empty;
             if (rows[row][0] != expected)
             {
                 throw new InvalidDataException($"{source}!A{row + 1}: Expected '{expected}' in the metadata column.");
@@ -39,14 +41,19 @@ internal static class CsvDataTables
         {
             throw new InvalidDataException($"{source}!B1: #Table must match the selected CSV name.");
         }
+        string workbookName = rows[workbookIndex][1];
+        if (!WorkbookParser.IsGeneratedWorkbookName(workbookName))
+        {
+            throw new InvalidDataException($"{source}!B{WorkbookParser.WorkbookRow}: Invalid #Workbook '{workbookName}'.");
+        }
         string target = rows[1][1];
         if (target is not ("Shared" or "Server" or "Client"))
         {
             throw new InvalidDataException($"{source}!B2: #Target must be Shared, Server or Client.");
         }
-        for (int row = 0; row < 3; ++row)
+        for (int row = 0; row <= workbookIndex; ++row)
         {
-            for (int column = row == 2 ? 1 : 2; column < width; ++column)
+            for (int column = 2; column < width; ++column)
             {
                 if (rows[row][column].Length != 0)
                 {
@@ -92,7 +99,7 @@ internal static class CsvDataTables
             throw new InvalidDataException($"{source}!A4: #Key must declare one Primary column.");
         }
 
-        var table = new DataTable(name, target, columns, [], keyIndex, []);
+        var table = new DataTable(name, workbookName, target, columns, [], keyIndex, []);
         for (int row = labels.Length; row < rows.Count; ++row)
         {
             if (rows[row].All(text => text.Length == 0))
@@ -114,7 +121,7 @@ internal static class CsvDataTables
         return table;
     }
 
-    // CSV에는 통합 문서명이 없으므로 0.3에서 검증한 한정자 대신 고유한 시트명으로 대상 CSV를 찾는다.
+    // 시트명으로 대상 CSV를 찾고 기록된 원본 통합 문서명까지 확인한다.
     public static void ValidateReferences(IReadOnlyDictionary<string, DataTable> tables)
     {
         foreach (DataTable table in tables.Values)
@@ -132,6 +139,10 @@ internal static class CsvDataTables
                 if (!tables.TryGetValue(parts[1], out DataTable? target))
                 {
                     throw Error(FieldDeclarations.ReferenceRow, $"target table '{parts[1]}' is not selected.");
+                }
+                if (target.WorkbookName != parts[0])
+                {
+                    throw Error(FieldDeclarations.ReferenceRow, $"target workbook must match '{target.WorkbookName}': '{reference}'.");
                 }
                 DataColumn targetKey = target.Columns[target.KeyIndex];
                 if (targetKey.Name != parts[2] || targetKey.Field.Type != column.Field.Type)

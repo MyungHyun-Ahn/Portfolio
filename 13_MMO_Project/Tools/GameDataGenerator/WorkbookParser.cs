@@ -8,6 +8,9 @@ internal static class WorkbookParser
     private sealed record ParsedTable(CsvTable Csv, string WorkbookName, string Source,
         FieldDeclaration[] Fields, Dictionary<long, int> PrimaryKeyRows);
 
+    internal const int WorkbookRow = 3;
+    internal const string WorkbookLabel = "#Workbook";
+
     internal static readonly string[] MetadataLabels =
     [
         "#Table", "#Target", "", "#Key", "#Scope", "#Type", "#Required",
@@ -138,6 +141,14 @@ internal static class WorkbookParser
             }
         }
 
+        for (int column = 2; column <= lastColumn; ++column)
+        {
+            if (CellText(WorkbookRow, column).Length != 0)
+            {
+                throw new InvalidDataException($"{source}!{worksheet.Cell(WorkbookRow, column).Address}: Expected a blank cell.");
+            }
+        }
+
         string tableName = CellText(1, 2);
         if (!IsTableName(tableName) || !string.Equals(tableName, worksheet.Name, StringComparison.Ordinal))
         {
@@ -146,6 +157,10 @@ internal static class WorkbookParser
         if (string.Equals(tableName, EnumDefinitions.CsvName, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidDataException($"{source}!B1: Enum.csv is reserved for Enum.xlsx.");
+        }
+        if (!IsGeneratedWorkbookName(workbookName))
+        {
+            throw new InvalidDataException($"{source}: Invalid workbook name '{workbookName}' for a generated folder and C++ namespace.");
         }
         if (CellText(2, 2) is not ("Shared" or "Server" or "Client"))
         {
@@ -181,6 +196,12 @@ internal static class WorkbookParser
             for (int column = 1; column <= lastColumn; ++column)
             {
                 cells[column - 1] = CellText(row, column);
+            }
+            // Excel의 구분 행은 그대로 두고 CSV에만 원본 파일명을 기록한다.
+            if (row == WorkbookRow)
+            {
+                cells[0] = WorkbookLabel;
+                cells[1] = workbookName;
             }
             if (row > MetadataLabels.Length && cells.Any(text => text.Length != 0))
             {
@@ -282,6 +303,10 @@ internal static class WorkbookParser
             _ => cell.GetString(),
         };
     }
+
+    internal static bool IsGeneratedWorkbookName(string name) => IsTableName(name) && EnumDefinitions.IsGeneratedCppName(name) &&
+        !string.Equals(name, EnumDefinitions.CsvName, StringComparison.OrdinalIgnoreCase) &&
+        name is not ("std" or "IGameDataTable" or "CGameDataReader" or "SGameDataFormat" or "EGameDataReadResult" or "CGameDataTables");
 
     internal static bool IsTableName(string name)
     {

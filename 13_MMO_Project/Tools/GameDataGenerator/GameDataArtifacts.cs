@@ -28,9 +28,16 @@ internal static class GameDataArtifacts
             enumDefinitions.ReadCsv(CsvReader.Read(Path.Combine(csvDirectory, "Enum.csv")));
         }
         var tables = new Dictionary<string, DataTable>(StringComparer.Ordinal);
+        var workbookNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (string name in selected.Order(StringComparer.Ordinal))
         {
-            tables.Add(name, CsvDataTables.Read(csvDirectory, name, enumDefinitions));
+            DataTable table = CsvDataTables.Read(csvDirectory, name, enumDefinitions);
+            if (workbookNames.TryGetValue(table.WorkbookName, out string? prior) && prior != table.WorkbookName)
+            {
+                throw new InvalidDataException($"{name}.csv!B{WorkbookParser.WorkbookRow}: #Workbook '{table.WorkbookName}' conflicts with '{prior}'.");
+            }
+            workbookNames[table.WorkbookName] = table.WorkbookName;
+            tables.Add(name, table);
         }
         CsvDataTables.ValidateReferences(tables);
 
@@ -38,16 +45,20 @@ internal static class GameDataArtifacts
         {
             [Path.Combine("Common", "GameDataEnums.h")] = WriteEnums(enumDefinitions),
         };
+        var manualTables = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
         foreach (DataTable table in tables.Values)
         {
-            AddProjection(table, "Server", 1, ".sdat", artifacts);
-            AddProjection(table, "Client", 2, ".cdat", artifacts);
+            AddProjection(table, "Server", 1, ".sdat", artifacts, manualTables);
+            AddProjection(table, "Client", 2, ".cdat", artifacts, manualTables);
         }
-        Publish(outputDirectory, artifacts);
+        AddTableBundle(tables.Values, "Server", ".sdat", artifacts);
+        AddTableBundle(tables.Values, "Client", ".cdat", artifacts);
+        Publish(outputDirectory, artifacts, manualTables);
     }
 
     // 같은 필드 목록과 스키마 식별자를 헤더와 바이너리에서 사용한다.
-    private static void AddProjection(DataTable table, string target, byte targetId, string extension, Dictionary<string, byte[]> artifacts)
+    private static void AddProjection(DataTable table, string target, byte targetId, string extension,
+        Dictionary<string, byte[]> artifacts, Dictionary<string, byte[]> manualTables)
     {
         if (!table.IncludesTarget(target))
         {
@@ -56,8 +67,151 @@ internal static class GameDataArtifacts
         int[] projection = Enumerable.Range(0, table.Columns.Length)
             .Where(index => CsvDataTables.IsProjected(table, table.Columns[index], target)).ToArray();
         byte[] schemaHash = WriteSchemaHash(table, projection);
-        artifacts.Add(Path.Combine(target, table.Name + ".h"), WriteHeader(table, projection, target, targetId, schemaHash));
-        artifacts.Add(Path.Combine("Data", target, table.Name + extension), WriteBinary(table, projection, targetId, schemaHash));
+        artifacts.Add(Path.Combine(target, table.WorkbookName, table.Name + ".h"), WriteHeader(table, projection, target, targetId, schemaHash));
+        artifacts.Add(Path.Combine(target, table.WorkbookName, table.Name + ".TableBase.g.h"), WriteTableBase(table, projection, target));
+        artifacts.Add(Path.Combine("Data", target, table.WorkbookName, table.Name + extension), WriteBinary(table, projection, targetId, schemaHash));
+        manualTables.Add(Path.Combine(target, $"C{table.Name}Table.h"), WriteManualTable(table, target));
+    }
+
+    // 생성 Load는 투영된 필드를 공통 판독기에 연결한다.
+    private static byte[] WriteTableBase(DataTable table, int[] projection, string target)
+    {
+        var text = new StringBuilder("#pragma once\n\n");
+        string row = $"S{table.Name}Row";
+        string tableBase = $"C{table.Name}TableBase";
+        string format = $"{table.Name}Format";
+        string key = table.Columns[table.KeyIndex].MemberName;
+        text.Append($"namespace GameData::{target}::{table.WorkbookName}\n{{\n\tclass {tableBase} : public IGameDataTable\n\t{{\n\tpublic:\n");
+        text.Append("\t\t[[nodiscard]]\n\t\tbool Load(const std::filesystem::path& path) final\n\t\t{\n");
+        text.Append($"\t\t\tstatic_assert({format}::kFormatVersion == CGameDataReader::kSupportedFormatVersion);\n");
+        text.Append("\t\t\tconst SGameDataFormat format\n\t\t\t{\n");
+        foreach (string field in new[] { "kFormatVersion", "kTarget", "kTableName", "kSchemaHash" })
+        {
+            text.Append($"\t\t\t\t{format}::{field},\n");
+        }
+        text.Append("\t\t\t};\n");
+        text.Append($"\t\t\tm_lastReadResult = CGameDataReader::Read(path, format, &readRow, &{row}::{key}, m_rows);\n");
+        text.Append("\t\t\treturn m_lastReadResult == EGameDataReadResult::Success;\n\t\t}\n\n");
+        text.Append("\t\t[[nodiscard]]\n\t\tEGameDataReadResult GetLastReadResult() const noexcept\n\t\t{\n\t\t\treturn m_lastReadResult;\n\t\t}\n\n");
+        text.Append("\t\t// 현재 묶음에서 PK에 해당하는 읽기 전용 행을 찾는다.\n");
+        text.Append($"\t\t[[nodiscard]]\n\t\tstatic const {row}* Find(std::uint32_t id);\n\n");
+        text.Append("\tprotected:\n\t\t[[nodiscard]]\n\t\tconst auto& GetRows() const noexcept\n\t\t{\n\t\t\treturn m_rows;\n\t\t}\n\n");
+        text.Append($"\tprivate:\n\t\t[[nodiscard]]\n\t\tstatic bool readRow(CGameDataReader& reader, {row}& outRow)\n\t\t{{\n");
+        foreach (int index in projection)
+        {
+            text.Append($"\t\t\tif (!reader.ReadValue(outRow.{table.Columns[index].MemberName}))\n\t\t\t{{\n\t\t\t\treturn false;\n\t\t\t}}\n");
+        }
+        text.Append("\t\t\treturn true;\n\t\t}\n\n\tprivate:\n");
+        text.Append($"\t\tstd::unordered_map<std::uint32_t, {row}> m_rows;\n");
+        text.Append("\t\tEGameDataReadResult m_lastReadResult = EGameDataReadResult::NotRead;\n\t};\n}\n");
+        return CsvReader.Utf8.GetBytes(text.ToString());
+    }
+
+    private static byte[] WriteManualTable(DataTable table, string target)
+    {
+        string name = table.Name;
+        string text = $"#pragma once\n\nnamespace GameData::{target}::{table.WorkbookName}\n{{\n\tclass C{name}Table final : public C{name}TableBase\n\t{{\n\tpublic:\n" +
+            "\t\t// 모든 테이블을 읽은 뒤 필요한 파생 데이터를 준비한다.\n\t\t[[nodiscard]]\n\t\tbool Init() override\n" +
+            "\t\t{\n\t\t\treturn true;\n\t\t}\n\n" +
+            "\t\t// 테이블 규칙을 구현하기 전에는 사용하지 않는다.\n\t\t[[nodiscard]]\n\t\tbool Validate() const override\n" +
+            "\t\t{\n\t\t\treturn false;\n\t\t}\n\t};\n}\n";
+        return CsvReader.Utf8.GetBytes(text);
+    }
+
+    // 발행 대상과 같은 테이블만 묶고, 실행 시 받는 디렉터리 아래의 상대 경로만 생성한다.
+    private static void AddTableBundle(IEnumerable<DataTable> tables, string target, string extension,
+        Dictionary<string, byte[]> artifacts)
+    {
+        DataTable[] projected = tables.Where(table => table.IncludesTarget(target)).ToArray();
+        if (projected.Length == 0)
+        {
+            return;
+        }
+
+        var includes = new StringBuilder("#pragma once\n\n#include \"GameData/IGameDataTable.h\"\n");
+        includes.Append("#include \"GameData/CGameDataReader.h\"\n#include \"Common/GameDataEnums.h\"\n");
+        foreach (DataTable table in projected)
+        {
+            includes.Append($"#include \"{target}/{table.WorkbookName}/{table.Name}.h\"\n");
+            includes.Append($"#include \"{target}/{table.WorkbookName}/{table.Name}.TableBase.g.h\"\n");
+        }
+        foreach (DataTable table in projected)
+        {
+            includes.Append($"#include \"Tables/{target}/C{table.Name}Table.h\"\n");
+        }
+        includes.Append($"#include \"{target}/CGameDataTables.g.h\"\n");
+        artifacts.Add(Path.Combine(target, "GameDataAll.g.h"), CsvReader.Utf8.GetBytes(includes.ToString()));
+
+        var text = new StringBuilder("#pragma once\n\n");
+        text.Append($"namespace GameData::{target}\n{{\n\tclass CGameDataTables\n\t{{\n");
+        foreach (DataTable table in projected)
+        {
+            text.Append($"\t\tfriend class ::GameData::{target}::{table.WorkbookName}::C{table.Name}TableBase;\n");
+        }
+        text.Append("\n\tpublic:\n");
+        text.Append("\t\t// 소유한 테이블이 사라지기 전에 정적 조회를 해제한다.\n\t\t~CGameDataTables()\n\t\t{\n");
+        text.Append("\t\t\tm_hasLoadedTables = false;\n\t\t\tm_tables = {};\n\t\t\tsm_pTables = nullptr;\n\t\t}\n\n");
+        text.Append("\t\t// 워커 시작 전에 전체 Load, 전체 Init, 전체 Validate를 순서대로 실행한다.\n\t\t[[nodiscard]]\n");
+        text.Append("\t\tstatic std::unique_ptr<CGameDataTables> Load(const std::filesystem::path& dataDirectory)\n\t\t{\n");
+        text.Append("\t\t\tusing ::MHLib::utils::CLogger;\n\t\t\tusing ::MHLib::utils::ELogLevel;\n\n");
+        text.Append("\t\t\tauto* pLogger = CLogger::GetInstance();\n");
+        text.Append("\t\t\tif (dataDirectory.empty() || sm_pTables != nullptr)\n\t\t\t{\n");
+        text.Append("\t\t\t\tpLogger->WriteLog(ELogLevel::Error, L\"GameData\", 0, std::source_location::current(),\n");
+        text.Append($"\t\t\t\t\tL\"event=game_data_bundle_rejected target={target} reason=%ls | 게임 데이터 로드를 시작할 수 없습니다.\",\n");
+        text.Append("\t\t\t\t\tdataDirectory.empty() ? L\"empty_directory\" : L\"bundle_already_exists\");\n");
+        text.Append("\t\t\t\treturn nullptr;\n\t\t\t}\n\n");
+        text.Append("\t\t\tauto pTables = std::unique_ptr<CGameDataTables>(new CGameDataTables());\n\t\t\tsm_pTables = pTables.get();\n");
+        text.Append("\t\t\tpTables->m_tables =\n\t\t\t{{\n");
+        foreach (DataTable table in projected)
+        {
+            text.Append($"\t\t\t\t{{ \"{table.WorkbookName}/{table.Name}{extension}\",\n");
+            text.Append($"\t\t\t\t\tstd::make_unique<::GameData::{target}::{table.WorkbookName}::C{table.Name}Table>() }},\n");
+        }
+        text.Append("\t\t\t}};\n\n");
+        foreach ((string function, string stage, string action) in new[]
+            { ("Load", "load", "로드"), ("Init", "init", "초기화"), ("Validate", "validate", "검증") })
+        {
+            text.Append("\t\t\tfor (const auto& table : pTables->m_tables)\n\t\t\t{\n");
+            string argument = function == "Load" ? "dataDirectory / table.m_pRelativePath" : string.Empty;
+            text.Append($"\t\t\t\tif (!table.m_pTable->{function}({argument}))\n\t\t\t\t{{\n");
+            text.Append("\t\t\t\t\tpLogger->WriteLog(ELogLevel::Error, L\"GameData\", 0, std::source_location::current(),\n");
+            text.Append($"\t\t\t\t\t\tL\"event=game_data_table_failed target={target} stage={stage} file=%hs | 게임 데이터 {action} 실패.\",\n");
+            text.Append("\t\t\t\t\t\ttable.m_pRelativePath);\n\t\t\t\t\treturn nullptr;\n\t\t\t\t}\n");
+            text.Append("\t\t\t\tpLogger->WriteLog(ELogLevel::Debug, L\"GameData\", 0, std::source_location::current(),\n");
+            text.Append($"\t\t\t\t\tL\"event=game_data_table_completed target={target} stage={stage} file=%hs | 게임 데이터 {action} 완료.\",\n");
+            text.Append("\t\t\t\t\ttable.m_pRelativePath);\n\t\t\t}\n");
+            if (function == "Load")
+            {
+                text.Append("\t\t\tpTables->m_hasLoadedTables = true;\n");
+            }
+            text.Append("\t\t\tpLogger->WriteLog(ELogLevel::Info, L\"GameData\", 0, std::source_location::current(),\n");
+            text.Append($"\t\t\t\tL\"event=game_data_stage_completed target={target} stage={stage} tables=%zu | 전체 게임 데이터 {action} 성공.\",\n");
+            text.Append("\t\t\t\tpTables->m_tables.size());\n\n");
+        }
+        text.Append("\t\t\treturn pTables;\n\t\t}\n\n\tprivate:\n\t\tCGameDataTables() = default;\n\n");
+        text.Append("\t\t// 전체 로드가 끝난 묶음에서만 생성된 배열 위치로 테이블을 찾는다.\n\t\t[[nodiscard]]\n");
+        text.Append("\t\tstatic const IGameDataTable* getTable(std::size_t index) noexcept\n\t\t{\n");
+        text.Append("\t\t\tif (sm_pTables == nullptr || !sm_pTables->m_hasLoadedTables)\n\t\t\t{\n\t\t\t\treturn nullptr;\n\t\t\t}\n");
+        text.Append("\t\t\treturn sm_pTables->m_tables[index].m_pTable.get();\n\t\t}\n\n");
+        text.Append("\tprivate:\n\t\tstruct STableEntry\n\t\t{\n\t\t\tconst char* m_pRelativePath;\n");
+        text.Append("\t\t\tstd::unique_ptr<IGameDataTable> m_pTable;\n\t\t};\n\n");
+        text.Append("\t\tinline static const CGameDataTables* sm_pTables = nullptr;\n");
+        text.Append($"\t\tstd::array<STableEntry, {projected.Length}> m_tables{{}};\n\t\tbool m_hasLoadedTables = false;\n\t}};\n}}\n");
+
+        // 등록 배열과 같은 순서로 Find의 슬롯을 만들어 서로 다른 타입이 섞이지 않게 한다.
+        for (int index = 0; index < projected.Length; ++index)
+        {
+            DataTable table = projected[index];
+            string tableBase = $"C{table.Name}TableBase";
+            text.Append($"\nnamespace GameData::{target}::{table.WorkbookName}\n{{\n");
+            text.Append($"\tinline const S{table.Name}Row* {tableBase}::Find(std::uint32_t id)\n\t{{\n");
+            text.Append($"\t\tconst auto* pTable = static_cast<const {tableBase}*>(\n");
+            text.Append($"\t\t\t::GameData::{target}::CGameDataTables::getTable({index}));\n");
+            text.Append("\t\tif (pTable == nullptr)\n\t\t{\n\t\t\treturn nullptr;\n\t\t}\n");
+            text.Append("\t\tconst auto iter = pTable->m_rows.find(id);\n");
+            text.Append("\t\treturn iter == pTable->m_rows.end() ? nullptr : &iter->second;\n\t}\n}\n");
+        }
+        artifacts.Add(Path.Combine(target, "CGameDataTables.g.h"), CsvReader.Utf8.GetBytes(text.ToString()));
     }
 
     private static byte[] WriteSchemaHash(DataTable table, int[] projection)
@@ -89,7 +243,7 @@ internal static class GameDataArtifacts
     private static byte[] WriteHeader(DataTable table, int[] projection, string target, byte targetId, byte[] schemaHash)
     {
         var text = new StringBuilder("#pragma once\n\n");
-        text.Append("namespace GameData::").Append(target).Append("\n{\n");
+        text.Append($"namespace GameData::{target}::{table.WorkbookName}\n{{\n");
         text.Append("\tstruct S").Append(table.Name).Append("Row\n\t{\n");
         var getters = new StringBuilder();
         foreach (int index in projection)
@@ -238,9 +392,24 @@ internal static class GameDataArtifacts
     }
 
     // 모든 후보를 먼저 쓴다. 전체 파일 교체의 복구는 Phase 0.7의 범위다.
-    private static void Publish(string outputDirectory, Dictionary<string, byte[]> artifacts)
+    private static void Publish(string outputDirectory, Dictionary<string, byte[]> artifacts, Dictionary<string, byte[]> manualTables)
     {
         CheckStaleOutputs(outputDirectory, artifacts.Keys.ToHashSet(StringComparer.Ordinal));
+        string? parent = Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(outputDirectory));
+        if (parent == null || string.Equals(Path.Combine(parent, "Tables"), Path.TrimEndingDirectorySeparator(outputDirectory),
+            StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException("The generated output must be separate from its sibling Tables directory.");
+        }
+        string manualDirectory = Path.Combine(parent, "Tables");
+        foreach (string path in manualTables.Keys)
+        {
+            string destination = Path.Combine(manualDirectory, path);
+            if (Directory.Exists(destination) || File.Exists(manualDirectory) || File.Exists(Path.GetDirectoryName(destination)))
+            {
+                throw new IOException($"Invalid manual table destination: {destination}.");
+            }
+        }
         string candidate = Path.Combine(outputDirectory, $".game-data-output-{Guid.NewGuid():N}");
         foreach (string path in artifacts.Keys)
         {
@@ -259,13 +428,43 @@ internal static class GameDataArtifacts
                 Directory.CreateDirectory(Path.GetDirectoryName(staged)!);
                 File.WriteAllBytes(staged, bytes);
             }
+            var stagedManualTables = new List<string>();
+            foreach ((string path, byte[] bytes) in manualTables)
+            {
+                string destination = Path.Combine(manualDirectory, path);
+                if (File.Exists(destination))
+                {
+                    continue;
+                }
+                string staged = Path.Combine(candidate, "Tables", path);
+                Directory.CreateDirectory(Path.GetDirectoryName(staged)!);
+                File.WriteAllBytes(staged, bytes);
+                stagedManualTables.Add(path);
+            }
             foreach (string path in artifacts.Keys)
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(outputDirectory, path))!);
             }
+            foreach (string path in stagedManualTables)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(manualDirectory, path))!);
+            }
             foreach (string path in artifacts.Keys)
             {
                 File.Move(Path.Combine(candidate, path), Path.Combine(outputDirectory, path), overwrite: true);
+            }
+            foreach (string path in stagedManualTables)
+            {
+                string destination = Path.Combine(manualDirectory, path);
+                try
+                {
+                    File.Move(Path.Combine(candidate, "Tables", path), destination, overwrite: false);
+                    Console.WriteLine(destination);
+                }
+                catch (IOException) when (File.Exists(destination))
+                {
+                    // 최초 생성 경쟁에서도 먼저 생긴 사용자 파일을 보존한다.
+                }
             }
         }
         finally
@@ -295,10 +494,16 @@ internal static class GameDataArtifacts
             {
                 continue;
             }
-            foreach (string file in Directory.EnumerateFiles(directory))
+            var options = new EnumerationOptions
+            {
+                RecurseSubdirectories = true,
+                AttributesToSkip = FileAttributes.ReparsePoint,
+                IgnoreInaccessible = false,
+            };
+            foreach (string file in Directory.EnumerateFiles(directory, "*", options))
             {
                 string extension = Path.GetExtension(file).ToLowerInvariant();
-                string path = Path.Combine(relativeDirectory, Path.GetFileName(file));
+                string path = Path.GetRelativePath(outputDirectory, file);
                 if (extension is ".h" or ".sdat" or ".cdat" or ".dat" && !expected.Contains(path))
                 {
                     throw new InvalidDataException($"Stale artifact '{path}'. Use a fresh output directory for the new selection.");

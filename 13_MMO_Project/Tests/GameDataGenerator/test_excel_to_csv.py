@@ -20,7 +20,7 @@ TYPES_NS = "{http://schemas.openxmlformats.org/package/2006/content-types}"
 ROWS = [
     ["#Table", "PlayerMovement", "", "", ""],
     ["#Target", "Shared", "", "", ""],
-    ["", "", "", "", ""],
+    ["#Workbook", "Player", "", "", ""],
     ["#Key", "Primary", "", "", ""],
     ["#Scope", "Shared", "Server", "Server", "Client"],
     ["#Type", "uint32", "uint32", "uint32", "uint32"],
@@ -152,6 +152,21 @@ class ExcelToCsvTests(unittest.TestCase):
     def read_rows(self):
         with self.csv.open(encoding="utf-8", newline="") as file:
             return list(csv.reader(file))
+
+    def test_workbook_name_must_be_usable_as_folder_and_cpp_namespace(self):
+        self.run_generator()
+        prior = self.read_rows()
+        for name in ('Bad-Name.xlsx', 'MAX_PATH.xlsx'):
+            with self.subTest(name=name):
+                candidate = self.input / name
+                self.xlsx.rename(candidate)
+                try:
+                    error = self.run_generator(success=False)
+                    self.assertIn(name, error)
+                    self.assertIn('workbook name', error)
+                    self.assertEqual(self.read_rows(), prior)
+                finally:
+                    candidate.rename(self.xlsx)
 
     def edit_cells(self, edits, destination=None, sheet_name=None):
         source = WORKBOOK
@@ -511,10 +526,10 @@ class ExcelToCsvTests(unittest.TestCase):
 
         self.run_generator()
         prior = self.csv.read_bytes()
-        collision = self.input / "z-second.xlsx"
+        collision = self.input / "z_second.xlsx"
         replace_cell(WORKBOOK, collision, "B1", "inlineStr", "playermovement", sheet_name="playermovement")
         message = self.run_generator(success=False)
-        self.assertIn("z-second.xlsx:playermovement!B1", message)
+        self.assertIn("z_second.xlsx:playermovement!B1", message)
         self.assertIn("duplicate", message.lower())
         self.assertEqual(self.csv.read_bytes(), prior)
         self.assertEqual(list(self.output.iterdir()), [self.csv])
@@ -647,12 +662,12 @@ class ExcelToCsvTests(unittest.TestCase):
                 self.assert_value_failure(address, label + " requires a text Excel cell", prior)
 
     def write_reference_target(self, key="42"):
-        target = self.input / "z-Profiles.xlsx"
+        target = self.input / "z_Profiles.xlsx"
         self.edit_cells([("B1", "inlineStr", "OtherProfile"), ("B15", "n", key)], target, "OtherProfile")
 
     def test_forward_reference_uses_workbook_sheet_and_pk_independent_of_file_order(self):
         self.write_reference_target()
-        reference = "z-Profiles.OtherProfile.PlayerMovementDataId"
+        reference = "z_Profiles.OtherProfile.PlayerMovementDataId"
         self.edit_cells([("C12", "inlineStr", reference), ("C15", "n", "42")])
         self.run_generator()
         rows = self.read_rows()
@@ -661,9 +676,13 @@ class ExcelToCsvTests(unittest.TestCase):
         prior = {path.name: path.read_bytes() for path in self.output.iterdir()}
         self.assertEqual(set(prior), {"PlayerMovement.csv", "OtherProfile.csv"})
 
-        self.xlsx.rename(self.input / "zz-source.xlsx")
+        self.xlsx.rename(self.input / "zz_source.xlsx")
         self.run_generator()
-        self.assertEqual({path.name: path.read_bytes() for path in self.output.iterdir()}, prior)
+        self.assertEqual(self.read_rows()[2][:2], ["#Workbook", "zz_source"])
+        new = (self.output / "PlayerMovement.csv").read_bytes()
+        self.assertEqual(new.replace(b"#Workbook,zz_source,", b"#Workbook," + self.xlsx.stem.encode() + b","),
+                         prior["PlayerMovement.csv"])
+        self.assertEqual((self.output / "OtherProfile.csv").read_bytes(), prior["OtherProfile.csv"])
 
     def test_same_workbook_accepts_mutual_and_self_references(self):
         self.write_two_sheet_workbook()
@@ -692,7 +711,7 @@ class ExcelToCsvTests(unittest.TestCase):
 
     def test_missing_reference_key_preserves_every_csv_and_creates_no_fresh_output(self):
         self.write_reference_target()
-        reference = "z-Profiles.OtherProfile.PlayerMovementDataId"
+        reference = "z_Profiles.OtherProfile.PlayerMovementDataId"
         self.edit_cells([("C12", "inlineStr", reference), ("C15", "n", "42")])
         self.run_generator()
         prior = {path.name: path.read_bytes() for path in self.output.iterdir()}
@@ -713,15 +732,15 @@ class ExcelToCsvTests(unittest.TestCase):
         self.write_reference_target()
         cases = [
             ("Missing.OtherProfile.PlayerMovementDataId", "uint32", "target workbook or sheet was not found"),
-            ("z-Profiles.Missing.PlayerMovementDataId", "uint32", "target workbook or sheet was not found"),
+            ("z_Profiles.Missing.PlayerMovementDataId", "uint32", "target workbook or sheet was not found"),
             ("z-profiles.OtherProfile.PlayerMovementDataId", "uint32", "target workbook or sheet was not found"),
-            ("z-Profiles.otherProfile.PlayerMovementDataId", "uint32", "target workbook or sheet was not found"),
-            ("z-Profiles.OtherProfile.Missing", "uint32", "target field was not found"),
-            ("z-Profiles.OtherProfile.playerMovementDataId", "uint32", "target field was not found"),
-            ("z-Profiles.OtherProfile.MoveSpeedCmPerSecond", "uint32", "target field must be the primary key"),
-            ("z-Profiles.OtherProfile.PlayerMovementDataId", "int32", "type must match uint32"),
-            ("z-Profiles.OtherProfile.PlayerMovementDataId", "float32", "type must match uint32"),
-            ("z-Profiles.OtherProfile.PlayerMovementDataId", "string", "type must match uint32"),
+            ("z_Profiles.otherProfile.PlayerMovementDataId", "uint32", "target workbook or sheet was not found"),
+            ("z_Profiles.OtherProfile.Missing", "uint32", "target field was not found"),
+            ("z_Profiles.OtherProfile.playerMovementDataId", "uint32", "target field was not found"),
+            ("z_Profiles.OtherProfile.MoveSpeedCmPerSecond", "uint32", "target field must be the primary key"),
+            ("z_Profiles.OtherProfile.PlayerMovementDataId", "int32", "type must match uint32"),
+            ("z_Profiles.OtherProfile.PlayerMovementDataId", "float32", "type must match uint32"),
+            ("z_Profiles.OtherProfile.PlayerMovementDataId", "string", "type must match uint32"),
         ]
         for reference, field_type, reason in cases:
             with self.subTest(reference=reference, field_type=field_type):
@@ -735,7 +754,7 @@ class ExcelToCsvTests(unittest.TestCase):
 
     def test_optional_reference_checks_default_without_filling_the_csv_blank(self):
         self.write_reference_target()
-        reference = "z-Profiles.OtherProfile.PlayerMovementDataId"
+        reference = "z_Profiles.OtherProfile.PlayerMovementDataId"
         optional = [("C7", "inlineStr", "false"), ("C12", "inlineStr", reference)]
         for default in ("", "42"):
             with self.subTest(default=default):
@@ -821,7 +840,7 @@ class ExcelToCsvTests(unittest.TestCase):
                                      ["", "", "", "", ""], ["", "1", "2147483647", "0", ""]])
 
     def test_invalid_later_workbook_prevents_all_csv_writes(self):
-        other = self.input / "z-other.xlsx"
+        other = self.input / "z_other.xlsx"
         self.edit_cells([("B1", "inlineStr", "OtherProfile")], other, "OtherProfile")
         self.run_generator()
         prior = {path.name: path.read_bytes() for path in self.output.iterdir()}
@@ -829,7 +848,7 @@ class ExcelToCsvTests(unittest.TestCase):
         self.edit_cells([("C15", "n", "451")])
         self.edit_cells([("B1", "inlineStr", "OtherProfile"), ("B15", "n", "0")], other, "OtherProfile")
         message = self.run_generator(success=False)
-        self.assertIn("z-other.xlsx:OtherProfile!B15", message)
+        self.assertIn("z_other.xlsx:OtherProfile!B15", message)
         self.assertIn("#Key=Primary", message)
         self.assertEqual({path.name: path.read_bytes() for path in self.output.iterdir()}, prior)
         self.output = self.root / "FreshCsv"
