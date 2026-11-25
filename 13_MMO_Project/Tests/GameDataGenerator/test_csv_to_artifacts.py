@@ -48,13 +48,13 @@ class CsvToArtifactsTests(unittest.TestCase):
         (self.input / 'Stale.csv').write_bytes(b'not a selected table')
         self.run_emit('PlayerMovement')
         outputs = self.snapshot()
-        self.assertEqual(set(outputs), {'Common/GameDataEnums.h', 'Server/PlayerMovement.h', 'Server/PlayerMovement.sdat',
-                                        'Client/PlayerMovement.h', 'Client/PlayerMovement.dat'})
+        self.assertEqual(set(outputs), {'Common/GameDataEnums.h', 'Server/PlayerMovement.h', 'Client/PlayerMovement.h',
+                                        'Data/Server/PlayerMovement.sdat', 'Data/Client/PlayerMovement.cdat'})
         server_schema = 'PlayerMovementDataId:uint32:required\nMoveSpeedCmPerSecond:uint32:required\nCollisionRadiusCm:uint32:required\n'
         client_schema = 'PlayerMovementDataId:uint32:required\nVisualScalePermille:uint32:required\n'
-        self.assertEqual(outputs['Server/PlayerMovement.sdat'], binary_header('PlayerMovement', 1, server_schema, 1)
+        self.assertEqual(outputs['Data/Server/PlayerMovement.sdat'], binary_header('PlayerMovement', 1, server_schema, 1)
                          + struct.pack('<III', 1, 450, 35))
-        self.assertEqual(outputs['Client/PlayerMovement.dat'], binary_header('PlayerMovement', 2, client_schema, 1)
+        self.assertEqual(outputs['Data/Client/PlayerMovement.cdat'], binary_header('PlayerMovement', 2, client_schema, 1)
                          + struct.pack('<II', 1, 1000))
         server = outputs['Server/PlayerMovement.h'].decode('utf-8')
         client = outputs['Client/PlayerMovement.h'].decode('utf-8')
@@ -84,8 +84,8 @@ class CsvToArtifactsTests(unittest.TestCase):
         write_csv(self.player, rows)
         self.run_emit('PlayerMovement')
         changed = self.snapshot()
-        self.assertEqual({key for key in changed if changed[key] != outputs[key]}, {'Server/PlayerMovement.sdat'})
-        self.assertEqual(changed['Server/PlayerMovement.sdat'][-12:], struct.pack('<III', 1, 451, 35))
+        self.assertEqual({key for key in changed if changed[key] != outputs[key]}, {'Data/Server/PlayerMovement.sdat'})
+        self.assertEqual(changed['Data/Server/PlayerMovement.sdat'][-12:], struct.pack('<III', 1, 451, 35))
 
     def test_array_enum_string_and_optional_values_have_explicit_encoding(self):
         write_csv(self.input / 'Enum.csv', [['Type', 'Name', 'Value'], ['DamageType', 'Fire', '9'], ['DamageType', 'Ice', '2']])
@@ -108,8 +108,8 @@ class CsvToArtifactsTests(unittest.TestCase):
                        + struct.pack('<IIBI', 2, 0, 1, len(bow)) + bow
                        + struct.pack('<IIBI', 3, 0, 1, len(bow)) + bow)
         client_rows = struct.pack('<IBIIB', 1, 1, 0, 2, 0) + struct.pack('<IBIff', 3, 1, 2, -1.5, 2.25)
-        self.assertEqual(outputs['Server/PlayerMovement.sdat'], binary_header('PlayerMovement', 1, server_schema, 3) + server_rows)
-        self.assertEqual(outputs['Client/PlayerMovement.dat'], binary_header('PlayerMovement', 2, client_schema, 3) + client_rows)
+        self.assertEqual(outputs['Data/Server/PlayerMovement.sdat'], binary_header('PlayerMovement', 1, server_schema, 3) + server_rows)
+        self.assertEqual(outputs['Data/Client/PlayerMovement.cdat'], binary_header('PlayerMovement', 2, client_schema, 3) + client_rows)
         self.assertIn(b'enum class DamageType : std::uint32_t', outputs['Common/GameDataEnums.h'])
         self.assertIn(b'Fire = 9u,', outputs['Common/GameDataEnums.h'])
         self.assertIn(b'std::optional<std::string>', outputs['Server/PlayerMovement.h'])
@@ -166,17 +166,30 @@ class CsvToArtifactsTests(unittest.TestCase):
 
     def test_changing_target_does_not_leave_a_stale_client_artifact(self):
         self.run_emit('PlayerMovement')
+        (self.output / 'Client/PlayerMovement.h').unlink()
         before = self.snapshot()
         rows = [row.copy() for row in ROWS]
         rows[1][1] = 'Server'
         write_csv(self.player, rows)
         error = self.run_emit('PlayerMovement', success=False)
         self.assertIn('Stale artifact', error)
-        self.assertIn('Client', error)
+        self.assertIn('Data/Client/PlayerMovement.cdat', error.replace('\\', '/'))
         self.assertEqual(self.snapshot(), before)
         self.output = self.root / 'ServerOnlyOutput'
         self.run_emit('PlayerMovement')
-        self.assertEqual(set(self.snapshot()), {'Common/GameDataEnums.h', 'Server/PlayerMovement.h', 'Server/PlayerMovement.sdat'})
+        self.assertEqual(set(self.snapshot()), {'Common/GameDataEnums.h', 'Server/PlayerMovement.h', 'Data/Server/PlayerMovement.sdat'})
+
+    def test_legacy_binary_locations_are_rejected_without_replacing_outputs(self):
+        for relative in ('Server/PlayerMovement.sdat', 'Client/PlayerMovement.dat'):
+            with self.subTest(relative=relative):
+                legacy = self.output / relative
+                legacy.parent.mkdir(parents=True, exist_ok=True)
+                legacy.write_bytes(b'legacy binary')
+                before = self.snapshot()
+                error = self.run_emit('PlayerMovement', success=False).replace('\\', '/')
+                self.assertIn(f"Stale artifact '{relative}'", error)
+                self.assertEqual(self.snapshot(), before)
+                legacy.unlink()
 
     def test_enum_cpp_macro_names_are_rejected_before_replacing_outputs(self):
         enum_path = self.input / 'Enum.csv'

@@ -41,7 +41,7 @@ internal static class GameDataArtifacts
         foreach (DataTable table in tables.Values)
         {
             AddProjection(table, "Server", 1, ".sdat", artifacts);
-            AddProjection(table, "Client", 2, ".dat", artifacts);
+            AddProjection(table, "Client", 2, ".cdat", artifacts);
         }
         Publish(outputDirectory, artifacts);
     }
@@ -57,7 +57,7 @@ internal static class GameDataArtifacts
             .Where(index => CsvDataTables.IsProjected(table, table.Columns[index], target)).ToArray();
         byte[] schemaHash = WriteSchemaHash(table, projection);
         artifacts.Add(Path.Combine(target, table.Name + ".h"), WriteHeader(table, projection, target, targetId, schemaHash));
-        artifacts.Add(Path.Combine(target, table.Name + extension), WriteBinary(table, projection, targetId, schemaHash));
+        artifacts.Add(Path.Combine("Data", target, table.Name + extension), WriteBinary(table, projection, targetId, schemaHash));
     }
 
     private static byte[] WriteSchemaHash(DataTable table, int[] projection)
@@ -288,9 +288,9 @@ internal static class GameDataArtifacts
     // 대상 변경으로 빠진 기존 파일을 새 산출물 묶음에 섞지 않는다.
     private static void CheckStaleOutputs(string outputDirectory, HashSet<string> expected)
     {
-        foreach (string target in new[] { "Common", "Server", "Client" })
+        foreach (string relativeDirectory in new[] { "Common", "Server", "Client", Path.Combine("Data", "Server"), Path.Combine("Data", "Client") })
         {
-            string directory = Path.Combine(outputDirectory, target);
+            string directory = Path.Combine(outputDirectory, relativeDirectory);
             if (!Directory.Exists(directory))
             {
                 continue;
@@ -298,8 +298,8 @@ internal static class GameDataArtifacts
             foreach (string file in Directory.EnumerateFiles(directory))
             {
                 string extension = Path.GetExtension(file).ToLowerInvariant();
-                string path = Path.Combine(target, Path.GetFileName(file));
-                if (extension is ".h" or ".sdat" or ".dat" && !expected.Contains(path))
+                string path = Path.Combine(relativeDirectory, Path.GetFileName(file));
+                if (extension is ".h" or ".sdat" or ".cdat" or ".dat" && !expected.Contains(path))
                 {
                     throw new InvalidDataException($"Stale artifact '{path}'. Use a fresh output directory for the new selection.");
                 }

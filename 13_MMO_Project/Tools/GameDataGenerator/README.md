@@ -47,9 +47,9 @@ CSV는 UTF-8(BOM 없음), 레코드 구분은 CRLF다. 셀 안의 CRLF·CR은 LF
 dotnet run --project Tools/GameDataGenerator -c Release -- --emit GameData/Csv GameData/Generated PlayerMovement
 ```
 
-이 모드에서는 Excel을 열지 않는다. 입력 목록은 확장자를 뺀 CSV 이름으로 명시한다. 여러 테이블과 참조 대상을 함께 선택하며, Enum을 사용하면 목록에 `Enum`도 넣는다. 선택하지 않은 CSV는 읽지 않는다. 검증에 실패하면 쓰기를 시작하지 않는다. 생성 전용 출력 디렉터리를 넘긴다. 선택 또는 대상이 바뀌어 이전 `.h`·`.sdat`·`.dat`가 남으면 새 출력 디렉터리를 요구하며 기존 파일을 자동 삭제하지 않는다.
+이 모드에서는 Excel을 열지 않는다. 입력 목록은 확장자를 뺀 CSV 이름으로 명시한다. 여러 테이블과 참조 대상을 함께 선택하며, Enum을 사용하면 목록에 `Enum`도 넣는다. 선택하지 않은 CSV는 읽지 않는다. 검증에 실패하면 쓰기를 시작하지 않는다. 생성 전용 출력 디렉터리를 넘긴다. 현재 출력 목록에 없는 `.h`·`.sdat`·`.cdat` 또는 이전 형식의 `.dat`가 생성 디렉터리에 남아 있으면 새 출력 디렉터리를 요구하며 기존 파일을 자동 삭제하지 않는다.
 
-- `Server/`에는 서버 행 헤더와 `.sdat`, `Client/`에는 클라이언트 행 헤더와 `.dat`를 내보낸다. `#Target`에 해당하는 테이블의 `Shared`와 그 대상의 `#Scope` 필드만 헤더와 바이너리에 같은 순서로 쓴다.
+- `Server/`와 `Client/`에는 각 대상의 행 헤더를, `Data/Server/`에는 `.sdat`, `Data/Client/`에는 `.cdat`를 내보낸다. `#Target`에 해당하는 테이블의 `Shared`와 그 대상의 `#Scope` 필드만 헤더와 바이너리에 같은 순서로 쓴다.
 - `Common/GameDataEnums.h`는 공용이다. 선택된 `Enum.csv`에서만 선언을 만들며, 선택하지 않으면 Enum 선언이 없다. 일반 행 헤더는 `GameData::Server`/`GameData::Client`의 `S<Table>Row`와 행 밖의 `<Table>Format` 네임스페이스를 담는다. 바이너리 검증에 쓰는 버전·대상·테이블 이름·스키마 해시는 `<Table>Format`에 둔다.
 - 행은 대상별 필드마다 읽기 전용 `Get<Field>() const noexcept`를 제공한다. 필수 숫자와 Enum은 값으로, 문자열·배열·선택값은 `const` 참조로 반환한다. 선택값의 미입력 상태를 그대로 확인할 수 있고, 반환된 참조는 원본 행의 수명을 넘겨 보관하지 않는다.
 - `GetMessage`, `GetObject`, `GetRValue`, `GetGValue`, `GetBValue`를 만드는 `#Field` 이름은 Windows 매크로와 충돌하므로 산출물 생성 전에 거절한다.
