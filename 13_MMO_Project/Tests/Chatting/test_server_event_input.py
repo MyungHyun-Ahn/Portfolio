@@ -349,9 +349,10 @@ def windows_nic_series():
 
 
 def check_monitor_series(samples, process_series, *, has_rates=True, has_chat_rates=True):
+    retired = {f"chat_work_{name}_{suffix}" for name in ("delegations", "steals") for suffix in ("total", "per_second")}
+    assert retired.isdisjoint(samples), f"retired worker metrics: {retired & samples.keys()}"
     intervals = (
         "net_accept_completions", "net_received_packets", "net_sent_packets", "net_send_batch_limit_hits",
-        "chat_work_delegations", "chat_work_steals",
     )
     chat_intervals = ("chat_content_updates", "chat_login_requests", "chat_sector_move_requests",
                       "chat_message_requests", "chat_message_send_requests")

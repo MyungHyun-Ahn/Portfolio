@@ -211,7 +211,6 @@ class CBaseContents;
 	public:
 		int WorkerThread() noexcept;
 
-		void RegisterSystemTimerEvent();
 		virtual void RegisterContentTimerEvent() noexcept = 0;
 
 	private:

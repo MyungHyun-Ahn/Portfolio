@@ -27,11 +27,6 @@ namespace ServerMetrics
 		AppendIntervalMetric("net_sent_packets", networkCounters.m_sendTps, m_sentPackets, elapsedSeconds, outMetrics);
 		AppendIntervalMetric("net_send_batch_limit_hits", networkCounters.m_maxSendCount, m_sendBatchLimitHits, elapsedSeconds, outMetrics);
 
-		// 구 워커의 분배·스틸 지표는 Phase 3.3 전까지 같은 이름으로 게시한다.
-		auto &monitor = ServerNetworkLib::g_monitor;
-		AppendIntervalMetric("chat_work_delegations", monitor.m_delWork, m_workDelegations, elapsedSeconds, outMetrics);
-		AppendIntervalMetric("chat_work_steals", monitor.m_stealWork, m_workSteals, elapsedSeconds, outMetrics);
-
 		const auto accepted = static_cast<UINT64>(InterlockedCompareExchange64(&networkCounters.m_acceptTotal, 0, 0));
 		const auto sendCalls = static_cast<UINT64>(InterlockedCompareExchange64(&networkCounters.m_sendCallCount, 0, 0));
 		const auto sendPending = static_cast<UINT64>(InterlockedCompareExchange64(&networkCounters.m_sendPendingCount, 0, 0));

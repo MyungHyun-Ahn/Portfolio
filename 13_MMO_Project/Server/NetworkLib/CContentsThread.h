@@ -150,8 +150,6 @@ private:
 				AcquireSRWLockExclusive(&m_timerEventQueueRWLock);
 				m_timerEventQueue.push(pTimerEvent);
 				ReleaseSRWLockExclusive(&m_timerEventQueueRWLock);
-				
-				InterlockedIncrement(&g_monitor.m_stealWork);
 
 				return true;
 			}
@@ -178,7 +176,6 @@ private:
 		}
 
 		EnqueueEvent(pTimerEvent);
-		InterlockedIncrement(&g_monitor.m_delWork);
 		return true;
 	}
 

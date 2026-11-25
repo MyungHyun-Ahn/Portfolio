@@ -3,7 +3,6 @@
   <ItemGroup />
   <ItemGroup>
     <ClCompile Include="CBaseContents.cpp" />
-    <ClCompile Include="CMonitor.cpp" />
     <ClCompile Include="CServer.cpp" />
     <ClCompile Include="ServerNetworkLibPch.cpp" />
     <ClCompile Include="ServerSetting.cpp" />
@@ -12,7 +11,6 @@
   <ItemGroup>
     <ClInclude Include="CBaseContents.h" />
     <ClInclude Include="CContentsThread.h" />
-    <ClInclude Include="CMonitor.h" />
     <ClInclude Include="CServer.h" />
     <ClInclude Include="ServerNetworkLibPch.h" />
     <ClInclude Include="SBaseEvent.h" />

@@ -133,19 +133,6 @@
       "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}}
     },
     {
-      "id": 14,
-      "type": "timeseries",
-      "title": "작업 분배·스틸 · 1분 평균/초",
-      "gridPos": {"x": 12, "y": 10, "w": 6, "h": 6},
-      "datasource": {"type": "prometheus", "uid": "portfolio-prometheus"},
-      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
-      "targets": [
-        {"refId": "A", "expr": "rate(chat_work_delegations_total{job=\"chat_server\"}[1m])", "legendFormat": "분배", "instant": false, "range": true},
-        {"refId": "B", "expr": "rate(chat_work_steals_total{job=\"chat_server\"}[1m])", "legendFormat": "스틸", "instant": false, "range": true}
-      ],
-      "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}}
-    },
-    {
       "id": 15,
       "type": "timeseries",
       "title": "송신 배치 한도 도달 · 1분 평균/초",

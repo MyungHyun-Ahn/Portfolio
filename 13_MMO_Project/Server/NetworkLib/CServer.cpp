@@ -1072,12 +1072,4 @@ CServer *g_pServer = nullptr;
 
 		return 0;
 	}
-
-	void CServer::RegisterSystemTimerEvent()
-	{
-		SMonitorTimerEvent *pMonitorEvent = new SMonitorTimerEvent;
-		pMonitorEvent->SetEvent();
-		CContentsThread::EnqueueEvent(pMonitorEvent);
-		// CContentThread::s_arrContentThreads[2]->EnqueueEventMy(pMonitorEvent);
-	}
 }

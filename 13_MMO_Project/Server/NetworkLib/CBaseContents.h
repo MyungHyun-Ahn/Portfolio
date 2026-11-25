@@ -38,7 +38,6 @@ class CBaseContents
 public:
 	friend class ServerNetworkLib::CServer;
 	friend struct SContentsFrameEvent;
-	friend class CMonitor;
 
 	CBaseContents() noexcept
 	{

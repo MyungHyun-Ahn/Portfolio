@@ -22,8 +22,6 @@ namespace ServerMetrics
 		UINT64 m_acceptCompletions = 0;
 		UINT64 m_receivedPackets = 0;
 		UINT64 m_sentPackets = 0;
-		UINT64 m_workDelegations = 0;
-		UINT64 m_workSteals = 0;
 		UINT64 m_sendBatchLimitHits = 0;
 	};
 }

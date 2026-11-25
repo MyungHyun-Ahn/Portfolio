@@ -2,20 +2,6 @@
 
 namespace ServerNetworkLib
 {
-void SMonitorTimerEvent::SetEvent() noexcept
-{
-	// execute = std::bind(&MonitorTimerEvent::Execute, this);
-	m_isRunning = true;
-	m_isTimerEvent = true;
-	m_timeMilliseconds = 1000; // 1초
-	m_nextExecuteTime = timeGetTime(); // 현재 시각
-}
-
-void SMonitorTimerEvent::Execute(int delayFrame) noexcept
-{
-	g_monitor.Update(g_pServer->GetSessionCount());
-}
-
 SContentsFrameEvent::~SContentsFrameEvent()
 {
 	delete m_pBaseContent;

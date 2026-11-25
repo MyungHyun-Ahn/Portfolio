@@ -1,4 +1,5 @@
 #include "pch.h"
+#include <pdh.h>
 #include "NetworkLimits.h"
 #include "COverlappedAllocator.h"
 #include "CRingBuffer.h"

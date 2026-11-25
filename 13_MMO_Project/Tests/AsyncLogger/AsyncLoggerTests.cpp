@@ -1,6 +1,38 @@
 #include <atomic>
 #include <regex>
+#include <semaphore>
 #include <sstream>
+#include <WinSock2.h>
+
+namespace
+{
+	thread_local bool g_isClearingPeriodicCallback = false;
+	std::atomic<SRWLOCK *> g_pObservedPeriodicLock = nullptr;
+	std::atomic<bool> g_isObservingEmptyTicks = false;
+	std::atomic<unsigned> g_observedTicks{0};
+	std::binary_semaphore g_clearContended{0};
+	std::binary_semaphore g_emptyTickObserved{0};
+
+	// 테스트에서만 실제 SRW 잠금의 경합과 로그 루프의 잠금 획득을 관찰한다.
+	void AcquireObservedSrwLockExclusive(SRWLOCK *pLock) noexcept
+	{
+		if (g_isClearingPeriodicCallback)
+		{
+			if (TryAcquireSRWLockExclusive(pLock))
+				return;
+
+			g_pObservedPeriodicLock = pLock;
+			g_clearContended.release();
+		}
+		AcquireSRWLockExclusive(pLock);
+		if (g_isObservingEmptyTicks && pLock == g_pObservedPeriodicLock && ++g_observedTicks == 2)
+			g_emptyTickObserved.release();
+	}
+}
+
+#define AcquireSRWLockExclusive AcquireObservedSrwLockExclusive
+#include "MHLib/utils/CLockGuard.h"
+#undef AcquireSRWLockExclusive
 #include "MHLib/MHLibPch.h"
 
 using MHLib::utils::CLogger;
@@ -95,6 +127,47 @@ namespace
 			&& file.find("event=after_stop") == std::string::npos && console.find("event=after_stop") == std::string::npos;
 	}
 
+	// 실행 중인 콜백이 반환하기 전에는 수명 관리 스레드의 해제가 끝나지 않아야 한다.
+	bool CheckPeriodicCallbackRemoval(CLogger &logger)
+	{
+		std::binary_semaphore callbackEntered{0};
+		std::binary_semaphore releaseCallback{0};
+		std::atomic<unsigned> callCount{0};
+		std::atomic<bool> didFinish = false;
+		bool didFinishBeforeClear = false;
+		logger.SetPeriodicCallback([&]
+		{
+			if (++callCount == 1)
+			{
+				callbackEntered.release();
+				releaseCallback.acquire();
+				didFinish = true;
+			}
+		});
+
+		const bool didEnter = callbackEntered.try_acquire_for(std::chrono::seconds(2));
+		std::thread clearThread([&]
+		{
+			g_isClearingPeriodicCallback = true;
+			logger.SetPeriodicCallback({});
+			g_isClearingPeriodicCallback = false;
+			didFinishBeforeClear = didFinish.load();
+		});
+		const bool didContend = g_clearContended.try_acquire_for(std::chrono::seconds(2));
+		releaseCallback.release();
+		clearThread.join();
+
+		const auto callsAfterClear = callCount.load();
+		// 두 번째 획득에 도달하면 그 사이 첫 틱에서 기존 콜백을 실행할 기회가 있었다.
+		g_isObservingEmptyTicks = true;
+		const bool didObserveEmptyTick = didContend && g_emptyTickObserved.try_acquire_for(std::chrono::seconds(2));
+		g_isObservingEmptyTicks = false;
+		// 해제 계약이 깨져도 로그 스레드가 끝날 때까지 콜백의 지역 상태를 유지한다.
+		logger.Stop();
+		logger.SetPeriodicCallback({});
+		return didEnter && didContend && didFinishBeforeClear && didObserveEmptyTick && callsAfterClear == callCount.load();
+	}
+
 	bool CheckOutputOracle()
 	{
 		const auto record = [](unsigned producer, unsigned sequence)
@@ -140,6 +213,7 @@ int main(void)
 	WCHAR consoleTest[2]{};
 	if (GetEnvironmentVariableW(L"MMO_LOGGER_CONSOLE_TEST", consoleTest, _countof(consoleTest)) == 1 && consoleTest[0] == L'1')
 		return CheckWindowsConsole(testDir);
+
 	const auto stdoutPath = testDir / L"stdout.txt";
 	FILE *pOutput = nullptr;
 	if (_wfreopen_s(&pOutput, stdoutPath.c_str(), L"wb", stdout) != 0)
@@ -176,9 +250,15 @@ int main(void)
 	_unlock_file(stdout);
 	first.join();
 	second.join();
-	logger.Stop();
+	const bool didWaitForCallback = CheckPeriodicCallbackRemoval(logger);
 	logger.WriteLog(ELogLevel::Error, L"AsyncLoggerTests", 0, std::source_location::current(), L"event=after_stop | 금지");
 	fclose(stdout);
+	if (!didWaitForCallback)
+	{
+		fputs("FAIL: clearing a periodic callback must wait for the active call\n", stderr);
+		return 1;
+	}
+	fputs("PASS: periodic callback removal waited for the active call\n", stderr);
 	if (!didSubmit)
 	{
 		fputs("FAIL: producer waited for the stdout sink\n", stderr);

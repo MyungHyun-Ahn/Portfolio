@@ -4,12 +4,6 @@ namespace ServerNetworkLib
 {
 // 시스템적인 이벤트는 여기서 선언
 
-struct SMonitorTimerEvent : public STimerEvent
-{
-	void SetEvent() noexcept;
-	void Execute(int delayFrame) noexcept override;
-};
-
 class CBaseContents;
 
 struct SContentsFrameEvent : public STimerEvent
