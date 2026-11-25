@@ -232,7 +232,7 @@ class ExcelToCsvTests(unittest.TestCase):
         prior = self.csv.read_bytes()
         cases = [
             ("C4", "Index", "#Key"), ("C4", "Primary", "#Key"),
-            ("C5", "Both", "#Scope"), ("C6", "string", "#Type"),
+            ("C5", "Both", "#Scope"), ("C6", "bool", "#Type"),
             ("B6", "int32", "#Key"), ("C7", "maybe", "#Required"), ("C7", "", "#Required"),
             ("A11", "#Allow", "#Allowed"), ("B8", "0", "#Min must be at least 1"),
             ("B9", "0", "#Max must be at least 1"),
@@ -259,6 +259,100 @@ class ExcelToCsvTests(unittest.TestCase):
         expected[10][2] = "10|20|450"
         expected[12][4] = ""
         self.assertEqual(self.read_rows(), expected)
+
+    def test_float32_and_string_round_trip_to_csv(self):
+        text = '  검, "방패" | 활\n001\u2028둘\u2029셋\u0085끝  '
+        self.edit_cells([("C6", "inlineStr", "float32"), ("C8", "n", "0.1"),
+                         ("C9", "inlineStr", "0.3"), ("C11", "inlineStr", "0.1 | 0.3"),
+                         ("C15", "n", "0.30000000000000004"),
+                         ("D6", "inlineStr", "string"), ("D15", "inlineStr", text),
+                         ("E6", "inlineStr", "string"), ("E15", "inlineStr", "001")])
+        self.run_generator()
+        self.assertEqual(self.read_rows()[14], ["", "1", "0.3", text, "001"])
+
+    def test_float32_decimal_text_rounds_directly_but_number_cells_round_the_excel_value(self):
+        midpoint = "1.0000000596046448"
+        scalar = [("C6", "inlineStr", "float32")]
+        self.edit_cells(scalar + [("C11", "n", midpoint), ("C15", "n", midpoint)])
+        self.run_generator()
+        rows = self.read_rows()
+        self.assertEqual((rows[10][2], rows[14][2]), ("1", "1"))
+        prior = self.csv.read_bytes()
+        self.edit_cells(scalar + [("C11", "inlineStr", midpoint), ("C15", "n", "1")])
+        self.assert_value_failure("C15", "#Allowed", prior)
+        self.edit_cells(scalar + [("C11", "inlineStr", midpoint), ("C15", "n", "1.0000001192092896")])
+        self.run_generator()
+        self.assertEqual(self.read_rows()[14][2], "1.0000001")
+
+    def test_float32_rejects_wrong_cell_kinds_and_unrepresentable_values(self):
+        self.run_generator()
+        prior = self.csv.read_bytes()
+        for cell_type, value, reason in [("inlineStr", "1.25", "numeric Excel cell"), ("b", "1", "numeric Excel cell"),
+                                          ("n", "3.5e38", "float32"), ("n", "1e-50", "float32")]:
+            with self.subTest(cell_type=cell_type, value=value):
+                self.edit_cells([("C6", "inlineStr", "float32"), ("C15", cell_type, value)])
+                self.assert_value_failure("C15", reason, prior)
+
+    def test_float32_limits_default_and_allowed_use_float32_values(self):
+        scalar = [("C6", "inlineStr", "float32"), ("C7", "inlineStr", "false")]
+        self.edit_cells(scalar + [("C10", "inlineStr", "0.100000001"), ("C11", "inlineStr", "0.1"),
+                                  ("C15", "inlineStr", ""), ("D6", "inlineStr", "float32"),
+                                  ("D15", "n", "3.4028235e38"), ("E6", "inlineStr", "float32"), ("E15", "n", "1e-45")])
+        self.run_generator()
+        rows = self.read_rows()
+        self.assertEqual(rows[9][2], "0.100000001")
+        self.assertEqual(rows[14][2:], ["", "3.4028235E+38", "1E-45"])
+        prior = self.csv.read_bytes()
+        cases = [
+            ([("C8", "n", "2.5"), ("C15", "n", "2.4")], "C15", "#Min"),
+            ([("C9", "n", "2.5"), ("C15", "n", "2.6")], "C15", "#Max"),
+            ([("C11", "inlineStr", "2.5|3.5"), ("C15", "n", "3")], "C15", "#Allowed"),
+            ([("C8", "n", "2.5"), ("C10", "n", "2.4")], "C10", "#Default #Min"),
+            ([("C11", "inlineStr", "0.1|0.100000001")], "C11", "duplicate float32"),
+            ([("C11", "inlineStr", "0|-0")], "C11", "duplicate float32"),
+            ([("C8", "inlineStr", "NaN")], "C8", "float32"),
+            ([("C9", "inlineStr", "Infinity")], "C9", "float32"),
+            ([("C10", "inlineStr", "1e-999")], "C10", "float32"),
+            ([("C10", "inlineStr", "1,25")], "C10", "float32"),
+        ]
+        for edits, address, reason in cases:
+            with self.subTest(edits=edits):
+                self.edit_cells(scalar + edits)
+                self.assert_value_failure(address, reason, prior)
+
+    def test_string_allowed_and_default_preserve_spaces_and_compare_exactly(self):
+        scalar = [("C6", "inlineStr", "string"), ("C7", "inlineStr", "false"),
+                  ("C11", "inlineStr", " Fire |Ice")]
+        self.edit_cells(scalar + [("C10", "inlineStr", " Fire "), ("C15", "inlineStr", "")])
+        self.run_generator()
+        rows = self.read_rows()
+        self.assertEqual(rows[9][2], " Fire ")
+        self.assertEqual(rows[14][2], "")
+        prior = self.csv.read_bytes()
+        for address, value, reason in [("C15", "Fire", "#Allowed"), ("C15", "ice", "#Allowed"),
+                                       ("C10", "Fire", "#Default #Allowed"), ("C11", "Ice|Ice", "duplicate string"),
+                                       ("C11", "Fire||Ice", "invalid"), ("C8", "1", "#Min"), ("C9", "2", "#Max")]:
+            with self.subTest(address=address, value=value):
+                self.edit_cells(scalar + [("C15", "inlineStr", "Ice"), (address, "inlineStr", value)])
+                self.assert_value_failure(address, reason, prior)
+
+    def test_string_requires_text_and_respects_required(self):
+        self.run_generator()
+        prior = self.csv.read_bytes()
+        for cell_type, value, reason in [("n", "123", "text Excel cell"), ("b", "1", "text Excel cell"),
+                                          ("inlineStr", "", "#Required")]:
+            with self.subTest(cell_type=cell_type, value=value):
+                self.edit_cells([("C6", "inlineStr", "string"), ("C15", cell_type, value)])
+                self.assert_value_failure("C15", reason, prior)
+
+    def test_string_default_and_allowed_require_text_cells(self):
+        self.run_generator()
+        prior = self.csv.read_bytes()
+        for address, label in [("C10", "#Default"), ("C11", "#Allowed")]:
+            with self.subTest(address=address):
+                self.edit_cells([("C6", "inlineStr", "string"), ("C7", "inlineStr", "false"),
+                                 ("C15", "inlineStr", "123"), (address, "n", "123")])
+                self.assert_value_failure(address, label + " requires a text Excel cell", prior)
 
     def write_reference_target(self, key="42"):
         target = self.input / "z-Profiles.xlsx"
@@ -334,6 +428,8 @@ class ExcelToCsvTests(unittest.TestCase):
             ("z-Profiles.OtherProfile.playerMovementDataId", "uint32", "target field was not found"),
             ("z-Profiles.OtherProfile.MoveSpeedCmPerSecond", "uint32", "target field must be the primary key"),
             ("z-Profiles.OtherProfile.PlayerMovementDataId", "int32", "type must match uint32"),
+            ("z-Profiles.OtherProfile.PlayerMovementDataId", "float32", "type must match uint32"),
+            ("z-Profiles.OtherProfile.PlayerMovementDataId", "string", "type must match uint32"),
         ]
         for reference, field_type, reason in cases:
             with self.subTest(reference=reference, field_type=field_type):

@@ -171,17 +171,17 @@ internal static class WorkbookParser
         {
             FieldDeclaration declaration = declarations[column - 2];
             IXLCell cell = worksheet.Cell(row, column);
-            if (declaration.ReadDataValue(cell, source, cells[column - 1]) is not long number)
+            if (declaration.ReadDataValue(cell, source, cells[column - 1]) is not FieldValue value)
             {
                 continue;
             }
 
-            if (declaration.IsPrimaryKey && !primaryKeyRows.TryAdd(number, row))
+            if (declaration.IsPrimaryKey && !primaryKeyRows.TryAdd((long)value.Number, row))
             {
-                var priorAddress = worksheet.Cell(primaryKeyRows[number], column).Address;
-                throw new InvalidDataException($"{source}!{cell.Address}: Duplicate primary key {number}, first used at {priorAddress}.");
+                var priorAddress = worksheet.Cell(primaryKeyRows[(long)value.Number], column).Address;
+                throw new InvalidDataException($"{source}!{cell.Address}: Duplicate primary key {value.Text}, first used at {priorAddress}.");
             }
-            cells[column - 1] = number.ToString(CultureInfo.InvariantCulture);
+            cells[column - 1] = value.Text;
         }
     }
 
@@ -223,9 +223,9 @@ internal static class WorkbookParser
                     throw Error(FieldDeclarations.ReferenceRow, $"#Reference type must match {targetField.Type}:");
                 }
 
-                if (field.DefaultValue is long defaultKey && !target.PrimaryKeyRows.ContainsKey(defaultKey))
+                if (field.DefaultValue is FieldValue defaultValue && !target.PrimaryKeyRows.ContainsKey((long)defaultValue.Number))
                 {
-                    throw Error(FieldDeclarations.DefaultRow, $"#Default #Reference key {defaultKey} was not found in");
+                    throw Error(FieldDeclarations.DefaultRow, $"#Default #Reference key {defaultValue.Text} was not found in");
                 }
 
                 for (int row = MetadataLabels.Length; row < table.Csv.Rows.Count; ++row)
@@ -249,7 +249,7 @@ internal static class WorkbookParser
             XLDataType.Number => cell.GetDouble().ToString("R", CultureInfo.InvariantCulture),
             XLDataType.DateTime => cell.GetDateTime().ToString("O", CultureInfo.InvariantCulture),
             XLDataType.TimeSpan => cell.GetTimeSpan().ToString("c", CultureInfo.InvariantCulture),
-            XLDataType.Text => cell.GetString().ReplaceLineEndings("\n"),
+            XLDataType.Text => cell.GetString().Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n'),
             _ => cell.GetString(),
         };
     }

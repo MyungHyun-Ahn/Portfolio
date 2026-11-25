@@ -1,11 +1,14 @@
 using System.Globalization;
 using ClosedXML.Excel;
 
+// double은 검증된 32비트 정수와 float32를 손실 없이 비교한다. 문자열은 Text만 사용한다.
+internal readonly record struct FieldValue(string Text, double Number = 0);
+
 internal sealed record FieldDeclaration(string Type, bool IsPrimaryKey, bool IsRequired,
-    long? Minimum, long? Maximum, HashSet<long>? Allowed, long? DefaultValue, string Reference)
+    FieldValue? Minimum, FieldValue? Maximum, HashSet<string>? Allowed, FieldValue? DefaultValue, string Reference)
 {
-    // 실제 숫자 셀만 허용하고 CSV로 옮기기 전에 정수 범위를 검사한다.
-    public long? ReadDataValue(IXLCell cell, string source, string text)
+    // CSV로 변환하기 전에 원본 셀의 종류를 확인한다.
+    public FieldValue? ReadDataValue(IXLCell cell, string source, string text)
     {
         InvalidDataException Error(string reason) => new($"{source}!{cell.Address}: {reason}");
         if (text.Length == 0)
@@ -17,43 +20,40 @@ internal sealed record FieldDeclaration(string Type, bool IsPrimaryKey, bool IsR
             return null;
         }
 
-        if (cell.DataType != XLDataType.Number)
+        bool isString = Type == "string";
+        if (cell.DataType != (isString ? XLDataType.Text : XLDataType.Number))
         {
-            throw Error($"{Type} requires a numeric Excel cell.");
+            throw Error($"{Type} requires a {(isString ? "text" : "numeric")} Excel cell.");
         }
 
-        double value = cell.GetDouble();
-        bool isUnsigned = Type == "uint32";
-        long minimum = isUnsigned ? 0L : int.MinValue;
-        long maximum = isUnsigned ? (long)uint.MaxValue : int.MaxValue;
-        if (value != Math.Truncate(value) || value < minimum || value > maximum)
+        FieldValue? value = isString ? FieldDeclarations.ReadValue(Type, text) : FieldDeclarations.ReadNumber(Type, cell.GetDouble());
+        if (value is not FieldValue parsed)
         {
-            throw Error($"Value must be a valid {Type} integer.");
+            throw Error($"Value must be a valid {Type}.");
         }
 
-        long number = (long)value;
-        if (IsPrimaryKey && number == 0)
+        if (IsPrimaryKey && parsed.Number == 0)
         {
             throw Error("#Key=Primary must be at least 1.");
         }
-        if (GetConstraintError(number) is string reason)
+        if (GetConstraintError(parsed) is string reason)
         {
             throw Error($"Value {reason}");
         }
-        return number;
+        return parsed;
     }
 
-    public string? GetConstraintError(long number)
+    public string? GetConstraintError(FieldValue value)
     {
-        if (number < Minimum)
+        if (Minimum is FieldValue minimum && value.Number < minimum.Number)
         {
-            return $"#Min violation: must be at least {Minimum}.";
+            return $"#Min violation: must be at least {minimum.Text}.";
         }
-        if (number > Maximum)
+        if (Maximum is FieldValue maximum && value.Number > maximum.Number)
         {
-            return $"#Max violation: must be at most {Maximum}.";
+            return $"#Max violation: must be at most {maximum.Text}.";
         }
-        if (Allowed != null && !Allowed.Contains(number))
+        if (Allowed != null && !Allowed.Contains(value.Text))
         {
             return "#Allowed violation: value is not in the allowed list.";
         }
@@ -66,8 +66,8 @@ internal static class FieldDeclarations
     internal const int DefaultRow = 10;
     internal const int ReferenceRow = 12;
 
-    // 데이터 값을 검증하기 전에 컬럼 선언만 확인한다.
-    public static FieldDeclaration Read(IXLWorksheet worksheet, string source, IReadOnlyDictionary<(int, int), string> values,
+    // 컬럼 선언을 검사하고 float32 숫자 셀 메타데이터는 CSV에 같은 값으로 남긴다.
+    public static FieldDeclaration Read(IXLWorksheet worksheet, string source, Dictionary<(int, int), string> values,
         int column, bool hasPrimaryKey)
     {
         string Text(int row) => values.GetValueOrDefault((row, column), string.Empty);
@@ -87,9 +87,9 @@ internal static class FieldDeclarations
         }
 
         string type = Text(6);
-        if (type is not ("int32" or "uint32"))
+        if (type is not ("int32" or "uint32" or "float32" or "string"))
         {
-            throw Error(6, "must be int32 or uint32.");
+            throw Error(6, "must be int32, uint32, float32 or string.");
         }
 
         string required = Text(7);
@@ -104,31 +104,46 @@ internal static class FieldDeclarations
             throw Error(row, "must satisfy #Key=Primary: Shared, uint32 and required.");
         }
 
-        long? ReadOptionalInteger(int row)
+        FieldValue? ReadMetadataValue(int row, string text)
         {
-            string text = Text(row);
-            if (text.Length == 0)
+            IXLCell cell = worksheet.Cell(row, column);
+            if (type == "string" && cell.DataType != XLDataType.Text)
             {
-                return null;
+                throw Error(row, "requires a text Excel cell.");
             }
-            if (!TryReadInteger(type, text, out long number))
+            if (type == "float32" && cell.DataType == XLDataType.Number)
             {
-                throw Error(row, $"must be a valid {type}.");
+                FieldValue? value = ReadNumber(type, cell.GetDouble());
+                if (value is FieldValue parsed)
+                {
+                    values[(row, column)] = parsed.Text;
+                }
+                return value;
             }
-            return number;
+            return ReadValue(type, text);
         }
 
-        long? minimum = ReadOptionalInteger(8);
-        long? maximum = ReadOptionalInteger(9);
-        if (key == "Primary" && minimum == 0)
+        FieldValue? ReadOptionalValue(int row)
+        {
+            string text = Text(row);
+            return text.Length == 0 ? null : ReadMetadataValue(row, text) ?? throw Error(row, $"must be a valid {type}.");
+        }
+
+        if (type == "string" && (Text(8).Length != 0 || Text(9).Length != 0))
+        {
+            throw Error(Text(8).Length != 0 ? 8 : 9, "is only valid for a numeric field.");
+        }
+        FieldValue? minimum = ReadOptionalValue(8);
+        FieldValue? maximum = ReadOptionalValue(9);
+        if (key == "Primary" && minimum?.Number == 0)
         {
             throw Error(8, "must be at least 1 for #Key=Primary.");
         }
-        if (key == "Primary" && maximum == 0)
+        if (key == "Primary" && maximum?.Number == 0)
         {
             throw Error(9, "must be at least 1 for #Key=Primary.");
         }
-        if (minimum > maximum)
+        if (minimum?.Number > maximum?.Number)
         {
             throw Error(9, "cannot be less than #Min.");
         }
@@ -136,15 +151,16 @@ internal static class FieldDeclarations
         {
             throw Error(DefaultRow, "is only valid for an optional field.");
         }
-        long? defaultValue = ReadOptionalInteger(DefaultRow);
+        FieldValue? defaultValue = ReadOptionalValue(DefaultRow);
 
-        HashSet<long>? allowed = null;
+        HashSet<string>? allowed = null;
         if (Text(11).Length != 0)
         {
-            allowed = new HashSet<long>();
-            foreach (string item in Text(11).Split('|', StringSplitOptions.TrimEntries))
+            allowed = new HashSet<string>(StringComparer.Ordinal);
+            StringSplitOptions options = type == "string" ? StringSplitOptions.None : StringSplitOptions.TrimEntries;
+            foreach (string item in Text(11).Split('|', options))
             {
-                if (!TryReadInteger(type, item, out long number) || !allowed.Add(number))
+                if (ReadMetadataValue(11, item) is not FieldValue value || !allowed.Add(value.Text))
                 {
                     throw Error(11, $"contains an invalid or duplicate {type} value.");
                 }
@@ -159,26 +175,92 @@ internal static class FieldDeclarations
 
         var declaration = new FieldDeclaration(type, key == "Primary", required == "true", minimum, maximum, allowed,
             defaultValue, reference);
-        if (defaultValue is long numberValue && declaration.GetConstraintError(numberValue) is string reason)
+        if (defaultValue is FieldValue parsed && declaration.GetConstraintError(parsed) is string reason)
         {
             throw Error(DefaultRow, reason);
         }
         return declaration;
     }
 
-    private static bool TryReadInteger(string type, string value, out long number)
+    internal static FieldValue? ReadValue(string type, string text)
     {
+        if (text.Length == 0 || text.Contains('\0'))
+        {
+            return null;
+        }
+        if (type == "string")
+        {
+            return new FieldValue(text);
+        }
         if (type == "uint32")
         {
-            bool parsed = uint.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out uint unsigned);
-            number = unsigned;
-            return parsed;
+            return uint.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out uint number) ?
+                new FieldValue(number.ToString(CultureInfo.InvariantCulture), number) : null;
+        }
+        if (type == "int32")
+        {
+            return int.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int number) ?
+                new FieldValue(number.ToString(CultureInfo.InvariantCulture), number) : null;
+        }
+        if (type != "float32")
+        {
+            return null;
         }
 
-        bool signedParsed = int.TryParse(value, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int signed);
-        number = signed;
-        return signedParsed;
+        const NumberStyles FloatStyles = NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent;
+        // 십진 텍스트를 double을 거쳐 읽으면 단정밀도 중점 부근에서 다르게 반올림될 수 있다.
+        if (!float.TryParse(text, FloatStyles, CultureInfo.InvariantCulture, out float value) || !float.IsFinite(value))
+        {
+            return null;
+        }
+        // 0이 아닌 가수가 단정밀도에서 0으로 반올림되면 거절한다.
+        if (value == 0)
+        {
+            foreach (char c in text)
+            {
+                if (c is 'e' or 'E')
+                {
+                    break;
+                }
+                if (c is >= '1' and <= '9')
+                {
+                    return null;
+                }
+            }
+        }
+        return FormatFloat32(value);
     }
+
+    internal static FieldValue? ReadNumber(string type, double value)
+    {
+        if (type == "float32")
+        {
+            float number = (float)value;
+            if (!float.IsFinite(number) || (value != 0 && number == 0))
+            {
+                return null;
+            }
+            return FormatFloat32(number);
+        }
+        if (type is not ("int32" or "uint32"))
+        {
+            return null;
+        }
+
+        bool isUnsigned = type == "uint32";
+        long minimum = isUnsigned ? 0L : int.MinValue;
+        long maximum = isUnsigned ? (long)uint.MaxValue : int.MaxValue;
+        if (value != Math.Truncate(value) || value < minimum || value > maximum)
+        {
+            return null;
+        }
+        long integer = (long)value;
+        return new FieldValue(integer.ToString(CultureInfo.InvariantCulture), integer);
+    }
+
+    // +0과 -0을 같은 값으로 비교하고 동일한 CSV로 기록한다.
+    private static FieldValue FormatFloat32(float number) =>
+        new(number == 0 ? "0" : number.ToString("R", CultureInfo.InvariantCulture), number);
 
     private static bool IsReferenceSyntax(string value)
     {
