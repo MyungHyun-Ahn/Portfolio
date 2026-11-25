@@ -1,10 +1,73 @@
 using System.Globalization;
 using ClosedXML.Excel;
 
+internal sealed record FieldDeclaration(string Type, bool IsPrimaryKey, bool IsRequired,
+    long? Minimum, long? Maximum, HashSet<long>? Allowed, long? DefaultValue, string Reference)
+{
+    // 실제 숫자 셀만 허용하고 CSV로 옮기기 전에 정수 범위를 검사한다.
+    public long? ReadDataValue(IXLCell cell, string source, string text)
+    {
+        InvalidDataException Error(string reason) => new($"{source}!{cell.Address}: {reason}");
+        if (text.Length == 0)
+        {
+            if (IsRequired)
+            {
+                throw Error("#Required must have a value in the Excel cell.");
+            }
+            return null;
+        }
+
+        if (cell.DataType != XLDataType.Number)
+        {
+            throw Error($"{Type} requires a numeric Excel cell.");
+        }
+
+        double value = cell.GetDouble();
+        bool isUnsigned = Type == "uint32";
+        long minimum = isUnsigned ? 0L : int.MinValue;
+        long maximum = isUnsigned ? (long)uint.MaxValue : int.MaxValue;
+        if (value != Math.Truncate(value) || value < minimum || value > maximum)
+        {
+            throw Error($"Value must be a valid {Type} integer.");
+        }
+
+        long number = (long)value;
+        if (IsPrimaryKey && number == 0)
+        {
+            throw Error("#Key=Primary must be at least 1.");
+        }
+        if (GetConstraintError(number) is string reason)
+        {
+            throw Error($"Value {reason}");
+        }
+        return number;
+    }
+
+    public string? GetConstraintError(long number)
+    {
+        if (number < Minimum)
+        {
+            return $"#Min violation: must be at least {Minimum}.";
+        }
+        if (number > Maximum)
+        {
+            return $"#Max violation: must be at most {Maximum}.";
+        }
+        if (Allowed != null && !Allowed.Contains(number))
+        {
+            return "#Allowed violation: value is not in the allowed list.";
+        }
+        return null;
+    }
+}
+
 internal static class FieldDeclarations
 {
+    internal const int DefaultRow = 10;
+    internal const int ReferenceRow = 12;
+
     // 데이터 값을 검증하기 전에 컬럼 선언만 확인한다.
-    public static bool Check(IXLWorksheet worksheet, string source, IReadOnlyDictionary<(int, int), string> values,
+    public static FieldDeclaration Read(IXLWorksheet worksheet, string source, IReadOnlyDictionary<(int, int), string> values,
         int column, bool hasPrimaryKey)
     {
         string Text(int row) => values.GetValueOrDefault((row, column), string.Empty);
@@ -69,15 +132,16 @@ internal static class FieldDeclarations
         {
             throw Error(9, "cannot be less than #Min.");
         }
-        if (Text(10).Length != 0 && required == "true")
+        if (Text(DefaultRow).Length != 0 && required == "true")
         {
-            throw Error(10, "is only valid for an optional field.");
+            throw Error(DefaultRow, "is only valid for an optional field.");
         }
-        ReadOptionalInteger(10);
+        long? defaultValue = ReadOptionalInteger(DefaultRow);
 
+        HashSet<long>? allowed = null;
         if (Text(11).Length != 0)
         {
-            var allowed = new HashSet<long>();
+            allowed = new HashSet<long>();
             foreach (string item in Text(11).Split('|', StringSplitOptions.TrimEntries))
             {
                 if (!TryReadInteger(type, item, out long number) || !allowed.Add(number))
@@ -87,11 +151,19 @@ internal static class FieldDeclarations
             }
         }
 
-        if (Text(12).Length != 0 && !IsReferenceSyntax(Text(12)))
+        string reference = Text(ReferenceRow);
+        if (reference.Length != 0 && !IsReferenceSyntax(reference))
         {
-            throw Error(12, "must use Workbook.Sheet.Field with no file extension.");
+            throw Error(ReferenceRow, "must use Workbook.Sheet.Field with no file extension.");
         }
-        return hasPrimaryKey || key == "Primary";
+
+        var declaration = new FieldDeclaration(type, key == "Primary", required == "true", minimum, maximum, allowed,
+            defaultValue, reference);
+        if (defaultValue is long numberValue && declaration.GetConstraintError(numberValue) is string reason)
+        {
+            throw Error(DefaultRow, reason);
+        }
+        return declaration;
     }
 
     private static bool TryReadInteger(string type, string value, out long number)
