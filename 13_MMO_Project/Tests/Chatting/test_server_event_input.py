@@ -348,18 +348,24 @@ def windows_nic_series():
         pdh.PdhCloseQuery(query)
 
 
-def check_monitor_series(samples, process_series, *, has_rates=True):
+def check_monitor_series(samples, process_series, *, has_rates=True, has_chat_rates=True):
     intervals = (
-        "net_accept_completions", "net_received_packets", "net_sent_packets", "chat_content_updates",
-        "chat_login_requests", "chat_sector_move_requests", "chat_message_requests", "chat_message_send_requests",
-        "chat_work_delegations", "chat_work_steals", "net_send_batch_limit_hits",
+        "net_accept_completions", "net_received_packets", "net_sent_packets", "net_send_batch_limit_hits",
+        "chat_work_delegations", "chat_work_steals",
     )
+    chat_intervals = ("chat_content_updates", "chat_login_requests", "chat_sector_move_requests",
+                      "chat_message_requests", "chat_message_send_requests")
     rates = {f"{name}_per_second" for name in intervals}
-    required = {f"{name}_total" for name in intervals}
+    chat_rates = {f"{name}_per_second" for name in chat_intervals}
+    required = {f"{name}_total" for name in intervals + chat_intervals}
     if has_rates:
         required |= rates
     else:
         assert rates.isdisjoint(samples), "first monitor snapshot published interval rates"
+    if has_chat_rates:
+        required |= chat_rates
+    else:
+        assert chat_rates.isdisjoint(samples), "first chat snapshot published interval rates"
     required |= {f"net_{name}" for name in ("sessions", "sessions_accepted_total", "wsasend_calls_total", "wsasend_pending_total")}
     required |= {f"process_{name}_bytes" for name in (
         "working_set", "peak_working_set", "paged_pool", "peak_paged_pool", "nonpaged_pool", "peak_nonpaged_pool",
@@ -401,7 +407,8 @@ def metrics(base, configuration):
         expected_nics = {f'{NIC_PREFIX}{{interface="{name.translate(LABEL_ESCAPES)}"}}'
                          for name in expected_interfaces}
         # The exporter only retains the latest sample, so the first HTTP read may miss warm-up.
-        check_monitor_series(initial, process_series, has_rates="net_accept_completions_per_second" in initial)
+        check_monitor_series(initial, process_series, has_rates="net_accept_completions_per_second" in initial,
+                             has_chat_rates="chat_message_requests_per_second" in initial)
         wait_metrics(address, metrics_port, lambda values: expected_nics <= values.keys())
         print(f"metrics discovery: {process_series} = 1; Windows PDH `Bytes Total/sec`: {sorted(expected_interfaces)}")
         assert initial["net_sessions"] == 0
@@ -409,10 +416,11 @@ def metrics(base, configuration):
         assert initial["process_nonpaged_pool_bytes"] > 0
         assert initial["net_sessions_accepted_total"] == 0
         wait_text(server, f"event=server_ready port={chat_port}")
-        idle_rates = wait_metrics(address, metrics_port,
-                                  lambda values: "net_accept_completions_per_second" in values)
+        idle_rates = wait_metrics(address, metrics_port, lambda values: "net_accept_completions_per_second" in values
+                                  and "chat_message_requests_per_second" in values)
         check_monitor_series(idle_rates, process_series)
         assert idle_rates["net_received_packets_per_second"] == idle_rates["net_sent_packets_per_second"] == 0
+        assert idle_rates["chat_message_requests_per_second"] == idle_rates["chat_message_send_requests_per_second"] == 0
         frame_count = idle_rates.get("chat_content_frames_total", 0)
         assert frame_count > 0, "no completed content frames while idle"
         publish_time = "observability_snapshot_timestamp_seconds"
@@ -424,7 +432,8 @@ def metrics(base, configuration):
             assert wrong_address.connect_ex(("127.0.0.1", metrics_port)) in (10060, 10061), "unexpected metrics listener"
         with launch(base, configuration, "Client", "metrics-client", chat_port) as client:
             wait_text(client, "READY account=")
-            pending_rates = {"net_received_packets_per_second", "net_sent_packets_per_second"}
+            pending_rates = {"net_received_packets_per_second", "net_sent_packets_per_second",
+                             "chat_message_requests_per_second", "chat_message_send_requests_per_second"}
 
             def observed_directional_rates(values):
                 # 수신과 송신은 서로 다른 모니터 구간에 집계될 수 있다.
@@ -435,7 +444,7 @@ def metrics(base, configuration):
             try:
                 wait_metrics(address, metrics_port, observed_directional_rates)
             except AssertionError as exc:
-                raise AssertionError(f"positive packet rates not observed: {sorted(pending_rates)}") from exc
+                raise AssertionError(f"positive network/chat rates not observed: {sorted(pending_rates)}") from exc
             wait_text(client, ": metrics echo")
             active = wait_metrics(address, metrics_port, lambda values: values.get("net_sessions") == 1
                                   and values.get("chat_message_send_requests_total", 0) >= 1
@@ -446,13 +455,17 @@ def metrics(base, configuration):
             assert active["net_wsasend_calls_total"] >= 1
             assert active["chat_login_requests_total"] == 1
             assert active["chat_sector_move_requests_total"] == 1
-            assert active["chat_message_send_requests_total"] >= 1
+            assert active["chat_content_updates_total"] >= 3
+            assert active["chat_message_requests_total"] == active["chat_message_send_requests_total"] == 1
             check_monitor_series(active, process_series)
             send(client, "/exit")
             assert client[0].wait(timeout=8) == 0
         idle = wait_metrics(address, metrics_port, lambda values: values.get("net_sessions") == 0
-                            and values.get("net_received_packets_per_second") == 0)
+                            and values.get("net_received_packets_per_second") == 0
+                            and values.get("chat_message_requests_per_second") == 0
+                            and values.get("chat_message_send_requests_per_second") == 0)
         assert idle["net_received_packets_total"] == active["net_received_packets_total"]
+        assert idle["chat_message_requests_total"] == idle["chat_message_send_requests_total"] == 1
         send(server, "/exit")
         assert server[0].wait(timeout=8) == 0
 

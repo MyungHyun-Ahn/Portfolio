@@ -11,7 +11,6 @@
 #include "ContentsHandle.h"
 #include "CContentsRuntime.h"
 #include "ChatMetrics.h"
-#include "CMonitor.h"
 #include "CommonProtocol.h"
 #include "PacketFraming.h"
 #include "CPlayer.h"
@@ -70,19 +69,19 @@ namespace Chatting
 
 	bool CChatContents::onRecv(UINT64 sessionId, NetworkCommonLib::CSerializableBufferView &message) noexcept
 	{
-		InterlockedIncrement(&ServerNetworkLib::g_monitor.m_updateTps);
+		RecordChatContentUpdate();
 		std::uint16_t type = 0;
 		const bool isHandled = DispatchServerPacket(sessionId, message, m_processPacket, &type);
 		switch (static_cast<EPacketType>(type))
 		{
 		case EPacketType::ReqLogin:
-			InterlockedIncrement(&ServerNetworkLib::g_monitor.m_loginReq);
+			RecordChatLoginRequest();
 			break;
 		case EPacketType::ReqSectorMove:
-			InterlockedIncrement(&ServerNetworkLib::g_monitor.m_sectorMoveReq);
+			RecordChatSectorMoveRequest();
 			break;
 		case EPacketType::ReqMessage:
-			InterlockedIncrement(&ServerNetworkLib::g_monitor.m_chatMsgReq);
+			RecordChatMessageRequest();
 			break;
 		default:
 			break;
@@ -114,7 +113,7 @@ namespace Chatting
 				{
 					if (entry.first == sessionId)
 						continue;
-					InterlockedIncrement(&ServerNetworkLib::g_monitor.m_chatMsgRes);
+					RecordChatMessageSendRequest();
 					m_server.SendPacket(entry.first, pMessage);
 				}
 			}

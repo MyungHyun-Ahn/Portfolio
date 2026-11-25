@@ -14,11 +14,6 @@ enum class EMonitorInterval
 	AcceptCompletions,
 	ReceivedPackets,
 	SentPackets,
-	ContentUpdates,
-	LoginRequests,
-	SectorMoveRequests,
-	MessageRequests,
-	MessageSendRequests,
 	WorkDelegations,
 	WorkSteals,
 	SendBatchLimitHits,
@@ -82,16 +77,7 @@ private:
 
 public:
 	LONG m_acceptTps = 0;
-	LONG m_updateTps = 0;
 	INT64 m_acceptTotal = 0;
-
-	// 초당 메시지 발생 빈도 체크
-	LONG m_loginReq = 0;
-	LONG m_sectorMoveReq = 0;
-	LONG m_chatMsgReq = 0;
-
-	// SendPacket 호출 횟수
-	LONG m_chatMsgRes = 0;
 	INT64 m_sendPendingCount = 0;
 	INT64 m_sendCallCount = 0;
 	LONG m_delWork = 0;

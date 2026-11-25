@@ -12,6 +12,8 @@
 
 #include <httplib.h>
 #include <pdh.h>
+#include <psapi.h>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include "CSystemMetrics.h"
@@ -69,6 +71,93 @@ namespace
 		Check(body.find("# TYPE process_working_set_bytes gauge") != std::string::npos, "process working set missing");
 		Check(body.find("test_requests_total 1") != std::string::npos, "collection must append to the caller's snapshot");
 		Check(body.find("host_nic_total_bytes_per_second") == std::string::npos, "first sample must omit NIC rates");
+	}
+
+	// Windows가 직접 보고한 프로세스의 최대 작업 집합을 바이트로 읽는다.
+	SIZE_T ReadPeakWorkingSetBytes()
+	{
+		PROCESS_MEMORY_COUNTERS memory{};
+		memory.cb = sizeof(memory);
+		Check(GetProcessMemoryInfo(GetCurrentProcess(), &memory, memory.cb) != FALSE, "could not read Windows process memory");
+		return memory.PeakWorkingSetSize;
+	}
+
+	// 이름과 필요 시 mode 라벨이 일치하는 게이지를 찾는다.
+	double FindGauge(const MetricsLib::SMetricsSnapshot &snapshot, const char *pName, const char *pMode = nullptr)
+	{
+		for (const auto &gauge : snapshot.m_gauges)
+		{
+			if (gauge.m_name != pName)
+				continue;
+			if (pMode == nullptr || (gauge.m_labels.size() == 1 && gauge.m_labels[0].m_name == "mode"
+				&& gauge.m_labels[0].m_value == pMode))
+				return gauge.m_value;
+		}
+		Check(false, pName);
+		return 0.0;
+	}
+
+	// CPU 게이지의 단위가 비율이며 총합이 사용자·커널 시간과 일치하는지 확인한다.
+	void CheckCpuRatios(const MetricsLib::SMetricsSnapshot &snapshot, const char *pName)
+	{
+		const double total = FindGauge(snapshot, pName, "total");
+		const double user = FindGauge(snapshot, pName, "user");
+		const double kernel = FindGauge(snapshot, pName, "kernel");
+		Check(std::isfinite(total) && total >= 0.0 && total <= 1.0 && user >= 0.0 && kernel >= 0.0,
+			"CPU samples must be finite nonnegative ratios");
+		Check(std::abs(total - (user + kernel)) < 1e-9, "CPU total must equal user plus kernel");
+	}
+
+	// 표본 간 간격을 둬 CPU·PDH 및 NIC 구간 값이 나오는지 확인한다.
+	void CollectsCpuAndPdhAfterWarmup()
+	{
+		MetricsLib::CSystemMetrics collector;
+		MetricsLib::SMetricsSnapshot first;
+		collector.Collect(first);
+		std::this_thread::sleep_for(std::chrono::milliseconds(1100));
+
+		const auto peakBefore = ReadPeakWorkingSetBytes();
+		MetricsLib::SMetricsSnapshot second;
+		collector.Collect(second);
+		const auto peakAfter = ReadPeakWorkingSetBytes();
+		const double peakBytes = FindGauge(second, "process_peak_working_set_bytes");
+		const double workingSetBytes = FindGauge(second, "process_working_set_bytes");
+		Check(peakBytes >= static_cast<double>(peakBefore) && peakBytes <= static_cast<double>(peakAfter)
+			&& workingSetBytes > 0 && workingSetBytes <= peakBytes, "process memory must match Windows byte units");
+		CheckCpuRatios(second, "host_cpu_usage_ratio");
+		CheckCpuRatios(second, "process_cpu_usage_ratio");
+
+		const double availableBytes = FindGauge(second, "host_available_memory_bytes");
+		constexpr double kBytesPerMegabyte = 1024.0 * 1024.0;
+		Check(availableBytes >= kBytesPerMegabyte && std::fmod(availableBytes, kBytesPerMegabyte) == 0.0,
+			"PDH available memory must be converted from megabytes to bytes");
+		Check(FindGauge(second, "host_nonpaged_pool_bytes") > 0, "PDH nonpaged pool sample missing or invalid");
+		Check(FindGauge(second, "host_tcpv4_retransmitted_segments_per_second") >= 0, "PDH TCP sample is invalid");
+
+		bool hasNic = false;
+		for (const auto &gauge : second.m_gauges)
+		{
+			if (gauge.m_name != "host_nic_total_bytes_per_second")
+				continue;
+			Check(gauge.m_labels.size() == 1 && gauge.m_labels[0].m_name == "interface" && !gauge.m_labels[0].m_value.empty()
+				&& std::isfinite(gauge.m_value) && gauge.m_value >= 0.0, "invalid PDH NIC sample");
+			hasNic = true;
+		}
+		Check(hasNic, "PDH NIC samples missing after warm-up");
+		std::string body;
+		Check(MetricsLib::FormatPrometheus(second, body), "second system sample must format as Prometheus metrics");
+	}
+
+	// 프로세스 조회가 실패해도 수집할 수 있는 호스트 지표는 남긴다.
+	void OmitsUnavailableProcessMetrics()
+	{
+		MetricsLib::CSystemMetrics collector(nullptr);
+		MetricsLib::SMetricsSnapshot snapshot;
+		collector.Collect(snapshot);
+		Check(snapshot.m_counters.empty(), "failed process sample must not report page faults as zero");
+		for (const auto &gauge : snapshot.m_gauges)
+			Check(gauge.m_name.starts_with("host_"), "failed process sample must omit process gauges");
+		Check(FindGauge(snapshot, "host_available_memory_bytes") > 0, "process collection failure must preserve host PDH metrics");
 	}
 
 	void ReturnsUnavailableBeforePublication()
@@ -253,6 +342,8 @@ namespace
 int main(void)
 {
 	AppendsCurrentProcessMetrics();
+	CollectsCpuAndPdhAfterWarmup();
+	OmitsUnavailableProcessMetrics();
 	BindsOnlyToTheRequestedAddress();
 	ReturnsUnavailableBeforePublication();
 	ReturnsLatestPublishedCounter();

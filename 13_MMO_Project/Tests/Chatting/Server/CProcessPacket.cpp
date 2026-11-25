@@ -9,7 +9,7 @@
 #include "CSerializableBufferView.h"
 #include "SBaseEvent.h"
 #include "ServerSetting.h"
-#include "CMonitor.h"
+#include "ChatMetrics.h"
 #include "CServer.h"
 #include "IContents.h"
 #include "ContentsHandle.h"
@@ -155,7 +155,7 @@ namespace Chatting
 
 		SendPacket(sessionId, spResponse);
 		pPlayer->m_prevRecvTime = timeGetTime();
-		InterlockedIncrement(&ServerNetworkLib::g_monitor.m_chatMsgRes);
+		RecordChatMessageSendRequest();
 		m_contents.SendSector(sessionId, pPlayer->m_sectorY, pPlayer->m_sectorX, spNotification);
 		g_pLogger->WriteLog(ELogLevel::Debug, L"ChatServer", sessionId, std::source_location::current(),
 			L"event=chat_processed sector_x=%u sector_y=%u | 채팅 요청을 처리했습니다.", pPlayer->m_sectorX, pPlayer->m_sectorY);
