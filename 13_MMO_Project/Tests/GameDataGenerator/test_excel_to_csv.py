@@ -77,6 +77,51 @@ def replace_cell(source, destination, address, cell_type, value, formula=None, s
             candidate.writestr(item, data)
 
 
+def write_enum_workbook(path, sheets):
+    # 운영 Enum을 만들지 않고 작은 실제 XLSX 패키지로 생성기를 검증한다.
+    types = ET.Element("Types", {"xmlns": TYPES_NS[1:-1]})
+    root_rels = ET.Element("Relationships", {"xmlns": PKG_NS[1:-1]})
+    book_rels = ET.Element("Relationships", {"xmlns": PKG_NS[1:-1]})
+    book = ET.Element(NS + "workbook")
+    book_sheets = ET.SubElement(book, NS + "sheets")
+    content = "application/vnd.openxmlformats-officedocument.spreadsheetml."
+    ET.SubElement(types, "Default", {"Extension": "rels",
+                  "ContentType": "application/vnd.openxmlformats-package.relationships+xml"})
+    ET.SubElement(types, "Override", {"PartName": "/xl/workbook.xml", "ContentType": content + "sheet.main+xml"})
+    ET.SubElement(root_rels, "Relationship", {"Id": "rId1", "Target": "xl/workbook.xml",
+                  "Type": REL_NS[1:-1] + "/officeDocument"})
+    with ZipFile(path, "w") as workbook:
+        for index, (title, rows) in enumerate(sheets, 1):
+            part = f"worksheets/sheet{index}.xml"
+            rel_id = f"rId{index}"
+            ET.SubElement(book_sheets, NS + "sheet", {"name": title, "sheetId": str(index), REL_NS + "id": rel_id})
+            ET.SubElement(book_rels, "Relationship", {"Id": rel_id, "Target": part,
+                          "Type": REL_NS[1:-1] + "/worksheet"})
+            ET.SubElement(types, "Override", {"PartName": "/xl/" + part, "ContentType": content + "worksheet+xml"})
+            sheet = ET.Element(NS + "worksheet")
+            data = ET.SubElement(sheet, NS + "sheetData")
+            for row_number, values in enumerate(rows, 1):
+                row = ET.SubElement(data, NS + "row", {"r": str(row_number)})
+                for column, value in zip("ABC", values):
+                    if value is None:
+                        continue
+                    cell = ET.SubElement(row, NS + "c", {"r": f"{column}{row_number}"})
+                    if isinstance(value, str):
+                        cell.set("t", "inlineStr")
+                        text = ET.SubElement(ET.SubElement(cell, NS + "is"), NS + "t")
+                        text.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
+                        text.text = value
+                    else:
+                        if isinstance(value, tuple):
+                            ET.SubElement(cell, NS + "f").text = value[0]
+                            value = value[1]
+                        ET.SubElement(cell, NS + "v").text = str(value)
+            workbook.writestr("xl/" + part, ET.tostring(sheet, encoding="utf-8"))
+        for name, xml in [("[Content_Types].xml", types), ("_rels/.rels", root_rels),
+                          ("xl/_rels/workbook.xml.rels", book_rels), ("xl/workbook.xml", book)]:
+            workbook.writestr(name, ET.tostring(xml, encoding="utf-8"))
+
+
 class ExcelToCsvTests(unittest.TestCase):
     def setUp(self):
         with self.subTest("빌드된 CLI"):
@@ -123,6 +168,253 @@ class ExcelToCsvTests(unittest.TestCase):
         self.assertEqual(self.csv.read_bytes(), prior)
         self.assertEqual(list(self.output.iterdir()), [self.csv])
         return message
+
+    def test_enum_workbook_and_field_generate_catalog_and_symbolic_csv(self):
+        enum_path = self.input / "Enum.xlsx"
+        damage = [("Fire", 9), ("None", 0), (None, None), ("Ice", 2)]
+        weather = [("Fire", 1), ("Rain", 4294967295)]
+        header = [("Name", "Value")]
+        write_enum_workbook(enum_path, [("WeatherType", header + weather), ("DamageType", header + damage)])
+        enum_bytes = enum_path.read_bytes()
+        self.edit_cells([("C6", "inlineStr", "enum:DamageType"), ("C15", "inlineStr", "Fire"),
+                         ("D6", "inlineStr", "enum:WeatherType"), ("D7", "inlineStr", "false"),
+                         ("D10", "inlineStr", "Rain"), ("D11", "inlineStr", "Fire | Rain"),
+                         ("D15", "inlineStr", "")])
+        self.run_generator()
+        self.assertEqual(self.read_rows()[14], ["", "1", "Fire", "", "1000"])
+        self.assertEqual(self.read_rows()[9][3], "Rain")
+        self.assertEqual(self.read_rows()[10][3], "Fire | Rain")
+        self.assertEqual(enum_path.read_bytes(), enum_bytes)
+        enum_csv = self.output / "Enum.csv"
+        expected = (b"Type,Name,Value\r\nDamageType,None,0\r\nDamageType,Ice,2\r\nDamageType,Fire,9\r\n"
+                    b"WeatherType,Fire,1\r\nWeatherType,Rain,4294967295\r\n")
+        self.assertEqual(enum_csv.read_bytes(), expected)
+        self.assertEqual({path.name for path in self.output.iterdir()}, {"Enum.csv", "PlayerMovement.csv"})
+        write_enum_workbook(enum_path, [("DamageType", header + damage[::-1]), ("WeatherType", header + weather[::-1])])
+        self.run_generator()
+        self.assertEqual(enum_csv.read_bytes(), expected)
+
+    def test_enum_catalog_can_be_generated_without_regular_tables(self):
+        self.xlsx.unlink()
+        write_enum_workbook(self.input / "Enum.xlsx", [("DamageType", [("Name", "Value"), ("Fire", 9)])])
+        self.run_generator()
+        self.assertEqual({path.name: path.read_bytes() for path in self.output.iterdir()},
+                         {"Enum.csv": b"Type,Name,Value\r\nDamageType,Fire,9\r\n"})
+
+    def test_enum_field_rejects_missing_catalog(self):
+        self.edit_cells([("C6", "inlineStr", "enum:DamageType"), ("C15", "inlineStr", "Fire")])
+        error = self.run_generator(success=False)
+        self.assertIn("Player.xlsx:PlayerMovement!C6", error)
+        self.assertIn("Unknown enum type 'DamageType'", error)
+        self.assertFalse(self.output.exists())
+
+    def test_invalid_enum_field_preserves_catalog_and_table_csv(self):
+        enum_path = self.input / "Enum.xlsx"
+        write_enum_workbook(enum_path, [("DamageType", [("Name", "Value"), ("Fire", 9), ("Ice", 2)]),
+                                        ("WeatherType", [("Name", "Value"), ("Rain", 9)])])
+        self.run_generator()
+        prior = {path.name: path.read_bytes() for path in self.output.iterdir()}
+        self.assertEqual(set(prior), {"Enum.csv", "PlayerMovement.csv"})
+        # 이 정의가 다시 발행되면 이전 Enum.csv와 다른 바이트가 된다.
+        write_enum_workbook(enum_path, [("DamageType", [("Name", "Value"), ("Fire", 9), ("Ice", 2)]),
+                                        ("WeatherType", [("Name", "Value"), ("Rain", 8)])])
+        cases = [
+            ([("C6", "inlineStr", "enum:damageType")], "C6", "Unknown enum type"),
+            ([("B6", "inlineStr", "enum:DamageType")], "B6", "#Key=Primary"),
+            ([("C15", "inlineStr", "fire")], "C15", "Unknown enum member"),
+            ([("C15", "inlineStr", "Rain")], "C15", "Unknown enum member"),
+            ([("C15", "n", "9")], "C15", "requires a text Excel cell"),
+            ([("C15", "inlineStr", "9")], "C15", "Unknown enum member"),
+            ([("C15", "inlineStr", "")], "C15", "#Required"),
+            ([("C7", "inlineStr", "false"), ("C10", "inlineStr", "Rain")], "C10", "Unknown enum member"),
+            ([("C7", "inlineStr", "false"), ("C10", "n", "9")], "C10", "requires a text Excel cell"),
+            ([("C11", "inlineStr", "Fire | Rain")], "C11", "Unknown enum member"),
+            ([("C11", "inlineStr", "Fire | Fire")], "C11", "duplicate"),
+            ([("C11", "inlineStr", "Ice")], "C15", "#Allowed"),
+            ([("C8", "n", "1")], "C8", "#Min"),
+            ([("C12", "inlineStr", "Player.PlayerMovement.PlayerMovementDataId")], "C12", "type must match uint32"),
+        ]
+        for edits, cell, reason in cases:
+            with self.subTest(edits=edits):
+                self.edit_cells([("C6", "inlineStr", "enum:DamageType"), ("C15", "inlineStr", "Fire")] + edits)
+                error = self.run_generator(success=False)
+                self.assertIn(f"Player.xlsx:PlayerMovement!{cell}", error)
+                self.assertIn(reason, error)
+                self.assertEqual({path.name: path.read_bytes() for path in self.output.iterdir()}, prior)
+
+        self.edit_cells([("C6", "inlineStr", "enum:DamageType"), ("C15", "inlineStr", "Fire")])
+        self.run_generator()
+        self.assertEqual((self.output / "Enum.csv").read_bytes(),
+                         prior["Enum.csv"].replace(b"WeatherType,Rain,9", b"WeatherType,Rain,8"))
+        self.assertEqual(self.read_rows()[14][2], "Fire")
+
+    def test_invalid_enum_definition_preserves_existing_csvs(self):
+        enum_path = self.input / "Enum.xlsx"
+        write_enum_workbook(enum_path, [("DamageType", [("Name", "Value"), ("Fire", 1), ("Ice", 2)])])
+        self.run_generator()
+        prior = {path.name: path.read_bytes() for path in self.output.iterdir()}
+        self.assertEqual(set(prior), {"Enum.csv", "PlayerMovement.csv"})
+
+        self.edit_cells([("C15", "n", "451")])
+        write_enum_workbook(enum_path, [("DamageType", [("Name", "Value"), ("Fire", 9), ("Ice", 9)])])
+        error = self.run_generator(success=False)
+        self.assertIn("Enum.xlsx:DamageType!B3", error)
+        self.assertIn("Duplicate enum value 9", error)
+        self.assertEqual({path.name: path.read_bytes() for path in self.output.iterdir()}, prior)
+
+    def test_invalid_enum_definitions_fail_before_output(self):
+        enum_path = self.input / "Enum.xlsx"
+        cases = [
+            ("class", [("Name", "Value"), ("Fire", 1)], "A1", "type name"),
+            ("DamageType", [("Member", "Value"), ("Fire", 1)], "A1", "Name"),
+            ("DamageType", [("Name", "Value")], "A2", "at least one"),
+            ("DamageType", [("Name", "Value"), ("Fire", 1), ("Fire", 2)], "A3", "Duplicate enum member"),
+            ("DamageType", [("Name", "Value"), ("Fire", 1), ("Ice", 1)], "B3", "Duplicate enum value"),
+            ("DamageType", [("Name", "Value"), ("return", 1)], "A2", "member name"),
+            ("DamageType", [("Name", "Value"), ("Ice__Wall", 1)], "A2", "member name"),
+            ("DamageType", [("Name", "Value"), ("Fire", None)], "B2", "uint32"),
+            ("DamageType", [("Name", "Value"), ("Fire", "1")], "B2", "uint32"),
+            ("DamageType", [("Name", "Value"), ("Fire", -1)], "B2", "uint32"),
+            ("DamageType", [("Name", "Value"), ("Fire", 1.5)], "B2", "uint32"),
+            ("DamageType", [("Name", "Value"), ("Fire", 4294967296)], "B2", "uint32"),
+            ("DamageType", [("Name", "Value"), ("Fire", ("1+1", 2))], "B2", "Formula"),
+            ("DamageType", [("Name", "Value"), ("Fire", 1, "extra")], "C2", "columns A and B"),
+        ]
+        for title, rows, cell, reason in cases:
+            with self.subTest(title=title, rows=rows):
+                write_enum_workbook(enum_path, [(title, rows)])
+                error = self.run_generator(success=False)
+                self.assertIn(f"Enum.xlsx:{title}!{cell}", error)
+                self.assertIn(reason, error)
+                self.assertFalse(self.output.exists())
+
+    def test_enum_csv_name_is_reserved_even_without_enum_workbook(self):
+        self.edit_cells([("B1", "inlineStr", "eNuM")], sheet_name="eNuM")
+        error = self.run_generator(success=False)
+        self.assertIn("Player.xlsx:eNuM!B1", error)
+        self.assertIn("Enum.csv is reserved", error)
+        self.assertFalse(self.output.exists())
+
+    def test_integer_arrays_preserve_order_duplicates_and_full_range(self):
+        self.edit_cells([
+            ("C6", "inlineStr", "int32[]"), ("C15", "inlineStr", " [-2147483648 | +2 | 2147483647 | 2] "),
+            ("D6", "inlineStr", "uint32[]"), ("D15", "inlineStr", "[4294967295|0|1]"),
+        ])
+        self.run_generator()
+        rows = self.read_rows()
+        self.assertEqual(rows[5][2:4], ["int32[]", "uint32[]"])
+        self.assertEqual(rows[14], ["", "1", "[-2147483648 | 2 | 2147483647 | 2]", "[4294967295 | 0 | 1]", "1000"])
+
+    def test_array_blanks_and_explicit_empty_values_stay_distinct(self):
+        self.edit_cells([
+            ("C6", "inlineStr", "uint32[]"), ("C7", "inlineStr", "false"),
+            ("C10", "inlineStr", "[ 002|1 ]"), ("C15", "inlineStr", ""),
+            ("D6", "inlineStr", "uint32[]"), ("D7", "inlineStr", "false"),
+            ("D10", "inlineStr", "[1]"), ("D15", "inlineStr", "[ ]"),
+            ("E6", "inlineStr", "uint32[]"), ("E15", "inlineStr", "[]"),
+        ])
+        self.run_generator()
+        rows = self.read_rows()
+        self.assertEqual(rows[9][2:], ["[2 | 1]", "[1]", ""])
+        self.assertEqual(rows[14][2:], ["", "[]", "[]"])
+
+    def test_string_arrays_round_trip_quoted_delimiters_and_whitespace(self):
+        first = '" 검 | 방패, [각인] "'
+        second = '"활 ""특수""\n2행\u2028"'
+        allowed = f'{first} | {second}'
+        self.edit_cells([
+            ("C6", "inlineStr", "string[]"), ("C7", "inlineStr", "false"),
+            ("C10", "inlineStr", f'[{first}]'), ("C11", "inlineStr", allowed),
+            ("C15", "inlineStr", f'[{second}|{first}]'),
+        ])
+        self.run_generator()
+        rows = self.read_rows()
+        self.assertEqual(rows[9][2], f'[{first}]')
+        self.assertEqual(rows[10][2], allowed)
+        self.assertEqual(rows[14][2], f'[{second} | {first}]')
+        self.assertEqual(len(rows), 15)
+
+    def test_float_and_enum_arrays_validate_each_element(self):
+        write_enum_workbook(self.input / "Enum.xlsx", [("DamageType", [("Name", "Value"), ("Fire", 9), ("Ice", 2)])])
+        edits = [
+            ("C6", "inlineStr", "float32[]"), ("C8", "n", "1"), ("C9", "n", "2"),
+            ("C11", "inlineStr", "1.0000000596046448 | 2"),
+            ("D6", "inlineStr", "enum:DamageType[]"), ("D11", "inlineStr", "Fire | Ice"),
+            ("C15", "inlineStr", "[2e0 | 1.0000000596046448]"), ("D15", "inlineStr", "[Ice|Fire]"),
+        ]
+        self.edit_cells(edits)
+        self.run_generator()
+        self.assertEqual(self.read_rows()[14][2:4], ["[2 | 1.0000001]", "[Ice | Fire]"])
+        prior = {path.name: path.read_bytes() for path in self.output.iterdir()}
+        self.assertEqual(set(prior), {"Enum.csv", "PlayerMovement.csv"})
+        write_enum_workbook(self.input / "Enum.xlsx", [("DamageType", [("Name", "Value"), ("Fire", 8), ("Ice", 2)])])
+        for cell, changes, reason in [
+            ("C15", [("C15", "[2 | 1]")], "Array element 2: #Allowed"),
+            ("C15", [("C15", "[2 | 0.5]")], "Array element 2: #Min"),
+            ("C15", [("C15", "[2 | 3]")], "Array element 2: #Max"),
+            ("C15", [("C15", "[2 | 1e-80]")], "Array element 2 must be a valid float32"),
+            ("D15", [("D15", "[Ice | fire]")], "Array element 2: Unknown enum member"),
+            ("D15", [("D15", "[Ice | 8]")], "Array element 2: Unknown enum member"),
+            ("D15", [("D11", "Ice")], "Array element 2: #Allowed"),
+        ]:
+            with self.subTest(cell=cell, changes=changes):
+                self.edit_cells(edits + [(address, "inlineStr", value) for address, value in changes])
+                error = self.run_generator(success=False)
+                self.assertIn(f"Player.xlsx:PlayerMovement!{cell}", error)
+                self.assertIn(reason, error)
+                self.assertEqual({path.name: path.read_bytes() for path in self.output.iterdir()}, prior)
+        self.edit_cells(edits)
+        self.run_generator()
+        self.assertIn(b"DamageType,Fire,8", (self.output / "Enum.csv").read_bytes())
+
+    def test_invalid_array_syntax_and_values_preserve_existing_output(self):
+        self.edit_cells([("C6", "inlineStr", "uint32[]"), ("C15", "inlineStr", "[0 | 2]")])
+        self.run_generator()
+        prior = self.csv.read_bytes()
+        for field_type, kind, value, reason in [
+            ("uint32[]", "n", "1", "requires a text Excel cell"),
+            ("uint32[]", "inlineStr", "", "#Required"),
+            ("uint32[]", "inlineStr", "1 | 2", "Invalid array"),
+            ("uint32[]", "inlineStr", "[1 | [2]]", "Array element 2"),
+            ("uint32[]", "inlineStr", "[1 | ]", "Array element 2"),
+            ("uint32[]", "inlineStr", "[1 || 2]", "Array element 2"),
+            ("uint32[]", "inlineStr", '[1 | "2"]', "Array element 2"),
+            ("uint32[]", "inlineStr", "[4294967296]", "Array element 1"),
+            ("int32[]", "inlineStr", "[-2147483649]", "Array element 1"),
+            ("float32[]", "inlineStr", "[1e40]", "Array element 1"),
+            ("string[]", "inlineStr", '["a" | b]', "Invalid array"),
+            ("string[]", "inlineStr", '["a" | "b]', "Invalid array"),
+            ("string[]", "inlineStr", '["a" | ]', "Invalid array"),
+            ("string[]", "inlineStr", '["a" x]', "Invalid array"),
+            ("string[]", "inlineStr", '[""]', "Array element 1"),
+        ]:
+            with self.subTest(type=field_type, value=value):
+                self.edit_cells([("C6", "inlineStr", field_type), ("C15", kind, value)])
+                self.assert_value_failure("C15", reason, prior)
+
+    def test_invalid_array_declarations_and_defaults(self):
+        self.run_generator()
+        prior = self.csv.read_bytes()
+        valid = [("C6", "inlineStr", "uint32[]"), ("C7", "inlineStr", "false"), ("C15", "inlineStr", "[2]")]
+        for edits, cell, reason in [
+            ([("C6", "inlineStr", "bool[]")], "C6", "type"),
+            ([("C6", "inlineStr", "int32[][]")], "C6", "type"),
+            ([("C6", "inlineStr", "enum:Unknown[]")], "C6", "Unknown enum type 'Unknown'"),
+            ([("B6", "inlineStr", "uint32[]")], "B6", "#Key=Primary"),
+            ([("C12", "inlineStr", "Player.PlayerMovement.PlayerMovementDataId")], "C12", "#Reference"),
+            ([("C6", "inlineStr", "string[]"), ("C8", "n", "1")], "C8", "#Min"),
+            ([("C8", "n", "3"), ("C9", "n", "2")], "C9", "cannot be less than #Min"),
+            ([("C11", "inlineStr", "2 | 02")], "C11", "duplicate"),
+            ([("C6", "inlineStr", "string[]"), ("C11", "inlineStr", '"a" | b')], "C11", "quoted"),
+            ([("C6", "inlineStr", "string[]"), ("C11", "inlineStr", '"a" | "a"')], "C11", "duplicate"),
+            ([("C10", "n", "1")], "C10", "requires a text Excel cell"),
+            ([("C10", "inlineStr", "[2 | 3]"), ("C11", "inlineStr", "2")], "C10", "Array element 2: #Allowed"),
+            ([("C10", "inlineStr", "[2 | 3]"), ("C9", "n", "2")], "C10", "Array element 2: #Max"),
+            ([("C7", "inlineStr", "true"), ("C10", "inlineStr", "[]")], "C10", "optional field"),
+        ]:
+            with self.subTest(edits=edits):
+                self.edit_cells(valid + edits)
+                self.assert_value_failure(cell, reason, prior)
 
     def test_player_movement_preserves_metadata_and_empty_cells(self):
         self.run_generator()

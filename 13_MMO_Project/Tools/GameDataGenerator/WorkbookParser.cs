@@ -21,16 +21,32 @@ internal static class WorkbookParser
         var tablesByName = new Dictionary<string, ParsedTable>(StringComparer.OrdinalIgnoreCase);
         var paths = Directory.EnumerateFiles(excelDirectory, "*.xlsx", SearchOption.TopDirectoryOnly)
             .Where(path => !Path.GetFileName(path).StartsWith("~$", StringComparison.Ordinal))
-            .OrderBy(path => path, StringComparer.Ordinal);
+            .OrderBy(path => path, StringComparer.Ordinal).ToArray();
+
+        var enumDefinitions = new EnumDefinitions();
+        string[] enumPaths = paths.Where(IsEnumWorkbook).ToArray();
+        if (enumPaths.Length > 1)
+        {
+            throw new InvalidDataException("Only one Enum.xlsx workbook is allowed.");
+        }
+        if (enumPaths.Length == 1)
+        {
+            using XLWorkbook enumWorkbook = OpenWorkbook(enumPaths[0]);
+            enumDefinitions.Read(enumWorkbook, Path.GetFileName(enumPaths[0]));
+        }
 
         foreach (string path in paths)
         {
+            if (IsEnumWorkbook(path))
+            {
+                continue;
+            }
             string workbookName = Path.GetFileNameWithoutExtension(path);
             using XLWorkbook workbook = OpenWorkbook(path);
             foreach (IXLWorksheet worksheet in workbook.Worksheets)
             {
                 string source = $"{Path.GetFileName(path)}:{worksheet.Name}";
-                ParsedTable? table = ReadWorksheet(worksheet, workbookName, source);
+                ParsedTable? table = ReadWorksheet(worksheet, workbookName, source, enumDefinitions);
                 if (table == null)
                 {
                     continue;
@@ -46,14 +62,22 @@ internal static class WorkbookParser
             }
         }
 
-        if (tables.Count == 0)
+        if (tables.Count == 0 && enumPaths.Length == 0)
         {
             throw new InvalidDataException($"{excelDirectory}: No game data sheets were found.");
         }
 
         ValidateReferences(tables, tablesByName);
-        return tables.Select(table => table.Csv).ToArray();
+        List<CsvTable> outputs = tables.Select(table => table.Csv).ToList();
+        if (enumPaths.Length == 1)
+        {
+            outputs.Add(enumDefinitions.ToCsvTable());
+        }
+        return outputs;
     }
+
+    private static bool IsEnumWorkbook(string path) =>
+        string.Equals(Path.GetFileName(path), EnumDefinitions.WorkbookFileName, StringComparison.OrdinalIgnoreCase);
 
     private static XLWorkbook OpenWorkbook(string path)
     {
@@ -67,7 +91,8 @@ internal static class WorkbookParser
         }
     }
 
-    private static ParsedTable? ReadWorksheet(IXLWorksheet worksheet, string workbookName, string source)
+    private static ParsedTable? ReadWorksheet(IXLWorksheet worksheet, string workbookName, string source,
+        EnumDefinitions enumDefinitions)
     {
         // 실제 값으로 행·열 범위를 잡는다. 서식과 빈 문자열은 범위를 늘리지 않는다.
         var values = new Dictionary<(int Row, int Column), string>();
@@ -118,6 +143,10 @@ internal static class WorkbookParser
         {
             throw new InvalidDataException($"{source}!B1: #Table must be a valid CSV file name and match the worksheet name.");
         }
+        if (string.Equals(tableName, EnumDefinitions.CsvName, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException($"{source}!B1: Enum.csv is reserved for Enum.xlsx.");
+        }
         if (CellText(2, 2) is not ("Shared" or "Server" or "Client"))
         {
             throw new InvalidDataException($"{source}!B2: #Target must be Shared, Server or Client.");
@@ -134,7 +163,7 @@ internal static class WorkbookParser
             {
                 throw new InvalidDataException($"{source}!{worksheet.Cell(headerRow, column).Address}: Invalid or duplicate #Field.");
             }
-            FieldDeclaration declaration = FieldDeclarations.Read(worksheet, source, values, column, hasPrimaryKey);
+            FieldDeclaration declaration = FieldDeclarations.Read(worksheet, source, values, column, hasPrimaryKey, enumDefinitions);
             declarations[column - 2] = declaration;
             hasPrimaryKey |= declaration.IsPrimaryKey;
         }
