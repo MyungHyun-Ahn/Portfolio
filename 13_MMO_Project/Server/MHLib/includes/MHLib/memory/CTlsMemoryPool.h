@@ -429,6 +429,11 @@ namespace MHLib::memory
 		LONG AllocTlsMemoryPoolIdx() noexcept
 		{
 			LONG idx = InterlockedIncrement(&m_tlsMemoryPoolsCurrentSize);
+			// 0번은 TLS 초기값이라 1번부터 사용한다. 고정 배열을 넘으면 메모리를 덮기 전에 멈춘다.
+			if (kThreadCount <= idx)
+			{
+				__debugbreak();
+			}
 			return idx;
 		}
 

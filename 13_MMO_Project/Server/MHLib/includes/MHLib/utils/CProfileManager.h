@@ -202,7 +202,7 @@ namespace MHLib::utils
 		inline LONG AllocThreadInfo()
 		{
 			LONG idx = InterlockedIncrement(&m_currentInfosIdx);
-			if (kMaxThreadCount + 1 <= idx)
+			if (kMaxThreadCount <= idx)
 			{
 				__debugbreak();
 			}
