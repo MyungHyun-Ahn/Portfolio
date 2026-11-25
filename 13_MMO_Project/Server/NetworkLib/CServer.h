@@ -233,6 +233,7 @@ class CBaseContents;
 		LPFN_ACCEPTEX					m_pAcceptEx = NULL;
 		GUID							m_guidAcceptEx = WSAID_ACCEPTEX;
 		CSession						**m_pAcceptExSessions;
+		LONG							m_lostAcceptSlotCount = 0; // 자원 오류로 다시 걸지 못한 accept 슬롯 수
 
 		LPFN_GETACCEPTEXSOCKADDRS		m_pGetAcceptExSockaddrs = NULL;
 		GUID							m_guidGetAcceptExSockaddrs = WSAID_GETACCEPTEXSOCKADDRS;

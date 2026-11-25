@@ -825,8 +825,15 @@ CServer *g_pServer = nullptr;
 		if (pNewAcceptEx->m_sessionSocket == INVALID_SOCKET)
 		{
 			errVal = WSAGetLastError();
+			CSession::Free(pNewAcceptEx);
+			if (m_isStop)
+				return FALSE;
+
+			// 자원 오류 등: 반납만 하고 슬롯은 포기한다.
+			const LONG lostCount = InterlockedIncrement(&m_lostAcceptSlotCount);
 			g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", 0, std::source_location::current(),
-				L"event=accept_socket_create_failed error_code=%d | 접속 수락용 소켓을 생성하지 못했습니다.", errVal);
+				L"event=accept_slot_lost index=%d error_code=%d remaining=%d total=%d | 접속 수락 슬롯을 다시 걸지 못했습니다.",
+				index, errVal, serverSetting::acceptexCount - lostCount, serverSetting::acceptexCount);
 			return FALSE;
 		}
 
@@ -835,16 +842,33 @@ CServer *g_pServer = nullptr;
 
 		retVal = m_pAcceptEx(m_listenSocket, pNewAcceptEx->m_sessionSocket
 			, pNewAcceptEx->m_acceptBuffer, 0, sizeof(SOCKADDR_IN) + 16, sizeof(SOCKADDR_IN) + 16, NULL,
-				pNewAcceptEx->m_pMyOverlappedStartAddr);
+			pNewAcceptEx->m_pMyOverlappedStartAddr);
 		if (retVal == FALSE)
 		{
 			errVal = WSAGetLastError();
 			if (errVal != WSA_IO_PENDING)
 			{
-				if (errVal != WSAECONNABORTED && errVal != WSAECONNRESET)
-					g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", 0, std::source_location::current(),
-						L"event=accept_submit_failed error_code=%d | 접속 수락 요청에 실패했습니다.", errVal);
+				// 즉시 실패는 완료 통지가 오지 않으므로 여기서 반납한다.
+				closesocket(pNewAcceptEx->m_sessionSocket);
+				CSession::Free(pNewAcceptEx);
 
+				// 중단 중에는 리슨 소켓이 닫혀 실패하는 것이 정상이다.
+				if (m_isStop)
+					return FALSE;
+
+				// 상대가 수락 전에 끊은 연결 : 같은 슬롯에 다시 건다.
+				if (errVal == WSAECONNRESET || errVal == WSAECONNABORTED)
+					return PostAcceptEx(index);
+
+				// 리슨 소켓·버퍼·인자를 잘못 넘긴 코드 버그
+				if (errVal == WSAEINVAL || errVal == WSAENOTSOCK || errVal == WSAEFAULT || errVal == WSAEOPNOTSUPP)
+					__debugbreak();
+
+				// 자원 오류 등: 반납만 하고 슬롯은 포기한다.
+				const LONG lostCount = InterlockedIncrement(&m_lostAcceptSlotCount);
+				g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", 0, std::source_location::current(),
+					L"event=accept_slot_lost index=%d error_code=%d remaining=%d total=%d | 접속 수락 슬롯을 다시 걸지 못했습니다.",
+					index, errVal, serverSetting::acceptexCount - lostCount, serverSetting::acceptexCount);
 				return FALSE;
 			}
 		}
