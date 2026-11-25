@@ -2,14 +2,22 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
-        if (args.Length is not (0 or 2))
+        bool isEmit = args.Length != 0 && args[0] == "--emit";
+        if (isEmit ? args.Length < 4 : args.Length is not (0 or 2))
         {
             Console.Error.WriteLine("Usage: GameDataGenerator [excel-directory csv-directory]");
+            Console.Error.WriteLine("       GameDataGenerator --emit csv-directory output-directory table-name [table-name ...]");
             return 1;
         }
 
         try
         {
+            if (isEmit)
+            {
+                GameDataArtifacts.Generate(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]), args[3..]);
+                return 0;
+            }
+
             string excelDirectory;
             string csvDirectory;
             if (args.Length == 0)

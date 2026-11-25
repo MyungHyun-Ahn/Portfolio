@@ -23,7 +23,11 @@ internal sealed record FieldDeclaration(string Type, bool IsPrimaryKey, bool IsR
 
         if (ElementType is string elementType)
         {
-            return ReadArrayValue(cell, text, elementType, $"{source}!{cell.Address}:");
+            if (cell.DataType != XLDataType.Text)
+            {
+                throw Error($"{Type} requires a text Excel cell.");
+            }
+            return ReadArrayValue(text, elementType, $"{source}!{cell.Address}:");
         }
 
         bool isText = Type == "string" || EnumMembers != null;
@@ -54,13 +58,44 @@ internal sealed record FieldDeclaration(string Type, bool IsPrimaryKey, bool IsR
         return parsed;
     }
 
-    // 데이터와 #Default에 같은 배열 문법과 원소 제약을 적용한다.
-    public FieldValue ReadArrayValue(IXLCell cell, string text, string elementType, string location)
+    // CSV의 빈 선택값에만 검증한 기본값을 적용한다.
+    public FieldValue? ReadCsvValue(string text, string location)
     {
-        if (cell.DataType != XLDataType.Text)
+        if (text.Length == 0)
         {
-            throw new InvalidDataException($"{location} {Type} requires a text Excel cell.");
+            if (IsRequired)
+            {
+                throw new InvalidDataException($"{location} #Required must have a value.");
+            }
+            return DefaultValue;
         }
+        if (ElementType is string elementType)
+        {
+            return ReadArrayValue(text, elementType, location);
+        }
+        if (EnumMembers != null && !EnumMembers.ContainsKey(text))
+        {
+            throw new InvalidDataException($"{location} Unknown enum member '{text}' for {Type}.");
+        }
+        FieldValue? value = EnumMembers != null ? new FieldValue(text) : FieldDeclarations.ReadValue(Type, text);
+        if (value is not FieldValue parsed)
+        {
+            throw new InvalidDataException($"{location} Value must be a valid {Type}.");
+        }
+        if (IsPrimaryKey && parsed.Text == "0")
+        {
+            throw new InvalidDataException($"{location} #Key=Primary must be at least 1.");
+        }
+        if (GetConstraintError(parsed) is string reason)
+        {
+            throw new InvalidDataException($"{location} Value {reason}");
+        }
+        return parsed;
+    }
+
+    // 데이터와 #Default에 같은 배열 문법과 원소 제약을 적용한다.
+    public FieldValue ReadArrayValue(string text, string elementType, string location)
+    {
         bool isString = elementType == "string";
         IReadOnlyList<string>? items = ArrayValues.ReadItems(text, isString);
         if (items == null)
@@ -114,12 +149,13 @@ internal static class FieldDeclarations
     internal const int ReferenceRow = 12;
 
     // 컬럼 선언을 검사하고 float32 숫자 셀 메타데이터는 CSV에 같은 값으로 남긴다.
-    public static FieldDeclaration Read(IXLWorksheet worksheet, string source, Dictionary<(int, int), string> values,
+    public static FieldDeclaration Read(IXLWorksheet? worksheet, string source, Dictionary<(int, int), string> values,
         int column, bool hasPrimaryKey, EnumDefinitions enumDefinitions)
     {
         string Text(int row) => values.GetValueOrDefault((row, column), string.Empty);
+        string Location(int row) => $"{source}!{XLHelper.GetColumnLetterFromNumber(column)}{row}: {values[(row, 1)]}";
         InvalidDataException Error(int row, string reason) =>
-            new($"{source}!{worksheet.Cell(row, column).Address}: {values[(row, 1)]} {reason}");
+            new($"{Location(row)} {reason}");
 
         string key = Text(4);
         if (key is not ("" or "Primary") || (key == "Primary" && hasPrimaryKey))
@@ -162,8 +198,8 @@ internal static class FieldDeclarations
         bool isText = scalarType == "string" || enumMembers != null;
         FieldValue? ReadMetadataValue(int row, string text)
         {
-            IXLCell cell = worksheet.Cell(row, column);
-            if (isText && cell.DataType != XLDataType.Text)
+            IXLCell? cell = worksheet?.Cell(row, column);
+            if (isText && cell != null && cell.DataType != XLDataType.Text)
             {
                 throw Error(row, "requires a text Excel cell.");
             }
@@ -172,7 +208,7 @@ internal static class FieldDeclarations
                 return enumMembers.ContainsKey(text) ? new FieldValue(text) :
                     throw Error(row, $"Unknown enum member '{text}' for {type}.");
             }
-            if (scalarType == "float32" && cell.DataType == XLDataType.Number)
+            if (scalarType == "float32" && cell?.DataType == XLDataType.Number)
             {
                 FieldValue? value = ReadNumber(scalarType, cell.GetDouble());
                 if (value is FieldValue parsed)
@@ -245,8 +281,11 @@ internal static class FieldDeclarations
             defaultValue, reference, enumMembers, isArray ? scalarType : null);
         if (isArray && Text(DefaultRow).Length != 0)
         {
-            IXLCell cell = worksheet.Cell(DefaultRow, column);
-            FieldValue arrayDefault = declaration.ReadArrayValue(cell, Text(DefaultRow), scalarType, $"{source}!{cell.Address}: #Default");
+            if (worksheet is not null && worksheet.Cell(DefaultRow, column).DataType != XLDataType.Text)
+            {
+                throw Error(DefaultRow, $"{type} requires a text Excel cell.");
+            }
+            FieldValue arrayDefault = declaration.ReadArrayValue(Text(DefaultRow), scalarType, Location(DefaultRow));
             values[(DefaultRow, column)] = arrayDefault.Text;
             return declaration with { DefaultValue = arrayDefault };
         }

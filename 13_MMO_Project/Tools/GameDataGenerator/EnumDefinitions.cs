@@ -17,6 +17,14 @@ internal sealed class EnumDefinitions
         volatile wchar_t while xor xor_eq interface near far small pascal cdecl std
         """.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries), StringComparer.Ordinal);
 
+    private static readonly HashSet<string> GeneratedEnumMacros = new("""
+        PTRDIFF_MIN PTRDIFF_MAX SIG_ATOMIC_MIN SIG_ATOMIC_MAX SIZE_MAX WCHAR_MIN WCHAR_MAX WINT_MIN WINT_MAX
+        NULL EOF CHAR_BIT CHAR_MIN CHAR_MAX SCHAR_MIN SCHAR_MAX UCHAR_MAX SHRT_MIN SHRT_MAX USHRT_MAX
+        LONG_MIN LONG_MAX ULONG_MAX LLONG_MIN LLONG_MAX ULLONG_MAX MB_LEN_MAX
+        ERROR NO_ERROR TRUE FALSE IN OUT OPTIONAL CONST DELETE VOID WINAPI APIENTRY CALLBACK
+        GetMessage SendMessage PostMessage GetObject DrawText CreateFile DeleteFile CreateWindow
+        """.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries), StringComparer.Ordinal);
+
     private readonly Dictionary<string, Dictionary<string, uint>> m_types = new(StringComparer.Ordinal);
 
     // 시트 단위로 정의를 읽은 뒤 일반 테이블에서 항목명을 조회한다.
@@ -43,6 +51,53 @@ internal sealed class EnumDefinitions
     }
 
     public IReadOnlyDictionary<string, uint>? Find(string typeName) => m_types.GetValueOrDefault(typeName);
+
+    // C++ 출력 단계는 Excel 대신 선택된 Enum.csv에서 같은 정의를 복원한다.
+    public void ReadCsv(IReadOnlyList<string[]> rows)
+    {
+        if (rows.Count < 2 || !rows[0].SequenceEqual(new[] { "Type", "Name", "Value" }))
+        {
+            throw new InvalidDataException("Enum.csv!A1: Expected Type,Name,Value and at least one member.");
+        }
+        var numbersByType = new Dictionary<string, HashSet<uint>>(StringComparer.OrdinalIgnoreCase);
+        for (int row = 1; row < rows.Count; ++row)
+        {
+            InvalidDataException Error(string column, string reason) => new($"Enum.csv!{column}{row + 1}: {reason}");
+            if (rows[row] is not [string type, string name, string text])
+            {
+                throw Error("A", "Expected exactly three fields.");
+            }
+            if (!IsGeneratedEnumName(type) || type is "Server" or "Client" or "IGameDataTable")
+            {
+                throw Error("A", "Invalid enum type name for the GameData namespace.");
+            }
+            if (!IsGeneratedEnumName(name) || name == type)
+            {
+                throw Error("B", "Invalid enum member name.");
+            }
+            if (text.Contains('\0') || !uint.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out uint number))
+            {
+                throw Error("C", "Enum value must be a uint32 integer.");
+            }
+            if (!m_types.TryGetValue(type, out Dictionary<string, uint>? members))
+            {
+                if (!numbersByType.TryAdd(type, []))
+                {
+                    throw Error("A", "Enum type names differ only in case.");
+                }
+                members = new Dictionary<string, uint>(StringComparer.Ordinal);
+                m_types.Add(type, members);
+            }
+            if (!members.TryAdd(name, number))
+            {
+                throw Error("B", $"Duplicate enum member '{name}'.");
+            }
+            if (!numbersByType[type].Add(number))
+            {
+                throw Error("C", $"Duplicate enum value {number.ToString(CultureInfo.InvariantCulture)}.");
+            }
+        }
+    }
 
     // 시트·행을 재배치해도 같은 이름과 번호로 같은 CSV를 만든다.
     public CsvTable ToCsvTable()
@@ -130,7 +185,28 @@ internal sealed class EnumDefinitions
         return members;
     }
 
-    private static bool IsCppName(string name) => name.Length != 0 && char.IsAsciiLetter(name[0]) &&
+    internal static bool IsCppName(string name) => name.Length != 0 && char.IsAsciiLetter(name[0]) &&
         name.All(c => char.IsAsciiLetterOrDigit(c) || c == '_') && !name.Contains("__", StringComparison.Ordinal) &&
         !ReservedNames.Contains(name);
+
+    // 소비자가 먼저 포함하는 표준 헤더와 Windows 헤더의 주요 매크로 이름은 생성하지 않는다.
+    private static bool IsGeneratedEnumName(string name)
+    {
+        if (!IsCppName(name) || GeneratedEnumMacros.Contains(name))
+        {
+            return false;
+        }
+        if (!name.EndsWith("_MIN", StringComparison.Ordinal) && !name.EndsWith("_MAX", StringComparison.Ordinal))
+        {
+            return true;
+        }
+        string stem = name[..^4];
+        if (stem.StartsWith("U", StringComparison.Ordinal))
+        {
+            stem = stem[1..];
+        }
+        return stem is not ("INT" or "INT8" or "INT16" or "INT32" or "INT64" or "INTPTR" or "INTMAX" or
+            "INT_LEAST8" or "INT_LEAST16" or "INT_LEAST32" or "INT_LEAST64" or
+            "INT_FAST8" or "INT_FAST16" or "INT_FAST32" or "INT_FAST64");
+    }
 }

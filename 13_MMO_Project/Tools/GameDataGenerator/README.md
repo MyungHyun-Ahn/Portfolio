@@ -1,6 +1,6 @@
 # GameDataGenerator
 
-`Tools/Tools.sln`의 .NET 10 콘솔 도구다. 현재는 Excel에서 CSV까지만 변환한다. 실행에 Excel 설치는 필요하지 않다.
+`Tools/Tools.sln`의 .NET 10 콘솔 도구다. Excel을 CSV로 변환하고, CSV만 읽어 대상별 바이너리와 C++ 행 구조체를 생성한다. 실행에 Excel 설치는 필요하지 않다.
 
 ## 실행
 
@@ -41,11 +41,28 @@ CSV는 UTF-8(BOM 없음), 레코드 구분은 CRLF다. 셀 안의 CRLF·CR은 LF
 - `#Min`·`#Max`는 숫자 배열에서 각 원소에 적용한다. `#Allowed`는 괄호 없는 원소 목록(예: `1 | 2`, `"검 | 방패" | "활"`)이며, 데이터와 기본값의 원소 하나하나가 이 목록에 있어야 한다. 배열은 PK와 `#Reference`에 쓸 수 없다.
 - CSV는 배열 데이터·기본값의 구분자를 ` | `로 맞추고, 숫자는 같은 값으로 다시 읽을 수 있게 기록한다. 인용된 문자열 내부 공백·파이프는 그대로 보존한다.
 
-공용 `GameDataEnums.h`와 일반 테이블의 바이너리·C++ 행 구조체는 0.4부터 CSV만 읽어 생성한다. 삭제된 입력의 CSV 정리와 여러 파일을 한 번에 교체하는 트랜잭션도 후속 작업이다.
+## CSV → 구조체와 바이너리
+
+```text
+dotnet run --project Tools/GameDataGenerator -c Release -- --emit GameData/Csv GameData/Generated PlayerMovement
+```
+
+이 모드에서는 Excel을 열지 않는다. 입력 목록은 확장자를 뺀 CSV 이름으로 명시한다. 여러 테이블과 참조 대상을 함께 선택하며, Enum을 사용하면 목록에 `Enum`도 넣는다. 선택하지 않은 CSV는 읽지 않는다. 검증에 실패하면 쓰기를 시작하지 않는다. 생성 전용 출력 디렉터리를 넘긴다. 선택 또는 대상이 바뀌어 이전 `.h`·`.sdat`·`.dat`가 남으면 새 출력 디렉터리를 요구하며 기존 파일을 자동 삭제하지 않는다.
+
+- `Server/`에는 서버 행 헤더와 `.sdat`, `Client/`에는 클라이언트 행 헤더와 `.dat`를 내보낸다. `#Target`에 해당하는 테이블의 `Shared`와 그 대상의 `#Scope` 필드만 헤더와 바이너리에 같은 순서로 쓴다.
+- `Common/GameDataEnums.h`는 공용이다. 선택된 `Enum.csv`에서만 선언을 만들며, 선택하지 않으면 Enum 선언이 없다. 일반 행 헤더는 `GameData::Server`/`GameData::Client`의 `S<Table>Row`와 행 밖의 `<Table>Format` 네임스페이스를 담는다. 바이너리 검증에 쓰는 버전·대상·테이블 이름·스키마 해시는 `<Table>Format`에 둔다.
+- 행은 대상별 필드마다 읽기 전용 `Get<Field>() const noexcept`를 제공한다. 필수 숫자와 Enum은 값으로, 문자열·배열·선택값은 `const` 참조로 반환한다. 선택값의 미입력 상태를 그대로 확인할 수 있고, 반환된 참조는 원본 행의 수명을 넘겨 보관하지 않는다.
+- `GetMessage`, `GetObject`, `GetRValue`, `GetGValue`, `GetBValue`를 만드는 `#Field` 이름은 Windows 매크로와 충돌하므로 산출물 생성 전에 거절한다.
+- C++ 사용부에서 `<cstdint>`와 필드 타입에 필요한 `<string>`, `<vector>`, `<optional>`을 먼저 공급한다. Enum 필드가 있으면 공용 Enum 헤더도 행 헤더보다 먼저 포함한다. 수기로 작성한 `IGameDataTable.h`를 쓸 때는 `<filesystem>`을 먼저 공급한다.
+
+바이너리의 바이트 계약은 [게임 데이터 생성기 계획](../../Docs/Plan/Common/001_게임데이터_생성기_계획.md#바이너리와-배포-경계)을 따른다. 독립 C++ 판독기와 전체 묶음의 I/O 실패 복구는 후속 작업이다.
 
 ## 검증
 
 ```text
 dotnet build Tools/Tools.sln -c Release
 python -B Tests/GameDataGenerator/test_excel_to_csv.py
+python -B Tests/GameDataGenerator/test_csv_to_artifacts.py
 ```
+
+x64 MSVC 개발자 프롬프트에서 `GAME_DATA_TEST_MSVC=1`을 설정하면 두 번째 시험에서 양쪽 생성 헤더와 `IGameDataTable`을 C++20으로 컴파일한다.

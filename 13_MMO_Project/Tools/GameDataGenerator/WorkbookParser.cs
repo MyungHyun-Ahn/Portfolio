@@ -8,7 +8,7 @@ internal static class WorkbookParser
     private sealed record ParsedTable(CsvTable Csv, string WorkbookName, string Source,
         FieldDeclaration[] Fields, Dictionary<long, int> PrimaryKeyRows);
 
-    private static readonly string[] MetadataLabels =
+    internal static readonly string[] MetadataLabels =
     [
         "#Table", "#Target", "", "#Key", "#Scope", "#Type", "#Required",
         "#Min", "#Max", "#Default", "#Allowed", "#Reference", "#Description", "#Field",
@@ -283,7 +283,7 @@ internal static class WorkbookParser
         };
     }
 
-    private static bool IsTableName(string name)
+    internal static bool IsTableName(string name)
     {
         if (!IsIdentifier(name))
         {
