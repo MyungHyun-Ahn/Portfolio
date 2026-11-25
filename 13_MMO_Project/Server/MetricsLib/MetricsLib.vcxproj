@@ -35,8 +35,10 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="CSystemMetrics.h" />
     <ClInclude Include="CMetricsExporter.h" />
     <ClInclude Include="MetricsSnapshot.h" />
+    <ClCompile Include="CSystemMetrics.cpp" />
     <ClCompile Include="CMetricsExporter.cpp" />
     <ClCompile Include="MetricsSnapshot.cpp" />
   </ItemGroup>

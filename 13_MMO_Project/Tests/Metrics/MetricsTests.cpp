@@ -11,8 +11,10 @@
 #include "CMetricsExporter.h"
 
 #include <httplib.h>
+#include <pdh.h>
 #include <cstdio>
 #include <cstdlib>
+#include "CSystemMetrics.h"
 
 namespace
 {
@@ -26,8 +28,8 @@ namespace
 		}
 	}
 
-	constexpr char kPublishTimeType[] = "# TYPE game_observability_snapshot_timestamp_seconds gauge\n";
-	constexpr char kPublishTimeSample[] = "game_observability_snapshot_timestamp_seconds ";
+	constexpr char kPublishTimeType[] = "# TYPE observability_snapshot_timestamp_seconds gauge\n";
+	constexpr char kPublishTimeSample[] = "observability_snapshot_timestamp_seconds ";
 
 	std::string StripPublishTime(std::string body, double *pPublishTime = nullptr)
 	{
@@ -49,6 +51,24 @@ namespace
 	double UnixSecondsNow()
 	{
 		return std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+	}
+
+	// 호스트·프로세스 지표가 기존 형식으로 추가되는지 확인한다.
+	void AppendsCurrentProcessMetrics()
+	{
+		MetricsLib::CSystemMetrics collector;
+		MetricsLib::SMetricsSnapshot snapshot;
+		snapshot.m_counters.push_back({"test_requests_total", 1, {}});
+		collector.Collect(snapshot);
+
+		std::string body;
+		Check(MetricsLib::FormatPrometheus(snapshot, body), "host/process metrics must format as Prometheus metrics");
+		Check(body.find("process_info{process=\"MetricsTests.exe\"} 1") != std::string::npos,
+			"process info must contain only the executable basename");
+		Check(body.find("# TYPE process_page_faults_total counter") != std::string::npos, "process page faults missing");
+		Check(body.find("# TYPE process_working_set_bytes gauge") != std::string::npos, "process working set missing");
+		Check(body.find("test_requests_total 1") != std::string::npos, "collection must append to the caller's snapshot");
+		Check(body.find("host_nic_total_bytes_per_second") == std::string::npos, "first sample must omit NIC rates");
 	}
 
 	void ReturnsUnavailableBeforePublication()
@@ -232,6 +252,7 @@ namespace
 
 int main(void)
 {
+	AppendsCurrentProcessMetrics();
 	BindsOnlyToTheRequestedAddress();
 	ReturnsUnavailableBeforePublication();
 	ReturnsLatestPublishedCounter();

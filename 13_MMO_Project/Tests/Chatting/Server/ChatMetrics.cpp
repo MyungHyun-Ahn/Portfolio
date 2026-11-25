@@ -36,12 +36,12 @@ namespace Chatting
 			using ServerNetworkLib::EMonitorInterval;
 			using ServerMetrics::AppendIntervalMetric;
 			ServerMetrics::AppendCommonMetrics(sample, outMetrics);
-			AppendIntervalMetric(sample, EMonitorInterval::ContentUpdates, "game_chat_content_updates", outMetrics);
-			AppendIntervalMetric(sample, EMonitorInterval::LoginRequests, "game_chat_login_requests", outMetrics);
-			AppendIntervalMetric(sample, EMonitorInterval::SectorMoveRequests, "game_chat_sector_move_requests", outMetrics);
-			AppendIntervalMetric(sample, EMonitorInterval::MessageRequests, "game_chat_message_requests", outMetrics);
-			AppendIntervalMetric(sample, EMonitorInterval::MessageSendRequests, "game_chat_message_send_requests", outMetrics);
-			outMetrics.m_counters.push_back({"game_chat_content_frames_total", g_completedChatFrames.load(), {}});
+			AppendIntervalMetric(sample, EMonitorInterval::ContentUpdates, "chat_content_updates", outMetrics);
+			AppendIntervalMetric(sample, EMonitorInterval::LoginRequests, "chat_login_requests", outMetrics);
+			AppendIntervalMetric(sample, EMonitorInterval::SectorMoveRequests, "chat_sector_move_requests", outMetrics);
+			AppendIntervalMetric(sample, EMonitorInterval::MessageRequests, "chat_message_requests", outMetrics);
+			AppendIntervalMetric(sample, EMonitorInterval::MessageSendRequests, "chat_message_send_requests", outMetrics);
+			outMetrics.m_counters.push_back({"chat_content_frames_total", g_completedChatFrames.load(), {}});
 
 			return true;
 		};

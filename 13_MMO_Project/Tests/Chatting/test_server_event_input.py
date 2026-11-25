@@ -309,7 +309,7 @@ def wait_metrics(address, port, predicate):
     raise AssertionError(f"metrics condition not met: {samples}")
 
 
-NIC_PREFIX = "game_host_nic_total_bytes_per_second"
+NIC_PREFIX = "host_nic_total_bytes_per_second"
 LABEL_ESCAPES = str.maketrans({"\\": "\\\\", '"': '\\"', "\n": "\\n"})
 
 
@@ -354,26 +354,26 @@ def check_monitor_series(samples, process_series, *, has_rates=True):
         "chat_login_requests", "chat_sector_move_requests", "chat_message_requests", "chat_message_send_requests",
         "chat_work_delegations", "chat_work_steals", "net_send_batch_limit_hits",
     )
-    rates = {f"game_{name}_per_second" for name in intervals}
-    required = {f"game_{name}_total" for name in intervals}
+    rates = {f"{name}_per_second" for name in intervals}
+    required = {f"{name}_total" for name in intervals}
     if has_rates:
         required |= rates
     else:
         assert rates.isdisjoint(samples), "first monitor snapshot published interval rates"
-    required |= {f"game_net_{name}" for name in ("sessions", "sessions_accepted_total", "wsasend_calls_total", "wsasend_pending_total")}
-    required |= {f"game_process_{name}_bytes" for name in (
+    required |= {f"net_{name}" for name in ("sessions", "sessions_accepted_total", "wsasend_calls_total", "wsasend_pending_total")}
+    required |= {f"process_{name}_bytes" for name in (
         "working_set", "peak_working_set", "paged_pool", "peak_paged_pool", "nonpaged_pool", "peak_nonpaged_pool",
         "commit", "peak_commit", "private",
     )}
-    publish_time = "game_observability_snapshot_timestamp_seconds"
-    required.update(("game_process_page_faults_total", process_series, publish_time))
-    required.add("game_chat_content_frames_total")
-    cpu = {f'game_{scope}_cpu_usage_ratio{{mode="{mode}"}}' for scope in ("host", "process")
+    publish_time = "observability_snapshot_timestamp_seconds"
+    required.update(("process_page_faults_total", process_series, publish_time))
+    required.add("chat_content_frames_total")
+    cpu = {f'{scope}_cpu_usage_ratio{{mode="{mode}"}}' for scope in ("host", "process")
            for mode in ("total", "user", "kernel")}
     pdh = {name for name in samples if re.fullmatch(rf'{NIC_PREFIX}\{{interface="(?:[^"\\]|\\["\\n])+"\}}', name)}
     if not has_rates:
         assert not pdh, "first monitor snapshot published NIC rates"
-    pdh |= {"game_host_nonpaged_pool_bytes", "game_host_available_memory_bytes", "game_host_tcpv4_retransmitted_segments_per_second"}
+    pdh |= {"host_nonpaged_pool_bytes", "host_available_memory_bytes", "host_tcpv4_retransmitted_segments_per_second"}
     actual = set(samples)
     assert required <= actual <= required | cpu | pdh, (required - actual, actual - required - cpu - pdh)
     assert all(isfinite(value) and value >= 0 for value in samples.values()), samples
@@ -385,7 +385,7 @@ def check_monitor_series(samples, process_series, *, has_rates=True):
 def metrics(base, configuration):
     address = "127.0.0.2"
     executable_name = "Monitor-검증-😀.exe"
-    process_series = f'game_process_info{{process="{executable_name}"}}'
+    process_series = f'process_info{{process="{executable_name}"}}'
     with socket.socket() as chat_probe, socket.socket() as metrics_probe:
         chat_probe.bind(("127.0.0.1", 0))
         metrics_probe.bind(("0.0.0.0", 0))
@@ -401,30 +401,30 @@ def metrics(base, configuration):
         expected_nics = {f'{NIC_PREFIX}{{interface="{name.translate(LABEL_ESCAPES)}"}}'
                          for name in expected_interfaces}
         # The exporter only retains the latest sample, so the first HTTP read may miss warm-up.
-        check_monitor_series(initial, process_series, has_rates="game_net_accept_completions_per_second" in initial)
+        check_monitor_series(initial, process_series, has_rates="net_accept_completions_per_second" in initial)
         wait_metrics(address, metrics_port, lambda values: expected_nics <= values.keys())
         print(f"metrics discovery: {process_series} = 1; Windows PDH `Bytes Total/sec`: {sorted(expected_interfaces)}")
-        assert initial["game_net_sessions"] == 0
-        assert initial["game_process_working_set_bytes"] > 0
-        assert initial["game_process_nonpaged_pool_bytes"] > 0
-        assert initial["game_net_sessions_accepted_total"] == 0
+        assert initial["net_sessions"] == 0
+        assert initial["process_working_set_bytes"] > 0
+        assert initial["process_nonpaged_pool_bytes"] > 0
+        assert initial["net_sessions_accepted_total"] == 0
         wait_text(server, f"event=server_ready port={chat_port}")
         idle_rates = wait_metrics(address, metrics_port,
-                                  lambda values: "game_net_accept_completions_per_second" in values)
+                                  lambda values: "net_accept_completions_per_second" in values)
         check_monitor_series(idle_rates, process_series)
-        assert idle_rates["game_net_received_packets_per_second"] == idle_rates["game_net_sent_packets_per_second"] == 0
-        frame_count = idle_rates.get("game_chat_content_frames_total", 0)
+        assert idle_rates["net_received_packets_per_second"] == idle_rates["net_sent_packets_per_second"] == 0
+        frame_count = idle_rates.get("chat_content_frames_total", 0)
         assert frame_count > 0, "no completed content frames while idle"
-        publish_time = "game_observability_snapshot_timestamp_seconds"
+        publish_time = "observability_snapshot_timestamp_seconds"
         later = wait_metrics(address, metrics_port, lambda values: values.get(publish_time, 0) - idle_rates[publish_time] >= 1)
-        measured_fps = (later["game_chat_content_frames_total"] - frame_count) / (later[publish_time] - idle_rates[publish_time])
+        measured_fps = (later["chat_content_frames_total"] - frame_count) / (later[publish_time] - idle_rates[publish_time])
         assert 2 <= measured_fps <= 10, f"configured 5 FPS, observed {measured_fps:.2f} FPS while idle"
         with socket.socket() as wrong_address:
             wrong_address.settimeout(3)
             assert wrong_address.connect_ex(("127.0.0.1", metrics_port)) in (10060, 10061), "unexpected metrics listener"
         with launch(base, configuration, "Client", "metrics-client", chat_port) as client:
             wait_text(client, "READY account=")
-            pending_rates = {"game_net_received_packets_per_second", "game_net_sent_packets_per_second"}
+            pending_rates = {"net_received_packets_per_second", "net_sent_packets_per_second"}
 
             def observed_directional_rates(values):
                 # 수신과 송신은 서로 다른 모니터 구간에 집계될 수 있다.
@@ -437,22 +437,22 @@ def metrics(base, configuration):
             except AssertionError as exc:
                 raise AssertionError(f"positive packet rates not observed: {sorted(pending_rates)}") from exc
             wait_text(client, ": metrics echo")
-            active = wait_metrics(address, metrics_port, lambda values: values.get("game_net_sessions") == 1
-                                  and values.get("game_chat_message_send_requests_total", 0) >= 1
-                                  and values.get("game_net_sent_packets_total", 0) >= 3)
-            assert active["game_net_sessions_accepted_total"] == 1
-            assert active["game_net_received_packets_total"] >= 3
-            assert active["game_net_sent_packets_total"] >= 3
-            assert active["game_net_wsasend_calls_total"] >= 1
-            assert active["game_chat_login_requests_total"] == 1
-            assert active["game_chat_sector_move_requests_total"] == 1
-            assert active["game_chat_message_send_requests_total"] >= 1
+            active = wait_metrics(address, metrics_port, lambda values: values.get("net_sessions") == 1
+                                  and values.get("chat_message_send_requests_total", 0) >= 1
+                                  and values.get("net_sent_packets_total", 0) >= 3)
+            assert active["net_sessions_accepted_total"] == 1
+            assert active["net_received_packets_total"] >= 3
+            assert active["net_sent_packets_total"] >= 3
+            assert active["net_wsasend_calls_total"] >= 1
+            assert active["chat_login_requests_total"] == 1
+            assert active["chat_sector_move_requests_total"] == 1
+            assert active["chat_message_send_requests_total"] >= 1
             check_monitor_series(active, process_series)
             send(client, "/exit")
             assert client[0].wait(timeout=8) == 0
-        idle = wait_metrics(address, metrics_port, lambda values: values.get("game_net_sessions") == 0
-                            and values.get("game_net_received_packets_per_second") == 0)
-        assert idle["game_net_received_packets_total"] == active["game_net_received_packets_total"]
+        idle = wait_metrics(address, metrics_port, lambda values: values.get("net_sessions") == 0
+                            and values.get("net_received_packets_per_second") == 0)
+        assert idle["net_received_packets_total"] == active["net_received_packets_total"]
         send(server, "/exit")
         assert server[0].wait(timeout=8) == 0
 

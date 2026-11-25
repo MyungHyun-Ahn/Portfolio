@@ -48,7 +48,7 @@ namespace MetricsLib
 			}
 			const auto now = std::chrono::system_clock::now();
 			const double unixSeconds = std::chrono::duration<double>(now.time_since_epoch()).count();
-			snapshot.m_gauges.push_back({"game_observability_snapshot_timestamp_seconds", unixSeconds, {}});
+			snapshot.m_gauges.push_back({"observability_snapshot_timestamp_seconds", unixSeconds, {}});
 
 			std::string body;
 			if (!FormatPrometheus(snapshot, body))
