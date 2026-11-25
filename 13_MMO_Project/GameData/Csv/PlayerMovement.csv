@@ -1,0 +1,15 @@
+#Table,PlayerMovement,,,
+#Target,Shared,,,
+,,,,
+#Key,Primary,,,
+#Scope,Shared,Server,Server,Client
+#Type,uint32,uint32,uint32,uint32
+#Required,true,true,true,true
+#Min,1,,,
+#Max,,,,
+#Default,,,,
+#Allowed,,,,
+#Reference,,,,
+#Description,이동 프로필 ID,기본 이동 속도(cm/s),충돌 반경(cm),외형 스케일(1/1000)
+#Field,PlayerMovementDataId,MoveSpeedCmPerSecond,CollisionRadiusCm,VisualScalePermille
+,1,450,35,1000
