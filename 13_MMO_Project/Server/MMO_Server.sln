@@ -1,12 +1,20 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.0.31903.59
+# Visual Studio Version 18
+VisualStudioVersion = 18.0.0.0
 MinimumVisualStudioVersion = 10.0.40219.1
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "GameServer", "GameServer\GameServer.vcxproj", "{09B04317-0D9A-4825-B2AE-3ECEA3DF0CD0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
-		Debug|Any CPU = Debug|Any CPU
-		Release|Any CPU = Release|Any CPU
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{09B04317-0D9A-4825-B2AE-3ECEA3DF0CD0}.Debug|x64.ActiveCfg = Debug|x64
+		{09B04317-0D9A-4825-B2AE-3ECEA3DF0CD0}.Debug|x64.Build.0 = Debug|x64
+		{09B04317-0D9A-4825-B2AE-3ECEA3DF0CD0}.Release|x64.ActiveCfg = Release|x64
+		{09B04317-0D9A-4825-B2AE-3ECEA3DF0CD0}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
