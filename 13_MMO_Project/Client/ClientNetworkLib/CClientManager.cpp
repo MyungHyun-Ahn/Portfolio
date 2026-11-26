@@ -1,4 +1,5 @@
 #include "ClientNetworkLibPch.h"
+#include "SClientNetworkSettings.h"
 
 namespace ClientNetworkLib
 {
@@ -10,8 +11,11 @@ namespace ClientNetworkLib
 	}
 
 	// ClientManager 초기화
-	bool CClientManager::Init(DWORD workerCount, int recvBufferBytes, EPacketMode packetMode) noexcept
+	bool CClientManager::Init(const SClientNetworkSettings &settings) noexcept
 	{
+		const DWORD workerCount = settings.workerCount;
+		const int recvBufferBytes = settings.recvBufferBytes;
+		const EPacketMode packetMode = settings.packetMode;
 		std::lock_guard lifecycleLock(m_lifecycleLock);
 		constexpr int kMinRecvBufferBytes = static_cast<int>(CSerializableBuffer::EBufferDefine::PacketMaxSize);
 		if (workerCount == 0 || m_iocpHandle != nullptr || recvBufferBytes < kMinRecvBufferBytes

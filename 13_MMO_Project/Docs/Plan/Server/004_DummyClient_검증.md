@@ -37,17 +37,18 @@
 
 ## 3. DummyClient Config
 
-EXE 옆 `DummyClientConfig.conf`를 `CFileLoader`로 읽는다(UTF-16LE BOM). `IP`, `PORT`, `ACCOUNT_BASE`는 필수이고 다른 설정은 생략 시 표의 기본값을 쓴다. 일회성 smoke 모드와 `SCENARIO` 키는 두지 않는다. 결과는 EXE 옆 `DummyReports/<run_id>/RunSummary.json`에 저장한다.
+`SDummyConfig::Load()`는 EXE 옆 `DummyClientConfig.conf`(UTF-16LE BOM)를 한 번 파싱한다. `DummyClient:`의 `IP`, `PORT`, `ACCOUNT_BASE`는 필수이고 나머지 앱 설정은 생략 시 표의 기본값을 쓴다. `ClientNetwork:`의 `WORKER_COUNT`, `RECV_BUFFER_BYTES`, `PACKET_MODE`는 모두 필수이며 `ClientNetworkLib`의 `SClientNetworkSettings::Load()`가 검증한다. 두 설정을 검증한 뒤에만 접속을 시작한다. `SCENARIO` 키는 사용하지 않는다. 결과는 EXE 옆 `DummyReports/<run_id>/RunSummary.json`에 저장한다.
 
 | 설정 | 기본값 또는 계약 |
 |---|---|
 | `IP`, `PORT` | 배포 파일은 `127.0.0.1`, `6000`. 실제 접속 대상이며 IPv4 루프백만 허용한다. |
-| `CLIENT_COUNT`, `WORKER_COUNT` | `2`, `1`. 대상 수는 양의 정수이며 별도 256 한도를 두지 않는다. 워커는 `1..16`. |
+| `CLIENT_COUNT` | `2`. 대상 수는 양의 정수이며 별도 256 한도를 두지 않는다. |
+| `WORKER_COUNT`, `RECV_BUFFER_BYTES`, `PACKET_MODE` (`ClientNetwork:`) | 샘플은 `1`, `4096`, `Net`. 워커는 `1..16`, 수신 용량은 최대 Net 패킷과 링버퍼 커서 범위 기준, 모드는 `Net` 또는 `Lan`. |
 | `APP_WORKER_COUNT` | `1`. 설정 범위는 `1..16`; 실제 앱 워커 수는 `CLIENT_COUNT`와 이 값 중 작은 쪽이다. `WORKER_COUNT`로 정하는 IOCP 워커와 별개다. |
 | `ACCOUNT_BASE`, `SECTOR_X`, `SECTOR_Y` | 양의 연속 계정 범위를 사용한다. 마지막 계정 오버플로를 사전 검사한다. 닉네임은 `dummy` + 번호(고정 폭을 넘으면 계정 번호). 초기 좌표는 `(10,10)`, 각 축 `0..49`. |
 | `CONNECT_INTERVAL_MS`, `CONNECT_ATTEMPTS_PER_INTERVAL` | `100` ms, `50`회. 각각 `1..4294967295`. 최초 접속과 재접속을 합쳐 앱 워커 전체가 주기당 시도 한도를 공유한다. |
 | `CONNECT_TIMEOUT_MS`, `LOGIN_TIMEOUT_MS`, `SECTOR_TIMEOUT_MS` | 각각 `5000`. 접속 기한은 실제 접속 시도부터 적용되며, 배치 대기 시간은 포함하지 않는다. 섹터 기한은 초기 진입과 이동 응답에 적용한다. |
-| `RECV_BUFFER_BYTES`, `TICK_INTERVAL_MS` | `4096`, `1`. 수신 용량은 기존 전송 계층 허용 범위, Tick 주기는 `1..100` ms. |
+| `TICK_INTERVAL_MS` | `1`. Tick 주기는 `1..100` ms. |
 | `RUN_DURATION_MS`, `ACTION_INTERVAL_MS` | `60000`, `1000`. 양의 정수. 동시에 진행하는 일반 동작은 더미당 하나로 제한하고, 밀린 동작은 몰아서 보내지 않는다. |
 | `SECTOR_MOVE_WEIGHT`, `MESSAGE_WEIGHT` | 각각 `1`. 0은 해당 동작을 끄며, 둘 다 0일 수 없다. |
 | `RECONNECT_PROBABILITY_BPS` | `0`. 동작 완료마다 `0..10000` 만분율 적용. 초기 진입·heartbeat에는 적용하지 않는다. |

@@ -1,4 +1,4 @@
-"""Run against the built x64 Chatting solution: python test_server_event_input.py bind|chat|log-interval|session-limit|server-options|metrics [Release|Debug]."""
+"""Run against the x64 Chatting solution: bind|chat|chat-lan|log-interval|session-limit|server-options|client-network|metrics [Release|Debug]."""
 
 from contextlib import ExitStack, contextmanager
 import ctypes
@@ -62,6 +62,8 @@ def launch(base, configuration, side, label, port, levels=None, log_interval=Non
     for key, value in (server_options or {}).items():
         if isinstance(key, tuple):
             section, key = key
+        elif side == "Client" and key in ("WORKER_COUNT", "RECV_BUFFER_BYTES", "PACKET_MODE"):
+            section = "ClientNetwork"
         elif key.startswith("CONTENTS_"):
             section = "ContentsRuntime"
         elif key.startswith("LOG_") or key in ("CONSOLE_LOG_LEVEL", "FILE_LOG_LEVEL"):
@@ -256,6 +258,22 @@ def server_options_config(base, configuration):
             if side == "Server":
                 assert not (child[1].parent / "LogFile").exists()
     print("server options: custom worker counts and loopback echo verified; invalid settings rejected")
+
+
+def client_network_config(base, configuration):
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+
+        invalid = (("WORKER_COUNT", 0), ("WORKER_COUNT", 17), ("RECV_BUFFER_BYTES", "4096bytes"),
+                   ("RECV_BUFFER_BYTES", 1), ("PACKET_MODE", "Invalid"),
+                   ("WORKER_COUNT", None), ("RECV_BUFFER_BYTES", None), ("PACKET_MODE", None))
+        for index, (key, value) in enumerate(invalid):
+            with launch(base, configuration, "Client", f"network-invalid-{index}", port,
+                        server_options={key: value}) as client:
+                wait_text(client, f"ClientNetwork: {key} ")
+                assert client[0].wait(timeout=5) == 2
+    print("client network: invalid and missing transport settings rejected before connecting")
 
 
 def chat(base, configuration, packet_mode=None):
@@ -568,7 +586,8 @@ if __name__ == "__main__":
     configuration = sys.argv[2] if len(sys.argv) > 2 else "Release"
     case = {"bind": bind_failure, "chat": chat, "chat-lan": lambda base, config: chat(base, config, "Lan"),
             "log-interval": log_interval_config,
-            "session-limit": session_limit_config, "server-options": server_options_config, "metrics": metrics}[mode]
+            "session-limit": session_limit_config, "server-options": server_options_config,
+            "client-network": client_network_config, "metrics": metrics}[mode]
     evidence = os.environ.get("MMO_SERVER_EVENT_EVIDENCE")
     if evidence:
         output = Path(evidence) / f"{configuration}-{mode}"

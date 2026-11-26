@@ -17,6 +17,9 @@
     <ClCompile Include="CDummyRunner.cpp">
       <Filter>DummyClient</Filter>
     </ClCompile>
+    <ClCompile Include="SDummyConfig.cpp">
+      <Filter>DummyClient</Filter>
+    </ClCompile>
     <ClCompile Include="CChatDummyClient.cpp">
       <Filter>DummyClient</Filter>
     </ClCompile>

@@ -4,7 +4,7 @@
 #include <condition_variable>
 #include "CSerializableBuffer.h"
 #include "CommonProtocol.h"
-#include "Config.h"
+#include "ClientConfig.h"
 #include "CClientManager.h"
 #include "CClient.h"
 #include "MHLib/serialization/ISerializable.h"

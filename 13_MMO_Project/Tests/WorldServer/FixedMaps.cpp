@@ -12,6 +12,7 @@ namespace ServerNetworkLib
 
 #include "ClientEvent.h"
 #include "CClientManager.h"
+#include "SClientNetworkSettings.h"
 #include "CClient.h"
 #include "MHLib/utils/CFileLoader.h"
 #include "IContents.h"
@@ -707,7 +708,7 @@ namespace WorldServer
 	bool RunClients(USHORT port)
 	{
 		ClientNetworkLib::CClientManager network;
-		if (!network.Init(2, 4096, NetworkCommonLib::EPacketMode::Lan))
+		if (!network.Init({2, 4096, NetworkCommonLib::EPacketMode::Lan}))
 			return false;
 		CHeadlessClient first(network);
 		CHeadlessClient second(network);

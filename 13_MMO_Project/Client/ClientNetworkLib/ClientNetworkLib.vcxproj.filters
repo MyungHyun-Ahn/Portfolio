@@ -5,6 +5,7 @@
     <ClCompile Include="CClient.cpp" />
     <ClCompile Include="CClientManager.cpp" />
     <ClCompile Include="CSession.cpp" />
+    <ClCompile Include="SClientNetworkSettings.cpp" />
     <ClCompile Include="ClientNetworkLibPch.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -12,6 +13,7 @@
     <ClInclude Include="ClientEvent.h" />
     <ClInclude Include="CClient.h" />
     <ClInclude Include="CClientManager.h" />
+    <ClInclude Include="SClientNetworkSettings.h" />
     <ClInclude Include="CSession.h" />
     <ClInclude Include="ClientNetworkLibPch.h" />
   </ItemGroup>

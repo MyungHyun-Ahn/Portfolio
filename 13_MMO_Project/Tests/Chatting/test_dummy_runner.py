@@ -22,10 +22,14 @@ def dummy(base, configuration, label, port, *, has_config=True, encoding="utf-16
     folder.mkdir()
     exe = folder / "DummyClient.exe"
     shutil.copyfile(ROOT / "Build" / configuration / "DummyClient" / exe.name, exe)
+    network = {"WORKER_COUNT": 1, "RECV_BUFFER_BYTES": 4096, "PACKET_MODE": "Net"}
     settings = {"IP": "127.0.0.1", "PORT": port, "ACCOUNT_BASE": 710001,
-                "RUN_DURATION_MS": 1100, "ACTION_INTERVAL_MS": 40, **overrides}
+                "RUN_DURATION_MS": 1100, "ACTION_INTERVAL_MS": 40}
+    for key, value in overrides.items():
+        (network if key in network else settings)[key] = value
     if has_config:
         text = "DummyClient:\n" + "".join(f"    - {key} = {value};\n" for key, value in settings.items())
+        text += "\nClientNetwork:\n" + "".join(f"    - {key} = {value};\n" for key, value in network.items() if value is not None)
         (folder / "DummyClientConfig.conf").write_text(text if config_text is None else config_text, encoding=encoding)
     stdout = folder / "stdout.txt"
     with stdout.open("wb") as output, subprocess.Popen(
@@ -241,6 +245,18 @@ def failures(base, configuration):
         result = summary(child, 2)
     assert result["stages"]["connect_requested"] == 0, result
     assert [failure["reason"] for failure in result["failures"]] == ["config_parse_failed"], result
+
+    for index, (key, value, reason) in enumerate((
+        ("WORKER_COUNT", None, "config_network_limits_invalid"),
+        ("RECV_BUFFER_BYTES", None, "config_network_limits_invalid"),
+        ("PACKET_MODE", None, "config_packet_mode_invalid"),
+        ("PACKET_MODE", "Invalid", "config_packet_mode_invalid"),
+    )):
+        with dummy(base, configuration, f"network-invalid-{index}", port, **{key: value}) as child:
+            wait_text(child, f"ClientNetwork: {key} ")
+            result = summary(child, 2)
+        assert result["stages"]["connect_requested"] == 0, result
+        assert [failure["reason"] for failure in result["failures"]] == [reason], result
 
     for label, overrides in (
         ("missing", {}), ("wrong-encoding", {"encoding": "utf-8"}), ("legacy", {"SCENARIO": "smoke"}),

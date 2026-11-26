@@ -5,6 +5,7 @@ namespace ClientNetworkLib
 	class CSession;
 	class CClientMailbox;
 	struct SClientEvent;
+	struct SClientNetworkSettings;
 	class CClientLifecycleProbe;
 	using SessionId = ULONG_PTR;
 
@@ -17,8 +18,7 @@ namespace ClientNetworkLib
 		CClientManager &operator=(const CClientManager &) = delete;
 
 		[[nodiscard]]
-		bool Init(DWORD workerCount, int recvBufferBytes,
-			NetworkCommonLib::EPacketMode packetMode = NetworkCommonLib::EPacketMode::Net) noexcept;
+		bool Init(const SClientNetworkSettings &settings) noexcept;
 
 		// 0은 Connect 예약에 실패함.
 		// - 0이 아닌 값은 SessionId이다.

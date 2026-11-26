@@ -3,7 +3,8 @@
 #include <condition_variable>
 #include "CSerializableBuffer.h"
 #include "CommonProtocol.h"
-#include "Config.h"
+#include "SClientNetworkSettings.h"
+#include "ClientConfig.h"
 #include "Console.h"
 #include "CClientManager.h"
 #include "CClient.h"
@@ -19,8 +20,9 @@ int main(void)
 	SetConsoleCP(CP_UTF8);
 	g_pLogger = MHLib::utils::CLogger::GetInstance();
 	g_pLogger->SetMainDirectory(L"LogFile");
+	ClientNetworkLib::SClientNetworkSettings networkSettings;
 	Chatting::SChatClientConfig config;
-	if (!Chatting::LoadClientConfig(L"ClientConfig.conf", config))
+	if (!Chatting::LoadClientConfig(L"ClientConfig.conf", networkSettings, config))
 		return 2;
 
 	int exitCode = 0;
@@ -28,7 +30,7 @@ int main(void)
 		ClientNetworkLib::CClientManager network;
 		Chatting::CConsoleChatClient client(network, config);
 		MHLib::security::CEncryption::sm_packetKey = Chatting::kPacketKey;
-		if (network.Init(1, config.m_recvBufferBytes, config.m_packetMode)
+		if (network.Init(networkSettings)
 			&& client.Connect(config.m_ip.c_str(), config.m_port, Chatting::kPacketCode, config.m_connectTimeoutMilliseconds))
 		{
 			while (client.IsActive() && !client.IsConnected())

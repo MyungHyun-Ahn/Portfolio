@@ -8,9 +8,9 @@
 #include <stdexcept>
 #include <utility>
 #include "CSerializableBuffer.h"
-#include "NetworkLimits.h"
 #include "CommonProtocol.h"
 #include "CClientManager.h"
+#include "SClientNetworkSettings.h"
 #include "CClient.h"
 #include "MHLib/serialization/ISerializable.h"
 #include "IncludePacketAll.g.h"
@@ -30,8 +30,6 @@ namespace Chatting
 		using TMilliseconds = std::chrono::milliseconds;
 		using MHLib::utils::ELogLevel;
 		using MHLib::utils::g_pLogger;
-		constexpr auto kSection = L"DummyClient";
-		constexpr DWORD kReconnectScale = 10000;
 
 		// 각 슬롯의 실행 상태는 한 앱 워커만 읽고 갱신한다.
 		struct SDummySlot
@@ -45,87 +43,10 @@ namespace Chatting
 		};
 
 
-		template<class TValue>
-		bool LoadNumber(MHLib::utils::CFileLoader &loader, const WCHAR *pKey, INT64 minValue, INT64 maxValue,
-			TValue &outValue, bool isRequired = false)
-		{
-			std::wstring text;
-			if (!loader.Load(kSection, pKey, &text))
-				return !isRequired;
-			INT64 number = 0;
-			if (!loader.Load(kSection, pKey, &number) || number < minValue || number > maxValue)
-				return false;
-			outValue = static_cast<TValue>(number);
-			return true;
-		}
 	}
 
-	const char *CDummyRunner::loadConfig(const std::filesystem::path &path)
-	{
-		if (!CheckConfigFile(path.c_str()))
-			return "config_file_unreadable_or_invalid_encoding";
-		MHLib::utils::CFileLoader loader;
-		if (!loader.Parse(path.c_str()))
-			return "config_parse_failed";
-		std::wstring text;
-		IN_ADDR address{};
-		if (!loader.Load(kSection, L"IP", &text) || InetPtonW(AF_INET, text.c_str(), &address) != 1
-			|| address.S_un.S_un_b.s_b1 != 127)
-			return "config_loopback_required";
-		SDummyConfig config;
-		config.m_ip.assign(text.begin(), text.end());
-		if (loader.Load(kSection, L"SCENARIO", &text))
-			return "config_scenario_removed";
-		if (loader.Load(kSection, L"PACKET_MODE", &text))
-		{
-			if (text == L"Lan")
-				config.m_packetMode = NetworkCommonLib::EPacketMode::Lan;
-			else if (text != L"Net")
-				return "config_packet_mode_invalid";
-		}
-
-		constexpr INT64 kMaxAccountNo = (std::numeric_limits<INT64>::max)();
-		INT64 clientCount = static_cast<INT64>(config.m_clientCount);
-		if (!LoadNumber(loader, L"CLIENT_COUNT", 1, kMaxAccountNo, clientCount)
-			|| static_cast<UINT64>(clientCount) > (std::numeric_limits<size_t>::max)()
-			|| !LoadNumber(loader, L"PORT", 1, 65535, config.m_port, true))
-			return "config_port_or_client_count_invalid";
-		config.m_clientCount = static_cast<size_t>(clientCount);
-		if (!LoadNumber(loader, L"ACCOUNT_BASE", 1, kMaxAccountNo - (clientCount - 1), config.m_accountBase, true))
-			return "config_account_base_invalid";
-		if (!LoadNumber(loader, L"SECTOR_X", 0, kMaxSectorX - 1, config.m_sectorX)
-			|| !LoadNumber(loader, L"SECTOR_Y", 0, kMaxSectorY - 1, config.m_sectorY))
-			return "config_sector_invalid";
-		constexpr int kMinRecvBufferBytes = static_cast<int>(NetworkCommonLib::CSerializableBuffer::EBufferDefine::PacketMaxSize);
-		if (!LoadNumber(loader, L"WORKER_COUNT", 1, 16, config.m_workerCount)
-			|| !LoadNumber(loader, L"APP_WORKER_COUNT", 1, 16, config.m_appWorkerCount)
-			|| !LoadNumber(loader, L"RECV_BUFFER_BYTES", kMinRecvBufferBytes, NetworkCommonLib::kMaxRecvBufferBytes, config.m_recvBufferBytes))
-			return "config_network_limits_invalid";
-		if (!LoadNumber(loader, L"CONNECT_INTERVAL_MS", 1, MAXDWORD, config.m_connectIntervalMilliseconds)
-			|| !LoadNumber(loader, L"CONNECT_ATTEMPTS_PER_INTERVAL", 1, MAXDWORD, config.m_connectAttemptsPerInterval))
-			return "config_connect_schedule_invalid";
-		if (!LoadNumber(loader, L"CONNECT_TIMEOUT_MS", 1, MAXDWORD, config.m_connectTimeoutMilliseconds)
-			|| !LoadNumber(loader, L"LOGIN_TIMEOUT_MS", 1, MAXDWORD, config.m_loginTimeoutMilliseconds)
-			|| !LoadNumber(loader, L"SECTOR_TIMEOUT_MS", 1, MAXDWORD, config.m_sectorTimeoutMilliseconds)
-			|| !LoadNumber(loader, L"DELIVERY_TIMEOUT_MS", 1, MAXDWORD, config.m_deliveryTimeoutMilliseconds)
-			|| !LoadNumber(loader, L"DRAIN_TIMEOUT_MS", 1, MAXDWORD, config.m_drainTimeoutMilliseconds)
-			|| !LoadNumber(loader, L"TICK_INTERVAL_MS", 1, 100, config.m_tickIntervalMilliseconds))
-			return "config_timeout_or_tick_invalid";
-		if (!LoadNumber(loader, L"RUN_DURATION_MS", 1, MAXDWORD, config.m_runDurationMilliseconds)
-			|| !LoadNumber(loader, L"ACTION_INTERVAL_MS", 1, MAXDWORD, config.m_actionIntervalMilliseconds)
-			|| !LoadNumber(loader, L"HEARTBEAT_INTERVAL_MS", 1, kReceiveTimeoutMilliseconds - 1, config.m_heartbeatIntervalMilliseconds))
-			return "config_schedule_invalid";
-		if (!LoadNumber(loader, L"SECTOR_MOVE_WEIGHT", 0, MAXDWORD, config.m_sectorMoveWeight)
-			|| !LoadNumber(loader, L"MESSAGE_WEIGHT", 0, MAXDWORD, config.m_messageWeight)
-			|| (config.m_sectorMoveWeight == 0 && config.m_messageWeight == 0))
-			return "config_action_weights_invalid";
-		if (!LoadNumber(loader, L"RECONNECT_PROBABILITY_BPS", 0, kReconnectScale, config.m_reconnectProbabilityBps))
-			return "config_reconnect_probability_invalid";
-		m_config = std::move(config);
-		return nullptr;
-	}
-
-	void CDummyRunner::runClients(const std::wstring &runMarker, TClock::time_point deadline)
+	void CDummyRunner::runClients(const ClientNetworkLib::SClientNetworkSettings &networkSettings, const std::wstring &runMarker,
+		TClock::time_point deadline)
 	{
 		struct SAppWork
 		{
@@ -163,7 +84,7 @@ namespace Chatting
 			return;
 		}
 		MHLib::security::CEncryption::sm_packetKey = kPacketKey;
-		if (!network.Init(m_config.m_workerCount, m_config.m_recvBufferBytes, m_config.m_packetMode))
+		if (!network.Init(networkSettings))
 		{
 			m_appWorkers.clear();
 			m_stats.Fail("network_init_failed");
@@ -220,7 +141,7 @@ namespace Chatting
 			std::mt19937 random(static_cast<DWORD>(seedTime ^ (seedTime >> 32) ^ result.m_threadId));
 			const UINT64 totalWeight = static_cast<UINT64>(m_config.m_sectorMoveWeight) + m_config.m_messageWeight;
 			std::uniform_int_distribution<UINT64> pickAction(0, totalWeight - 1);
-			std::uniform_int_distribution<DWORD> pickReconnect(0, kReconnectScale - 1);
+			std::uniform_int_distribution<DWORD> pickReconnect(0, SDummyConfig::kReconnectScale - 1);
 			std::uniform_int_distribution<int> pickSector(0, kMaxSectorX * kMaxSectorY - 2);
 
 			const auto pump = [&]
@@ -392,7 +313,7 @@ namespace Chatting
 	}
 
 	bool CDummyRunner::saveSummary(const std::filesystem::path &path, const std::string &runId,
-		long long startUnixMilliseconds, int exitCode) const
+		const ClientNetworkLib::SClientNetworkSettings &networkSettings, long long startUnixMilliseconds, int exitCode) const
 	{
 		const auto endUnixMilliseconds = std::chrono::duration_cast<TMilliseconds>(
 			std::chrono::system_clock::now().time_since_epoch()).count();
@@ -402,7 +323,7 @@ namespace Chatting
 			<< ",\n  \"settings\": {\"ip\": \"" << m_config.m_ip << "\", \"port\": " << m_config.m_port
 			<< ", \"client_count\": " << m_config.m_clientCount << ", \"account_base\": " << m_config.m_accountBase
 			<< ", \"sector\": [" << m_config.m_sectorX << ", " << m_config.m_sectorY << "]"
-			<< ", \"workers\": " << m_config.m_workerCount << ", \"recv_buffer_bytes\": " << m_config.m_recvBufferBytes
+			<< ", \"workers\": " << networkSettings.workerCount << ", \"recv_buffer_bytes\": " << networkSettings.recvBufferBytes
 			<< ", \"app_worker_count\": " << m_config.m_appWorkerCount
 			<< ", \"connect_interval_ms\": " << m_config.m_connectIntervalMilliseconds
 			<< ", \"connect_attempts_per_interval\": " << m_config.m_connectAttemptsPerInterval
@@ -484,7 +405,8 @@ namespace Chatting
 		const auto report = runDirectory / L"RunSummary.json";
 		g_pLogger->WriteLogConsole(ELogLevel::Info, L"event=dummy_start | 결과 파일: %ls", report.c_str());
 		int exitCode = 0;
-		if (const char *pError = loadConfig(directory / L"DummyClientConfig.conf"))
+		ClientNetworkLib::SClientNetworkSettings networkSettings;
+		if (const char *pError = SDummyConfig::Load(directory / L"DummyClientConfig.conf", networkSettings, m_config))
 		{
 			m_stats.Fail(pError);
 			exitCode = 2;
@@ -492,10 +414,10 @@ namespace Chatting
 		else
 		{
 			const auto deadline = processStart + TMilliseconds(m_config.m_runDurationMilliseconds);
-			runClients(L"dummy:" + std::wstring(runId.begin(), runId.end()) + L":", deadline);
+			runClients(networkSettings, L"dummy:" + std::wstring(runId.begin(), runId.end()) + L":", deadline);
 			exitCode = m_stats.m_failureCount == 0 ? 0 : 1;
 		}
-		if (!saveSummary(report, runId, start, exitCode))
+		if (!saveSummary(report, runId, networkSettings, start, exitCode))
 		{
 			g_pLogger->WriteLogConsole(ELogLevel::Error, L"event=report_write_failed | 결과 파일을 저장하지 못했습니다: %ls", report.c_str());
 			return 1;

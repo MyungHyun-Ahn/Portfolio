@@ -6,6 +6,7 @@
 #include "ClientEvent.h"
 #include "CClientMailbox.h"
 #include "CClientManager.h"
+#include "SClientNetworkSettings.h"
 #include "CClient.h"
 #include "NetworkLimits.h"
 #include "CRingBuffer.h"
@@ -224,9 +225,9 @@ namespace
 		constexpr int kHeaderBytes = sizeof(SPacketHeader);
 		constexpr int kRecvBufferBytes = kPacketBytes * 2;
 		CClientManager client;
-		Check(!client.Init(1, kPacketBytes - 1), L"ring rejects capacity below a full frame");
-		Check(!client.Init(1, INT_MAX), L"ring rejects capacity that overflows cursor arithmetic");
-		Check(client.Init(1, kRecvBufferBytes, mode), L"ring fixture initializes the manager with a custom capacity");
+		Check(!client.Init({1, kPacketBytes - 1}), L"ring rejects capacity below a full frame");
+		Check(!client.Init({1, INT_MAX}), L"ring rejects capacity that overflows cursor arithmetic");
+		Check(client.Init({1, kRecvBufferBytes, mode}), L"ring fixture initializes the manager with a custom capacity");
 		USHORT port = 0;
 		SOCKET listener = BindLoopback(port);
 		Check(listen(listener, SOMAXCONN) == 0, L"ring fixture listens");
@@ -377,7 +378,7 @@ namespace
 		constexpr BYTE kPacketCode = 0x77;
 		CClientManager network;
 		CTickClient client(network, rejectsPacket, sendsPeerEof ? ERROR_SUCCESS : ERROR_OPERATION_ABORTED);
-		Check(network.Init(1, kDefaultFixtureRecvBufferBytes), L"Tick fixture initializes the manager");
+		Check(network.Init({1, kDefaultFixtureRecvBufferBytes}), L"Tick fixture initializes the manager");
 		USHORT port = 0;
 		SOCKET listener = BindLoopback(port);
 		Check(listen(listener, SOMAXCONN) == 0, L"Tick fixture listens");
@@ -516,12 +517,12 @@ namespace
 	{
 		constexpr BYTE kPacketCode = 0x77;
 		CClientManager client;
-		Check(!client.Init(0, kDefaultFixtureRecvBufferBytes) && CClientLifecycleProbe::GetCachedConnectEx(client) == nullptr,
+		Check(!client.Init({0, kDefaultFixtureRecvBufferBytes}) && CClientLifecycleProbe::GetCachedConnectEx(client) == nullptr,
 			L"invalid worker count leaves no cache");
-		Check(client.Init(workers, kDefaultFixtureRecvBufferBytes), L"manager initialization succeeds");
+		Check(client.Init({workers, kDefaultFixtureRecvBufferBytes}), L"manager initialization succeeds");
 		const auto pConnectEx = CClientLifecycleProbe::GetCachedConnectEx(client);
 		Check(pConnectEx != nullptr, L"initialization caches ConnectEx before any connection");
-		Check(!client.Init(workers, kDefaultFixtureRecvBufferBytes) && CClientLifecycleProbe::GetCachedConnectEx(client) == pConnectEx,
+		Check(!client.Init({workers, kDefaultFixtureRecvBufferBytes}) && CClientLifecycleProbe::GetCachedConnectEx(client) == pConnectEx,
 			L"duplicate initialization preserves cache");
 		USHORT port = 0;
 		SOCKET listener = BindLoopback(port);
@@ -678,7 +679,7 @@ namespace
 		Check(!client.SendPacket(second, makePacket()) && !client.Disconnect(next), L"no sessions remain after Stop");
 		Check(CClientLifecycleProbe::GetCachedConnectEx(client) == nullptr, L"Stop clears the ConnectEx cache");
 		Check(client.Connect("127.0.0.1", port, kPacketCode, kConnectTimeoutMilliseconds) == 0, L"Stop rejects new attempts");
-		Check(client.Init(workers, kDefaultFixtureRecvBufferBytes), L"manager restarts after draining pending receives");
+		Check(client.Init({workers, kDefaultFixtureRecvBufferBytes}), L"manager restarts after draining pending receives");
 		Check(CClientLifecycleProbe::GetCachedConnectEx(client) != nullptr, L"reinitialization restores the ConnectEx cache");
 		const auto restarted = client.Connect("127.0.0.1", port, kPacketCode, kConnectTimeoutMilliseconds);
 		Check(restarted > stopPending && WaitEvent(client, restarted).m_kind == EClientEvent::Connected,
