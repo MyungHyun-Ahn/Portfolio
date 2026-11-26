@@ -6,7 +6,7 @@ public class MMOClientNetwork : ModuleRules
 	public MMOClientNetwork(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
-		PrivateDependencyModuleNames.Add("Core");
+		PrivateDependencyModuleNames.AddRange(new[] { "Core", "CoreUObject", "Engine" });
 		// 네이티브 라이브러리는 UE 전용 중간 경로에서 같은 컴파일러와 릴리스 CRT로 빌드한다.
 		const string ToolVersion = "14.50.35717";
 		if (Target.Platform != UnrealTargetPlatform.Win64 || Target.Architecture != UnrealArch.X64 ||
@@ -19,7 +19,8 @@ public class MMOClientNetwork : ModuleRules
 		string Root = Path.GetFullPath(Path.Combine(ProjectDir, "../.."));
 		PrivateIncludePaths.Add(Path.Combine(Root, "Client/ClientNetworkLib"));
 		PrivateIncludePaths.Add(Path.Combine(Root, "Common/NetworkCommon"));
-		foreach (string Name in new[] { "ClientNetworkLib", "NetworkCommonLib" })
+		PrivateIncludePaths.Add(Path.Combine(Root, "Client/UEChatLogin"));
+		foreach (string Name in new[] { "UEChatLogin", "ClientNetworkLib", "NetworkCommonLib" })
 		{
 			PublicPreBuildLibraries.Add(Path.Combine(Root, "Build/Unreal/NativeNetwork", ToolVersion, Name, Name + ".lib"));
 		}
