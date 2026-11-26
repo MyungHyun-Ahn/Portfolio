@@ -4,5 +4,7 @@
     <ClInclude Include="pch.h" />
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClInclude Include="MovementStep.h" />
+    <ClCompile Include="MovementStep.cpp" />
   </ItemGroup>
 </Project>

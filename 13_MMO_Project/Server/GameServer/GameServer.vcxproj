@@ -40,6 +40,8 @@
     <ClInclude Include="pch.h" />
     <ClCompile Include="pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
     <ClCompile Include="Main.cpp" />
+    <ClInclude Include="MovementStep.h" />
+    <ClCompile Include="MovementStep.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
