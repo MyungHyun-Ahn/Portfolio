@@ -1,0 +1,16 @@
+# 언리얼이 다시 생성하는 프로젝트 산출물
+/Binaries/
+/DerivedDataCache/
+/Intermediate/
+/Saved/
+/Plugins/**/Intermediate/
+
+# 에디터에서 생성하는 로컬 IDE 파일
+/.vs/
+/.idea/
+/*.sln
+/*.slnx
+
+# 쿠킹·패키징 임시 파일. Build/의 아이콘과 패키징 설정은 유지한다.
+/Build/**/FileOpenOrder/
+/Build/**/PipelineCaches/*.upipelinecache
