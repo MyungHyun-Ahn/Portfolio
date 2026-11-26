@@ -10,6 +10,6 @@ namespace ServerNetworkLib
 	using namespace NetworkCommonLib;
 }
 
-#include "ServerSetting.h"
 #include "CServer.h"
 #include "CSession.h"
+#include "SServerNetworkSettings.h"

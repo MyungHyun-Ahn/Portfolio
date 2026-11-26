@@ -610,7 +610,7 @@ int main(void)
 {
 	CLogger::GetInstance()->SetLogLevel(ELogLevel::Info);
 	CFileLoader file;
-	file.Parse(L"ServerRecvView.ini");
+	Require(file.Parse(L"ServerRecvView.ini"), "failed to parse ServerRecvView.ini");
 	int producers = 0, groups = 0;
 	Require(file.Load(L"ServerRecvView", L"Producers", &producers) && producers >= 1 && producers <= 32, "invalid Producers");
 	Require(file.Load(L"ServerRecvView", L"Groups", &groups) && groups >= 2 && groups <= 4096, "invalid Groups");

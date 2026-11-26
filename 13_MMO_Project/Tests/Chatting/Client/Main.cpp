@@ -19,8 +19,8 @@ int main(void)
 	SetConsoleCP(CP_UTF8);
 	g_pLogger = MHLib::utils::CLogger::GetInstance();
 	g_pLogger->SetMainDirectory(L"LogFile");
-	Chatting::SChatConfig config;
-	if (!Chatting::LoadConfig(L"ClientConfig.conf", false, config))
+	Chatting::SChatClientConfig config;
+	if (!Chatting::LoadClientConfig(L"ClientConfig.conf", config))
 		return 2;
 
 	int exitCode = 0;

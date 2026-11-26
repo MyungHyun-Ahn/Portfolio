@@ -65,7 +65,8 @@ namespace Chatting
 		if (!CheckConfigFile(path.c_str()))
 			return "config_file_unreadable_or_invalid_encoding";
 		MHLib::utils::CFileLoader loader;
-		loader.Parse(path.c_str());
+		if (!loader.Parse(path.c_str()))
+			return "config_parse_failed";
 		std::wstring text;
 		IN_ADDR address{};
 		if (!loader.Load(kSection, L"IP", &text) || InetPtonW(AF_INET, text.c_str(), &address) != 1

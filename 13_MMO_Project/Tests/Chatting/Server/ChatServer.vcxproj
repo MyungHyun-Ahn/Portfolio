@@ -54,6 +54,7 @@
   <ItemGroup>
     <ClCompile Include="pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="ServerConfig.cpp" />
     <ClCompile Include="ChatMetrics.cpp" />
     <ClCompile Include="..\..\..\Server\ServerMetrics\ServerMetrics.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
@@ -68,6 +69,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
+    <ClInclude Include="ServerConfig.h" />
     <ClInclude Include="ChatMetrics.h" />
     <ClInclude Include="..\..\..\Server\ServerMetrics\ServerMetrics.h" />
     <ClInclude Include="CChatServer.h" />

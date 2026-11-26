@@ -14,6 +14,9 @@
     <ClCompile Include="Main.cpp">
       <Filter>Server</Filter>
     </ClCompile>
+    <ClCompile Include="ServerConfig.cpp">
+      <Filter>Server</Filter>
+    </ClCompile>
     <ClCompile Include="ChatMetrics.cpp">
       <Filter>Server</Filter>
     </ClCompile>
@@ -44,6 +47,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
+      <Filter>Server</Filter>
+    </ClInclude>
+    <ClInclude Include="ServerConfig.h">
       <Filter>Server</Filter>
     </ClInclude>
     <ClInclude Include="ChatMetrics.h">

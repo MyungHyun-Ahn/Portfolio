@@ -12,25 +12,28 @@ CServer *g_pServer = nullptr;
 		return g_pServer->WorkerThread();
 	}
 
-	BOOL CServer::Start(const CHAR *pOpenIp, const USHORT port, EPacketMode packetMode) noexcept
+	BOOL CServer::Start(const SServerNetworkSettings &settings) noexcept
 	{
-		if (packetMode != EPacketMode::Net && packetMode != EPacketMode::Lan)
+		if (settings.packetMode != EPacketMode::Net && settings.packetMode != EPacketMode::Lan)
 			return FALSE;
 
-		m_packetMode = packetMode;
+		m_packetCode = settings.packetCode;
+		m_packetMode = settings.packetMode;
+		m_maxSessionCount = settings.maxSessionCount;
+		m_acceptExCount = settings.acceptExCount;
 		int retVal;
 		int errVal;
 		WSAData wsaData;
 
-		m_pSessions = new CSession * [serverSetting::maxSessionCount];
+		m_pSessions = new CSession * [m_maxSessionCount];
 
-		ZeroMemory((char *)m_pSessions, sizeof(CSession *) * serverSetting::maxSessionCount);
+		ZeroMemory((char *)m_pSessions, sizeof(CSession *) * m_maxSessionCount);
 
-		m_pAcceptExSessions = new CSession * [serverSetting::acceptexCount];
+		m_pAcceptExSessions = new CSession * [m_acceptExCount];
 
 		// 디스커넥트 스택 채우기
-		USHORT val = serverSetting::maxSessionCount - 1;
-		for (int i = 0; i < serverSetting::maxSessionCount; i++)
+		USHORT val = m_maxSessionCount - 1;
+		for (int i = 0; i < m_maxSessionCount; i++)
 		{
 			m_stackDisconnectIndex.Push(val--);
 		}
@@ -56,8 +59,8 @@ CServer *g_pServer = nullptr;
 		SOCKADDR_IN serverAddr;
 		ZeroMemory(&serverAddr, sizeof(serverAddr));
 		serverAddr.sin_family = AF_INET;
-		InetPtonA(AF_INET, pOpenIp, &serverAddr.sin_addr);
-		serverAddr.sin_port = htons(port);
+		InetPtonA(AF_INET, settings.ip.c_str(), &serverAddr.sin_addr);
+		serverAddr.sin_port = htons(settings.port);
 
 		retVal = bind(m_listenSocket, (SOCKADDR *)&serverAddr, sizeof(serverAddr));
 		if (retVal == SOCKET_ERROR)
@@ -69,7 +72,7 @@ CServer *g_pServer = nullptr;
 		}
 
 		// 송신 버퍼를 0으로 만들어서 실직적인 I/O를 우리의 버퍼를 이용하도록 만듬
-		if (serverSetting::useZeroCopy)
+		if (settings.useZeroCopy)
 		{
 			DWORD sendBufferSize = 0;
 			retVal = setsockopt(m_listenSocket, SOL_SOCKET, SO_SNDBUF, (char *)&sendBufferSize, sizeof(DWORD));
@@ -104,7 +107,7 @@ CServer *g_pServer = nullptr;
 		}
 
 		// CP 핸들 생성
-		m_iocpHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, serverSetting::iocpActiveThread);
+		m_iocpHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, settings.iocpConcurrency);
 		if (m_iocpHandle == NULL)
 		{
 			errVal = WSAGetLastError();
@@ -142,7 +145,7 @@ CServer *g_pServer = nullptr;
 		m_hasStartedBackgroundWork = true;
 
 		// CreateWorkerThread
-		for (int i = 1; i <= serverSetting::iocpWorkerThread; i++)
+		for (int i = 1; i <= settings.iocpWorkerCount; i++)
 		{
 			HANDLE hWorkerThread = (HANDLE)_beginthreadex(nullptr, 0, NetWorkerThreadFunc, nullptr, 0, nullptr);
 			if (hWorkerThread == 0)
@@ -159,7 +162,7 @@ CServer *g_pServer = nullptr;
 				L"event=worker_started worker_index=%d | 네트워크 워커를 시작했습니다.", i);
 		}
 
-		OnServerReady();
+		OnServerReady(settings.port);
 
 		WaitForMultipleObjects((DWORD)m_arrWorkerThreads.size(), m_arrWorkerThreads.data(), TRUE, INFINITE);
 
@@ -172,7 +175,7 @@ CServer *g_pServer = nullptr;
 		InterlockedExchange(&m_isStop, TRUE);
 		closesocket(m_listenSocket);
 
-		for (int i = 0; i < serverSetting::maxSessionCount; i++)
+		for (int i = 0; i < m_maxSessionCount; i++)
 		{
 			if (m_pSessions[i] != NULL)
 			{
@@ -197,7 +200,7 @@ CServer *g_pServer = nullptr;
 	{
 		outPacket.reset();
 		const USHORT index = getIndex(sessionId);
-		if (m_pSessions == nullptr || index >= serverSetting::maxSessionCount)
+		if (m_pSessions == nullptr || index >= m_maxSessionCount)
 			return false;
 		CSession *pSession = m_pSessions[index];
 		if (pSession == nullptr)
@@ -340,7 +343,7 @@ CServer *g_pServer = nullptr;
 	void CServer::FristPostAcceptEx() noexcept
 	{
 		// 처음에 AcceptEx를 걸어두고 시작
-		for (int i = 0; i < serverSetting::acceptexCount; i++)
+		for (int i = 0; i < m_acceptExCount; i++)
 		{
 			PostAcceptEx(i);
 		}
@@ -366,7 +369,7 @@ CServer *g_pServer = nullptr;
 			const LONG lostCount = InterlockedIncrement(&m_lostAcceptSlotCount);
 			g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", 0, std::source_location::current(),
 				L"event=accept_slot_lost index=%d error_code=%d remaining=%d total=%d | 접속 수락 슬롯을 다시 걸지 못했습니다.",
-				index, errVal, serverSetting::acceptexCount - lostCount, serverSetting::acceptexCount);
+				index, errVal, m_acceptExCount - lostCount, m_acceptExCount);
 			return FALSE;
 		}
 
@@ -401,7 +404,7 @@ CServer *g_pServer = nullptr;
 				const LONG lostCount = InterlockedIncrement(&m_lostAcceptSlotCount);
 				g_pLogger->WriteLog(ELogLevel::Error, L"NetworkLib", 0, std::source_location::current(),
 					L"event=accept_slot_lost index=%d error_code=%d remaining=%d total=%d | 접속 수락 슬롯을 다시 걸지 못했습니다.",
-					index, errVal, serverSetting::acceptexCount - lostCount, serverSetting::acceptexCount);
+					index, errVal, m_acceptExCount - lostCount, m_acceptExCount);
 				return FALSE;
 			}
 		}

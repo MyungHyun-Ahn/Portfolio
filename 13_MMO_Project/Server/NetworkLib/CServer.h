@@ -7,11 +7,13 @@ using SendPacketPtr = MHLib::utils::CSmartPtr<NetworkCommonLib::CSerializableBuf
 using RecvPacketPtr = std::unique_ptr<CSerializableBufferView, decltype(&CSerializableBufferView::Free)>;
 
 class CSession;
+struct SServerNetworkSettings;
 
 	class CServer
 	{
 	public:
-		BOOL Start(const CHAR *pOpenIp, const USHORT port, EPacketMode packetMode = EPacketMode::Net) noexcept;
+		BOOL Start(const SServerNetworkSettings &settings) noexcept;
+		BYTE GetPacketCode() const noexcept { return m_packetCode; }
 		EPacketMode GetPacketMode() const noexcept { return m_packetMode; }
 		// Start 호출 스레드가 반환하고 합류한 뒤에만 조회한다.
 		bool HasStartedBackgroundWork() const noexcept { return m_hasStartedBackgroundWork; }
@@ -68,17 +70,19 @@ class CSession;
 		int WorkerThread() noexcept;
 
 		// IOCP 워커를 모두 시작한 뒤 준비 완료를 통지한다.
-		virtual void OnServerReady() noexcept = 0;
+		virtual void OnServerReady(USHORT port) noexcept = 0;
 
 	private:
 		// Session
 		LONG					m_sessionCount = 0;
 		LONG64					m_currentId = 0;
+		INT m_maxSessionCount = 0;
 
 		CSession				**m_pSessions;
 		CLfStack<USHORT>		m_stackDisconnectIndex;
 
 		// Worker
+		BYTE m_packetCode = 0;
 		EPacketMode m_packetMode = EPacketMode::Net;
 		SOCKET					m_listenSocket = INVALID_SOCKET;
 		BOOL					m_isWorkerRun = TRUE;
@@ -86,6 +90,7 @@ class CSession;
 		std::vector<HANDLE>		m_arrWorkerThreads;
 
 		// Accepter
+		INT m_acceptExCount = 0;
 		LPFN_ACCEPTEX					m_pAcceptEx = NULL;
 		GUID							m_guidAcceptEx = WSAID_ACCEPTEX;
 		CSession						**m_pAcceptExSessions;

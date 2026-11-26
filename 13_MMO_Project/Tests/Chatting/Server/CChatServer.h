@@ -15,7 +15,7 @@ namespace Chatting
 		void OnAccept(UINT64 sessionId) noexcept override;
 		void OnClientLeave(UINT64 sessionId) noexcept override;
 		void OnError(int errorCode, WCHAR *pMessage) noexcept override;
-		void OnServerReady() noexcept override;
+		void OnServerReady(USHORT port) noexcept override;
 
 	private:
 		static constexpr ContentsRuntimeLib::ContentsInstanceId kChatContentsId = 1;

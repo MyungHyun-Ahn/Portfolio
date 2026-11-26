@@ -17,7 +17,7 @@ from test_server_event_input import ROOT, launch, send, wait_text
 
 
 @contextmanager
-def dummy(base, configuration, label, port, *, has_config=True, encoding="utf-16", **overrides):
+def dummy(base, configuration, label, port, *, has_config=True, encoding="utf-16", config_text=None, **overrides):
     folder = base / label
     folder.mkdir()
     exe = folder / "DummyClient.exe"
@@ -26,7 +26,7 @@ def dummy(base, configuration, label, port, *, has_config=True, encoding="utf-16
                 "RUN_DURATION_MS": 1100, "ACTION_INTERVAL_MS": 40, **overrides}
     if has_config:
         text = "DummyClient:\n" + "".join(f"    - {key} = {value};\n" for key, value in settings.items())
-        (folder / "DummyClientConfig.conf").write_text(text, encoding=encoding)
+        (folder / "DummyClientConfig.conf").write_text(text if config_text is None else config_text, encoding=encoding)
     stdout = folder / "stdout.txt"
     with stdout.open("wb") as output, subprocess.Popen(
         [str(exe)], cwd=base, stdin=subprocess.DEVNULL, stdout=output, stderr=subprocess.STDOUT
@@ -236,6 +236,11 @@ def failures(base, configuration):
         result = summary(child, 1)
     assert result["stages"]["connect_requested"] == 0, result
     assert [failure["reason"] for failure in result["failures"]] == ["client_storage_size_unavailable"], result
+
+    with dummy(base, configuration, "parse-failed", port, config_text="// No entries\n") as child:
+        result = summary(child, 2)
+    assert result["stages"]["connect_requested"] == 0, result
+    assert [failure["reason"] for failure in result["failures"]] == ["config_parse_failed"], result
 
     for label, overrides in (
         ("missing", {}), ("wrong-encoding", {"encoding": "utf-8"}), ("legacy", {"SCENARIO": "smoke"}),

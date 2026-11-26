@@ -7,7 +7,6 @@
 #include "CSerializableBuffer.h"
 #include "CRecvBuffer.h"
 #include "CSerializableBufferView.h"
-#include "ServerSetting.h"
 #include "ChatMetrics.h"
 #include "CServer.h"
 #include "IContents.h"
@@ -33,7 +32,7 @@ namespace Chatting
 
 	void CProcessPacket::sendPacket(UINT64 sessionId, NetworkCommonLib::CSerializableBuffer &packet) noexcept
 	{
-		NetworkCommonLib::PreparePacket(packet, kPacketCode, m_contents.m_server.GetPacketMode());
+		NetworkCommonLib::PreparePacket(packet, m_contents.m_server.GetPacketCode(), m_contents.m_server.GetPacketMode());
 		m_contents.m_server.SendPacket(sessionId, &packet);
 	}
 

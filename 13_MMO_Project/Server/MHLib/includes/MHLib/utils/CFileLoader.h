@@ -8,18 +8,13 @@ namespace MHLib::utils
 	class CFileLoader
 	{
 	public:
-		// 기본적으로 std::wstring 으로 저장
-		VOID Parse(const WCHAR *pFileName) noexcept
+		// 파일을 읽어 키를 등록한다. 읽지 못했거나 등록할 키가 없으면 실패한다.
+		[[nodiscard]]
+		bool Parse(const WCHAR *pFileName) noexcept
 		{
-			size_t retVal;
-
 			FILE *pFile = _wfsopen(pFileName, L"r, ccs = UTF-16LE", _SH_DENYWR);
 			if (pFile == nullptr)
-			{
-				const int errorCode = errno;
-				CLogger::GetInstance()->WriteLogConsole(ELogLevel::Error, L"config file open failed: %ls, errno=%d", pFileName, errorCode);
-				return;
-			}
+				return false;
 
 			size_t fileBytes;
 			fseek(pFile, 0, SEEK_END);
@@ -27,14 +22,14 @@ namespace MHLib::utils
 			fseek(pFile, 0, SEEK_SET);
 
 			WCHAR *pFileBuffer = new WCHAR[fileBytes / sizeof(WCHAR) + 1/*마지막 널문자 자리 확보*/];
-			retVal = fread_s(pFileBuffer, fileBytes, sizeof(char), fileBytes, pFile);
-			if (retVal == 0)
-			{
-				// error
-				return;
-			}
-
+			const size_t retVal = fread_s(pFileBuffer, fileBytes, sizeof(char), fileBytes, pFile);
+			const bool isRead = retVal != 0 && ferror(pFile) == 0;
 			fclose(pFile);
+			if (!isRead)
+			{
+				delete[] pFileBuffer;
+				return false;
+			}
 
 			pFileBuffer[retVal / sizeof(WCHAR)] = L'\0';
 
@@ -44,8 +39,8 @@ namespace MHLib::utils
 			delete[] pFileBuffer;
 
 			// \t\r 띄워쓰기 제거
-			wStr.erase(remove(wStr.begin(), wStr.end(), L'\t'), wStr.end());
-			wStr.erase(remove(wStr.begin(), wStr.end(), L' '), wStr.end());
+			wStr.erase(std::remove(wStr.begin(), wStr.end(), L'\t'), wStr.end());
+			wStr.erase(std::remove(wStr.begin(), wStr.end(), L' '), wStr.end());
 
 			// 주석 삭제 "//"
 			{
@@ -68,7 +63,7 @@ namespace MHLib::utils
 				}
 			}
 			// 한줄 주석을 지웠으면 \n 또한 지워도 됨
-			wStr.erase(remove(wStr.begin(), wStr.end(), L'\n'), wStr.end());
+			wStr.erase(std::remove(wStr.begin(), wStr.end(), L'\n'), wStr.end());
 
 			// /* ~ */ 제거
 			{
@@ -92,6 +87,7 @@ namespace MHLib::utils
 			// 모든 Key Value를 std::wstring으로 저장
 			//	* Get 계열 함수에서 원하는 타입으로 변환
 
+			bool hasEntries = false;
 			// ClassName 무조건 :으로 끝남
 			{
 				size_t keyStart = wStr.find(L"-"); // 첫 -
@@ -126,6 +122,7 @@ namespace MHLib::utils
 						std::wstring valueStr = wStr.substr(valueStart, valueEnd - valueStart);
 
 						m_parsedDatas[className].insert(std::make_pair(keyStr, valueStr));
+						hasEntries = true;
 
 						keyStart = wStr.find(L"-", keyStart);
 					}
@@ -134,7 +131,7 @@ namespace MHLib::utils
 				}
 			}
 
-			return;
+			return hasEntries;
 		}
 
 		// 필요하면 더 구현할 것

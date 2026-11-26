@@ -19,9 +19,27 @@ from http.client import HTTPConnection
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def set_config_option(text, section, key, value):
+    headers = list(re.finditer(r"(?m)^([A-Za-z]+):[ \t]*\r?$", text))
+    for index, header in enumerate(headers):
+        if header[1] != section:
+            continue
+        end = headers[index + 1].start() if index + 1 < len(headers) else len(text)
+        body = text[header.end():end]
+        entry = "" if value is None else f"\t- {key} = {value};"
+        body, count = re.subn(rf"(?m)^[ \t]*-[ \t]*{re.escape(key)}[ \t]*=[^\n]*", entry, body)
+        assert count <= 1, (section, key)
+        if value is None:
+            assert count == 1, f"fixture is missing {section}: {key} before removal"
+        if count == 0 and value is not None:
+            body = "\n" + entry + body
+        return text[:header.end()] + body + text[end:]
+    raise AssertionError(f"missing config section: {section}")
+
+
 @contextmanager
 def launch(base, configuration, side, label, port, levels=None, log_interval=None, nickname=None, *, session_limit=None,
-           server_options=None, executable_name=None):
+           server_options=None, executable_name=None, config_text=None):
     folder = base / label
     folder.mkdir()
     source = ROOT / "Build" / configuration / f"Chat{side}"
@@ -36,20 +54,22 @@ def launch(base, configuration, side, label, port, levels=None, log_interval=Non
         assert count == 1
     if levels is not None:
         for key, value in zip(("CONSOLE_LOG_LEVEL", "FILE_LOG_LEVEL"), levels):
-            text, count = re.subn(rf"(\b{key}\s*=\s*)\w+", rf"\g<1>{value}", text)
-            if not count:
-                text += f"\n\t- {key} = {value};"
+            text = set_config_option(text, "Logging", key, value)
     if log_interval is not None:
-        text, count = re.subn(r"\bLOG_POLL_INTERVAL_MS\s*=\s*[^;]*;", f"LOG_POLL_INTERVAL_MS = {log_interval};", text)
-        if not count:
-            text += f"\n\t- LOG_POLL_INTERVAL_MS = {log_interval};"
+        text = set_config_option(text, "Logging", "LOG_POLL_INTERVAL_MS", log_interval)
     if session_limit is not None:
-        text = re.sub(r"(?m)^[ \t]*-[ \t]*MAX_SESSION_COUNT[ \t]*=[^\n]*\n?", "", text)
-        text += f"\n\t- MAX_SESSION_COUNT = {session_limit};"
+        text = set_config_option(text, "Server", "MAX_SESSION_COUNT", session_limit)
     for key, value in (server_options or {}).items():
-        text = re.sub(rf"(?m)^[ \t]*-[ \t]*{re.escape(key)}[ \t]*=[^\n]*\n?", "", text)
-        text += f"\n\t- {key} = {value};"
-    (folder / config).write_text(text, encoding="utf-16")
+        if isinstance(key, tuple):
+            section, key = key
+        elif key.startswith("CONTENTS_"):
+            section = "ContentsRuntime"
+        elif key.startswith("LOG_") or key in ("CONSOLE_LOG_LEVEL", "FILE_LOG_LEVEL"):
+            section = "Logging"
+        else:
+            section = side
+        text = set_config_option(text, section, key, value)
+    (folder / config).write_text(text if config_text is None else config_text, encoding="utf-16")
     stdout = folder / "stdout.txt"
     with stdout.open("wb") as output, subprocess.Popen(
         [str(exe)], cwd=folder, stdin=subprocess.PIPE, stdout=output, stderr=subprocess.STDOUT
@@ -191,6 +211,7 @@ def server_options_config(base, configuration):
     invalid = [("ACCEPTEX_COUNT", 0), ("ACCEPTEX_COUNT", 65536), ("IOCP_WORKER_COUNT", 65),
                ("IOCP_CONCURRENCY", 0), ("IOCP_CONCURRENCY", 4), ("CONTENTS_WORKER_COUNT", 0),
                ("LOG_QUEUE_CAPACITY", 0), ("LOG_QUEUE_CAPACITY", "1024items"), ("LOG_QUEUE_CAPACITY", 1048577),
+               ("CONSOLE_LOG_LEVEL", "Trace"), ("FILE_LOG_LEVEL", "Trace"),
                ("CONTENTS_FPS", 0), ("CONTENTS_FPS", 1001), ("CONTENTS_FPS", "25fps")]
     for index, (key, value) in enumerate(invalid):
         with launch(base, configuration, "Server", f"invalid-option-{index}", port,
@@ -198,6 +219,42 @@ def server_options_config(base, configuration):
             assert server[0].wait(timeout=5) == 2, f"{key}={value} was not rejected"
             wait_text(server, key)
             assert not (server[1].parent / "LogFile").exists()
+    with launch(base, configuration, "Server", "wrong-section", port,
+                server_options={("Server", "CONTENTS_FPS"): 30}) as server:
+        assert server[0].wait(timeout=5) == 2, "misplaced CONTENTS_FPS was not rejected"
+        wait_text(server, "CONTENTS_FPS belongs in ContentsRuntime:")
+        assert not (server[1].parent / "LogFile").exists()
+
+    required = {
+        "Server": ("PACKET_MODE", "IP", "PORT", "MAX_SESSION_COUNT", "ACCEPTEX_COUNT", "IOCP_WORKER_COUNT", "IOCP_CONCURRENCY",
+                   "METRICS_PORT", "METRICS_BIND_ADDRESS"),
+        "ContentsRuntime": ("CONTENTS_WORKER_COUNT", "CONTENTS_FPS"),
+        "Logging": ("CONSOLE_LOG_LEVEL", "FILE_LOG_LEVEL", "LOG_QUEUE_CAPACITY", "LOG_POLL_INTERVAL_MS"),
+    }
+    for section, keys in required.items():
+        for key in keys:
+            with launch(base, configuration, "Server", f"missing-{key}", port,
+                        server_options={(section, key): None}) as server:
+                try:
+                    assert server[0].wait(timeout=5) == 2, f"missing {key} was not rejected"
+                except subprocess.TimeoutExpired as error:
+                    output = server[1].read_text(encoding="utf-8")
+                    raise AssertionError(f"missing {key} did not stop startup: {output}") from error
+                wait_text(server, f"{section}: {key} ")
+                assert not (server[1].parent / "LogFile").exists()
+
+    with launch(base, configuration, "Server", "empty-contents", port,
+                server_options={"CONTENTS_WORKER_COUNT": None, "CONTENTS_FPS": None}) as server:
+        assert server[0].wait(timeout=5) == 2, "empty required section must prevent startup"
+        wait_text(server, "ContentsRuntime: CONTENTS_WORKER_COUNT")
+        assert not (server[1].parent / "LogFile").exists()
+
+    for side in ("Server", "Client"):
+        with launch(base, configuration, side, f"unparsed-{side}", port, config_text="// No entries\n") as child:
+            assert child[0].wait(timeout=5) == 2
+            wait_text(child, f"CONFIG ERROR: {side}Config.conf: failed to parse config file")
+            if side == "Server":
+                assert not (child[1].parent / "LogFile").exists()
     print("server options: custom worker counts and loopback echo verified; invalid settings rejected")
 
 

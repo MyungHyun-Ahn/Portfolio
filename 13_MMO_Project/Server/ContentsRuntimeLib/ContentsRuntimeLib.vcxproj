@@ -42,9 +42,11 @@
     <ClInclude Include="CContentsRuntime.h" />
     <ClInclude Include="CContentsScheduler.h" />
     <ClInclude Include="ContentsDelegatePolicies.h" />
+    <ClInclude Include="SContentsRuntimeSettings.h" />
     <ClCompile Include="ContentsRuntimeLibPch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
     <ClCompile Include="IContents.cpp" />
     <ClCompile Include="CContentsRuntime.cpp" />
+    <ClCompile Include="SContentsRuntimeSettings.cpp" />
     <ClCompile Include="CContentsScheduler.cpp" />
     <ClCompile Include="ContentsDelegatePolicies.cpp" />
   </ItemGroup>

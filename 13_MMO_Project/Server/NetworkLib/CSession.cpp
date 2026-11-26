@@ -10,7 +10,7 @@ namespace ServerNetworkLib
 		constexpr int kRecvHeaderBytes = sizeof(SPacketHeader);
 		constexpr int kMaxFrameBytes = static_cast<int>(CSerializableBuffer::EBufferDefine::PacketMaxSize);
 		constexpr int kChecksumOffset = offsetof(SPacketHeader, checkSum);
-		const BYTE packetCode = serverSetting::packetCode;
+		const BYTE packetCode = g_pServer->GetPacketCode();
 		const EPacketMode mode = g_pServer->GetPacketMode();
 		if (size <= 0 || size > m_pRecvBuffer->GetCapacity())
 		{
@@ -345,7 +345,7 @@ namespace ServerNetworkLib
 				MHLib::diagnostics::CCrashDump::Crash();
 			}
 
-			PreparePacket(*pSBuffer, serverSetting::packetCode, g_pServer->GetPacketMode());
+			PreparePacket(*pSBuffer, g_pServer->GetPacketCode(), g_pServer->GetPacketMode());
 
 			wsaBuf[count].buf = pSBuffer->GetBufferPtr();
 			wsaBuf[count].len = pSBuffer->GetFullSize();

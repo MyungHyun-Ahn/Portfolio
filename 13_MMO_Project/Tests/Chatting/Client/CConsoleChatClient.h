@@ -5,7 +5,7 @@ namespace Chatting
 	class CConsoleChatClient : public CChatNetClient
 	{
 	public:
-		CConsoleChatClient(ClientNetworkLib::CClientManager &network, const SChatConfig &config)
+		CConsoleChatClient(ClientNetworkLib::CClientManager &network, const SChatClientConfig &config)
 			: CChatNetClient(network)
 			, m_config(config)
 		{
@@ -20,6 +20,6 @@ namespace Chatting
 		void 	onChatMessageEcho(const SResMessage &packet) noexcept override;
 		void 	onChatMessageNoti(const SMessageNoti &packet) noexcept override;
 		
-		SChatConfig m_config;
+		SChatClientConfig m_config;
 	};
 }

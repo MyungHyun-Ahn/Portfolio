@@ -7,8 +7,8 @@ namespace ServerNetworkLib
 	using namespace NetworkCommonLib;
 }
 
-#include "ServerSetting.h"
 #include "CServer.h"
+#include "SServerNetworkSettings.h"
 
 #include "ClientEvent.h"
 #include "CClientManager.h"
@@ -540,7 +540,16 @@ namespace WorldServer
 			}
 			if (!m_runtime.Start())
 				return false;
-			return Start("127.0.0.1", port, NetworkCommonLib::EPacketMode::Lan) != FALSE;
+			const SServerNetworkSettings networkSettings{
+				.ip = "127.0.0.1",
+				.port = port,
+				.packetMode = NetworkCommonLib::EPacketMode::Lan,
+				.maxSessionCount = 8,
+				.acceptExCount = 2,
+				.iocpWorkerCount = 2,
+				.iocpConcurrency = 2,
+				.packetCode = kFixedMapsPacketCode};
+			return Start(networkSettings) != FALSE;
 		}
 
 	private:
@@ -595,11 +604,11 @@ namespace WorldServer
 			g_pLogger->WriteLogConsole(ELogLevel::Error, L"event=fixed_maps_network_error code=%d | 네트워크 오류입니다.", errorCode);
 		}
 
-		void OnServerReady() noexcept override
+		void OnServerReady(USHORT port) noexcept override
 		{
 			g_pLogger->WriteLogConsole(ELogLevel::Info,
 				L"event=fixed_maps_ready port=%u | 고정 맵 테스트 서버가 준비되었습니다.",
-				static_cast<unsigned>(serverSetting::openPort));
+				static_cast<unsigned>(port));
 		}
 
 	private:
@@ -751,7 +760,11 @@ int main(void)
 	using namespace WorldServer;
 	g_pLogger = MHLib::utils::CLogger::GetInstance();
 	MHLib::utils::CFileLoader loader;
-	loader.Parse(L"FixedMaps.conf");
+	if (!loader.Parse(L"FixedMaps.conf"))
+	{
+		g_pLogger->WriteLogConsole(ELogLevel::Error, L"event=fixed_maps_bad_config | FixedMaps.conf를 파싱하지 못했습니다.");
+		return 2;
+	}
 	INT64 configuredPort = -1;
 	INT64 controls = 0;
 	INT64 autoDelegate = 0;
@@ -778,12 +791,6 @@ int main(void)
 		return 2;
 	g_pLogger->RegisterLogProducer();
 	MHLib::utils::g_pProfileManager = MHLib::utils::CProfileManager::GetInstance();
-	serverSetting::maxSessionCount = 8;
-	serverSetting::acceptexCount = 2;
-	serverSetting::iocpWorkerThread = 2;
-	serverSetting::iocpActiveThread = 2;
-	serverSetting::openPort = port;
-	serverSetting::packetCode = kFixedMapsPacketCode;
 	CFixedMapServer server(autoDelegate == 1);
 	g_pServer = &server;
 	// 테스트 실행기가 이 프로세스만 회수한다. 기존 네트워크 Stop은 사용하지 않는다.

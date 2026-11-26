@@ -2,22 +2,10 @@
 
 namespace Chatting
 {
-	struct SChatConfig
+	struct SChatClientConfig
 	{
 		std::string m_ip = "127.0.0.1";
-		MHLib::utils::ELogLevel m_consoleLogLevel = MHLib::utils::ELogLevel::Info;
-		MHLib::utils::ELogLevel m_fileLogLevel = MHLib::utils::ELogLevel::Debug;
-		std::chrono::milliseconds m_logPollInterval{MHLib::utils::CLogger::kDefaultPollInterval};
 		USHORT m_port = kDefaultPort;
-		std::string m_metricsBindAddress;
-		USHORT m_metricsPort = 0;
-		USHORT m_maxSessionCount = 256;
-		int m_acceptExCount = 4;
-		int m_iocpWorkerCount = 2;
-		int m_iocpConcurrency = 2;
-		int m_contentsWorkerCount = 2;
-		int m_contentsFps = 25;
-		int m_logQueueCapacity = 1024;
 		DWORD m_connectTimeoutMilliseconds = 5000;
 		int m_recvBufferBytes = 4096;
 		NetworkCommonLib::EPacketMode m_packetMode = NetworkCommonLib::EPacketMode::Net;
@@ -32,6 +20,17 @@ namespace Chatting
 	[[nodiscard]] 
 	bool CheckConfigFile(const WCHAR *pPath);
 
-	// 실행 파일 옆 설정을 읽는다. 실패하면 outConfig는 변경하지 않는다.
-	bool LoadConfig(const WCHAR *pFileName, bool isServer, SChatConfig &outConfig);
+	// 설정 오류를 콘솔에 남기고 실패를 반환한다.
+	bool ConfigError(const WCHAR *pFileName, const WCHAR *pReason);
+	// 실행 파일 옆의 UTF-16LE BOM 설정을 파싱한다.
+	[[nodiscard]]
+	bool LoadConfigFile(const WCHAR *pFileName, MHLib::utils::CFileLoader &outLoader);
+	// 리슨 또는 접속에 사용할 주소·포트·모드를 읽는다.
+	[[nodiscard]]
+	bool LoadEndpoint(MHLib::utils::CFileLoader &loader, const WCHAR *pFileName, const WCHAR *pSection,
+		std::string &outIp, USHORT &outPort, NetworkCommonLib::EPacketMode &outPacketMode);
+
+	// 실행 파일 옆 클라이언트 설정을 읽는다. 실패하면 outConfig는 변경하지 않는다.
+	[[nodiscard]]
+	bool LoadClientConfig(const WCHAR *pFileName, SChatClientConfig &outConfig);
 }

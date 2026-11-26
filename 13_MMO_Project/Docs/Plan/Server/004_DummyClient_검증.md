@@ -55,22 +55,25 @@ EXE 옆 `DummyClientConfig.conf`를 `CFileLoader`로 읽는다(UTF-16LE BOM). `I
 
 첫 배치는 즉시 시작한다. 한도를 다 쓰면 다음 주기까지 추가 접속만 대기하고, 기존 연결의 Tick과 heartbeat는 계속 처리한다. 사용하지 않은 시도 수는 다음 주기로 이월하지 않는다. 각 더미는 첫 Ready 직후 다른 더미를 기다리지 않고 일반 동작을 시작한다. 그다음 동작과 재접속 뒤 첫 동작에는 `ACTION_INTERVAL_MS`를 적용한다. 종료 시점까지 시도하지 못한 배치는 실패로 세지 않으며, 실제 접속·Ready 수는 실행 요약에서 확인한다.
 
-- **256은 `ServerConfig.conf`의 `MAX_SESSION_COUNT` 기본값**이다. 클라이언트 PC의 포트 수나 더미의 입력 한도가 아니다. 용량 시험은 더미에 256 한도를 두지 않고, 해당 PC에서 테스트에 실제로 사용할 수 있는 클라이언트 TCP 포트 수까지 동시 접속하는 것을 목표로 한다. 서버 슬롯 설정을 먼저 확인하고, 포트 고갈·재접속 중 잔류 연결·서버 슬롯 부족을 구분해 목표 수와 실제 TCP 연결 수·Ready 수를 기록한다. 설정 범위나 포트 범위 크기만으로 같은 수의 동시 연결을 보장하지 않는다. Windows에서는 `netsh int ipv4 show dynamicport tcp`로 설정 범위를 확인한다.
+- **256은 배포 샘플 `ServerConfig.conf`의 `MAX_SESSION_COUNT` 값**이다. 클라이언트 PC의 포트 수나 더미의 입력 한도가 아니다. 용량 시험은 더미에 256 한도를 두지 않고, 해당 PC에서 테스트에 실제로 사용할 수 있는 클라이언트 TCP 포트 수까지 동시 접속하는 것을 목표로 한다. 서버 슬롯 설정을 먼저 확인하고, 포트 고갈·재접속 중 잔류 연결·서버 슬롯 부족을 구분해 목표 수와 실제 TCP 연결 수·Ready 수를 기록한다. 설정 범위나 포트 범위 크기만으로 같은 수의 동시 연결을 보장하지 않는다. Windows에서는 `netsh int ipv4 show dynamicport tcp`로 설정 범위를 확인한다.
 
 ### 서버 설정 외부화
 
-채팅 서버의 세션·접속·IOCP·콘텐츠 워커·로그 큐 설정은 EXE 옆 `ServerConfig.conf`에서 조정할 수 있다. `ChatServer`가 기존 `CFileLoader`로 읽고 검증한 뒤 서버를 시작한다. 네트워크 라이브러리가 채팅 앱의 설정 파일을 직접 읽지는 않는다. 설정 누락 시 현재 채팅 서버의 유효 기본값을 유지하고, 명시한 값이 잘못됐으면 서버를 시작하지 않는다.
+`ChatServer`는 EXE 옆의 UTF-16LE BOM `ServerConfig.conf` 한 파일을 `CFileLoader`로 한 번 파싱한다. `SServerNetworkSettings`, `SContentsRuntimeSettings`, `SMetricsSettings`의 `Load()`는 해당 라이브러리의 `.cpp`에 있고, `MHLib::utils::SLoggingSettings::Load()`는 헤더에 구현한다. 앱의 `LoadServerConfig()`는 네 로더와 앱 정책을 모두 검증한 뒤 `main()`의 지역 객체를 채운다. `CServer::Start(networkSettings)`와 콘텐츠 런타임·로거·메트릭에는 각각 필요한 값만 넘긴다. 실행 경로는 설정 파일이나 로더를 보관하지 않는다.
+
+`CFileLoader::Parse()`가 파일을 읽지 못하거나 읽을 키가 없어 `false`를 반환하면, 호출자가 파일명과 오류를 기록하고 시작하지 않는다. 사용하는 키 15개는 다음과 같이 파일에 모두 명시한다. 필수 키 누락, 잘못된 값이나 `Server:`에 남아 있는 콘텐츠·로그 키도 기동을 거부한다. 키가 없는 빈 섹션은 두지 않는다. `Chatting:`은 채팅 서버 고유 설정이 생기면 사용한다. 콘솔 클라이언트의 `SECTOR_X/Y`는 `Client:`의 최초 입장 좌표이며 서버 설정으로 옮기지 않는다.
 
 | 대상 | 설정화 범위 |
 |---|---|
-| 리슨 주소 | `openIp`, `openPort`는 기존 `IP`, `PORT` 설정을 유지한다. 이번 테스트 범위는 루프백이다. |
-| 서버 세션 슬롯 | `MAX_SESSION_COUNT` 적용 완료. `1..65535` 정수를 받고 생략하면 `256`을 사용한다. 이 범위는 16비트 슬롯 개수의 표현 범위이며 실제 동시 접속 용량을 보장하지 않는다. |
-| 접속·IOCP | `ACCEPTEX_COUNT`는 기본 `4` (`1..65535`), `IOCP_WORKER_COUNT`는 기본 `2` (`1..64`), `IOCP_CONCURRENCY`는 기본 `2` (`1..IOCP_WORKER_COUNT`)다. `useZeroCopy`는 이 설정화 범위에 포함하지 않는다. |
-| 콘텐츠 스레드 | `CONTENTS_WORKER_COUNT`는 기본 `2` (`1..64`)다. `maxContentsFps`, `delayFrame`은 후속 설정화 대상이다. |
-| 로그 큐 | `LOG_QUEUE_CAPACITY`는 생산자 스레드당 기본 `1024`건 (`1..1048576`)이다. |
+| `Server:` 리슨 주소·모드 | `IP`, `PORT`, `PACKET_MODE`를 `SServerNetworkSettings`에 담는다. `127.0.0.1` 제한은 채팅 테스트 앱의 정책이다. `Net`은 암호화·체크섬, `Lan`은 평문이다. 준비 로그에도 같은 포트를 사용한다. |
+| `Server:` 세션 슬롯 | `MAX_SESSION_COUNT`는 `1..65535`다. 이 범위는 16비트 슬롯 개수의 표현 범위이며 실제 동시 접속 용량을 보장하지 않는다. |
+| `Server:` 접속·IOCP | `ACCEPTEX_COUNT`는 `1..65535`, `IOCP_WORKER_COUNT`는 `1..64`, `IOCP_CONCURRENCY`는 `1..IOCP_WORKER_COUNT`다. `useZeroCopy`는 파일 설정에 노출하지 않는다. |
+| `Server:` 메트릭 | `METRICS_PORT`와 구체적인 IPv4 주소인 `METRICS_BIND_ADDRESS`는 기존 위치를 유지한다. 포트가 `0`이면 주소도 검증하되 리스너는 기동하지 않는다. |
+| `ContentsRuntime:` | `CONTENTS_WORKER_COUNT`는 `1..64`, `CONTENTS_FPS`는 `1..1000`이다. 런타임 설정 로더가 FPS를 프레임 간격으로 환산한다. |
+| `Logging:` | `LOG_QUEUE_CAPACITY`는 생산자 스레드당 `1..1048576`건, `LOG_POLL_INTERVAL_MS`는 `1..1000`ms다. `CONSOLE_LOG_LEVEL`, `FILE_LOG_LEVEL`은 `Debug`·`Info`·`Error`를 받는다. |
 | Net 패킷 호환 | `packetCode`, `packetKey`는 서버 단독 튜닝 값이 아니다. 설정으로 노출하려면 콘솔·더미도 동일한 값을 사용하게 하고, 서버의 프레이밍·수신 검사·인코딩이 모두 검증된 같은 설정에서 읽도록 연결한다. 그 전에는 기존 공용 값을 유지한다. 키 값은 로그나 실행 요약에 남기지 않는다. |
 
-기본 채팅, 비기본 세션 슬롯·워커·로그 설정, 잘못된 설정의 시작 거부는 x64 Debug·Release 루프백에서 확인했다.
+비기본 세션 슬롯·워커·로그 설정 적용, 키 15개의 개별 누락과 빈 콘텐츠 섹션의 시작 거부, Net/Lan 채팅과 메트릭은 x64 Debug·Release에서 확인했다. 빈 섹션 뒤의 파서 동작 자체는 수정하지 않았다.
 
 ## 4. 구현과 검증 이력
 

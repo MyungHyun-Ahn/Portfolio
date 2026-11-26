@@ -49,6 +49,7 @@
     <ClInclude Include="includes\MHLib\utils\CFileLoader.h" />
     <ClInclude Include="includes\MHLib\utils\CLockGuard.h" />
     <ClInclude Include="includes\MHLib\utils\CLogger.h" />
+    <ClInclude Include="includes\MHLib\utils\SLoggingSettings.h" />
     <ClInclude Include="includes\MHLib\utils\CProfileManager.h" />
     <ClInclude Include="includes\MHLib\utils\CScopedExecutionTimer.h" />
     <ClInclude Include="includes\MHLib\utils\CSingleton.h" />

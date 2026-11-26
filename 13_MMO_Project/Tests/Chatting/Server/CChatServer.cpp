@@ -5,7 +5,6 @@
 #include "CSerializableBuffer.h"
 #include "CRecvBuffer.h"
 #include "CSerializableBufferView.h"
-#include "ServerSetting.h"
 #include "CServer.h"
 #include "IContents.h"
 #include "ContentsHandle.h"
@@ -72,9 +71,9 @@ namespace Chatting
 			errorCode, pMessage != nullptr ? pMessage : L"");
 	}
 
-	void CChatServer::OnServerReady() noexcept
+	void CChatServer::OnServerReady(USHORT port) noexcept
 	{
 		g_pLogger->WriteLog(ELogLevel::Info, L"ChatServer", 0, std::source_location::current(),
-			L"event=server_ready port=%u | 테스트 채팅 서버가 준비되었습니다.", ServerNetworkLib::serverSetting::openPort);
+			L"event=server_ready port=%u | 테스트 채팅 서버가 준비되었습니다.", static_cast<unsigned>(port));
 	}
 }

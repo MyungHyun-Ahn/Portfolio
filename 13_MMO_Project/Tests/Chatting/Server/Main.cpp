@@ -6,10 +6,13 @@
 #include "CSerializableBuffer.h"
 #include "CRecvBuffer.h"
 #include "CSerializableBufferView.h"
-#include "ServerSetting.h"
 #include "CServer.h"
+#include "SServerNetworkSettings.h"
+#include "SContentsRuntimeSettings.h"
+#include "MHLib/utils/SLoggingSettings.h"
+#include "SMetricsSettings.h"
 #include "CommonProtocol.h"
-#include "Config.h"
+#include "ServerConfig.h"
 #include "Console.h"
 #include "IContents.h"
 #include "ContentsHandle.h"
@@ -27,11 +30,14 @@ int main(void)
 	SetConsoleOutputCP(CP_UTF8);
 	SetConsoleCP(CP_UTF8);
 	g_pLogger = MHLib::utils::CLogger::GetInstance();
-	Chatting::SChatConfig config;
-	if (!Chatting::LoadConfig(L"ServerConfig.conf", true, config))
+	ServerNetworkLib::SServerNetworkSettings networkSettings{};
+	ContentsRuntimeLib::SContentsRuntimeSettings contentsConfig{};
+	MHLib::utils::SLoggingSettings loggingConfig{};
+	MetricsLib::SMetricsSettings metricsConfig{};
+	if (!Chatting::LoadServerConfig(L"ServerConfig.conf", networkSettings, contentsConfig, loggingConfig, metricsConfig))
 		return 2;
-	if (!g_pLogger->Start(L"LogFile", config.m_consoleLogLevel, config.m_fileLogLevel,
-		config.m_logPollInterval, static_cast<std::size_t>(config.m_logQueueCapacity)))
+	if (!g_pLogger->Start(L"LogFile", loggingConfig.consoleLevel, loggingConfig.fileLevel,
+		loggingConfig.pollInterval, loggingConfig.queueCapacity))
 	{
 		g_pLogger->WriteLogConsole(ELogLevel::Error, L"CLogger: cannot open the async log file");
 		return 2;
@@ -42,10 +48,10 @@ int main(void)
 	std::optional<MetricsLib::CSystemMetrics> systemMetrics;
 	ServerMetrics::CServerMetrics serverMetrics;
 	Chatting::CChatMetrics chatMetrics;
-	if (config.m_metricsPort != 0)
+	if (metricsConfig.port != 0)
 	{
 		uint16_t boundPort = 0;
-		if (metricsExporter.Start(config.m_metricsBindAddress, config.m_metricsPort, boundPort))
+		if (metricsExporter.Start(metricsConfig.bindAddress, metricsConfig.port, boundPort))
 		{
 			systemMetrics.emplace();
 			g_pLogger->WriteLog(ELogLevel::Info, L"ChatServer", 0, std::source_location::current(),
@@ -55,7 +61,7 @@ int main(void)
 		{
 			g_pLogger->WriteLog(ELogLevel::Error, L"ChatServer", 0, std::source_location::current(),
 				L"event=metrics_start_failed port=%u | 메트릭 리스너를 시작하지 못했습니다. 채팅 서버는 계속 시작합니다.",
-				static_cast<unsigned>(config.m_metricsPort));
+				static_cast<unsigned>(metricsConfig.port));
 		}
 	}
 	const auto stopMetrics = [&metricsExporter, &systemMetrics]
@@ -65,22 +71,14 @@ int main(void)
 		systemMetrics.reset();
 	};
 
-	ServerNetworkLib::serverSetting::openIp = config.m_ip;
-	ServerNetworkLib::serverSetting::openPort = config.m_port;
-	ServerNetworkLib::serverSetting::maxSessionCount = config.m_maxSessionCount;
-	ServerNetworkLib::serverSetting::acceptexCount = config.m_acceptExCount;
-	ServerNetworkLib::serverSetting::iocpWorkerThread = config.m_iocpWorkerCount;
-	ServerNetworkLib::serverSetting::iocpActiveThread = config.m_iocpConcurrency;
-	ServerNetworkLib::serverSetting::packetCode = Chatting::kPacketCode;
 	MHLib::security::CEncryption::sm_packetKey = Chatting::kPacketKey;
 	MHLib::utils::g_pProfileManager = MHLib::utils::CProfileManager::GetInstance();
 	g_pLogger->WriteLog(ELogLevel::Info, L"ChatServer", 0, std::source_location::current(),
-		L"event=server_config acceptex_count=%d iocp_worker_count=%d iocp_concurrency=%d contents_worker_count=%d log_queue_capacity=%d"
-		L" | 서버 시작 설정을 적용했습니다.", config.m_acceptExCount, config.m_iocpWorkerCount, config.m_iocpConcurrency,
-		config.m_contentsWorkerCount, config.m_logQueueCapacity);
+		L"event=server_config acceptex_count=%d iocp_worker_count=%d iocp_concurrency=%d contents_worker_count=%zu log_queue_capacity=%zu"
+		L" | 서버 시작 설정을 적용했습니다.", networkSettings.acceptExCount, networkSettings.iocpWorkerCount,
+		networkSettings.iocpConcurrency, contentsConfig.workerCount, loggingConfig.queueCapacity);
 
-	auto *pServer = new Chatting::CChatServer(static_cast<std::size_t>(config.m_contentsWorkerCount),
-		std::chrono::milliseconds{1000 / config.m_contentsFps});
+	auto *pServer = new Chatting::CChatServer(contentsConfig.workerCount, contentsConfig.frameInterval);
 	if (!pServer->StartContents())
 	{
 		g_pLogger->WriteLog(ELogLevel::Error, L"ChatServer", 0, std::source_location::current(),
@@ -116,7 +114,7 @@ int main(void)
 	std::thread serverThread([&]()
 	{
 		g_pLogger->RegisterLogProducer();
-		isStarted = pServer->Start(config.m_ip.c_str(), config.m_port, config.m_packetMode) != FALSE;
+		isStarted = pServer->Start(networkSettings) != FALSE;
 		isReturned = true;
 	});
 

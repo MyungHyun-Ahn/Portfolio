@@ -99,7 +99,7 @@ namespace Chatting
 	{
 		auto *pMessage = spMessage.GetRealPtr();
 		// 공유하는 송신 버퍼는 큐에 넣기 전에 한 번만 준비한다.
-		NetworkCommonLib::PreparePacket(*pMessage, kPacketCode, m_server.GetPacketMode());
+		NetworkCommonLib::PreparePacket(*pMessage, m_server.GetPacketCode(), m_server.GetPacketMode());
 		int startY = sectorY - kSectorViewStart;
 		int startX = sectorX - kSectorViewStart;
 		for (int y = 0; y < kSectorViewCount; y++)
