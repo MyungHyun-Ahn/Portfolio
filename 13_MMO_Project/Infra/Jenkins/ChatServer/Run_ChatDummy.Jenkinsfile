@@ -67,7 +67,7 @@ $port = $values.PORT
 $listeners = @(Get-NetTCPConnection -State Listen -LocalAddress 127.0.0.1 -LocalPort $port -ErrorAction SilentlyContinue)
 $expected = @($listeners | Where-Object { (Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName -eq 'ChatServer' })
 if ($expected.Count -eq 0) { throw "ChatServer is not listening on 127.0.0.1:$port. Run Run_ChatServer with the same port first." }
-$source = 'C:/MyServer/Portfolio/13_MMO_Project/Build/Release/DummyClient'
+$source = 'C:/MyServer/Portfolio/13_MMO_Project/Build/Client/Release/DummyClient'
 $run = Join-Path $env:WORKSPACE ('dummy-' + $env:BUILD_NUMBER)
 New-Item -Path $run -ItemType Directory | Out-Null
 Copy-Item -LiteralPath (Join-Path $source 'DummyClient.exe'), (Join-Path $source 'DummyClientConfig.conf') -Destination $run

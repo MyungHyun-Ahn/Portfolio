@@ -68,7 +68,7 @@ if ($metricsPort -ne 0) {
     }
     if ($metricsPort -eq $port -and $metricsAddress -eq '127.0.0.1') { throw 'Chat and metrics must not share the same listener address and port.' }
 }
-$source = 'C:/MyServer/Portfolio/13_MMO_Project/Build/Release/ChatServer'
+$source = 'C:/MyServer/Portfolio/13_MMO_Project/Build/Server/Release/ChatServer'
 $run = Join-Path $env:WORKSPACE ('server-' + $env:BUILD_NUMBER)
 if (Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue) { throw "Port $port already has a listener. No process was stopped." }
 New-Item -Path $run -ItemType Directory | Out-Null

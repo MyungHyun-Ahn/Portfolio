@@ -21,7 +21,7 @@ def dummy(base, configuration, label, port, *, has_config=True, encoding="utf-16
     folder = base / label
     folder.mkdir()
     exe = folder / "DummyClient.exe"
-    shutil.copyfile(ROOT / "Build" / configuration / "DummyClient" / exe.name, exe)
+    shutil.copyfile(ROOT / "Build" / "Client" / configuration / "DummyClient" / exe.name, exe)
     network = {"WORKER_COUNT": 1, "RECV_BUFFER_BYTES": 4096, "PACKET_MODE": "Net"}
     settings = {"IP": "127.0.0.1", "PORT": port, "ACCOUNT_BASE": 710001,
                 "RUN_DURATION_MS": 1100, "ACTION_INTERVAL_MS": 40}

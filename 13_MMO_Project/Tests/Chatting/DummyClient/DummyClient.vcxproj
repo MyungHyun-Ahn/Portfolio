@@ -21,7 +21,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup>
-    <OutDir>$(ProjectDir)..\..\..\Build\$(Configuration)\$(ProjectName)\</OutDir>
+    <OutDir>$(ProjectDir)..\..\..\Build\Client\$(Configuration)\$(ProjectName)\</OutDir>
     <IntDir>$(OutDir)obj\</IntDir>
     <LinkIncremental Condition="'$(Configuration)' == 'Debug'">true</LinkIncremental>
     <LinkIncremental Condition="'$(Configuration)' == 'Release'">false</LinkIncremental>

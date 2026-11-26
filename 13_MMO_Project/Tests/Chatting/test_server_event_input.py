@@ -42,7 +42,7 @@ def launch(base, configuration, side, label, port, levels=None, log_interval=Non
            server_options=None, executable_name=None, config_text=None):
     folder = base / label
     folder.mkdir()
-    source = ROOT / "Build" / configuration / f"Chat{side}"
+    source = ROOT / "Build" / side / configuration / f"Chat{side}"
     exe = folder / (executable_name or f"Chat{side}.exe")
     shutil.copyfile(source / f"Chat{side}.exe", exe)
     config = f"{side}Config.conf"

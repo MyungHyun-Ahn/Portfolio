@@ -113,8 +113,9 @@ def main():
         msbuild = Path(env["VSINSTALLDIR"]) / "MSBuild" / "Current" / "Bin" / "MSBuild.exe"
         subprocess.run([str(msbuild), str(SERVER / "ServerNetworkLib.vcxproj"), "/t:Build", "/p:Configuration=Release",
                         "/p:Platform=x64", "/nologo", "/v:minimal"], cwd=ROOT, env=env, check=True, timeout=180)
-        lib_root = ROOT / "Build" / "Release"
-        libraries = [str(lib_root / name / f"{name}.lib") for name in ("ServerNetworkLib", "NetworkCommonLib")]
+        lib_root = ROOT / "Build"
+        libraries = [lib_root / "Server" / "Release" / "ServerNetworkLib" / "ServerNetworkLib.lib",
+                     lib_root / "Common" / "Release" / "NetworkCommonLib" / "NetworkCommonLib.lib"]
         with tempfile.TemporaryDirectory(prefix="run-", dir=build) as run_dir:
             run = Path(run_dir)
             exe = run / "ServerRecvViewMock.exe"

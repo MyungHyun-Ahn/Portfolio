@@ -1,0 +1,6 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <OutDir>$(NativeOutputRoot)\$(MSBuildProjectName)\</OutDir>
+    <IntDir>$(NativeOutputRoot)\obj\$(MSBuildProjectName)\</IntDir>
+  </PropertyGroup>
+</Project>

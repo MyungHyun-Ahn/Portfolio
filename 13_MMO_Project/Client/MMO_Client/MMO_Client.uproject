@@ -5,6 +5,12 @@
 	"Description": "",
 	"Modules": [
 		{
+			"Name": "MMOClientNetwork",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": ["Win64"]
+		},
+		{
 			"Name": "MMO_Client",
 			"Type": "Runtime",
 			"LoadingPhase": "Default",
@@ -14,6 +20,9 @@
 			]
 		}
 	],
+	"PreBuildSteps": {
+		"Win64": ["call \"$(ProjectDir)/Source/MMOClientNetwork/BuildNative.cmd\" || exit /b 1"]
+	},
 	"Plugins": [
 		{
 			"Name": "ModelContextProtocol",

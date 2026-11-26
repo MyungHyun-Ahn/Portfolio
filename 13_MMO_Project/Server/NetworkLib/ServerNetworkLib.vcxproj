@@ -155,7 +155,7 @@
     </Link>
   </ItemDefinitionGroup>
   <PropertyGroup>
-    <OutDir>$(ProjectDir)..\..\Build\$(Configuration)\$(ProjectName)\</OutDir>
+    <OutDir>$(ProjectDir)..\..\Build\Server\$(Configuration)\$(ProjectName)\</OutDir>
     <OutDir Condition="'$(Platform)' == 'Win32'">$(OutDir)Win32\</OutDir>
     <IntDir>$(OutDir)obj\</IntDir>
   </PropertyGroup>
