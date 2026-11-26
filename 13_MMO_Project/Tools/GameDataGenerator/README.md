@@ -44,7 +44,7 @@ CSV는 UTF-8(BOM 없음), 레코드 구분은 CRLF다. 셀 안의 CRLF·CR은 LF
 ## CSV → 구조체와 바이너리
 
 ```text
-dotnet run --project Tools/GameDataGenerator -c Release -- --emit GameData/Csv GameData/Generated PlayerMovement
+dotnet run --project Tools/GameDataGenerator -c Release -- --emit GameData/Csv GameData/Generated Enum Map PlayerMovement
 ```
 
 이 모드에서는 Excel을 열지 않는다. 입력 목록은 확장자를 뺀 CSV 이름으로 명시한다. 여러 테이블과 참조 대상을 함께 선택하며, Enum을 사용하면 목록에 `Enum`도 넣는다. 선택하지 않은 CSV는 읽지 않는다. 검증에 실패하면 쓰기를 시작하지 않는다. 생성 전용 출력 디렉터리를 넘긴다. 현재 출력 목록에 없는 `.h`·`.sdat`·`.cdat` 또는 이전 형식의 `.dat`가 생성 디렉터리에 남아 있으면 새 출력 디렉터리를 요구하며 기존 파일을 자동 삭제하지 않는다.

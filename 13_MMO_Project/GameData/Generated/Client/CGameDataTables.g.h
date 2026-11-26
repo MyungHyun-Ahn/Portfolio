@@ -4,6 +4,7 @@ namespace GameData::Client
 {
 	class CGameDataTables
 	{
+		friend class ::GameData::Client::World::CMapTableBase;
 		friend class ::GameData::Client::Player::CPlayerMovementTableBase;
 
 	public:
@@ -35,6 +36,8 @@ namespace GameData::Client
 			sm_pTables = pTables.get();
 			pTables->m_tables =
 			{{
+				{ "World/Map.cdat",
+					std::make_unique<::GameData::Client::World::CMapTable>() },
 				{ "Player/PlayerMovement.cdat",
 					std::make_unique<::GameData::Client::Player::CPlayerMovementTable>() },
 			}};
@@ -116,9 +119,24 @@ namespace GameData::Client
 		};
 
 		inline static const CGameDataTables* sm_pTables = nullptr;
-		std::array<STableEntry, 1> m_tables{};
+		std::array<STableEntry, 2> m_tables{};
 		bool m_hasLoadedTables = false;
 	};
+}
+
+namespace GameData::Client::World
+{
+	inline const SMapRow* CMapTableBase::Find(std::uint32_t id)
+	{
+		const auto* pTable = static_cast<const CMapTableBase*>(
+			::GameData::Client::CGameDataTables::getTable(0));
+		if (pTable == nullptr)
+		{
+			return nullptr;
+		}
+		const auto iter = pTable->m_rows.find(id);
+		return iter == pTable->m_rows.end() ? nullptr : &iter->second;
+	}
 }
 
 namespace GameData::Client::Player
@@ -126,7 +144,7 @@ namespace GameData::Client::Player
 	inline const SPlayerMovementRow* CPlayerMovementTableBase::Find(std::uint32_t id)
 	{
 		const auto* pTable = static_cast<const CPlayerMovementTableBase*>(
-			::GameData::Client::CGameDataTables::getTable(0));
+			::GameData::Client::CGameDataTables::getTable(1));
 		if (pTable == nullptr)
 		{
 			return nullptr;
