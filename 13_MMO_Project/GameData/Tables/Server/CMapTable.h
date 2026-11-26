@@ -12,11 +12,21 @@ namespace GameData::Server::World
 			return true;
 		}
 
-		// 테이블 규칙을 구현하기 전에는 사용하지 않는다.
+		// 모든 맵의 경계와 스폰 위치를 확인한다.
 		[[nodiscard]]
 		bool Validate() const override
 		{
-			return false;
+			for (const auto& entry : GetRows())
+			{
+				const auto& row = entry.second;
+				if (row.GetMinXCm() >= row.GetMaxXCm() || row.GetMinYCm() >= row.GetMaxYCm() ||
+					row.GetSpawnXCm() < row.GetMinXCm() || row.GetSpawnXCm() > row.GetMaxXCm() ||
+					row.GetSpawnYCm() < row.GetMinYCm() || row.GetSpawnYCm() > row.GetMaxYCm())
+				{
+					return false;
+				}
+			}
+			return true;
 		}
 	};
 }

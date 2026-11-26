@@ -12,11 +12,27 @@ namespace GameData::Client::World
 			return true;
 		}
 
-		// 테이블 규칙을 구현하기 전에는 사용하지 않는다.
+		// 프로젝트 레벨의 패키지 경로 형식을 확인한다.
 		[[nodiscard]]
 		bool Validate() const override
 		{
-			return false;
+			for (const auto& entry : GetRows())
+			{
+				const auto& path = entry.second.GetLevelAssetPath();
+				if (!path.starts_with("/Game/") || path.back() == '/' || path.find("//") != path.npos ||
+					path.find_first_of("\\.:*?\"<>|' ,&!~@#(){}[]=;^%$`") != path.npos)
+				{
+					return false;
+				}
+				for (const unsigned char ch : path)
+				{
+					if (ch < 32 || ch == 127)
+					{
+						return false;
+					}
+				}
+			}
+			return true;
 		}
 	};
 }

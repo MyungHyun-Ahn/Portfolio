@@ -337,16 +337,53 @@ class CsvToArtifactsTests(unittest.TestCase):
             (self.root / f'{name}.sdat').write_bytes(contents)
         (self.root / 'empty.sdat').write_bytes(server[:count_offset] + struct.pack('<I', 0))
 
+        exe = self.build_reader('PlayerMovementReaderTests', self.output)
+        self.run_reader(exe)
+
+    def build_reader(self, name, generated):
         common = ROOT / 'Common'
-        fixture = Path(__file__).with_name('PlayerMovementReaderTests.cpp')
+        fixture = Path(__file__).with_name(f'{name}.cpp')
         reader = common / 'GameData/CGameDataReader.cpp'
         result = subprocess.run(['cl.exe', '/nologo', '/std:c++20', '/EHsc', '/utf-8', '/W4', '/WX',
                                  '/DUNICODE', '/D_UNICODE', f'/external:I{ROOT / "Server/MHLib/includes"}', '/external:W3',
-                                 '/Fe:PlayerMovementReaderTests.exe', f'/I{self.output}', f'/I{common}', f'/I{ROOT / "GameData"}',
+                                 f'/Fe:{name}.exe', f'/I{generated}', f'/I{common}', f'/I{ROOT / "GameData"}',
                                  str(fixture), str(reader)], cwd=self.root, capture_output=True, timeout=45)
         self.assertEqual(result.returncode, 0, (result.stdout, result.stderr))
-        result = subprocess.run([self.root / 'PlayerMovementReaderTests.exe'], cwd=self.root, capture_output=True, timeout=20)
-        self.assertEqual(result.returncode, 0, f'Native reader case {result.returncode}: {result.stdout!r} {result.stderr!r}')
+        return self.root / f'{name}.exe'
+
+    def run_reader(self, exe, *args):
+        result = subprocess.run([exe, *args], cwd=self.root, capture_output=True, timeout=20)
+        self.assertEqual(result.returncode, 0, f'{exe.name} {args}: {result.stdout!r} {result.stderr!r}')
+
+    @unittest.skipUnless(os.environ.get('GAME_DATA_TEST_MSVC') == '1', 'requires the MSVC x64 environment')
+    def test_cpp_map_load_and_validation(self):
+        generated = ROOT / 'GameData/Generated'
+        exe = self.build_reader('MapReaderTests', generated)
+        self.run_reader(exe, generated / 'Data')
+
+        for name in ('Map', 'Enum'):
+            (self.input / f'{name}.csv').write_bytes((ROOT / f'GameData/Csv/{name}.csv').read_bytes())
+        with (self.input / 'Map.csv').open(encoding='utf-8', newline='') as source:
+            rows = list(csv.reader(source))
+        fields = rows[-2]
+        for target, changes, valid in (
+                ('Server', {'SpawnXCm': '-5000', 'SpawnYCm': '5000'}, True),
+                ('Server', {'SpawnXCm': '5000', 'SpawnYCm': '-5000'}, True),
+                ('Server', {'MinXCm': '5001'}, False), ('Server', {'MaxYCm': '-5000'}, False),
+                ('Server', {'SpawnXCm': '-5001'}, False), ('Server', {'SpawnXCm': '5001'}, False),
+                ('Server', {'SpawnYCm': '-5001'}, False), ('Server', {'SpawnYCm': '5001'}, False),
+                ('Client', {'LevelAssetPath': '/Game/World/Town_2'}, True),
+                ('Client', {'LevelAssetPath': 'World/Town'}, False),
+                ('Client', {'LevelAssetPath': '/Game/'}, False),
+                ('Client', {'LevelAssetPath': '/Game//Town'}, False),
+                ('Client', {'LevelAssetPath': '/Game/World/Town.umap'}, False)):
+            with self.subTest(target=target, changes=changes):
+                second = rows[-1].copy()
+                for field, value in {'MapId': '2', **changes}.items():
+                    second[fields.index(field)] = value
+                write_csv(self.input / 'Map.csv', [*rows, second])
+                self.run_emit('Enum', 'Map', 'PlayerMovement')
+                self.run_reader(exe, self.output / 'Data' / target, target, 'valid' if valid else 'invalid')
 
     def test_array_enum_string_and_optional_values_have_explicit_encoding(self):
         write_csv(self.input / 'Enum.csv', [['Type', 'Name', 'Value'], ['DamageType', 'Fire', '9'], ['DamageType', 'Ice', '2']])
