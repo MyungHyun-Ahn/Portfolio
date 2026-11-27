@@ -1,0 +1,8 @@
+table: characters
+record: SDbCharacter
+options: { engine: InnoDB, charset: utf8mb4, collation: utf8mb4_bin }
+columns:
+  - { name: character_id, field: m_characterId, cpp_type: uint64, mysql_type: "BIGINT UNSIGNED", nullable: false }
+  - { name: account_id, field: m_accountId, cpp_type: uint64, mysql_type: "BIGINT UNSIGNED", nullable: false }
+  - { name: last_logout_map, field: m_lastLogoutMap, cpp_type: uint32, mysql_type: "INT UNSIGNED", nullable: true, default: null }
+primary_key: [character_id]

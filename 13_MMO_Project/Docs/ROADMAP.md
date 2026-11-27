@@ -2,12 +2,12 @@
 
 서버와 클라이언트 작업을 기능 단위로 묶어 아래 순서대로 하나씩 진행한다. 단계별 목적과 완료 조건, 책임 경계는 [마일스톤](MILESTONES.md)에 둔다.
 
-**지금 할 일: 1차를 마무리할 `SDbCharacter` 헤더 생성과 컴파일 확인.**
+**1차 완료. 다음 작업: 2차에서 `SCharacterData`를 담은 패킷의 송수신 왕복 확인.**
 
 ## 1. 게임 서버 기반 마련
 
 - [x] 채팅 서버 시작·종료와 콘솔 두 개의 양방향 채팅 검증. 네트워크·패킷 처리·`ContentsRuntime` 기반은 [완료 기록](#완료된-작업)에 모았다.
-- [ ] `GameDB/Player/Character.yaml`에서 서버 전용 `SDbCharacter` 헤더를 생성하고 C++에서 컴파일한다. [DBGenerator 계획](Plan/Server/015_캐릭터_저장_구조와_DBGenerator_계획.md)의 헤더 생성 범위만 진행한다. **DDL 생성·적용과 DB 접속은 4차다.**
+- [x] `GameDB/Player/Character.yaml`에서 서버 전용 `SDbCharacter.h` 생성과 C++20 컴파일을 확인했다. [DBGenerator 검증 결과](Plan/Server/015_캐릭터_저장_구조와_DBGenerator_계획.md#구현-순서와-완료-기준). **DDL 생성·적용과 DB 접속은 4차다.**
 
 ## 2. 캐릭터 맵 입장과 이동 동기화
 

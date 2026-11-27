@@ -16,10 +16,10 @@
 | 구분 | 규칙 | 캐릭터 예시 |
 |---|---|---|
 | 저장 스키마 YAML | `YamlSchema/{논리DB}/{카테고리}/{파일}.yaml` | `YamlSchema/GameDB/Player/Character.yaml` |
-| 생성 헤더 | `Generated/Server/{논리DB}/{카테고리}/{파일}.h` — YAML의 논리 DB·카테고리·파일명을 유지하고 확장자만 `.h`로 바꾼다. | `Generated/Server/GameDB/Player/Character.h` |
+| 생성 헤더 | `Generated/Server/{논리DB}/{카테고리}/{record}.h` — YAML의 논리 DB·카테고리를 유지하고 파일명은 `record`를 사용한다. | `Generated/Server/GameDB/Player/SDbCharacter.h` |
 | 저장용 C++ 구조체 | `SDb{이름}` — YAML의 `record` 값을 헤더 내부의 타입 이름으로 사용한다. | `record: SDbCharacter` → `struct SDbCharacter` |
 
-`SDb` 접두사는 **구조체 이름**에 붙이며, 생성 헤더의 파일명을 `SDbCharacter.h`로 바꾸지 않는다. 아래는 1차 배치 예시다.
+`SDb` 접두사는 구조체와 생성 헤더에 함께 쓰인다. 원본 YAML의 파일명과 SQL의 테이블명은 별개다. C++ 네임스페이스는 `Database::{논리DB}::{카테고리}`로 구분한다.
 
 ```text
 Database/
@@ -32,7 +32,7 @@ Database/
 │   ├── Server/
 │   │   └── GameDB/
 │   │       └── Player/
-│   │           └── Character.h     # SDbCharacter 선언
+│   │           └── SDbCharacter.h  # SDbCharacter 선언
 │   └── Sql/
 │       ├── YYMMDD_HHMMSS_DDL.sql    # 오프라인 초기 DDL 초안
 │       └── Patches/
@@ -93,9 +93,9 @@ flowchart LR
     T -->|전송 타입| R
 ```
 
-## YAML 초안
+## 저장 YAML
 
-아래는 `Database/YamlSchema/GameDB/Player/Character.yaml`의 설명용 예시다. 실제 키 이름은 1단계에서 확정한다. YAML에는 컬럼명, C++ 이름·타입, MySQL 타입, `NULL` 허용 여부와 기본값 정책, 숫자 PK를 명시한다. 테이블 엔진·문자셋·콜레이션은 명시한 값을 초기 DDL과 YAML 기준 비교에 똑같이 사용하고 배포 환경의 기본값에 의존하지 않는다. 보조 인덱스는 조회 요건이 있을 때 명시하며, 생략은 보조 인덱스가 없다는 뜻이다.
+아래는 1차의 실제 입력 `Database/YamlSchema/GameDB/Player/Character.yaml`이다. YAML에는 컬럼명, C++ 이름·타입, MySQL 타입, `NULL` 허용 여부와 기본값 정책, 숫자 PK를 명시한다. 4차의 초기 DDL과 YAML 기준 비교는 명시한 엔진·문자셋·콜레이션을 공통으로 사용한다. 보조 인덱스는 1차에서 지원하지 않고, 이후 조회 요건이 생길 때 선언한다.
 
 ```yaml
 table: characters
@@ -111,6 +111,7 @@ primary_key: [character_id]
 - `nullable: true`는 C++에서 `std::optional`로 대응한다. 이 예시에서 저장 맵 없음은 DB에서 `NULL`, `ResLogin`에서는 기존 입장 계약대로 `0`이다. MySQL 컬럼에는 별도 `0` 기본값을 넣지 않는다.
 - 캐릭터 ID 발급 방식은 별도로 정한다. 1차에는 `AccountId`만 보관하고 `AccountDB`를 직접 참조하는 스키마 간 FK는 추가하지 않는다. 계정과 캐릭터의 소유 관계는 실제 로그인·DB 연동 단계에서 검증한다. `LastLogoutMap`이 실제로 입장 가능한지는 DB 제약이 아니라 Hub가 게임 데이터 `Map`으로 판단한다.
 - 중복 YAML 키·컬럼명·C++ 필드명, 알 수 없는 키나 지원하지 않는 타입, C++/MySQL 범위 불일치, 필수 키 누락, 존재하지 않거나 nullable인 PK 컬럼, 잘못된 기본값을 거절한다. MySQL 타입은 지원 목록으로 해석하며 YAML 값을 임의 SQL 조각으로 붙이지 않는다. 오류가 있으면 어느 산출물도 바꾸지 않고, 동일 입력의 재생성 결과는 같아야 한다.
+- 1차 CLI 실행 및 검증 방법은 [DBGenerator 사용법](../../../Tools/DBGenerator/README.md)을 따른다.
 
 ## SQL 생성과 적용
 
@@ -152,9 +153,9 @@ MySQL 참고: [CREATE TABLE](https://dev.mysql.com/doc/refman/8.4/en/create-tabl
 
 ## 구현 순서와 완료 기준
 
-한 항목을 확인한 뒤 다음으로 넘어간다. 아래 검증은 아직 실행하지 않았다.
+한 항목을 확인한 뒤 다음으로 넘어간다. 1번만 구현·검증했으며, 이후 항목은 아직 실행하지 않았다.
 
-1. [ ] **1차 — 저장 구조체 헤더 생성:** `AccountDB`·`GameDB`로 입력 경로를 나눈다. `Database/YamlSchema/GameDB/Player/Character.yaml`에서 `Database/Generated/Server/GameDB/Player/Character.h`를 생성해 C++에서 컴파일한다. 같은 입력이면 헤더 바이트가 같고 잘못된 입력은 기존 산출물을 바꾸지 않아야 한다. 패킷 YAML, DDL 생성·적용, DB 접속은 필요하지 않다.
+1. [x] **1차 — 저장 구조체 헤더 생성:** `AccountDB`·`GameDB`로 입력 경로를 나눴다. `Database/YamlSchema/GameDB/Player/Character.yaml`에서 `Database/Generated/Server/GameDB/Player/SDbCharacter.h`를 생성하고 MSVC v145 x64에서 C++20 `/W4 /WX`로 검증 소스를 컴파일했다. [생성기 회귀 테스트](../../../Tests/DBGenerator/test_generator.py) 12개가 통과했고, 같은 입력의 헤더 바이트 일치와 잘못된 입력·교체 실패 시 기존 헤더 보존을 확인했다. 패킷 YAML, DDL 생성·적용, DB 접속은 사용하지 않았다.
 2. [ ] **2차 — 캐릭터 공개 데이터의 패킷 왕복:** `SCharacterData`를 별도 선언하고 `ResLogin`에 값으로 담도록 `PacketGenerator`를 확장한다. 독립 구조체에 패킷 ID가 없고, 정상 맵 값과 없음(`0`)이 송신과 수신 `View`에서 일치하며, 중첩 값이 잘린 입력은 거절하는지 확인한다. 기존 채팅·고정 맵 패킷의 생성 결과는 그대로여야 한다. 이 시험은 저장 구조체나 DB에 의존하지 않는다.
 3. [ ] **2차 — 공개 값 변환 함수 생성:** 두 YAML에서 `ToCharacterData`를 생성한다. 정상 맵 값과 `NULL → 0`, `AccountId` 제외를 확인한다. 저장 필드를 추가해도 패킷이나 변환 결과가 자동으로 바뀌지 않아야 한다. 매핑 누락·중복·타입 불일치 또는 `NULL` 규칙 누락은 거절하고 기존 변환 산출물을 보존한다.
 4. [ ] **2차 — 로그인 성공 시 소유권 인수:** [첫 게임 서버 로그인](014_월드_이동과_초기_동기화.md#첫-게임-서버-로그인)에 따라 시험에서 준비한 `SDbCharacter` 조회 결과를 Hub가 받아 `CCharacter`를 한 번 생성한다. `CCharacter`가 저장 구조체를 단독 소유한 뒤 생성한 함수로 만든 공개 값만 응답에 담는다. 중복·실패·단절 뒤 늦은 결과는 객체를 추가 생성하지 않으며 로그인만으로 맵을 예약하지 않는다. 제품 인증 우회는 넣지 않는다.

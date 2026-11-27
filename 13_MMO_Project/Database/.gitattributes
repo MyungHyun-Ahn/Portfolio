@@ -1,0 +1,2 @@
+# 생성기와 체크아웃의 헤더 바이트를 동일하게 유지한다.
+Generated/Server/**/*.h text eol=lf
