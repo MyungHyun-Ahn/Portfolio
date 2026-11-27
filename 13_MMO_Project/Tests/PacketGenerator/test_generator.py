@@ -32,6 +32,10 @@ NESTED_LOGIN = '''packets:
       - {name: character_data, type: CharacterData}
       - {name: suffix, type: uint16}
 '''
+RESULT_ENUM = '''Type,Name,Value
+EResultCode,Success,0
+EResultCode,Rejected,1
+'''
 
 
 class GeneratorTests(unittest.TestCase):
@@ -85,13 +89,16 @@ class GeneratorTests(unittest.TestCase):
         self.assertIn('struct namespace', result.stderr)
         self.assertFalse(self.common.exists())
 
-    def generate_nested_login(self):
+    def generate_nested_login(self, *, typed_result=False):
         character = self.schema / 'Player/CharacterData.yaml'
         character.parent.mkdir()
         shutil.copyfile(ROOT / 'Common/Packet/Game/Schema/Player/CharacterData.yaml', character)
         login = self.schema / 'Login/Login.yaml'
         login.parent.mkdir()
-        login.write_text(NESTED_LOGIN, encoding='utf-8')
+        login_schema = NESTED_LOGIN
+        if typed_result:
+            login_schema = login_schema.replace('result, type: uint8', "result, type: 'enum:EResultCode', wire: uint8")
+        login.write_text(login_schema, encoding='utf-8')
         self.assert_generated(self.generate(namespace='Game', client_class='GameClient'))
 
     def test_packet_nests_registered_value_from_another_group(self):
@@ -107,19 +114,54 @@ class GeneratorTests(unittest.TestCase):
         self.assertIn('struct SCharacterData;', sender)
         self.assertIn('const SCharacterData &characterData', sender)
 
+    def test_packet_result_is_a_registered_enum(self):
+        self.generate_nested_login(typed_result=True)
+        header = (self.common / 'Login/Login.g.h').read_text(encoding='utf-8')
+        self.assertIn('::GameData::EResultCode m_result{};', header)
+        self.assertIn('::GameData::EResultCode::Success', header)
+        self.assertIn('::GameData::EResultCode::Rejected', header)
+        self.assertNotIn('enum class EResultCode', header)
+        self.assertIn('static_cast<std::uint8_t>(m_result)', header)
+        self.assertIn('EResultCode result', (self.server / 'ServerPacketSend.g.h').read_text(encoding='utf-8'))
+        aggregate = (self.common / 'Login/LoginPacketAll.g.h').read_text(encoding='utf-8')
+        self.assertLess(aggregate.index('"GameDataEnums.h"'), aggregate.index('"Login.g.h"'))
+
+    def test_invalid_enum_values_preserve_outputs(self):
+        self.generate_nested_login(typed_result=True)
+        before = {p: p.read_bytes() for p in self.common.rglob('*') if p.is_file()}
+        for invalid in ('256', '-1', 'true', '0'):
+            with self.subTest(value=invalid):
+                catalog = self.root / 'Enum.csv'
+                catalog.write_text(RESULT_ENUM.replace('Rejected,1', f'Rejected,{invalid}'), encoding='utf-8')
+                result = self.generate(namespace='Game', client_class='GameClient', extra=('--enum-csv', str(catalog)))
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('enum value', result.stderr)
+                self.assertEqual({p: p.read_bytes() for p in self.common.rglob('*') if p.is_file()}, before)
+
     @unittest.skipUnless(os.name == 'nt' and os.environ.get('PACKET_GENERATOR_NATIVE_TESTS') == '1',
                          'requires x64 Native Tools and the Release NetworkCommonLib archive')
     def test_nested_login_native_round_trip(self):
         self.generate_nested_login()
+        self.check_native_round_trip('NestedLoginRoundTrip')
+
+    @unittest.skipUnless(os.name == 'nt' and os.environ.get('PACKET_GENERATOR_NATIVE_TESTS') == '1',
+                         'requires x64 Native Tools and the Release NetworkCommonLib archive')
+    def test_game_login_packet_native_round_trip(self):
+        schema = ROOT / 'Common/Packet/Game/Schema'
+        self.assert_generated(self.generate(schema=schema, namespace='Game', client_class='GameClient'))
+        self.check_native_round_trip('GameLoginPacketTests')
+
+    def check_native_round_trip(self, name):
         library = ROOT / 'Build/Common/Release/NetworkCommonLib/NetworkCommonLib.lib'
         self.assertTrue(library.is_file(), f'build x64 Release NetworkCommonLib first: {library}')
-        includes = [ROOT / 'Server/GameServer', ROOT / 'Server/MHLib/includes', ROOT / 'Common/NetworkCommon',
-                    self.common, self.client, self.server]
+        (self.root / 'pch.h').write_text('#pragma once\n', encoding='utf-8')
+        includes = [self.root, ROOT / 'Server/MHLib/includes', ROOT / 'Common/NetworkCommon',
+                    ROOT / 'GameData/Generated/Common', self.common, self.client, self.server]
         compiler = ['cl.exe', '/nologo', '/std:c++20', '/permissive-', '/utf-8', '/W3', '/WX', '/EHsc',
                     '/MD', '/DNDEBUG', '/DUNICODE', '/D_UNICODE', *(f'/I{path}' for path in includes)]
-        executable = self.root / 'NestedLoginRoundTrip.exe'
+        executable = self.root / f'{name}.exe'
         self.assert_generated(subprocess.run([
-            *compiler, f'/Fe{executable}', str(ROOT / 'Tests/PacketGenerator/NestedLoginRoundTrip.cpp'),
+            *compiler, f'/Fe{executable}', str(ROOT / 'Tests/PacketGenerator' / f'{name}.cpp'),
             str(self.client / 'ClientPacketDispatch.g.cpp'), str(library),
         ], cwd=self.root, capture_output=True, text=True, errors='replace', check=False))
         self.assert_generated(subprocess.run([str(executable)], cwd=self.root, capture_output=True, text=True, timeout=30))

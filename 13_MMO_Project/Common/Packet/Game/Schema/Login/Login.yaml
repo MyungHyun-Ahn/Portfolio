@@ -1,0 +1,12 @@
+packets:
+  - name: ReqLogin
+    kind: req
+    id: 1
+    fields:
+      - {name: login_id, type: utf16}
+  - name: ResLogin
+    kind: res
+    id: 2
+    fields:
+      - {name: result, type: 'enum:EResultCode', wire: uint8}
+      - {name: character_data, type: CharacterData}

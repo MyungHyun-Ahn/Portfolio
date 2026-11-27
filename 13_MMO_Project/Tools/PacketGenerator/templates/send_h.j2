@@ -4,6 +4,15 @@
 #include "IClientPacketHandler.g.h"
 {% endif %}
 
+{% if enum_types %}
+namespace GameData
+{
+{% for type in enum_types %}
+	enum class {{ type }} : std::uint32_t;
+{% endfor %}
+}
+
+{% endif %}
 namespace {{ namespace }}
 {
 {% for type in struct_types %}

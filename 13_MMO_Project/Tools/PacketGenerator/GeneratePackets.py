@@ -1,4 +1,5 @@
 import argparse
+import csv
 import hashlib
 import json
 import os
@@ -124,8 +125,31 @@ def integer(value, minimum, maximum):
     return type(value) is int and minimum <= value <= maximum
 
 
-def parse_field(value, struct_headers):
-    value = mapping(value, ('name', 'type'), ('bytes', 'code_units'))
+def read_enum_values(path, name):
+    values, numbers = {}, set()
+    with path.open(encoding='utf-8', newline='') as stream:
+        rows = csv.reader(stream)
+        if next(rows, None) != ['Type', 'Name', 'Value']:
+            raise GenerationError(f'{path}: expected Enum.csv header Type,Name,Value')
+        for row in rows:
+            if len(row) != 3:
+                raise GenerationError(f'{path}:{rows.line_num}: invalid enum row')
+            enum_name, member, code = row
+            if enum_name != name:
+                continue
+            if (not re.fullmatch(r'[A-Za-z][A-Za-z0-9_]{0,79}', member) or member in CPP_PARAMETER_RESERVED or
+                    member == name or member in values or not re.fullmatch(r'[0-9]{1,3}', code) or
+                    int(code) > 255 or int(code) in numbers):
+                raise GenerationError(f'{path}:{rows.line_num}: invalid or duplicate uint8 enum value for {name}')
+            values[member] = int(code)
+            numbers.add(int(code))
+    if not values:
+        raise GenerationError(f'{path}: unknown GameData enum {name!r}')
+    return values
+
+
+def parse_field(value, struct_headers, enum_csv):
+    value = mapping(value, ('name', 'type'), ('bytes', 'code_units', 'wire'))
     name, field_type = value['name'], value['type']
     if not isinstance(name, str) or not FIELD_NAME.fullmatch(name) or len(name) > 80:
         raise GenerationError(f'invalid field name: {name!r}')
@@ -133,6 +157,14 @@ def parse_field(value, struct_headers):
     member = 'm_' + first + ''.join(word.capitalize() for word in words)
     if not isinstance(field_type, str):
         raise GenerationError(f'unsupported type for {name}')
+    if field_type.startswith('enum:'):
+        mapping(value, ('name', 'type', 'wire'))
+        enum_name = field_type.removeprefix('enum:')
+        check_name(enum_name, 'GameData enum name')
+        if value['wire'] != 'uint8':
+            raise GenerationError(f'{name}.wire must be uint8')
+        return dict(member=member, cpp_type=f'::GameData::{enum_name}', copy_by_ref=False, field_type=field_type,
+                    enum_name=enum_name, enum_values=read_enum_values(enum_csv, enum_name))
     if field_type in FIXED_TYPES:
         scalar, size_key = FIXED_TYPES[field_type]
         mapping(value, ('name', 'type', size_key))
@@ -154,7 +186,7 @@ def parse_field(value, struct_headers):
     return dict(member=member, cpp_type=cpp_type, copy_by_ref=field_type not in INTEGER_TYPES, field_type=field_type)
 
 
-def parse_packet(value, struct_headers):
+def parse_packet(value, struct_headers, enum_csv):
     value = mapping(value, ('name', 'id', 'kind', 'fields'), ('direction',))
     name, packet_id, kind = value['name'], value['id'], value['kind']
     check_packet_name(name, 'packet name')
@@ -170,7 +202,7 @@ def parse_packet(value, struct_headers):
     else:
         mapping(value, ('name', 'id', 'kind', 'fields'))
         direction = DIRECTIONS[kind]
-    fields = [parse_field(field, struct_headers) for field in sequence(value['fields'])]
+    fields = [parse_field(field, struct_headers, enum_csv) for field in sequence(value['fields'])]
     if len({field['member'] for field in fields}) != len(fields):
         raise GenerationError(f'{name}: duplicate field')
     set_send_parameters(fields)
@@ -191,7 +223,7 @@ def is_link(path):
     return stat.S_ISLNK(info.st_mode) or bool(getattr(info, 'st_file_attributes', 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT)
 
 
-def load_protocol(root, namespace):
+def load_protocol(root, namespace, enum_csv):
     files = []
     for path in sorted(root.rglob('*'), key=lambda path: (str(path).casefold(), str(path))):
         if is_link(path):
@@ -255,11 +287,11 @@ def load_protocol(root, namespace):
                     error = f'invalid YAML (line {mark.line + 1})' if mark else 'invalid YAML'
                 raise GenerationError(f'{path}: {error}') from None
 
-    # 구조체를 먼저 등록해 YAML 파일의 순서나 콘텐츠 위치에 의존하지 않게 한다.
+    # 공용 타입을 먼저 등록해 YAML 파일의 순서나 콘텐츠 위치에 의존하지 않게 한다.
     for group, output, path, document in packet_sources:
         try:
             document = mapping(document, ('packets',), ('reserved',))
-            local = [parse_packet(value, struct_headers) for value in sequence(document['packets'])]
+            local = [parse_packet(value, struct_headers, enum_csv) for value in sequence(document['packets'])]
             kinds = {packet['kind'] for packet in local}
             if len(kinds) != len(local):
                 raise GenerationError('duplicate kind')
@@ -301,10 +333,12 @@ def render_protocol(contents, packets, reserved, namespace, client_class, member
     for group, headers in contents.items():
         aggregator = f'{group}/{group}PacketAll.g.h'
         includes.append(aggregator)
-        dependencies = [field['struct_header'] for local in headers.values() for dto in local
-                        for field in dto['fields'] if 'struct_header' in field]
+        fields = [field for local in headers.values() for dto in local for field in dto['fields']]
+        dependencies = [field['struct_header'] for field in fields if 'struct_header' in field]
         ordered = dict.fromkeys([*dependencies, *headers])
         local_includes = [name.split('/')[1] if name.startswith(f'{group}/') else f'../{name}' for name in ordered]
+        if any('enum_name' in field for field in fields):
+            local_includes.insert(0, 'GameDataEnums.h')
         common[aggregator] = render('includes.j2', includes=local_includes)
         common.update({name: render('structs.j2', packets=local) for name, local in headers.items()})
     common['IncludePacketAll.g.h'] = render('includes.j2', includes=includes)
@@ -316,8 +350,10 @@ def render_protocol(contents, packets, reserved, namespace, client_class, member
         receive = [packet for packet in packets if packet['direction'] != send_direction]
         send_stem = client_class if side == 'Client' else 'ServerPacketSend'
         struct_types = dict.fromkeys(field['cpp_type'] for packet in send for field in packet['fields'] if 'struct_header' in field)
+        enum_types = dict.fromkeys(field['enum_name'] for packet in send for field in packet['fields'] if 'enum_name' in field)
         sides.append({f'{send_stem}.g.{ext}': render(f'send_{ext}.j2', side=side, packets=send,
-                                                   receive=receive, send_stem=send_stem, struct_types=struct_types)
+                                                   receive=receive, send_stem=send_stem,
+                                                   struct_types=struct_types, enum_types=enum_types)
                       for ext in ('h', 'cpp')} |
                      {f'{side}PacketDispatch.g.{ext}': render(f'dispatch_{ext}.j2', side=side, packets=receive,
                                                                table_size=max((p['id'] for p in receive), default=0) + 1)
@@ -440,7 +476,7 @@ def create_client_members(path):
         file.write(data)
 
 
-def generate(schema, common, client, server, namespace, client_class, client_members=None):
+def generate(schema, common, client, server, namespace, client_class, client_members=None, enum_csv=None):
     check_packet_name(namespace, 'namespace')
     check_packet_name(client_class, 'client class')
     if client_class.casefold() in {'clientpacketdispatch', 'cclientpacketdispatch', 'iserverpackethandler',
@@ -465,7 +501,8 @@ def generate(schema, common, client, server, namespace, client_class, client_mem
         client_members = client_members.resolve()
         if client_members.is_dir() or any(client_members.is_relative_to(root) for root in paths):
             raise GenerationError(f'client members must be outside generation roots: {client_members}')
-    contents, packets, reserved = load_protocol(paths[0], namespace)
+    enum_csv = enum_csv or Path(__file__).resolve().parents[2] / 'GameData/Csv/Enum.csv'
+    contents, packets, reserved = load_protocol(paths[0], namespace, enum_csv)
     if any(client_class == f"S{dto['name']}" for headers in contents.values() for local in headers.values() for dto in local):
         raise GenerationError(f'client class collides with packet DTO: {client_class}')
     outputs = render_protocol(contents, packets, reserved, namespace, client_class,
@@ -484,10 +521,11 @@ def main():
     parser.add_argument('--namespace', required=True)
     parser.add_argument('--client-class', required=True)
     parser.add_argument('--client-members-out', type=Path, help='Create the handwritten client scaffold if missing.')
+    parser.add_argument('--enum-csv', type=Path, help='Use this generated GameData enum catalog instead of the project default.')
     args = parser.parse_args()
     try:
         generate(args.schema_dir, args.common_out, args.client_out, args.server_out,
-                 args.namespace, args.client_class, args.client_members_out)
+                 args.namespace, args.client_class, args.client_members_out, args.enum_csv)
     except (GenerationError, OSError) as error:
         parser.exit(1, f'Packet generator: {error}\n')
 

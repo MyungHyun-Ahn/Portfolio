@@ -1,6 +1,9 @@
 {
   "files": {
-    "IncludePacketAll.g.h": "5a9d96984c03556c97be64d27e1d655ab707dd129a0639bfb711e8c791a0bc8f",
+    "IncludePacketAll.g.h": "5d1f1ee7a1cc92f471958250b278fcc5a2c09ee96920a762d179c6aedb1b6d1f",
+    "Login/Login.g.h": "5643950ce298c31858b1a920546a663d3485532512f215a2ec42bcce52bd5ce8",
+    "Login/LoginPacketAll.g.h": "a31d7891a0584676f30dc1b32f6d502cf195f8af201385dd2a5b12858287a3a0",
+    "PacketTypes.g.h": "4f641d1d769b7bb81ac15267d447873416d2d89e6e17fb621b4ca47a6eba9f8e",
     "Player/CharacterData.g.h": "dc5b50a0829defe86b694a4749e78fcdb7804ceec15b01bfee3b39753e4e5bb3",
     "Player/PlayerPacketAll.g.h": "84d119adec05745bb74b86d3db8e34382b973c6991a2f9414349428cd90a9d6b"
   },

@@ -1,0 +1,11 @@
+{
+  "files": {
+    "ClientPacketDispatch.g.cpp": "52562136770cd6f6b561c5845e5ec6d23b7c7a73a545924a7eaff104240f2a49",
+    "ClientPacketDispatch.g.h": "24d63db88b6c7bed4e2e7133ae61787ca1b4dee3eb5959cb772de2cd3470e9e9",
+    "GameClient.g.cpp": "0528a4d003b2fdce2fbaf84e7e1f29232f3394324326476967af91f381dfadab",
+    "GameClient.g.h": "dca6c304c7e58bbda22e3b9710faab1f5b712bd4835def2f0419eaebdb6eefed",
+    "IClientPacketHandler.g.h": "f9bd2e274c5c0d5e26521cc45ceb106a1fe2042791874354a8466b82f820fe09"
+  },
+  "role": "Client",
+  "version": 1
+}
