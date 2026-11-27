@@ -1,0 +1,6 @@
+struct:
+  name: CharacterData
+  namespace: Game
+  fields:
+    - {name: character_id, type: uint64}
+    - {name: last_logout_map, type: uint32}

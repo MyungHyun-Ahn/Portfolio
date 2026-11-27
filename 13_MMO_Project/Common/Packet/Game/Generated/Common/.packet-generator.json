@@ -1,0 +1,9 @@
+{
+  "files": {
+    "IncludePacketAll.g.h": "5a9d96984c03556c97be64d27e1d655ab707dd129a0639bfb711e8c791a0bc8f",
+    "Player/CharacterData.g.h": "dc5b50a0829defe86b694a4749e78fcdb7804ceec15b01bfee3b39753e4e5bb3",
+    "Player/PlayerPacketAll.g.h": "84d119adec05745bb74b86d3db8e34382b973c6991a2f9414349428cd90a9d6b"
+  },
+  "role": "Common",
+  "version": 1
+}

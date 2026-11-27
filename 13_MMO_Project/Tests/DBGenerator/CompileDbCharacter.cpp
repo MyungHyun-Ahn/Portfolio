@@ -3,7 +3,7 @@
 #include <optional>
 #include <type_traits>
 
-#include "../../Database/Generated/Server/GameDB/Player/SDbCharacter.h"
+#include "../../Database/Generated/Server/IncludeDbAll.h"
 
 using Database::GameDB::Player::SDbCharacter;
 

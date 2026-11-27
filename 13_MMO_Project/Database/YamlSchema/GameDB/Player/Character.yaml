@@ -6,3 +6,8 @@ columns:
   - { name: account_id, field: m_accountId, cpp_type: uint64, mysql_type: "BIGINT UNSIGNED", nullable: false }
   - { name: last_logout_map, field: m_lastLogoutMap, cpp_type: uint32, mysql_type: "INT UNSIGNED", nullable: true, default: null }
 primary_key: [character_id]
+projection:
+  schema: Game/Player/CharacterData.yaml
+  fields:
+    - {column: character_id, field: character_id}
+    - {column: last_logout_map, field: last_logout_map, null_to: 0}

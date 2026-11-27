@@ -8,6 +8,8 @@ import stat
 import sys
 from tempfile import NamedTemporaryFile
 
+from PacketStructSchema import parse_struct
+
 try:
     from jinja2 import Environment, FileSystemLoader, StrictUndefined
     import yaml
@@ -186,20 +188,22 @@ def is_link(path):
     return stat.S_ISLNK(info.st_mode) or bool(getattr(info, 'st_file_attributes', 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT)
 
 
-def load_protocol(root):
+def load_protocol(root, namespace):
     files = []
     for path in sorted(root.rglob('*'), key=lambda path: (str(path).casefold(), str(path))):
         if is_link(path):
             raise GenerationError(f'links are not allowed in schema: {path}')
         if path.suffix.lower() in ('.yaml', '.yml') and path.is_file():
             files.append(path)
+    if not files:
+        raise GenerationError(f'no schema files: {root}')
     packets, reserved, groups, names, ids, outputs = [], [], {}, set(), set(), set()
-    sender_names = set()
+    sender_names, struct_names = set(), set()
 
     def register(entry):
         if entry['id'] in ids:
             raise GenerationError(f'duplicate packet id: {entry["id"]}')
-        if entry['name'].casefold() in names:
+        if entry['name'].casefold() in names | struct_names:
             raise GenerationError(f'duplicate packet name: {entry["name"]}')
         ids.add(entry['id'])
         names.add(entry['name'].casefold())
@@ -229,7 +233,16 @@ def load_protocol(root):
         contents[group] = {}
         for output, path in schemas:
             try:
-                document = mapping(yaml.load(path.read_text(encoding='utf-8'), Loader=PacketLoader), ('packets',), ('reserved',))
+                document = yaml.load(path.read_text(encoding='utf-8'), Loader=PacketLoader)
+                if isinstance(document, dict) and 'struct' in document:
+                    struct = parse_struct(document, namespace)
+                    name = struct['name'].casefold()
+                    if name in names | struct_names:
+                        raise GenerationError(f'duplicate struct name: {struct["name"]}')
+                    struct_names.add(name)
+                    contents[group][output] = [struct]
+                    continue
+                document = mapping(document, ('packets',), ('reserved',))
                 local = [parse_packet(value) for value in sequence(document['packets'])]
                 kinds = {packet['kind'] for packet in local}
                 if len(kinds) != len(local):
@@ -251,7 +264,7 @@ def load_protocol(root):
                     sender_names.add(sender_key)
                 packets.extend(local)
                 contents[group][output] = local
-            except (GenerationError, UnicodeError, yaml.YAMLError, RecursionError) as error:
+            except (ValueError, yaml.YAMLError, RecursionError) as error:
                 # YAML 오류 전체를 출력하면 원본 데이터까지 노출될 수 있다.
                 if isinstance(error, yaml.YAMLError):
                     mark = getattr(error, 'problem_mark', None)
@@ -268,14 +281,19 @@ def render_protocol(contents, packets, reserved, namespace, client_class, member
         text = environment.get_template(template).render(namespace=namespace, client_class=client_class, members=members, **values)
         return GENERATED_MARKER + text.encode()
 
-    common = {'PacketTypes.g.h': render('types.j2', packets=sorted(reserved + packets, key=lambda packet: packet['id']))}
-    includes = ['PacketTypes.g.h']
+    structs_only = not (packets or reserved) and bool(contents)
+    common, includes = {}, []
+    if not structs_only:
+        common['PacketTypes.g.h'] = render('types.j2', packets=sorted(reserved + packets, key=lambda packet: packet['id']))
+        includes.append('PacketTypes.g.h')
     for group, headers in contents.items():
         aggregator = f'{group}/{group}PacketAll.g.h'
         includes.append(aggregator)
         common[aggregator] = render('includes.j2', includes=[name.split('/')[1] for name in headers])
         common.update({name: render('structs.j2', packets=local) for name, local in headers.items()})
     common['IncludePacketAll.g.h'] = render('includes.j2', includes=includes)
+    if structs_only:
+        return common, {}, {}
     sides = []
     for side, send_direction in (('Client', 'client_to_server'), ('Server', 'server_to_client')):
         send = [packet for packet in packets if packet['direction'] == send_direction]
@@ -430,14 +448,15 @@ def generate(schema, common, client, server, namespace, client_class, client_mem
         client_members = client_members.resolve()
         if client_members.is_dir() or any(client_members.is_relative_to(root) for root in paths):
             raise GenerationError(f'client members must be outside generation roots: {client_members}')
-    contents, packets, reserved = load_protocol(paths[0])
-    if any(client_class == f"S{packet['name']}" for packet in packets):
+    contents, packets, reserved = load_protocol(paths[0], namespace)
+    if any(client_class == f"S{dto['name']}" for headers in contents.values() for local in headers.values() for dto in local):
         raise GenerationError(f'client class collides with packet DTO: {client_class}')
     outputs = render_protocol(contents, packets, reserved, namespace, client_class,
                               client_members.name if client_members else None)
-    plans = [plan_output(root, role, files) for root, role, files in zip(paths[1:], ('Common', 'Client', 'Server'), outputs)]
+    plans = [plan_output(root, role, files) for root, role, files in zip(paths[1:], ('Common', 'Client', 'Server'), outputs)
+             if files or (root / MANIFEST).exists() or is_link(root / MANIFEST)]
     publish(plans)
-    if client_members is not None and not client_members.exists():
+    if packets and client_members is not None and not client_members.exists():
         create_client_members(client_members)
 
 

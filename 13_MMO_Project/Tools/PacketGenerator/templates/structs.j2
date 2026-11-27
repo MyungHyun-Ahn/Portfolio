@@ -5,13 +5,20 @@ namespace {{ namespace }}
 {% for packet in packets %}
 	struct S{{ packet.name }} final : public MHLib::serialization::ISerializable
 	{
+{% if packet.id is defined %}
 		static constexpr EPacketType kPacketType = EPacketType::{{ packet.name }};
 
+{% endif %}
 {% for field in packet.fields %}
 		{{ field.cpp_type }} {{ field.member }}{};
 {% endfor %}
 
+{% if packet.id is not defined %}
+		[[nodiscard]]
+		bool Serialize(NetworkCommonLib::CSerializableBuffer &buffer) const noexcept override
+{% else %}
 		[[nodiscard]] bool Serialize(NetworkCommonLib::CSerializableBuffer &buffer) const noexcept override
+{% endif %}
 		{
 {% if packet.fields %}
 			buffer
@@ -22,7 +29,12 @@ namespace {{ namespace }}
 			return buffer.IsValid();
 		}
 
+{% if packet.id is not defined %}
+		[[nodiscard]]
+		bool Deserialize(NetworkCommonLib::CSerializableBuffer &buffer) noexcept override
+{% else %}
 		[[nodiscard]] bool Deserialize(NetworkCommonLib::CSerializableBuffer &buffer) noexcept override
+{% endif %}
 		{
 {% if packet.fields %}
 			buffer

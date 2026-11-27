@@ -43,6 +43,51 @@ class GeneratorTests(unittest.TestCase):
     def assert_generated(self, result):
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_standalone_struct_has_no_packet_id_or_side_artifacts(self):
+        self.source.write_text('''struct:
+  name: CharacterData
+  namespace: Game
+  fields:
+    - {name: character_id, type: uint64}
+    - {name: last_logout_map, type: uint32}
+''', encoding='utf-8')
+        self.assert_generated(self.generate(namespace='Game'))
+        dto = (self.common / 'System/Pulse.g.h').read_text(encoding='utf-8')
+        self.assertIn('struct SCharacterData final : public MHLib::serialization::ISerializable', dto)
+        self.assertIn('std::uint64_t m_characterId{};', dto)
+        self.assertIn('std::uint32_t m_lastLogoutMap{};', dto)
+        self.assertNotIn('EPacketType', dto)
+        self.assertFalse((self.common / 'PacketTypes.g.h').exists())
+        self.assertFalse(self.client.exists())
+        self.assertFalse(self.server.exists())
+
+    def test_standalone_struct_namespace_must_match_cli(self):
+        self.source.write_text('''struct:
+  name: CharacterData
+  namespace: Game
+  fields: [{name: character_id, type: uint64}]
+''', encoding='utf-8')
+        result = self.generate(namespace='Different')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('struct namespace', result.stderr)
+        self.assertFalse(self.common.exists())
+
+    def test_removed_only_standalone_schema_does_not_publish_empty_protocol(self):
+        self.source.write_text('''struct:
+  name: CharacterData
+  namespace: Game
+  fields: [{name: character_id, type: uint64}]
+''', encoding='utf-8')
+        self.assert_generated(self.generate(namespace='Game'))
+        before = {p: p.read_bytes() for p in self.common.rglob('*') if p.is_file()}
+        self.source.unlink()
+        result = self.generate(namespace='Game')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('no schema files', result.stderr)
+        self.assertEqual({p: p.read_bytes() for p in self.common.rglob('*') if p.is_file()}, before)
+        self.assertFalse(self.server.exists())
+        self.assertFalse(self.client.exists())
+
     def test_configured_protocol_has_independent_client_and_view_dispatch(self):
         self.assert_generated(self.generate(namespace='World', client_class='WorldClient'))
         client = (self.client / 'WorldClient.g.h').read_text(encoding='utf-8')
@@ -93,7 +138,7 @@ class GeneratorTests(unittest.TestCase):
     def test_bat_creates_handwritten_client_members_for_both_protocols(self):
         tool = self.root / 'Tools/PacketGenerator'
         shutil.copytree(CLI.parent / 'templates', tool / 'templates')
-        for name in ('GeneratePackets.py', 'GeneratePackets.bat'):
+        for name in ('GeneratePackets.py', 'GeneratePackets.bat', 'PacketStructSchema.py'):
             shutil.copyfile(CLI.parent / name, tool / name)
         env = dict(os.environ, PACKET_GENERATOR_PYTHON=sys.executable)
         for protocol, client_class, client_dir in (

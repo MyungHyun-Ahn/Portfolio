@@ -5,6 +5,7 @@ if not "%~2"=="" goto usage
 if "%~1"=="" goto chatting
 if /i "%~1"=="Chatting" goto chatting
 if /i "%~1"=="World" goto world
+if /i "%~1"=="Game" goto game
 goto usage
 
 :chatting
@@ -19,6 +20,13 @@ set "PROTOCOL=World"
 set "PROTOCOL_NAMESPACE=WorldServer"
 set "CLIENT_CLASS=WorldClient"
 set "CLIENT_DIR=Tests\WorldServer"
+goto generate
+
+:game
+set "PROTOCOL=Game"
+set "PROTOCOL_NAMESPACE=Game"
+set "CLIENT_CLASS=GameClient"
+set "CLIENT_DIR=Tests\GameServer"
 
 :generate
 set "PACKET_ROOT=%~dp0..\..\Common\Packet\%PROTOCOL%"
@@ -30,5 +38,5 @@ set "PACKET_ROOT=%~dp0..\..\Common\Packet\%PROTOCOL%"
 exit /b %errorlevel%
 
 :usage
->&2 echo Usage: GeneratePackets.bat [Chatting^|World]
+>&2 echo Usage: GeneratePackets.bat [Chatting^|World^|Game]
 exit /b 2

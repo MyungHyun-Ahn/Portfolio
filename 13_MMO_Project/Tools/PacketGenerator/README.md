@@ -7,7 +7,6 @@
 Windows 명령 프롬프트(`cmd.exe`)에서 `13_MMO_Project` 루트로 이동해 실행한다. 가상환경은 저장소 밖에 만든다.
 
 ```bat
-cd /d C:\MyServer\Portfolio\13_MMO_Project
 python -m venv "%LOCALAPPDATA%\MMO_Project\PacketGenerator"
 set "PACKET_GENERATOR_PYTHON=%LOCALAPPDATA%\MMO_Project\PacketGenerator\Scripts\python.exe"
 "%PACKET_GENERATOR_PYTHON%" -m pip install -r Tools\PacketGenerator\requirements.txt
@@ -16,19 +15,39 @@ call Tools\PacketGenerator\GeneratePackets.bat
 
 초기 설정 이후 같은 터미널에서는 BAT만 다시 실행하면 된다. 새 터미널에서는 `PACKET_GENERATOR_PYTHON`을 다시 설정한다. 변수를 지정하지 않으면 BAT는 `PATH`의 `python`을 사용한다. 실행 환경은 [requirements.txt](requirements.txt)의 PyYAML·Jinja2가 설치된 인터프리터여야 한다.
 
+인수를 생략하면 `Chatting`을 생성한다. `World`는 고정 맵 패킷, `Game`은 현재 [패킷 ID 없는 공개 구조체](#패킷-id-없는-공개-구조체)를 생성한다.
+
 ## 스키마를 바꿀 때
 
-1. [`Common/Packet/Schema`](../../Common/Packet/Schema)에 콘텐츠별로 기능 YAML을 둔다. [로그인 예시](../../Common/Packet/Schema/Chatting/Login.yaml)처럼 `Req`와 `Res`는 쌍으로 정의한다. `Noti`는 [하트비트 예시](../../Common/Packet/Schema/System/Heartbeat.yaml)처럼 단독으로도 정의할 수 있고, `direction`을 지정한다.
+1. `Common/Packet/<프로토콜>/Schema/`에 콘텐츠별로 기능 YAML을 둔다. [채팅 로그인 예시](../../Common/Packet/Chatting/Schema/Chatting/Login.yaml)처럼 `Req`와 `Res`는 쌍으로 정의한다. `Noti`는 [하트비트 예시](../../Common/Packet/Chatting/Schema/System/Heartbeat.yaml)처럼 단독으로도 정의할 수 있고, `direction`을 지정한다.
 2. 실제 패킷의 `id`는 중복되지 않게 명시한다. `fields`의 순서가 전송 순서다. 기본 타입은 `int8`, `int16`, `int32`, `int64`, `uint8`, `uint16`, `uint32`, `uint64`이며, `bytes_fixed`는 `bytes`, `utf16_fixed`는 `code_units`로 고정 길이를 지정한다. 가변 `utf16`은 별도 길이 필드를 선언하지 않는다.
-3. [GeneratePackets.bat](GeneratePackets.bat)를 실행한다. 새 수신 패킷의 `Handle*` 선언이 생기면 수동 클래스에 구현을 추가하고, `Chatting.sln`에서 서버와 클라이언트를 함께 빌드한다. 생성기는 Handle 본문을 쓰지 않는다.
+3. [GeneratePackets.bat](GeneratePackets.bat)에 해당 프로토콜을 지정해 실행한다. 새 수신 패킷의 `Handle*` 선언이 생기면 수동 클래스에 구현을 추가한 뒤 해당 프로젝트를 빌드한다. 생성기는 Handle 본문을 쓰지 않는다.
 
 | 출력 | 내용 |
 |---|---|
-| [`Common/Packet/Struct`](../../Common/Packet/Struct) | 공용 패킷 ID, 구조체와 직렬화, include 집계 헤더 |
-| [`Client/Generated/PacketHandler`](../../Tests/Chatting/Client/Generated/PacketHandler) | `CChatNetClient`, 송신 빌더, 수신 디스패처, Handle 선언 |
-| [`Server/Generated/PacketHandler`](../../Tests/Chatting/Server/Generated/PacketHandler) | `CServerPacketSender`, 송신 빌더, 수신 디스패처, Handle 선언 |
+| `Generated/Common/` | 공용 구조체·직렬화·집계 헤더, 패킷이 있으면 ID 목록 |
+| `Generated/Client/` | 클라이언트 송신 빌더, 수신 디스패처, Handle 선언 |
+| `Generated/Server/` | 서버 송신 빌더, 수신 디스패처, Handle 선언 |
+
+위 경로는 `Common/Packet/<프로토콜>/` 기준이다. 프로토콜에 패킷이 없으면 송수신 코드는 생성하지 않는다.
 
 `.g.h`, `.g.cpp`, `.packet-generator.json`은 함께 관리하고 손으로 편집하지 않는다. 내용이 같으면 다시 쓰지 않는다. 스키마가 바뀌면 일반 빌드가 생성물을 자동으로 갱신하지 않으므로 BAT를 먼저 실행한다.
+
+## 패킷 ID 없는 공개 구조체
+
+```bat
+call Tools\PacketGenerator\GeneratePackets.bat Game
+```
+
+[공개 캐릭터 YAML](../../Common/Packet/Game/Schema/Player/CharacterData.yaml)의 `struct`에서 [`Game::SCharacterData`](../../Common/Packet/Game/Generated/Common/Player/CharacterData.g.h)와 공용 집계 헤더를 생성한다. `struct`에는 `name`, `namespace`, 순서가 있는 정수 `fields`만 선언한다. 현재 `Game`에는 패킷 정의가 없어 ID 목록, 양쪽 송수신 코드, 클라이언트 `.inc` 뼈대가 나오지 않는다.
+
+```mermaid
+flowchart LR
+    A[캐릭터 공개 YAML] --> B[GeneratePackets.bat Game]
+    B --> C[공용 SCharacterData와 집계 헤더]
+```
+
+이 명령은 DB 헤더를 읽거나 생성하지 않는다. 서버에서 `SDbCharacter`의 값을 옮기는 함수는 [DBGenerator 사용법](../DBGenerator/README.md#공개-값-변환-생성)을 따른다. `SCharacterData`를 `ResLogin`에 넣어 송수신하는 단계는 아직 구현하지 않았다.
 
 ## 생성된 송신 함수
 
