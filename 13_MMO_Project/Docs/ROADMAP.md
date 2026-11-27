@@ -15,7 +15,7 @@
 
 - [x] [공개 값 변환 자동 생성](Plan/Server/015_캐릭터_저장_구조와_DBGenerator_계획.md#구현-순서와-완료-기준): `SCharacterData`와 `ToCharacterData`를 생성·검증했다. 저장 헤더는 `IncludeDbAll.h`, 변환 함수는 `DbPacketConversions.h`로 구분했다. [생성·사용 방법](../Tools/DBGenerator/README.md#공개-값-변환-생성)을 참고한다.
 
-1. [ ] [공개 패킷 왕복·로그인](Plan/Server/014_월드_이동과_초기_동기화.md#로그인db-연동-구현-순서): `ToCharacterData`의 결과를 `ResLogin`에 담아 왕복한 뒤 시험에서 `ReqLogin → CCharacter 생성 → ResLogin`을 확인한다. 실제 인증·DB는 연결하지 않는다.
+1. [ ] [게임 로그인](Plan/Common/002_게임_로그인_계획.md): `EResultCode`와 `ReqLogin`·`ResLogin` 계약을 먼저 생성·검증한다. 그다음 서버 응답과 UE 로그인 씬을 연결해 숫자 아이디로 성공 응답을 받으면 게임 화면으로 전환되는지 확인한다. 실제 인증·DB·서버 맵 입장은 별도다.
 2. [ ] [한 맵에서 스폰과 이동](Plan/Server/013_맵_콘텐츠와_마을_이동_계획.md): 고정 맵 하나에서 소켓 없이 데이터 기반 스폰과 20 Hz 이동을 확인한다.
 3. [ ] 첫 마을 배정과 예약·인계를 확인한 뒤, 빈 마을 회수를 별도로 검증한다.
 4. [ ] [콘솔 더미 루프백](Plan/Client/001_OOP_기반_플레이어_이동_동기화_계획.md#구현-순서와-완료-기준): 더미 2개와 2개보다 큰 설정으로 입장·이동·퇴장을 확인한다.
