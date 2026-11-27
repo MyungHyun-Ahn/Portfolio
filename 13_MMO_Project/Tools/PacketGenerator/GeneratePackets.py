@@ -124,7 +124,7 @@ def integer(value, minimum, maximum):
     return type(value) is int and minimum <= value <= maximum
 
 
-def parse_field(value):
+def parse_field(value, struct_headers):
     value = mapping(value, ('name', 'type'), ('bytes', 'code_units'))
     name, field_type = value['name'], value['type']
     if not isinstance(name, str) or not FIELD_NAME.fullmatch(name) or len(name) > 80:
@@ -146,12 +146,15 @@ def parse_field(value):
             cpp_type = INTEGER_TYPES[field_type]
         elif field_type == 'utf16':
             cpp_type = 'std::wstring'
+        elif field_type in struct_headers:
+            return dict(member=member, cpp_type=f'S{field_type}', copy_by_ref=True,
+                        field_type=field_type, struct_header=struct_headers[field_type])
         else:
             raise GenerationError(f'unsupported type: {field_type!r}')
     return dict(member=member, cpp_type=cpp_type, copy_by_ref=field_type not in INTEGER_TYPES, field_type=field_type)
 
 
-def parse_packet(value):
+def parse_packet(value, struct_headers):
     value = mapping(value, ('name', 'id', 'kind', 'fields'), ('direction',))
     name, packet_id, kind = value['name'], value['id'], value['kind']
     check_packet_name(name, 'packet name')
@@ -167,7 +170,7 @@ def parse_packet(value):
     else:
         mapping(value, ('name', 'id', 'kind', 'fields'))
         direction = DIRECTIONS[kind]
-    fields = [parse_field(field) for field in sequence(value['fields'])]
+    fields = [parse_field(field, struct_headers) for field in sequence(value['fields'])]
     if len({field['member'] for field in fields}) != len(fields):
         raise GenerationError(f'{name}: duplicate field')
     set_send_parameters(fields)
@@ -198,7 +201,7 @@ def load_protocol(root, namespace):
     if not files:
         raise GenerationError(f'no schema files: {root}')
     packets, reserved, groups, names, ids, outputs = [], [], {}, set(), set(), set()
-    sender_names, struct_names = set(), set()
+    sender_names, struct_names, struct_headers = set(), set(), {}
 
     def register(entry):
         if entry['id'] in ids:
@@ -228,7 +231,7 @@ def load_protocol(root, namespace):
         outputs.add(output.casefold())
         groups[group].append((output, path))
 
-    contents = {}
+    contents, packet_sources = {}, []
     for group, schemas in groups.items():
         contents[group] = {}
         for output, path in schemas:
@@ -237,39 +240,48 @@ def load_protocol(root, namespace):
                 if isinstance(document, dict) and 'struct' in document:
                     struct = parse_struct(document, namespace)
                     name = struct['name'].casefold()
-                    if name in names | struct_names:
+                    if name in struct_names:
                         raise GenerationError(f'duplicate struct name: {struct["name"]}')
                     struct_names.add(name)
+                    struct_headers[struct['name']] = output
                     contents[group][output] = [struct]
-                    continue
-                document = mapping(document, ('packets',), ('reserved',))
-                local = [parse_packet(value) for value in sequence(document['packets'])]
-                kinds = {packet['kind'] for packet in local}
-                if len(kinds) != len(local):
-                    raise GenerationError('duplicate kind')
-                if kinds not in ({'noti'}, {'req', 'res'}, {'req', 'res', 'noti'}):
-                    raise GenerationError('req and res must appear together, or use a standalone noti')
-                for value in sequence(document.get('reserved', [])):
-                    value = mapping(value, ('name', 'id'))
-                    check_packet_name(value['name'], 'reserved packet name')
-                    if not integer(value['id'], 0, 0):
-                        raise GenerationError('reserved packet id must be 0')
-                    register(value)
-                    reserved.append(value)
-                for packet in local:
-                    register(packet)
-                    sender_key = (packet['direction'], packet['send_name'].casefold())
-                    if sender_key in sender_names:
-                        raise GenerationError(f'duplicate sender name: {packet["send_name"]}')
-                    sender_names.add(sender_key)
-                packets.extend(local)
-                contents[group][output] = local
+                else:
+                    contents[group][output] = []
+                    packet_sources.append((group, output, path, document))
             except (ValueError, yaml.YAMLError, RecursionError) as error:
                 # YAML 오류 전체를 출력하면 원본 데이터까지 노출될 수 있다.
                 if isinstance(error, yaml.YAMLError):
                     mark = getattr(error, 'problem_mark', None)
                     error = f'invalid YAML (line {mark.line + 1})' if mark else 'invalid YAML'
                 raise GenerationError(f'{path}: {error}') from None
+
+    # 구조체를 먼저 등록해 YAML 파일의 순서나 콘텐츠 위치에 의존하지 않게 한다.
+    for group, output, path, document in packet_sources:
+        try:
+            document = mapping(document, ('packets',), ('reserved',))
+            local = [parse_packet(value, struct_headers) for value in sequence(document['packets'])]
+            kinds = {packet['kind'] for packet in local}
+            if len(kinds) != len(local):
+                raise GenerationError('duplicate kind')
+            if kinds not in ({'noti'}, {'req', 'res'}, {'req', 'res', 'noti'}):
+                raise GenerationError('req and res must appear together, or use a standalone noti')
+            for value in sequence(document.get('reserved', [])):
+                value = mapping(value, ('name', 'id'))
+                check_packet_name(value['name'], 'reserved packet name')
+                if not integer(value['id'], 0, 0):
+                    raise GenerationError('reserved packet id must be 0')
+                register(value)
+                reserved.append(value)
+            for packet in local:
+                register(packet)
+                sender_key = (packet['direction'], packet['send_name'].casefold())
+                if sender_key in sender_names:
+                    raise GenerationError(f'duplicate sender name: {packet["send_name"]}')
+                sender_names.add(sender_key)
+            packets.extend(local)
+            contents[group][output] = local
+        except GenerationError as error:
+            raise GenerationError(f'{path}: {error}') from None
     return contents, packets, reserved
 
 
@@ -289,7 +301,11 @@ def render_protocol(contents, packets, reserved, namespace, client_class, member
     for group, headers in contents.items():
         aggregator = f'{group}/{group}PacketAll.g.h'
         includes.append(aggregator)
-        common[aggregator] = render('includes.j2', includes=[name.split('/')[1] for name in headers])
+        dependencies = [field['struct_header'] for local in headers.values() for dto in local
+                        for field in dto['fields'] if 'struct_header' in field]
+        ordered = dict.fromkeys([*dependencies, *headers])
+        local_includes = [name.split('/')[1] if name.startswith(f'{group}/') else f'../{name}' for name in ordered]
+        common[aggregator] = render('includes.j2', includes=local_includes)
         common.update({name: render('structs.j2', packets=local) for name, local in headers.items()})
     common['IncludePacketAll.g.h'] = render('includes.j2', includes=includes)
     if structs_only:
@@ -299,8 +315,9 @@ def render_protocol(contents, packets, reserved, namespace, client_class, member
         send = [packet for packet in packets if packet['direction'] == send_direction]
         receive = [packet for packet in packets if packet['direction'] != send_direction]
         send_stem = client_class if side == 'Client' else 'ServerPacketSend'
+        struct_types = dict.fromkeys(field['cpp_type'] for packet in send for field in packet['fields'] if 'struct_header' in field)
         sides.append({f'{send_stem}.g.{ext}': render(f'send_{ext}.j2', side=side, packets=send,
-                                                   receive=receive, send_stem=send_stem)
+                                                   receive=receive, send_stem=send_stem, struct_types=struct_types)
                       for ext in ('h', 'cpp')} |
                      {f'{side}PacketDispatch.g.{ext}': render(f'dispatch_{ext}.j2', side=side, packets=receive,
                                                                table_size=max((p['id'] for p in receive), default=0) + 1)

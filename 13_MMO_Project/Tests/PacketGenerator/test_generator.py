@@ -19,6 +19,19 @@ NOTI = '''packets:
     fields:
       - {name: account_no, type: int64}
 '''
+NESTED_LOGIN = '''packets:
+  - name: ReqLogin
+    kind: req
+    id: 1
+    fields: [{name: login_id, type: utf16}]
+  - name: ResLogin
+    kind: res
+    id: 2
+    fields:
+      - {name: result, type: uint8}
+      - {name: character_data, type: CharacterData}
+      - {name: suffix, type: uint16}
+'''
 
 
 class GeneratorTests(unittest.TestCase):
@@ -41,7 +54,7 @@ class GeneratorTests(unittest.TestCase):
         ], cwd=self.root, capture_output=True, text=True, encoding='utf-8')
 
     def assert_generated(self, result):
-        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_standalone_struct_has_no_packet_id_or_side_artifacts(self):
         self.source.write_text('''struct:
@@ -71,6 +84,59 @@ class GeneratorTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('struct namespace', result.stderr)
         self.assertFalse(self.common.exists())
+
+    def generate_nested_login(self):
+        character = self.schema / 'Player/CharacterData.yaml'
+        character.parent.mkdir()
+        shutil.copyfile(ROOT / 'Common/Packet/Game/Schema/Player/CharacterData.yaml', character)
+        login = self.schema / 'Login/Login.yaml'
+        login.parent.mkdir()
+        login.write_text(NESTED_LOGIN, encoding='utf-8')
+        self.assert_generated(self.generate(namespace='Game', client_class='GameClient'))
+
+    def test_packet_nests_registered_value_from_another_group(self):
+        self.generate_nested_login()
+        header = (self.common / 'Login/Login.g.h').read_text(encoding='utf-8')
+        self.assertIn('SCharacterData m_characterData{};', header)
+        self.assertNotIn('#include', header)
+        self.assertRegex(header, r'view >> m_result;\s*if \(!view.IsValid\(\) \|\| !m_characterData.Deserialize\(view\)\)')
+        aggregate = (self.common / 'Login/LoginPacketAll.g.h').read_text(encoding='utf-8')
+        self.assertLess(aggregate.index('"../Player/CharacterData.g.h"'), aggregate.index('"Login.g.h"'))
+        self.assertNotIn('CharacterData', (self.common / 'PacketTypes.g.h').read_text(encoding='utf-8'))
+        sender = (self.server / 'ServerPacketSend.g.h').read_text(encoding='utf-8')
+        self.assertIn('struct SCharacterData;', sender)
+        self.assertIn('const SCharacterData &characterData', sender)
+
+    @unittest.skipUnless(os.name == 'nt' and os.environ.get('PACKET_GENERATOR_NATIVE_TESTS') == '1',
+                         'requires x64 Native Tools and the Release NetworkCommonLib archive')
+    def test_nested_login_native_round_trip(self):
+        self.generate_nested_login()
+        library = ROOT / 'Build/Common/Release/NetworkCommonLib/NetworkCommonLib.lib'
+        self.assertTrue(library.is_file(), f'build x64 Release NetworkCommonLib first: {library}')
+        includes = [ROOT / 'Server/GameServer', ROOT / 'Server/MHLib/includes', ROOT / 'Common/NetworkCommon',
+                    self.common, self.client, self.server]
+        compiler = ['cl.exe', '/nologo', '/std:c++20', '/permissive-', '/utf-8', '/W3', '/WX', '/EHsc',
+                    '/MD', '/DNDEBUG', '/DUNICODE', '/D_UNICODE', *(f'/I{path}' for path in includes)]
+        executable = self.root / 'NestedLoginRoundTrip.exe'
+        self.assert_generated(subprocess.run([
+            *compiler, f'/Fe{executable}', str(ROOT / 'Tests/PacketGenerator/NestedLoginRoundTrip.cpp'),
+            str(self.client / 'ClientPacketDispatch.g.cpp'), str(library),
+        ], cwd=self.root, capture_output=True, text=True, errors='replace', check=False))
+        self.assert_generated(subprocess.run([str(executable)], cwd=self.root, capture_output=True, text=True, timeout=30))
+        self.assert_generated(subprocess.run([
+            *compiler, f'/I{ROOT / "Server/NetworkLib"}', '/Zs', str(self.server / 'ServerPacketSend.g.cpp'),
+            str(self.server / 'ServerPacketDispatch.g.cpp'),
+        ], cwd=self.root, capture_output=True, text=True, errors='replace', check=False))
+
+    def test_unregistered_packet_field_type_preserves_outputs(self):
+        self.assert_generated(self.generate(namespace='Game'))
+        before = {p: p.read_bytes() for p in self.root.rglob('*') if p.is_file()}
+        self.source.write_text(NESTED_LOGIN, encoding='utf-8')
+        before[self.source] = self.source.read_bytes()
+        result = self.generate(namespace='Game')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unsupported type: 'CharacterData'", result.stderr)
+        self.assertEqual({p: p.read_bytes() for p in self.root.rglob('*') if p.is_file()}, before)
 
     def test_removed_only_standalone_schema_does_not_publish_empty_protocol(self):
         self.source.write_text('''struct:

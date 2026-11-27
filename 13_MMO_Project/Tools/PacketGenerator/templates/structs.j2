@@ -49,7 +49,18 @@ namespace {{ namespace }}
 		[[nodiscard]]
 		bool Deserialize(NetworkCommonLib::CSerializableBufferView &view) noexcept
 		{
-{% if packet.fields %}
+{% if packet.fields | selectattr('struct_header', 'defined') | list %}
+{% for field in packet.fields %}
+{% if field.struct_header is defined %}
+			if (!view.IsValid() || !{{ field.member }}.Deserialize(view))
+			{
+				return false;
+			}
+{% else %}
+			view >> {{ field.member }};
+{% endif %}
+{% endfor %}
+{% elif packet.fields %}
 			view
 {% for field in packet.fields %}
 				>> {{ field.member }}{{ ';' if loop.last else '' }}{{ '\n' -}}

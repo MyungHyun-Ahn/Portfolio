@@ -6,6 +6,9 @@
 
 namespace {{ namespace }}
 {
+{% for type in struct_types %}
+	struct {{ type }};
+{% endfor %}
 {% for packet in packets %}
 	struct S{{ packet.name }};
 {% endfor %}

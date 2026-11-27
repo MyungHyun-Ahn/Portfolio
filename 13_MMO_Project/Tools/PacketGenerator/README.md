@@ -47,7 +47,29 @@ flowchart LR
     B --> C[공용 SCharacterData와 집계 헤더]
 ```
 
-이 명령은 DB 헤더를 읽거나 생성하지 않는다. 서버에서 `SDbCharacter`의 값을 옮기는 함수는 [DBGenerator 사용법](../DBGenerator/README.md#공개-값-변환-생성)을 따른다. `SCharacterData`를 `ResLogin`에 넣어 송수신하는 단계는 아직 구현하지 않았다.
+이 명령은 DB 헤더를 읽거나 생성하지 않는다. 서버에서 `SDbCharacter`의 값을 옮기는 함수는 [DBGenerator 사용법](../DBGenerator/README.md#공개-값-변환-생성)을 따른다.
+
+### 패킷에 공용 구조체 넣기
+
+패킷의 `fields`에서 같은 프로토콜의 `struct.name`을 `type`으로 참조한다. 예를 들어 `CharacterData`는 아래 선언에서 `SCharacterData` 값 멤버가 된다.
+
+```yaml
+fields:
+  - {name: character_data, type: CharacterData}
+```
+
+집계 헤더가 구조체 정의를 패킷 정의보다 먼저 포함한다. 바이트에는 바깥 패킷 ID만 한 번 쓰고, 중첩 구조체는 선언 순서대로 필드만 쓴다. 수신 버퍼나 `View`에서 중첩 값 읽기에 실패하면 패킷도 실패한다. 패킷에 독립 구조체를 넣는 것만 지원한다. 구조체끼리의 중첩과 다른 프로토콜 타입 참조는 지원하지 않는다.
+
+시험용 `ResLogin` 왕복은 x64 Native Tools 명령 프롬프트에서 x64 Release `NetworkCommonLib.lib`를 빌드한 뒤 실행한다. 시험 패킷은 임시 폴더에만 생성한다.
+
+```bat
+if not defined PACKET_GENERATOR_PYTHON set "PACKET_GENERATOR_PYTHON=python"
+set "PACKET_GENERATOR_NATIVE_TESTS=1"
+"%PACKET_GENERATOR_PYTHON%" -B -m unittest discover -s Tests\PacketGenerator -k nested_login_native_round_trip -v
+set "PACKET_GENERATOR_NATIVE_TESTS="
+```
+
+이 시험은 제품 `ResLogin`의 확정이나 실제 로그인 서버·클라이언트의 연결을 의미하지 않는다.
 
 ## 생성된 송신 함수
 
