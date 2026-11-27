@@ -4,12 +4,22 @@
 
 - 1차부터 계정 데이터는 `AccountDB`, 캐릭터 등 게임 저장 데이터는 `GameDB`로 구분한다. 처음에는 **같은 MySQL 인스턴스에서 두 스키마로 분리**하고, 인스턴스를 따로 운영하지 않는다.
 - 캐릭터의 영속 데이터는 **MySQL 관계형 테이블**에 저장한다. 첫 생성 대상은 `GameDB`의 캐릭터 테이블 하나다. `AccountDB`의 폴더·스키마 경계는 먼저 잡고, 계정 테이블 정의와 인증 연동은 별도 단계로 둔다. 캐릭터 전체를 담는 JSON 컬럼은 만들지 않는다. 이후 같이 읽고 저장하는 상태에 JSON이 필요하면 해당 기능에서 따로 검토한다.
-- **YAML을 저장 스키마의 편집 원본**으로 둔다. `DBGenerator`는 같은 YAML에서 서버용 `SDbCharacter`와 검토 가능한 MySQL DDL 파일을 생성한다. 실제 DB와 비교해 패치 파일을 만드는 기능은 아래 두 모드로 나눈다. DB 간 비교는 YAML 원본을 바꾸거나 C++ 구조체를 역생성하지 않는다. YAML에는 스키마만 정의한다. 캐릭터 레코드, 접속 정보, 비밀번호는 넣지 않는다. Excel 기반 정적 게임 데이터와 패킷 YAML은 기존 생성 경로를 유지한다.
+- **저장 스키마와 패킷의 편집 원본은 각각의 YAML**로 둔다. 1차 마일스톤은 `DBGenerator`로 서버용 `SDbCharacter` 헤더를 생성하고 컴파일하는 데까지다. 2차에 `PacketGenerator`로 공개 타입과 패킷을 생성하고, `DBGenerator`는 두 YAML을 읽어서 서버용 값 변환 함수만 추가 생성한다. 초기 MySQL DDL 생성·적용과 실제 DB 연동은 4차다. DB 비교는 YAML을 수정하거나 C++ 구조체를 역생성하지 않는다. YAML에는 캐릭터 레코드, 접속 정보, 비밀번호를 넣지 않는다. Excel 기반 정적 게임 데이터의 생성 경로는 그대로 유지한다.
 - 이 문서는 설계와 완료 기준이다. `main`에는 아직 DB 생성기, 캐릭터 DB 스키마, 운영 DB 연결이 없다. YAML 키의 정확한 형식, MySQL 대상 버전과 커넥터는 구현 전에 정한다.
 
 ## 디렉터리 배치
 
-`13_MMO_Project/Database/`의 기존 `YamlSchema`, `Generated`, `Sql`을 사용한다. `YamlSchema/{논리DB}/{카테고리}/{파일}.yaml`에서 논리 DB·카테고리·파일명을 그대로 가져와 `Generated/Server/{논리DB}/{카테고리}/{파일}.h`를 생성한다. 논리 DB 이름은 `AccountDB`, `GameDB` 등 최상위 폴더 이름이고, 헤더 안의 C++ 타입 이름은 YAML의 `record` 값으로 정한다. 아래는 1차 배치 예시다.
+`13_MMO_Project/Database/`의 기존 `YamlSchema`, `Generated`, `Sql`을 사용한다. `AccountDB`, `GameDB` 등은 `YamlSchema` 바로 아래의 논리 DB 폴더 이름이다.
+
+### 이름 규칙
+
+| 구분 | 규칙 | 캐릭터 예시 |
+|---|---|---|
+| 저장 스키마 YAML | `YamlSchema/{논리DB}/{카테고리}/{파일}.yaml` | `YamlSchema/GameDB/Player/Character.yaml` |
+| 생성 헤더 | `Generated/Server/{논리DB}/{카테고리}/{파일}.h` — YAML의 논리 DB·카테고리·파일명을 유지하고 확장자만 `.h`로 바꾼다. | `Generated/Server/GameDB/Player/Character.h` |
+| 저장용 C++ 구조체 | `SDb{이름}` — YAML의 `record` 값을 헤더 내부의 타입 이름으로 사용한다. | `record: SDbCharacter` → `struct SDbCharacter` |
+
+`SDb` 접두사는 **구조체 이름**에 붙이며, 생성 헤더의 파일명을 `SDbCharacter.h`로 바꾸지 않는다. 아래는 1차 배치 예시다.
 
 ```text
 Database/
@@ -52,14 +62,35 @@ flowchart TD
     V -->|아니오| F[오류 보고 / 산출물 변경 없음]
     V -->|예| G[DBGenerator]
     G --> D[서버용 SDbCharacter]
-    G --> P[오프라인 초기 MySQL DDL 파일]
+    G --> P[4차 오프라인 초기 MySQL DDL 파일]
     P --> R[SQL 검토 및 별도 적용]
     R --> M[공용 MySQL 인스턴스의 GameDB 스키마에 캐릭터 테이블 생성]
     M -->|수기 조회와 결과 매핑| L[SDbCharacter 조회 결과]
     D --> L
     L -->|로그인 성공 시 소유권 이동| C[CCharacter가 저장 데이터 단독 소유]
-    C -->|공개 필드만 값으로 복사| S[SCharacterData]
+    C -->|서버 전용 ToCharacterData로 공개 필드만 복사| S[SCharacterData]
     S --> N[ResLogin]
+```
+
+## 공개 구조체와 변환 함수 생성
+
+- **`PacketGenerator`:** 현행 생성기는 `id`와 `kind`가 있는 패킷만 처리하고 독립 구조체 및 중첩 참조를 지원하지 않는다. 2차에 패킷 YAML에서 패킷 ID가 없는 `SCharacterData`를 별도로 선언하고, `ResLogin`이 이를 값 멤버로 참조하도록 확장한다. 공용 C++ 구조체는 `ISerializable`을 구현한다. 패킷 ID는 `ResLogin`에만 두며, 생성 코드는 중첩 값의 직렬화·역직렬화와 수신 `View` 직접 읽기를 지원하고 읽기 실패를 전파한다. 공용 패킷 헤더는 DB 헤더를 참조하지 않는다.
+- **`DBGenerator`:** 값 변환을 명시적으로 요청한 경우에만 저장 YAML과 `SCharacterData`를 선언한 패킷 YAML을 함께 읽는다. `SDb{이름}` → `S{이름}Data` 규칙은 타입을 짝짓는 데만 사용한다. 저장 YAML의 서버 전용 매핑 선언에서 복사할 원본·대상 필드와 필요한 변환을 지정한다. 두 YAML을 수정하거나 패킷 타입을 다시 생성하지 않는다. 생성하는 것은 `ToCharacterData(const SDbCharacter&)`처럼 원본을 읽어 `SCharacterData`를 값으로 돌려주는 서버 전용 함수뿐이다.
+- **첫 매핑:** `CharacterId`는 같은 타입으로 복사하고 `LastLogoutMap`은 저장값이 없을 때만 `0`으로 변환한다. `AccountId`는 복사하지 않는다. 이름이 같은 필드라도 명시된 매핑 없이는 내보내지 않는다. 선언되지 않은 필드, 빠지거나 중복된 대상 필드, 호환되지 않는 타입이나 미지정 `NULL` 변환은 생성 전에 거절한다. 실제 매핑 키 형식은 2차 작업에서 정한다.
+- **의존 범위:** 1차 헤더 생성과 4차 초기 DDL 생성은 저장 YAML만 읽는다. 2차 변환 함수의 컴파일에만 두 생성 헤더가 필요하다. 성공한 로그인에서 생성된 함수를 호출해 공개 값을 만든 뒤 `ResLogin`에 담고, 저장 객체 자체는 패킷에 넣지 않는다.
+
+```mermaid
+flowchart LR
+    D[저장 YAML] --> H[DBGenerator 헤더 생성]
+    H --> S[서버용 SDbCharacter]
+    P[공개 구조체와 패킷 YAML] --> W[PacketGenerator]
+    W --> T[공용 SCharacterData와 ResLogin]
+    D -->|서버 전용 매핑을 지정한 경우| G[DBGenerator 값 변환 생성]
+    P --> G
+    G --> F[서버용 ToCharacterData]
+    S -->|저장값| F
+    F -->|공개 값만 생성| R[성공 ResLogin에 삽입]
+    T -->|전송 타입| R
 ```
 
 ## YAML 초안
@@ -85,7 +116,7 @@ primary_key: [character_id]
 
 ### 오프라인 초기 생성
 
-- 1차는 DB에 접속하지 않고 **`SDbCharacter`를 선언한 헤더와 `CREATE TABLE`을 담은 `YYMMDD_HHMMSS_DDL.sql`**을 만든다. 한 실행은 논리 DB 하나만 다루고 실제 대상 스키마명을 별도로 명시한다. 초기 DDL에도 `스키마.테이블`을 써서 기본 스키마에 의존하지 않는다. 생성기는 스키마 자체를 생성하지 않는다. 테스트 MySQL 한 인스턴스에 두 스키마를 별도로 준비하고, 검토한 SQL을 `GameDB` 쪽에만 적용한다.
+- 4차에 저장 YAML만 읽어 DB에 접속하지 않고 **`CREATE TABLE`을 담은 `YYMMDD_HHMMSS_DDL.sql`**을 만든다. 한 실행은 논리 DB 하나만 다루고 실제 대상 스키마명을 별도로 명시한다. 초기 DDL에도 `스키마.테이블`을 써서 기본 스키마에 의존하지 않는다. 생성기는 스키마 자체를 생성하지 않는다. 테스트 MySQL 한 인스턴스에 두 스키마를 별도로 준비하고, 검토한 SQL을 `GameDB` 쪽에만 적용한다.
 - 런타임 `SELECT`·`INSERT`·`UPDATE`와 트랜잭션 경계는 직접 작성한다. 파라미터 바인딩과 행 매핑 코드가 반복될 때 해당 코드의 생성을 다시 검토한다.
 
 ### 패치 비교 모드
@@ -123,10 +154,12 @@ MySQL 참고: [CREATE TABLE](https://dev.mysql.com/doc/refman/8.4/en/create-tabl
 
 한 항목을 확인한 뒤 다음으로 넘어간다. 아래 검증은 아직 실행하지 않았다.
 
-1. [ ] **저장 스키마와 초기 생성:** `AccountDB`·`GameDB`로 입력 경로를 나누고, `Database/YamlSchema/GameDB/Player/Character.yaml`에서 `Database/Generated/Server/GameDB/Player/Character.h`와 `Database/Generated/Sql/YYMMDD_HHMMSS_DDL.sql`을 생성한다. 헤더를 컴파일하고, 같은 입력으로 다시 생성하면 SQL 파일명의 시각이 달라도 헤더와 SQL 내용의 바이트가 각각 일치하는지 확인한다. 잘못된 입력이나 SQL 파일명 충돌 시 기존 산출물을 그대로 두고, 정상 생성도 `Database/YamlSchema/`와 `Database/Sql/`은 바꾸지 않는다. 테스트 MySQL 한 인스턴스에서 검토한 DDL을 적용해, 지정한 게임 스키마에만 `characters`가 생성되고 계정 스키마는 그대로인지 확인한다. 컬럼 타입·`NULL`·기본값·숫자 PK를 대조한다. `NULL` 맵이 있는 행과 정상 맵이 있는 행은 받아야 하고, 중복 PK와 필수 컬럼의 `NULL`은 거절해야 한다.
-2. [ ] **캐릭터 공개 데이터의 패킷 왕복:** 기존 `PacketGenerator`에서 패킷 ID가 없는 `SCharacterData`를 정의하고 `ResLogin`에 값으로 넣는다. 정상 값과 저장 맵 없음(`0`)의 직렬화·역직렬화 결과가 일치하고, 중첩 필드가 잘린 입력은 거절한다. 이 시험은 DB에 접속하지 않는다.
-3. [ ] **로그인 성공 시 소유권 인수:** [첫 게임 서버 로그인](014_월드_이동과_초기_동기화.md#첫-게임-서버-로그인)에 따라 시험에서 준비한 `SDbCharacter` 조회 결과를 Hub가 받아 `CCharacter`를 한 번 생성한다. `CCharacter`가 저장 구조체를 단독 소유한 뒤 공개 필드만 응답으로 전달한다. 중복·실패·단절 뒤 늦은 결과는 객체를 추가 생성하지 않으며 로그인만으로 맵을 예약하지 않는다. 제품 인증 우회는 넣지 않는다.
-4. [ ] **후속 — 실제 MySQL 조회·저장 연동:** 접속 방식·대상 버전·커넥터를 확정한 뒤 검토한 SQL로 테스트 DB의 행을 읽어 위 로그인 경로에 연결한다. 소유 계정과 캐릭터가 일치하지 않거나 결과가 잘못되면 거절한다. 저장은 변경 필드·실패 처리·동일 캐릭터에 대한 쓰기 순서를 정한 뒤 별도 검증한다. 운영 인증·배포, 거래·재화·인벤토리는 초기 생성 작업에 포함하지 않는다.
+1. [ ] **1차 — 저장 구조체 헤더 생성:** `AccountDB`·`GameDB`로 입력 경로를 나눈다. `Database/YamlSchema/GameDB/Player/Character.yaml`에서 `Database/Generated/Server/GameDB/Player/Character.h`를 생성해 C++에서 컴파일한다. 같은 입력이면 헤더 바이트가 같고 잘못된 입력은 기존 산출물을 바꾸지 않아야 한다. 패킷 YAML, DDL 생성·적용, DB 접속은 필요하지 않다.
+2. [ ] **2차 — 캐릭터 공개 데이터의 패킷 왕복:** `SCharacterData`를 별도 선언하고 `ResLogin`에 값으로 담도록 `PacketGenerator`를 확장한다. 독립 구조체에 패킷 ID가 없고, 정상 맵 값과 없음(`0`)이 송신과 수신 `View`에서 일치하며, 중첩 값이 잘린 입력은 거절하는지 확인한다. 기존 채팅·고정 맵 패킷의 생성 결과는 그대로여야 한다. 이 시험은 저장 구조체나 DB에 의존하지 않는다.
+3. [ ] **2차 — 공개 값 변환 함수 생성:** 두 YAML에서 `ToCharacterData`를 생성한다. 정상 맵 값과 `NULL → 0`, `AccountId` 제외를 확인한다. 저장 필드를 추가해도 패킷이나 변환 결과가 자동으로 바뀌지 않아야 한다. 매핑 누락·중복·타입 불일치 또는 `NULL` 규칙 누락은 거절하고 기존 변환 산출물을 보존한다.
+4. [ ] **2차 — 로그인 성공 시 소유권 인수:** [첫 게임 서버 로그인](014_월드_이동과_초기_동기화.md#첫-게임-서버-로그인)에 따라 시험에서 준비한 `SDbCharacter` 조회 결과를 Hub가 받아 `CCharacter`를 한 번 생성한다. `CCharacter`가 저장 구조체를 단독 소유한 뒤 생성한 함수로 만든 공개 값만 응답에 담는다. 중복·실패·단절 뒤 늦은 결과는 객체를 추가 생성하지 않으며 로그인만으로 맵을 예약하지 않는다. 제품 인증 우회는 넣지 않는다.
+5. [ ] **4차 — 초기 DDL 생성·적용:** `Database/Generated/Sql/YYMMDD_HHMMSS_DDL.sql`을 생성한다. 파일명의 시각이 달라도 같은 입력이면 SQL 내용이 같고, 오류 입력이나 파일명 충돌은 기존 산출물을 그대로 둔다. 테스트 MySQL에서 검토한 DDL을 적용해 게임 스키마에만 `characters`가 생기고 계정 스키마가 그대로인지 확인한다. 컬럼 타입·`NULL`·기본값·숫자 PK를 대조한다. `NULL` 맵과 정상 맵은 허용하며 중복 PK와 필수 컬럼의 `NULL`은 거절해야 한다.
+6. [ ] **4차 — 실제 MySQL 조회·저장 연동:** 접속 방식·대상 버전·커넥터를 확정한 뒤 검토한 SQL로 테스트 DB의 행을 읽어 위 로그인 경로에 연결한다. 소유 계정과 캐릭터가 일치하지 않거나 결과가 잘못되면 거절한다. 저장은 변경 필드·실패 처리·동일 캐릭터에 대한 쓰기 순서를 정한 뒤 별도 검증한다. 운영 인증·배포, 거래·재화·인벤토리는 초기 생성 작업에 포함하지 않는다.
 
 **DDL 비교는 오프라인 초기 생성 이후의 별도 작업이다.** 로그인 1차를 막는 선행 조건으로 추가하지 않는다.
 
