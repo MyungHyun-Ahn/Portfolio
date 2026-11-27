@@ -24,7 +24,8 @@ struct SServerNetworkSettings;
 			return InterlockedCompareExchange(&m_sessionCount, 0, 0);
 		}
 
-		void SendPacket(const UINT64 sessionId, CSerializableBuffer *pSBuffer) noexcept;
+		// true는 정상 송신 대상으로 접수했다는 뜻이며, 전송이나 클라이언트 수신 완료는 아니다.
+		bool SendPacket(const UINT64 sessionId, CSerializableBuffer *pSBuffer) noexcept;
 		// 담당 맵의 수신 큐에서 한 건을 꺼내 소유권을 넘긴다.
 		[[nodiscard]]
 		bool TryPopRecvPacket(UINT64 sessionId, RecvPacketPtr &outPacket) noexcept;

@@ -219,7 +219,7 @@ CServer *g_pServer = nullptr;
 		return outPacket != nullptr;
 	}
 
-	void CServer::SendPacket(const UINT64 sessionId, CSerializableBuffer *pSBuffer) noexcept
+	bool CServer::SendPacket(const UINT64 sessionId, CSerializableBuffer *pSBuffer) noexcept
 	{
 		CSession *pSession = m_pSessions[getIndex(sessionId)];
 
@@ -230,7 +230,7 @@ CServer *g_pServer = nullptr;
 			{
 				ReleaseSession(pSession);
 			}
-			return;
+			return false;
 		}
 
 		if (sessionId != pSession->m_sessionId)
@@ -239,10 +239,11 @@ CServer *g_pServer = nullptr;
 			{
 				ReleaseSession(pSession);
 			}
-			return;
+			return false;
 		}
 
-		if (pSession->SendPacket(pSBuffer))
+		const bool isAccepted = pSession->SendPacket(pSBuffer);
+		if (isAccepted)
 			pSession->PostSend();
 		else
 			Disconnect(sessionId);
@@ -251,6 +252,7 @@ CServer *g_pServer = nullptr;
 		{
 			ReleaseSession(pSession);
 		}
+		return isAccepted;
 	}
 
 	BOOL CServer::Disconnect(const UINT64 sessionId, BOOL isPqcs) noexcept
