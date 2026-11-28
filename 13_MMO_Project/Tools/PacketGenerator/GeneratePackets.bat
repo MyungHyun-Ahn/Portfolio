@@ -26,7 +26,7 @@ goto generate
 set "PROTOCOL=Game"
 set "PROTOCOL_NAMESPACE=Game"
 set "CLIENT_CLASS=GameClient"
-set "CLIENT_DIR=Tests\GameServer"
+set "CLIENT_DIR=Client\GameLogin"
 
 :generate
 set "PACKET_ROOT=%~dp0..\..\Common\Packet\%PROTOCOL%"

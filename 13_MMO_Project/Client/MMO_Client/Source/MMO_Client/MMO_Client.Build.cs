@@ -23,7 +23,8 @@ public class MMO_Client : ModuleRules
 			"Slate"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		PrivateDependencyModuleNames.AddRange(new string[] { "SlateCore", "MMOClientNetwork" });
+		RuntimeDependencies.Add("$(ProjectDir)/Content/Slate/Login/AshenGate.png", StagedFileType.UFS);
 
 		PublicIncludePaths.AddRange(new string[] {
 			"MMO_Client",

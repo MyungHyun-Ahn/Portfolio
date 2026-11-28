@@ -1,0 +1,28 @@
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType><PlatformToolset>v145</PlatformToolset><CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <Root>$(ProjectDir)..\..</Root><Generated>$(Root)\Common\Packet\Game\Generated</Generated>
+  </PropertyGroup>
+  <ItemDefinitionGroup><ClCompile>
+    <LanguageStandard>stdcpp20</LanguageStandard><RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+    <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    <AdditionalIncludeDirectories>$(ProjectDir);$(Root)\GameData\Generated\Common;$(Generated)\Client;$(Generated)\Common;$(Root)\Common\NetworkCommon;$(Root)\Client\ClientNetworkLib;$(Root)\Server\MHLib\includes;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    <PrecompiledHeader>Use</PrecompiledHeader><PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+  </ClCompile></ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="pch.cpp"><PrecompiledHeader>Create</PrecompiledHeader></ClCompile>
+    <ClCompile Include="GameClientHandlers.cpp" />
+    <ClCompile Include="$(Generated)\Client\GameClient.g.cpp" />
+    <ClCompile Include="$(Generated)\Client\ClientPacketDispatch.g.cpp" />
+    <ClCompile Include="GameLoginFacade.cpp" /><ClInclude Include="GameLoginFacade.h" />
+    <ClInclude Include="GameLoginId.h" /><ClInclude Include="pch.h" /><None Include="GameClientMembers.inc" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

@@ -12,6 +12,7 @@ if not defined MSBUILD exit /b 1
 call :build NetworkCommonLib Common\NetworkCommon || exit /b 1
 call :build ClientNetworkLib Client\ClientNetworkLib || exit /b 1
 call :build UEChatLogin Client\UEChatLogin || exit /b 1
+call :build GameLogin Client\GameLogin || exit /b 1
 exit /b 0
 :build
 set "OUT=%ROOT%\Build\Unreal\NativeNetwork\%VCVER%"

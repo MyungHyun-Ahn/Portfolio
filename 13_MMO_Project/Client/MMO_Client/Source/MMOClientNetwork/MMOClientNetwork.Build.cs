@@ -20,7 +20,8 @@ public class MMOClientNetwork : ModuleRules
 		PrivateIncludePaths.Add(Path.Combine(Root, "Client/ClientNetworkLib"));
 		PrivateIncludePaths.Add(Path.Combine(Root, "Common/NetworkCommon"));
 		PrivateIncludePaths.Add(Path.Combine(Root, "Client/UEChatLogin"));
-		foreach (string Name in new[] { "UEChatLogin", "ClientNetworkLib", "NetworkCommonLib" })
+		PrivateIncludePaths.Add(Path.Combine(Root, "Client/GameLogin"));
+		foreach (string Name in new[] { "GameLogin", "UEChatLogin", "ClientNetworkLib", "NetworkCommonLib" })
 		{
 			PublicPreBuildLibraries.Add(Path.Combine(Root, "Build/Unreal/NativeNetwork", ToolVersion, Name, Name + ".lib"));
 		}

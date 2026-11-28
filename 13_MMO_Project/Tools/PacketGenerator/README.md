@@ -15,7 +15,7 @@ call Tools\PacketGenerator\GeneratePackets.bat
 
 초기 설정 이후 같은 터미널에서는 BAT만 다시 실행하면 된다. 새 터미널에서는 `PACKET_GENERATOR_PYTHON`을 다시 설정한다. 변수를 지정하지 않으면 BAT는 `PATH`의 `python`을 사용한다. 실행 환경은 [requirements.txt](requirements.txt)의 PyYAML·Jinja2가 설치된 인터프리터여야 한다.
 
-인수를 생략하면 `Chatting`을 생성한다. `World`는 고정 맵 패킷, `Game`은 현재 [패킷 ID 없는 공개 구조체](#패킷-id-없는-공개-구조체)를 생성한다.
+인수를 생략하면 `Chatting`을 생성한다. `World`는 고정 맵 패킷, `Game`은 로그인 패킷과 [패킷 ID 없는 공개 구조체](#패킷-id-없는-공개-구조체)를 생성한다.
 
 ## 스키마를 바꿀 때
 
@@ -39,7 +39,7 @@ call Tools\PacketGenerator\GeneratePackets.bat
 call Tools\PacketGenerator\GeneratePackets.bat Game
 ```
 
-[공개 캐릭터 YAML](../../Common/Packet/Game/Schema/Player/CharacterData.yaml)의 `struct`에서 [`Game::SCharacterData`](../../Common/Packet/Game/Generated/Common/Player/CharacterData.g.h)와 공용 집계 헤더를 생성한다. `struct`에는 `name`, `namespace`, 순서가 있는 정수 `fields`만 선언한다. 현재 `Game`에는 패킷 정의가 없어 ID 목록, 양쪽 송수신 코드, 클라이언트 `.inc` 뼈대가 나오지 않는다.
+[공개 캐릭터 YAML](../../Common/Packet/Game/Schema/Player/CharacterData.yaml)의 `struct`에서 [`Game::SCharacterData`](../../Common/Packet/Game/Generated/Common/Player/CharacterData.g.h)와 공용 집계 헤더를 생성한다. `struct`에는 `name`, `namespace`, 순서가 있는 정수 `fields`만 선언한다. 이 타입 자체는 ID 목록이나 송수신 코드에 등록되지 않는다.
 
 ```mermaid
 flowchart LR
@@ -69,7 +69,11 @@ set "PACKET_GENERATOR_NATIVE_TESTS=1"
 set "PACKET_GENERATOR_NATIVE_TESTS="
 ```
 
-이 시험은 제품 `ResLogin`의 확정이나 실제 로그인 서버·클라이언트의 연결을 의미하지 않는다.
+`-k game_login_packet_native_round_trip`으로 작성된 게임 로그인 계약 자체도 검증할 수 있다. 이 시험은 실제 로그인 서버·클라이언트 연결을 의미하지 않는다.
+
+### GameData enum 참조
+
+`EResultCode`는 [GameDataGenerator](../GameDataGenerator/README.md#enum)로 `Enum.xlsx`에서 먼저 생성한다. 패킷 YAML은 `{name: result, type: 'enum:EResultCode', wire: uint8}`처럼 타입만 참조한다. 생성 집계 헤더가 `GameDataEnums.h`를 읽도록 소비 프로젝트의 추가 포함 경로에 `GameData/Generated/Common`을 지정한다. C++ enum은 기존 `uint32` 기반 타입이고, 이 패킷의 전송 결과 필드는 1바이트다.
 
 ## 생성된 송신 함수
 

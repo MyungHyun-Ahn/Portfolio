@@ -1,2 +1,4 @@
 Type,Name,Value
+EResultCode,Success,0
+EResultCode,Rejected,1
 MapType,Town,1

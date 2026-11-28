@@ -1,4 +1,22 @@
 #pragma once
+{% macro undefined_enum(field, value, indent) -%}
+{% for name in field.enum_values -%}
+{{ value }} != {{ field.cpp_type }}::{{ name }}{{ (' &&\n' + indent) if not loop.last else '' }}
+{%- endfor %}
+{%- endmacro %}
+{% macro decode_enum(field, input) %}
+			{
+				std::uint8_t value{};
+				{{ input }} >> value;
+				const auto decoded = static_cast<{{ field.cpp_type }}>(value);
+				if (!{{ input }}.IsValid() ||
+					({{ undefined_enum(field, 'decoded', '					 ') }}))
+				{
+					return false;
+				}
+				{{ field.member }} = decoded;
+			}
+{% endmacro %}
 
 namespace {{ namespace }}
 {
@@ -10,6 +28,11 @@ namespace {{ namespace }}
 
 {% endif %}
 {% for field in packet.fields %}
+{% if field.enum_name is defined %}
+{% for name, code in field.enum_values.items() %}
+		static_assert(static_cast<std::uint32_t>({{ field.cpp_type }}::{{ name }}) == {{ code }}u);
+{% endfor %}
+{% endif %}
 		{{ field.cpp_type }} {{ field.member }}{};
 {% endfor %}
 
@@ -21,9 +44,15 @@ namespace {{ namespace }}
 {% endif %}
 		{
 {% if packet.fields %}
+{% for field in packet.fields if field.enum_name is defined %}
+			if ({{ undefined_enum(field, field.member, '				') }})
+			{
+				return false;
+			}
+{% endfor %}
 			buffer
 {% for field in packet.fields %}
-				<< {{ field.member }}{{ ';' if loop.last else '' }}{{ '\n' -}}
+				<< {{ 'static_cast<std::uint8_t>(' + field.member + ')' if field.enum_name is defined else field.member }}{{ ';' if loop.last else '' }}{{ '\n' -}}
 {% endfor %}
 {% endif %}
 			return buffer.IsValid();
@@ -36,7 +65,15 @@ namespace {{ namespace }}
 		[[nodiscard]] bool Deserialize(NetworkCommonLib::CSerializableBuffer &buffer) noexcept override
 {% endif %}
 		{
-{% if packet.fields %}
+{% if packet.fields | selectattr('enum_name', 'defined') | list %}
+{% for field in packet.fields %}
+{% if field.enum_name is defined %}
+{{ decode_enum(field, 'buffer') -}}
+{% else %}
+			buffer >> {{ field.member }};
+{% endif %}
+{% endfor %}
+{% elif packet.fields %}
 			buffer
 {% for field in packet.fields %}
 				>> {{ field.member }}{{ ';' if loop.last else '' }}{{ '\n' -}}
@@ -49,9 +86,12 @@ namespace {{ namespace }}
 		[[nodiscard]]
 		bool Deserialize(NetworkCommonLib::CSerializableBufferView &view) noexcept
 		{
-{% if packet.fields | selectattr('struct_header', 'defined') | list %}
+{% if (packet.fields | selectattr('struct_header', 'defined') | list) or
+      (packet.fields | selectattr('enum_name', 'defined') | list) %}
 {% for field in packet.fields %}
-{% if field.struct_header is defined %}
+{% if field.enum_name is defined %}
+{{ decode_enum(field, 'view') -}}
+{% elif field.struct_header is defined %}
 			if (!view.IsValid() || !{{ field.member }}.Deserialize(view))
 			{
 				return false;
