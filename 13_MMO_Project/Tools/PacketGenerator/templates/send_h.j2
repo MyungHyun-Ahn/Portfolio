@@ -56,7 +56,7 @@ namespace {{ namespace }}
 	{
 	public:
 {% if side == 'Server' %}
-		// 버퍼가 있으면 송신을 요청한다. 접수나 전송 완료는 보장하지 않는다.
+		// 버퍼 준비가 실패하면 false, 그 외에는 송신 훅의 큐 접수 결과를 반환한다.
 		bool SendPacket(UINT64 sessionId, const ServerNetworkLib::SendPacketPtr &spPacket) noexcept;
 
 {% endif %}
@@ -93,7 +93,7 @@ namespace {{ namespace }}
 		virtual ~C{{ side }}PacketSender() = default;
 
 	private:
-		virtual void sendPacket(UINT64 sessionId, NetworkCommonLib::CSerializableBuffer &packet) noexcept = 0;
+		virtual bool sendPacket(UINT64 sessionId, NetworkCommonLib::CSerializableBuffer &packet) noexcept = 0;
 {% endif %}
 	};
 }

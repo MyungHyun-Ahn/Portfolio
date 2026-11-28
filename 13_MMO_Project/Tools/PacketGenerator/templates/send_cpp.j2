@@ -54,8 +54,7 @@ namespace {{ namespace }}
 		auto *pPacket = spPacket.GetRealPtr();
 		if (pPacket == nullptr)
 			return false;
-		sendPacket(sessionId, *pPacket);
-		return true;
+		return sendPacket(sessionId, *pPacket);
 	}
 {% endif %}
 {% for packet in packets %}
